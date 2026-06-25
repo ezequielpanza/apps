@@ -49,13 +49,13 @@
     });
     if (!button || !mode) return;
     button.classList.add('is-active');
-    button.dataset.speed = mode.label;
+    button.dataset.speed = mode.speedLabel;
     button.setAttribute('aria-pressed', 'true');
   }
 
   function updateUi() {
     const mode = modes[modeIndex];
-    if (status) status.textContent = `${mode.label} hacia ${directionLabels[activeDirection]}`;
+    if (status) status.textContent = `Moviendo hacia ${directionLabels[activeDirection]} · ${mode.label} · ${mode.speedLabel}`;
     if (modeMetric) modeMetric.textContent = mode.label;
     if (speedMetric) speedMetric.textContent = mode.speedLabel;
     setButtonState(activeButton, mode);
@@ -72,7 +72,7 @@
     const longitudeDelta = (meters * eastFactor) / (111320 * longitudeScale);
     const next = L.latLng(point.lat + latitudeDelta, point.lng + longitudeDelta);
 
-    if (typeof setPosition === 'function') setPosition(next, `Movimiento simulado · ${mode.label}`);
+    if (typeof setPosition === 'function') setPosition(next, `Movimiento simulado · ${mode.label} · ${mode.speedLabel}`);
     else {
       marker.setLatLng(next);
       map.panTo(next, { animate: false });
@@ -108,7 +108,7 @@
     activeButton = null;
     modeIndex = 0;
     setButtonState(null, null);
-    if (status) status.textContent = 'Movimiento detenido';
+    if (status) status.textContent = 'Movimiento detenido · 0 km/h';
     if (modeMetric) modeMetric.textContent = 'Detenido';
     if (speedMetric) speedMetric.textContent = '0 km/h';
   }
