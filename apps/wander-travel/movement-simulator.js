@@ -1,9 +1,15 @@
 (() => {
+  const APP_VERSION = 'v0.9.1';
+  const versionBadge = document.querySelector('.app-version');
+  if (versionBadge) versionBadge.textContent = APP_VERSION;
+  document.title = `Wander Travel ${APP_VERSION}`;
+
   const buttons = [...document.querySelectorAll('[data-move]')];
   const stopButton = document.querySelector('[data-stop-move]');
   const status = document.querySelector('#simulator-status');
   const modeMetric = document.querySelector('.status-rail .metric:nth-child(1) strong');
   const speedMetric = document.querySelector('.status-rail .metric:nth-child(2) strong');
+  const locateButton = document.querySelector('#locate-button');
 
   if (!buttons.length || !stopButton || typeof marker === 'undefined' || typeof map === 'undefined') return;
 
@@ -40,6 +46,7 @@
   let activeDirection = null;
   let modeIndex = 0;
   let activeButton = null;
+  let followCursor = true;
 
   function setButtonState(button, mode) {
     buttons.forEach((item) => {
@@ -55,10 +62,37 @@
 
   function updateUi() {
     const mode = modes[modeIndex];
-    if (status) status.textContent = `Moviendo hacia ${directionLabels[activeDirection]} · ${mode.label} · ${mode.speedLabel}`;
+    if (status) {
+      const viewState = followCursor ? '' : ' · Vista libre';
+      status.textContent = `Moviendo hacia ${directionLabels[activeDirection]} · ${mode.label} · ${mode.speedLabel}${viewState}`;
+    }
     if (modeMetric) modeMetric.textContent = mode.label;
     if (speedMetric) speedMetric.textContent = mode.speedLabel;
     setButtonState(activeButton, mode);
+  }
+
+  function updatePositionWithoutForcedCenter(next, mode) {
+    marker.setLatLng(next);
+
+    const readout = document.querySelector('#location-readout');
+    if (readout) {
+      const strong = readout.querySelector('strong');
+      const small = readout.querySelector('small');
+      if (strong) strong.textContent = `${next.lat.toFixed(5)}, ${next.lng.toFixed(5)}`;
+      if (small) small.textContent = `Movimiento simulado · ${mode.label} · ${mode.speedLabel}`;
+    }
+
+    try {
+      if (typeof tracking !== 'undefined' && tracking) {
+        points.push([next.lat, next.lng]);
+        route.setLatLngs(points);
+        if (typeof updateTrack === 'function') updateTrack();
+      }
+    } catch (_) {
+      // El simulador puede funcionar aunque el registro de ruta no este disponible.
+    }
+
+    if (followCursor) map.panTo(next, { animate: false });
   }
 
   function moveOneTick() {
@@ -72,11 +106,7 @@
     const longitudeDelta = (meters * eastFactor) / (111320 * longitudeScale);
     const next = L.latLng(point.lat + latitudeDelta, point.lng + longitudeDelta);
 
-    if (typeof setPosition === 'function') setPosition(next, `Movimiento simulado · ${mode.label} · ${mode.speedLabel}`);
-    else {
-      marker.setLatLng(next);
-      map.panTo(next, { animate: false });
-    }
+    updatePositionWithoutForcedCenter(next, mode);
   }
 
   function restartTimer() {
@@ -89,11 +119,10 @@
     if (!directions[direction]) return;
 
     if (activeDirection === direction && timer) {
-      modeIndex = (modeIndex + 1) % modes.length;
+      modeIndex = Math.min(modeIndex + 1, modes.length - 1);
     } else {
       activeDirection = direction;
       activeButton = button;
-      modeIndex = 0;
     }
 
     updateUi();
@@ -112,6 +141,16 @@
     if (modeMetric) modeMetric.textContent = 'Detenido';
     if (speedMetric) speedMetric.textContent = '0 km/h';
   }
+
+  map.on('dragstart', () => {
+    followCursor = false;
+    if (activeDirection) updateUi();
+  });
+
+  locateButton?.addEventListener('click', () => {
+    followCursor = true;
+    if (activeDirection) updateUi();
+  }, true);
 
   buttons.forEach((button) => {
     button.setAttribute('aria-pressed', 'false');
