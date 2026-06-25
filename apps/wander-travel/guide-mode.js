@@ -141,17 +141,19 @@
       const key = topicKey(place, pois, point);
       if (!force && memory.topics.includes(key)) return;
 
+      const selectedInterests = interests();
       const response = await fetch('/api/assistant', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          message: 'Actuá como guía de turismo. Decidí si hay algo realmente interesante para contar ahora sobre el lugar, su historia, la ciudad, el paisaje o los puntos cercanos. Priorizá los intereses del usuario. No repitas temas ya contados. Si no hay suficiente información verificable o no vale la pena interrumpir, respondé exactamente SILENCIO.',
+          message: 'Actuá como guía de turismo. Los intereses enviados son gustos confirmados del usuario y debés hablar como alguien que ya los conoce. Si recomendás algo relacionado, decí por ejemplo: Como te gustan los museos, te propongo este lugar; o Como te interesa la historia, te cuento esto. No uses frases condicionales como si te interesan los museos cuando museos ya figura entre sus intereses. Escribí texto limpio y natural, pensado para ser leído en voz alta, sin Markdown, asteriscos, listas, títulos ni enlaces. No repitas temas ya contados. Si no hay suficiente información verificable o no vale la pena interrumpir, respondé exactamente SILENCIO.',
           context: {
             mode: 'tour_guide',
             location: { lat: point.lat, lng: point.lng },
             place,
             nearby_pois: pois,
-            interests: interests(),
+            interests: selectedInterests,
+            interests_are_confirmed_preferences: true,
             movement: {
               mode: document.querySelector('.status-rail .metric:nth-child(1) strong')?.textContent || null,
               speed: document.querySelector('.status-rail .metric:nth-child(2) strong')?.textContent || null,
