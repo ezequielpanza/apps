@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.12.6';
+  const VERSION = 'v0.13.0';
   const STORAGE_KEY = 'wander-travel-settings';
   const defaults = {
     trackRouteByDefault: true,
@@ -43,23 +43,33 @@
   }
 
   function applyDeveloperMode(enabled) {
-    document.body.classList.toggle('developer-mode-disabled', !enabled);
     const devPanel = document.querySelector('#developer-panel');
     const devTab = document.querySelector('#show-dev-panel');
+    const overlay = document.querySelector('#movement-simulator-overlay');
 
     if (!enabled && document.body.classList.contains('dev-panel-open')) {
-      devTab?.click();
+      devTab?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     }
 
-    if (devPanel) devPanel.setAttribute('aria-hidden', String(!enabled));
-    if (devTab) devTab.setAttribute('aria-hidden', String(!enabled));
+    document.body.classList.toggle('developer-mode-disabled', !enabled);
+
+    [devPanel, devTab, overlay].forEach((element) => {
+      if (!element) return;
+      if (enabled) {
+        element.style.removeProperty('display');
+        element.removeAttribute('aria-hidden');
+      } else {
+        element.style.setProperty('display', 'none', 'important');
+        element.setAttribute('aria-hidden', 'true');
+      }
+    });
 
     document.dispatchEvent(new CustomEvent('wander:developer-mode-setting', { detail: { enabled } }));
   }
 
   const style = document.createElement('style');
   style.textContent = `
-    .settings-list{display:grid;gap:12px}.developer-mode-disabled #show-dev-panel,.developer-mode-disabled #developer-panel{display:none!important}.developer-mode-disabled #movement-simulator-overlay{display:none!important}
+    .settings-list{display:grid;gap:12px}.developer-mode-disabled #show-dev-panel,.developer-mode-disabled #developer-panel,.developer-mode-disabled #movement-simulator-overlay{display:none!important}
   `;
   document.head.appendChild(style);
 
@@ -82,5 +92,5 @@
   });
 
   if (settings.trackRouteByDefault) window.setTimeout(ensureTrackingEnabled, 80);
-  applyDeveloperMode(Boolean(settings.developerModeEnabled));
+  window.setTimeout(() => applyDeveloperMode(Boolean(settings.developerModeEnabled)), 120);
 })();
