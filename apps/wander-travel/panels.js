@@ -1,4 +1,9 @@
 (() => {
+  const movementStyles = document.createElement('link');
+  movementStyles.rel = 'stylesheet';
+  movementStyles.href = 'movement-controls.css?v=20260625-1';
+  document.head.appendChild(movementStyles);
+
   const shell = document.querySelector('.app-shell');
   const tripPanel = document.querySelector('.control-panel');
   const devPanel = document.querySelector('#developer-panel');
