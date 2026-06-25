@@ -5,57 +5,67 @@
   document.head.appendChild(movementStyles);
 
   const shell = document.querySelector('.app-shell');
-  const tripPanel = document.querySelector('.control-panel');
-  const devPanel = document.querySelector('#developer-panel');
-  const tripTab = document.querySelector('#show-panel');
-  const devTab = document.querySelector('#show-dev-panel');
+  const panels = {
+    trip: document.querySelector('.control-panel'),
+    developer: document.querySelector('#developer-panel'),
+    settings: document.querySelector('#settings-panel'),
+  };
+  const tabs = {
+    trip: document.querySelector('#show-panel'),
+    developer: document.querySelector('#show-dev-panel'),
+    settings: document.querySelector('#show-settings-panel'),
+  };
   const collapseTrip = document.querySelector('#collapse-panel');
+  const collapseSettings = document.querySelector('#collapse-settings-panel');
 
-  if (!shell || !tripPanel || !devPanel || !tripTab || !devTab) return;
+  if (!shell || !panels.trip || !panels.developer || !panels.settings || !tabs.trip || !tabs.developer || !tabs.settings) return;
 
   const PANEL_WIDTH = 'min(380px, 90vw)';
   const ANIMATION = { duration: 280, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' };
+  const animations = new Map();
   let openPanel = null;
-  let tripAnimation = null;
-  let devAnimation = null;
 
   function important(element, property, value) {
     element.style.setProperty(property, value, 'important');
   }
 
-  function preparePanel(element, displayValue) {
-    important(element, 'position', 'fixed');
-    important(element, 'top', '0');
-    important(element, 'right', '0');
-    important(element, 'left', 'auto');
-    important(element, 'bottom', '0');
-    important(element, 'width', PANEL_WIDTH);
-    important(element, 'height', '100vh');
-    important(element, 'z-index', '950');
-    important(element, 'display', displayValue);
-    important(element, 'overflow-y', 'auto');
-    important(element, 'background', '#fff');
-    important(element, 'box-shadow', '-15px 0 40px rgba(20,35,55,.18)');
-    important(element, 'will-change', 'transform');
-  }
+  Object.values(panels).forEach((panel) => {
+    important(panel, 'position', 'fixed');
+    important(panel, 'top', '0');
+    important(panel, 'right', '0');
+    important(panel, 'left', 'auto');
+    important(panel, 'bottom', '0');
+    important(panel, 'width', PANEL_WIDTH);
+    important(panel, 'height', '100vh');
+    important(panel, 'z-index', '950');
+    important(panel, 'display', panel === panels.trip ? 'flex' : 'block');
+    important(panel, 'overflow-y', 'auto');
+    important(panel, 'background', '#fff');
+    important(panel, 'box-shadow', '-15px 0 40px rgba(20,35,55,.18)');
+    important(panel, 'will-change', 'transform');
+    important(panel, 'transform', 'translateX(100%)');
+  });
+  important(panels.trip, 'flex-direction', 'column');
 
-  preparePanel(tripPanel, 'flex');
-  preparePanel(devPanel, 'block');
-  important(tripPanel, 'flex-direction', 'column');
+  const tabStyle = {
+    trip: { top: 'calc(50% - 150px)', height: '96px', color: '#173f3b' },
+    developer: { top: 'calc(50% - 42px)', height: '126px', color: '#6c5aa8' },
+    settings: { top: 'calc(50% + 96px)', height: '118px', color: '#4a6b8a' },
+  };
 
-  [tripTab, devTab].forEach((tab, index) => {
+  Object.entries(tabs).forEach(([key, tab]) => {
     important(tab, 'display', 'grid');
     important(tab, 'position', 'fixed');
     important(tab, 'right', '0');
     important(tab, 'left', 'auto');
-    important(tab, 'top', index === 0 ? 'calc(50% - 82px)' : 'calc(50% + 56px)');
+    important(tab, 'top', tabStyle[key].top);
     important(tab, 'min-width', '44px');
-    important(tab, 'min-height', index === 0 ? '112px' : '138px');
+    important(tab, 'min-height', tabStyle[key].height);
     important(tab, 'z-index', '1000');
     important(tab, 'place-items', 'center');
     important(tab, 'cursor', 'pointer');
     important(tab, 'color', '#fff');
-    important(tab, 'background', index === 0 ? '#173f3b' : '#6c5aa8');
+    important(tab, 'background', tabStyle[key].color);
     important(tab, 'border-radius', '10px 0 0 10px');
     important(tab, 'box-shadow', '0 12px 30px rgba(20,35,55,.22)');
     important(tab, 'transition', 'right 280ms cubic-bezier(.22,.61,.36,1)');
@@ -66,127 +76,75 @@
     }
   });
 
-  function panelEdge(panel) {
-    const width = Math.round(panel.getBoundingClientRect().width);
-    return `${width}px`;
-  }
-
-  function moveTabsToPanel(panel) {
-    const right = panelEdge(panel);
-    important(tripTab, 'right', right);
-    important(devTab, 'right', right);
-  }
-
-  function moveTabsClosed() {
-    important(tripTab, 'right', '0');
-    important(devTab, 'right', '0');
+  function moveTabs(rightValue) {
+    Object.values(tabs).forEach((tab) => important(tab, 'right', rightValue));
   }
 
   function refreshMap() {
     window.setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
   }
 
-  function animatePanel(panel, open, animationRefSetter) {
-    animationRefSetter('cancel');
+  function animatePanel(panel, open) {
+    animations.get(panel)?.cancel();
     const from = open ? 'translateX(100%)' : 'translateX(0)';
     const to = open ? 'translateX(0)' : 'translateX(100%)';
     important(panel, 'transform', from);
     panel.getBoundingClientRect();
     const animation = panel.animate([{ transform: from }, { transform: to }], ANIMATION);
-    animationRefSetter(animation);
+    animations.set(panel, animation);
     animation.onfinish = () => {
       important(panel, 'transform', to);
-      animationRefSetter(null);
+      animations.delete(panel);
     };
   }
 
-  function setTripAnimation(value) {
-    if (value === 'cancel') {
-      tripAnimation?.cancel();
-      tripAnimation = null;
-    } else tripAnimation = value;
-  }
-
-  function setDevAnimation(value) {
-    if (value === 'cancel') {
-      devAnimation?.cancel();
-      devAnimation = null;
-    } else devAnimation = value;
-  }
-
   function closeAll() {
-    if (openPanel === 'trip') animatePanel(tripPanel, false, setTripAnimation);
-    else important(tripPanel, 'transform', 'translateX(100%)');
-
-    if (openPanel === 'developer') animatePanel(devPanel, false, setDevAnimation);
-    else important(devPanel, 'transform', 'translateX(100%)');
-
+    Object.entries(panels).forEach(([key, panel]) => {
+      if (openPanel === key) animatePanel(panel, false);
+      else important(panel, 'transform', 'translateX(100%)');
+    });
     shell.classList.add('panel-collapsed');
-    devPanel.classList.add('dev-collapsed');
-    document.body.classList.remove('dev-panel-open');
-    moveTabsClosed();
+    document.body.classList.remove('dev-panel-open', 'settings-panel-open');
+    panels.developer.classList.add('dev-collapsed');
+    panels.settings.classList.add('settings-collapsed');
+    moveTabs('0');
     openPanel = null;
     refreshMap();
   }
 
-  function openTrip() {
-    if (openPanel === 'developer') animatePanel(devPanel, false, setDevAnimation);
-    else important(devPanel, 'transform', 'translateX(100%)');
-
-    shell.classList.remove('panel-collapsed');
-    devPanel.classList.add('dev-collapsed');
-    document.body.classList.remove('dev-panel-open');
-    openPanel = 'trip';
-
-    requestAnimationFrame(() => {
-      important(tripPanel, 'display', 'flex');
-      moveTabsToPanel(tripPanel);
-      requestAnimationFrame(() => animatePanel(tripPanel, true, setTripAnimation));
+  function open(key) {
+    if (openPanel === key) return closeAll();
+    Object.entries(panels).forEach(([otherKey, panel]) => {
+      if (otherKey !== key) important(panel, 'transform', 'translateX(100%)');
     });
+    shell.classList.toggle('panel-collapsed', key !== 'trip');
+    document.body.classList.toggle('dev-panel-open', key === 'developer');
+    document.body.classList.toggle('settings-panel-open', key === 'settings');
+    panels.developer.classList.toggle('dev-collapsed', key !== 'developer');
+    panels.settings.classList.toggle('settings-collapsed', key !== 'settings');
+    openPanel = key;
+    moveTabs(`${Math.round(panels[key].getBoundingClientRect().width)}px`);
+    requestAnimationFrame(() => requestAnimationFrame(() => animatePanel(panels[key], true)));
     refreshMap();
   }
 
-  function openDeveloper() {
-    if (openPanel === 'trip') animatePanel(tripPanel, false, setTripAnimation);
-    else important(tripPanel, 'transform', 'translateX(100%)');
+  Object.entries(tabs).forEach(([key, tab]) => {
+    tab.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      open(key);
+    }, true);
+  });
 
-    shell.classList.add('panel-collapsed');
-    devPanel.classList.remove('dev-collapsed');
-    document.body.classList.add('dev-panel-open');
-    openPanel = 'developer';
-
-    requestAnimationFrame(() => {
-      important(devPanel, 'display', 'block');
-      moveTabsToPanel(devPanel);
-      requestAnimationFrame(() => animatePanel(devPanel, true, setDevAnimation));
-    });
-    refreshMap();
-  }
-
-  tripTab.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    openPanel === 'trip' ? closeAll() : openTrip();
-  }, true);
-
-  devTab.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    openPanel === 'developer' ? closeAll() : openDeveloper();
-  }, true);
-
-  collapseTrip?.addEventListener('click', (event) => {
+  [collapseTrip, collapseSettings].forEach((button) => button?.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
     closeAll();
-  }, true);
+  }, true));
 
   window.addEventListener('resize', () => {
-    if (openPanel === 'trip') moveTabsToPanel(tripPanel);
-    if (openPanel === 'developer') moveTabsToPanel(devPanel);
+    if (openPanel) moveTabs(`${Math.round(panels[openPanel].getBoundingClientRect().width)}px`);
   });
 
-  important(tripPanel, 'transform', 'translateX(100%)');
-  important(devPanel, 'transform', 'translateX(100%)');
-  moveTabsClosed();
+  moveTabs('0');
 })();
