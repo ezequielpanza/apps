@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#080a12" />
+  <meta name="description" content="Cronómetro de vida desde el 18 de julio de 1981 a las 18:55." />
+  <title>Mi tiempo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <main>
+    <header class="topbar">
+      <div class="brand"><span class="pulse"></span> TIEMPO VIVIDO</div>
+      <button id="settingsBtn" class="icon-btn" aria-label="Configurar fecha de nacimiento" title="Configurar">⚙</button>
+    </header>
+
+    <section class="hero">
+      <p class="eyebrow">DESDE EL 18 DE JULIO DE 1981 · 18:55</p>
+      <h1 id="ageText">44 años</h1>
+      <p class="subtitle">y el reloj sigue corriendo</p>
+    </section>
+
+    <section class="clock" aria-label="Tiempo transcurrido">
+      <div class="unit featured"><strong id="years">00</strong><span>años</span></div>
+      <div class="separator">:</div>
+      <div class="unit"><strong id="days">000</strong><span>días</span></div>
+      <div class="separator">:</div>
+      <div class="unit"><strong id="hours">00</strong><span>horas</span></div>
+      <div class="separator">:</div>
+      <div class="unit"><strong id="minutes">00</strong><span>minutos</span></div>
+      <div class="separator">:</div>
+      <div class="unit seconds"><strong id="seconds">00</strong><span>segundos</span></div>
+    </section>
+
+    <section class="stats">
+      <article><span class="label">DÍAS TOTALES</span><strong id="totalDays">—</strong></article>
+      <article><span class="label">HORAS TOTALES</span><strong id="totalHours">—</strong></article>
+      <article><span class="label">LATIDOS ESTIMADOS</span><strong id="heartbeats">—</strong></article>
+    </section>
+
+    <section class="birthday-card">
+      <div><span class="label">PRÓXIMO CUMPLEAÑOS</span><strong id="nextBirthday">—</strong></div>
+      <div class="progress-wrap" aria-label="Progreso hasta el próximo cumpleaños">
+        <div class="progress"><span id="birthdayProgress"></span></div>
+        <small id="birthdayCountdown">—</small>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" id="settingsForm">
+      <div class="dialog-head">
+        <div><span class="label">AJUSTES</span><h2>Momento de nacimiento</h2></div>
+        <button class="icon-btn" value="cancel" aria-label="Cerrar">×</button>
+      </div>
+      <label>Fecha<input id="birthDate" type="date" value="1981-07-18" required></label>
+      <label>Hora<input id="birthTime" type="time" value="18:55" required></label>
+      <label>Zona horaria
+        <select id="birthOffset">
+          <option value="-03:00" selected>UTC−3 (Argentina)</option>
+          <option value="-04:00">UTC−4 (Bahamas)</option>
+          <option value="+00:00">UTC±0</option>
+        </select>
+      </label>
+      <p class="hint">La configuración queda guardada solamente en este dispositivo.</p>
+      <button class="save-btn" value="default">Guardar cambios</button>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
