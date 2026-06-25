@@ -1,0 +1,312 @@
+const fallbackLocation = [20.95, -73.666667];
+
+const poiData = {};
+
+const messages = {
+  details: {
+    title: "Contexto pendiente",
+    body: "Todavia no tengo POIs reales cargados para esta zona. Busca lugares cercanos o fija tu ubicacion y te cuento por que vale la pena cada punto.",
+  },
+  route: {
+    title: "Ruta pendiente",
+    body: "Primero necesito POIs reales cerca de tu posicion. Cuando esten cargados, puedo ordenar opciones por distancia e intereses.",
+  },
+  skip: {
+    title: "Otra opcion pendiente",
+    body: "No voy a inventar una alternativa. Carga POIs reales y te propongo otra parada con nombre, distancia y contexto.",
+  },
+};
+
+const title = document.querySelector("#wander-title");
+const message = document.querySelector("#wander-message");
+const talkToggle = document.querySelector("#talk-toggle");
+const pauseToggle = document.querySelector("#pause-toggle");
+const locateButton = document.querySelector("#locate-button");
+const routeButton = document.querySelector("#route-button");
+const trackRouteButton = document.querySelector("#track-route-button");
+const saveRouteButton = document.querySelector("#save-route-button");
+const shareRouteButton = document.querySelector("#share-route-button");
+const realPoiButton = document.querySelector("#real-poi-button");
+const manualLocationButton = document.querySelector("#manual-location-button");
+const manualLocationHint = document.querySelector("#manual-location-hint");
+const zoomInButton = document.querySelector("#zoom-in-button");
+const zoomOutButton = document.querySelector("#zoom-out-button");
+const companionPanel = document.querySelector(".companion-panel");
+const hideCompanion = document.querySelector("#hide-companion");
+const showCompanion = document.querySelector("#show-companion");
+const appShell = document.querySelector(".app-shell");
+const collapsePanelButton = document.querySelector("#collapse-panel");
+const showPanelButton = document.querySelector("#show-panel");
+const developerPanel = document.querySelector("#developer-panel");
+const showDevPanelButton = document.querySelector("#show-dev-panel");
+let realLocationLoaded = false;
+let manualLocationMode = false;
+let currentLocation = fallbackLocation;
+let realPoiMarkers = [];
+let movementTimer = null;
+let movementDirection = null;
+let movementLastPoiSearchAt = 0;
+let movementDistanceSinceSearch = 0;
+const movementSpeedLevels = [
+  { label: "Caminando", kmh: 5, stepMeters: 2.8 },
+  { label: "Bici", kmh: 16, stepMeters: 8.9 },
+  { label: "Auto urbano", kmh: 42, stepMeters: 23.3 },
+  { label: "Ruta / tren", kmh: 90, stepMeters: 50 },
+];
+let movementSpeedIndex = 0;
+const activeFeed = document.querySelector("#active-feed");
+const activeCount = document.querySelector("#active-count");
+const locationReadout = document.querySelector("#location-readout");
+const guideToggle = document.querySelector("#guide-toggle");
+const interestInput = document.querySelector("#interest-input");
+const applyInterests = document.querySelector("#apply-interests");
+const interestTags = document.querySelector("#interest-tags");
+const suggestedTagButtons = document.querySelectorAll("[data-suggest-tag]");
+const moveButtons = document.querySelectorAll("[data-move]");
+const stopMoveButton = document.querySelector("[data-stop-move]");
+const simulatorStatus = document.querySelector("#simulator-status");
+const toggleGuideSettings = document.querySelector("#toggle-guide-settings");
+const guideSettings = document.querySelector("#guide-settings");
+const trackStatusBadge = document.querySelector("#track-status-badge");
+const trackSummary = document.querySelector("#track-summary");
+let dynamicRouteLine;
+const navigationModes = [
+  { id: "movement", label: "Movimiento" },
+  { id: "compass", label: "Brujula" },
+  { id: "north", label: "Norte" },
+];
+let navigationModeIndex = 0;
+let isFollowingUser = true;
+let lastMovementBearing = null;
+let compassHeading = null;
+let programmaticMapMoveCount = 0;
+
+if (!window.L) {
+  title.textContent = "Mapa no disponible";
+  message.textContent = "No pude cargar el proveedor de mapa. Revisa la conexion y vuelve a abrir el prototipo.";
+  throw new Error("Leaflet failed to load");
+}
+
+const map = L.map("wander-map", {
+  zoomControl: false,
+  scrollWheelZoom: true,
+  preferCanvas: true,
+}).setView(fallbackLocation, 15);
+
+const baseLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  minZoom: 2,
+  attribution: "&copy; OpenStreetMap",
+  crossOrigin: true,
+  detectRetina: false,
+  keepBuffer: 5,
+  updateWhenIdle: false,
+  updateWhenZooming: false,
+});
+
+baseLayer.on("tileerror", (event) => {
+  const tile = event.tile;
+  const originalSrc = tile.src;
+  window.setTimeout(() => {
+    tile.src = `${originalSrc}${originalSrc.includes("?") ? "&" : "?"}retry=${Date.now()}`;
+  }, 600);
+});
+
+baseLayer.on("load", () => {
+  refreshMapSize();
+});
+
+baseLayer.addTo(map);
+
+const userIcon = L.divIcon({
+  className: "",
+  html: '<div class="user-map-marker"><span></span></div>',
+  iconSize: [48, 48],
+  iconAnchor: [24, 24],
+});
+
+const userMarker = L.marker(fallbackLocation, { icon: userIcon })
+  .addTo(map)
+  .bindPopup("Ubicacion simulada de Wander");
+
+const routeLine = L.polyline([], {
+  color: "#147d78",
+  weight: 6,
+  opacity: 0.86,
+  lineCap: "round",
+  lineJoin: "round",
+}).addTo(map);
+
+let trackedRouteLine = L.polyline([], {
+  color: "#d85b45",
+  weight: 4,
+  opacity: 0.92,
+  lineCap: "round",
+  lineJoin: "round",
+  dashArray: "8 8",
+}).addTo(map);
+
+const markerById = {};
+let notificationTimer;
+let messageId = 0;
+
+const activeMessages = [];
+const trackedRoutePoints = [];
+let isRouteTracking = false;
+let trackedRouteDistanceMeters = 0;
+
+let lastTrackedPoint = null;
+const announcedRelevantPoiIds = new Set();
+const curiosityNotifiedPoiIds = new Set();
+let lastCuriosityMessageAt = 0;
+let currentRealPois = [];
+let activeRouteDestinationId = null;
+let activeRouteSummary = null;
+let currentCompanionMessageId = null;
+const aiMessageSettings = {
+  enabled: true,
+  model: "gpt-4.1-mini",
+  storageKey: "wander_openai_api_key",
+};
+
+function normalizeHeading(deg) {
+  const value = Number(deg);
+  if (!Number.isFinite(value)) return null;
+  return ((value % 360) + 360) % 360;
+}
+
+function bearingBetween([lat1, lng1], [lat2, lng2]) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const toDeg = (value) => (value * 180) / Math.PI;
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+  const lambda = toRad(lng2 - lng1);
+  const y = Math.sin(lambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(lambda);
+  return normalizeHeading(toDeg(Math.atan2(y, x)));
+}
+
+function offsetFromHeading([lat, lng], headingDeg, meters) {
+  const heading = normalizeHeading(headingDeg);
+  if (!Number.isFinite(heading)) return [lat, lng];
+  const latDelta = meters / 111320;
+  const lngDelta = meters / (111320 * Math.cos((lat * Math.PI) / 180));
+  const rad = (heading * Math.PI) / 180;
+  const northSouth = Math.cos(rad);
+  const eastWest = Math.sin(rad);
+  return [lat + latDelta * northSouth, lng + lngDelta * eastWest];
+}
+
+function currentNavigationMode() {
+  return navigationModes[navigationModeIndex];
+}
+
+function focusTargetForCurrentMode(current) {
+  const mode = currentNavigationMode().id;
+  if (mode === "north") return current;
+  if (mode === "movement" && Number.isFinite(lastMovementBearing)) {
+    return offsetFromHeading(current, lastMovementBearing, 170);
+  }
+  if (mode === "compass") {
+    if (Number.isFinite(compassHeading)) return offsetFromHeading(current, compassHeading, 170);
+    if (Number.isFinite(lastMovementBearing)) return offsetFromHeading(current, lastMovementBearing, 170);
+  }
+  return current;
+}
+
+function withProgrammaticMapMove(action) {
+  programmaticMapMoveCount += 1;
+  try {
+    action();
+    map.once("moveend", () => {
+      programmaticMapMoveCount = Math.max(0, programmaticMapMoveCount - 1);
+    });
+  } catch (error) {
+    programmaticMapMoveCount = Math.max(0, programmaticMapMoveCount - 1);
+    throw error;
+  }
+}
+
+function centerOnUser(options = {}) {
+  if (!currentLocation) return;
+  const target = focusTargetForCurrentMode(currentLocation);
+  const zoom = options.zoom ?? map.getZoom();
+  withProgrammaticMapMove(() => {
+    if (options.animate === false) {
+      map.setView(target, zoom, { animate: false });
+    } else {
+      map.flyTo(target, zoom, { duration: 0.55 });
+    }
+  });
+}
+
+function updateLocateButtonLabel() {
+  const modeLabel = currentNavigationMode().label;
+  locateButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v3" /><path d="M12 19v3" /><path d="M2 12h3" /><path d="M19 12h3" /><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" /></svg>${isFollowingUser ? `Mi ubicacion · ${modeLabel}` : "Mi ubicacion"}`;
+}
+
+function disengageFollowMode(messageText) {
+  if (!isFollowingUser) return;
+  isFollowingUser = false;
+  updateLocateButtonLabel();
+  addActiveMessage({
+    title: "Mapa libre",
+    body: messageText || "Moviste el mapa manualmente. Toca Mi ubicacion para volver a centrar.",
+  }, { autoHide: true });
+}
+function formatTrackedDistanceLabel() {
+  if (trackedRouteDistanceMeters < 1000) {
+    return `${Math.round(trackedRouteDistanceMeters)} m`;
+  }
+  return `${(trackedRouteDistanceMeters / 1000).toFixed(2)} km`;
+}
+
+function updateRouteTrackingUi() {
+  if (trackStatusBadge) {
+    trackStatusBadge.textContent = isRouteTracking ? "REC" : "OFF";
+    trackStatusBadge.style.background = isRouteTracking ? "#d85b45" : "#6c5aa8";
+  }
+
+  if (trackRouteButton) {
+    trackRouteButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4" /><path d="M17 12h4" /><circle cx="12" cy="12" r="3" /><path d="M12 3v4" /><path d="M12 17v4" /></svg>${isRouteTracking ? "Detener grabacion" : "Registrar camino"}`;
+  }
+
+  if (trackSummary) {
+    trackSummary.textContent = trackedRoutePoints.length > 1
+      ? `Puntos: ${trackedRoutePoints.length} · Distancia: ${formatTrackedDistanceLabel()}`
+      : "Sin recorrido grabado.";
+  }
+
+  const hasTrack = trackedRoutePoints.length > 1;
+  if (saveRouteButton) saveRouteButton.disabled = !hasTrack;
+  if (shareRouteButton) shareRouteButton.disabled = !hasTrack;
+}
+
+function pushTrackedPoint(current) {
+  if (!isRouteTracking) return;
+  if (!lastTrackedPoint) {
+    trackedRoutePoints.push(current);
+    lastTrackedPoint = current;
+    trackedRouteLine.setLatLngs(trackedRoutePoints);
+    updateRouteTrackingUi();
+    return;
+  }
+
+  const delta = map.distance(lastTrackedPoint, current);
+  if (delta < 8) return;
+  trackedRouteDistanceMeters += delta;
+  trackedRoutePoints.push(current);
+  lastTrackedPoint = current;
+  trackedRouteLine.setLatLngs(trackedRoutePoints);
+  updateRouteTrackingUi();
+}
+
+function buildTrackedRouteGeoJson() {
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        properties: {
+          app: "Wander Travel",
+          recordedAt: new Date().toISOString(),
