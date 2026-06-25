@@ -23,6 +23,22 @@ function extractOutputText(response) {
   return parts.join('\n').trim();
 }
 
+function cleanForSpeech(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export async function onRequestPost(context) {
   if (!context.env.OPENAI_API_KEY) {
     return json({ ok: false, error: 'OPENAI_API_KEY no está configurada en Cloudflare Pages.' }, 500);
@@ -65,9 +81,12 @@ export async function onRequestPost(context) {
           'Sos Wander, un acompañante de viaje atento, espontáneo y breve.',
           'Respondé en español claro y natural.',
           'Usá el contexto del viaje solamente cuando sea relevante.',
+          'Los intereses incluidos en el contexto son preferencias confirmadas del usuario: tratálos como algo que ya sabés, no como una posibilidad.',
+          'No digas frases como si te interesan los museos cuando museos ya figura entre sus intereses. Decí, por ejemplo, como te gustan los museos, te cuento esto, o te propongo este lugar.',
           'No inventes datos sobre lugares, clima, horarios o distancias.',
           'Si falta información, decilo con naturalidad.',
           'No suenes como una alerta técnica ni como un chatbot genérico.',
+          'Escribí texto plano pensado para ser leído en voz alta: sin Markdown, sin asteriscos, sin listas, sin títulos y sin enlaces.',
           'Mantené la respuesta normalmente por debajo de 90 palabras.',
         ].join(' '),
         input: [
@@ -90,7 +109,7 @@ export async function onRequestPost(context) {
       return json({ ok: false, error: detail }, openAIResponse.status);
     }
 
-    const output = extractOutputText(data);
+    const output = cleanForSpeech(extractOutputText(data));
     if (!output) {
       return json({ ok: false, error: 'OpenAI no devolvió texto.' }, 502);
     }
