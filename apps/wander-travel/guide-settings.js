@@ -3,13 +3,15 @@
   const defaults = {
     tourGuideEnabled: true,
     guideHistoricalNearbyEnabled: true,
+    guideInternetDiscoveryEnabled: true,
   };
 
   const masterToggle = document.querySelector('#setting-tour-guide');
   const historicalToggle = document.querySelector('#setting-guide-history-nearby');
+  const internetToggle = document.querySelector('#setting-guide-internet-discovery');
   const status = document.querySelector('#guide-settings-save-status');
 
-  if (!masterToggle || !historicalToggle) return;
+  if (!masterToggle || !historicalToggle || !internetToggle) return;
 
   function loadSettings() {
     try {
@@ -26,8 +28,10 @@
   }
 
   function syncAvailability() {
-    historicalToggle.disabled = !masterToggle.checked;
-    historicalToggle.closest('.settings-card')?.classList.toggle('is-disabled', !masterToggle.checked);
+    [historicalToggle, internetToggle].forEach((toggle) => {
+      toggle.disabled = !masterToggle.checked;
+      toggle.closest('.settings-card')?.classList.toggle('is-disabled', !masterToggle.checked);
+    });
   }
 
   function emit() {
@@ -35,6 +39,7 @@
       detail: {
         enabled: masterToggle.checked,
         historicalNearbyEnabled: historicalToggle.checked,
+        internetDiscoveryEnabled: internetToggle.checked,
       },
     }));
   }
@@ -42,22 +47,20 @@
   const settings = loadSettings();
   masterToggle.checked = Boolean(settings.tourGuideEnabled);
   historicalToggle.checked = Boolean(settings.guideHistoricalNearbyEnabled);
+  internetToggle.checked = Boolean(settings.guideInternetDiscoveryEnabled);
   syncAvailability();
 
-  masterToggle.addEventListener('change', () => {
+  function persist() {
     const next = loadSettings();
     next.tourGuideEnabled = masterToggle.checked;
     next.guideHistoricalNearbyEnabled = historicalToggle.checked;
+    next.guideInternetDiscoveryEnabled = internetToggle.checked;
     saveSettings(next);
     syncAvailability();
     emit();
-  });
+  }
 
-  historicalToggle.addEventListener('change', () => {
-    const next = loadSettings();
-    next.tourGuideEnabled = masterToggle.checked;
-    next.guideHistoricalNearbyEnabled = historicalToggle.checked;
-    saveSettings(next);
-    emit();
-  });
+  masterToggle.addEventListener('change', persist);
+  historicalToggle.addEventListener('change', persist);
+  internetToggle.addEventListener('change', persist);
 })();
