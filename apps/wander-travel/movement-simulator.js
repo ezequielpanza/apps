@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = 'v0.12.0';
+  const APP_VERSION = 'v0.12.1';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
   document.title = `Wander Travel ${APP_VERSION}`;
@@ -156,7 +156,7 @@
   }
   if (!document.querySelector('script[data-movement-overlay]')) {
     const script = document.createElement('script');
-    script.src = 'movement-overlay.js?v=20260625-1';
+    script.src = 'movement-overlay.js?v=20260625-2';
     script.dataset.movementOverlay = 'true';
     document.body.appendChild(script);
   }
