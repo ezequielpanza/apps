@@ -9,7 +9,6 @@
 
   const defaultInterests = ['Cafés', 'Restaurantes', 'Sitios históricos', 'Naturaleza', 'Museos'];
   const selected = new Set(defaultInterests);
-
   const normalize = (value) => value.trim().replace(/\s+/g, ' ');
 
   function syncInput() {
@@ -21,6 +20,7 @@
         ? `${values.length} intereses seleccionados`
         : 'Sin intereses seleccionados';
     }
+    input.dispatchEvent(new Event('change', { bubbles: true }));
     document.dispatchEvent(new CustomEvent('wander:interests-changed', { detail: { interests: values } }));
   }
 
