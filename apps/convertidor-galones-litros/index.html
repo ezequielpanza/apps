@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1729">
+  <meta name="description" content="Conversor rápido de galones a litros y de litros a galones.">
+  <title>Galones ↔ Litros</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="converter" aria-labelledby="app-title">
+      <header>
+        <p class="eyebrow">CONVERSOR DE VOLUMEN</p>
+        <h1 id="app-title">Galones <span>↔</span> Litros</h1>
+        <p class="subtitle">Conversión instantánea en ambos sentidos.</p>
+      </header>
+
+      <label class="system-control" for="gallonType">
+        <span>Tipo de galón</span>
+        <select id="gallonType">
+          <option value="us">Estadounidense (US)</option>
+          <option value="imperial">Imperial (UK)</option>
+        </select>
+      </label>
+
+      <div class="conversion-grid">
+        <label class="field-card" for="gallons">
+          <span class="field-label">Galones</span>
+          <div class="input-row">
+            <input id="gallons" type="number" inputmode="decimal" min="0" step="any" placeholder="0" autocomplete="off">
+            <span class="unit">gal</span>
+          </div>
+        </label>
+
+        <button id="swap" class="swap-button" type="button" aria-label="Intercambiar valores" title="Intercambiar valores">⇄</button>
+
+        <label class="field-card" for="liters">
+          <span class="field-label">Litros</span>
+          <div class="input-row">
+            <input id="liters" type="number" inputmode="decimal" min="0" step="any" placeholder="0" autocomplete="off">
+            <span class="unit">L</span>
+          </div>
+        </label>
+      </div>
+
+      <div class="reference" aria-live="polite">
+        <span id="formula">1 galón US = 3,785411784 litros</span>
+      </div>
+
+      <button id="clear" class="clear-button" type="button">Limpiar</button>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
