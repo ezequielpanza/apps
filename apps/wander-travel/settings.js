@@ -1,8 +1,11 @@
 (() => {
-  const VERSION = 'v0.11.0';
+  const VERSION = 'v0.12.4';
   const STORAGE_KEY = 'wander-travel-settings';
+  const OVERLAY_VISIBLE_KEY = 'wander-travel-simulator-overlay-visible';
   const defaults = {
     trackRouteByDefault: true,
+    movementOverlayByDefault: true,
+    developerModeEnabled: true,
   };
 
   const badge = document.querySelector('.app-version');
@@ -11,11 +14,13 @@
 
   const panel = document.querySelector('#settings-panel');
   const trackToggle = document.querySelector('#setting-track-default');
+  const overlayToggle = document.querySelector('#setting-overlay-default');
+  const developerToggle = document.querySelector('#setting-developer-mode');
   const status = document.querySelector('#settings-save-status');
   const trackButton = document.querySelector('#track-route-button');
   const trackBadge = document.querySelector('#track-status-badge');
 
-  if (!panel || !trackToggle) return;
+  if (!panel || !trackToggle || !overlayToggle || !developerToggle) return;
 
   function loadSettings() {
     try {
@@ -40,8 +45,40 @@
     if (!isActive) trackButton.click();
   }
 
+  function applyOverlaySetting(enabled) {
+    localStorage.setItem(OVERLAY_VISIBLE_KEY, String(enabled));
+    const overlay = document.querySelector('#movement-simulator-overlay');
+    if (overlay) overlay.classList.toggle('is-hidden', !enabled);
+    const developerOverlayToggle = document.querySelector('#toggle-movement-overlay');
+    if (developerOverlayToggle) developerOverlayToggle.checked = enabled;
+    document.dispatchEvent(new CustomEvent('wander:movement-overlay-setting', { detail: { enabled } }));
+  }
+
+  function applyDeveloperMode(enabled) {
+    document.body.classList.toggle('developer-mode-disabled', !enabled);
+    const devPanel = document.querySelector('#developer-panel');
+    const devTab = document.querySelector('#show-dev-panel');
+
+    if (!enabled && document.body.classList.contains('dev-panel-open')) {
+      devTab?.click();
+    }
+
+    if (devPanel) devPanel.setAttribute('aria-hidden', String(!enabled));
+    if (devTab) devTab.setAttribute('aria-hidden', String(!enabled));
+
+    document.dispatchEvent(new CustomEvent('wander:developer-mode-setting', { detail: { enabled } }));
+  }
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .settings-list{display:grid;gap:12px}.developer-mode-disabled #show-dev-panel,.developer-mode-disabled #developer-panel{display:none!important}.developer-mode-disabled #movement-simulator-overlay{display:none!important}
+  `;
+  document.head.appendChild(style);
+
   const settings = loadSettings();
   trackToggle.checked = Boolean(settings.trackRouteByDefault);
+  overlayToggle.checked = Boolean(settings.movementOverlayByDefault);
+  developerToggle.checked = Boolean(settings.developerModeEnabled);
 
   trackToggle.addEventListener('change', () => {
     const next = loadSettings();
@@ -50,7 +87,21 @@
     if (trackToggle.checked) ensureTrackingEnabled();
   });
 
-  if (settings.trackRouteByDefault) {
-    window.setTimeout(ensureTrackingEnabled, 80);
-  }
+  overlayToggle.addEventListener('change', () => {
+    const next = loadSettings();
+    next.movementOverlayByDefault = overlayToggle.checked;
+    saveSettings(next);
+    applyOverlaySetting(overlayToggle.checked);
+  });
+
+  developerToggle.addEventListener('change', () => {
+    const next = loadSettings();
+    next.developerModeEnabled = developerToggle.checked;
+    saveSettings(next);
+    applyDeveloperMode(developerToggle.checked);
+  });
+
+  if (settings.trackRouteByDefault) window.setTimeout(ensureTrackingEnabled, 80);
+  applyDeveloperMode(Boolean(settings.developerModeEnabled));
+  applyOverlaySetting(Boolean(settings.movementOverlayByDefault));
 })();
