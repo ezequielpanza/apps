@@ -1,6 +1,10 @@
 (() => {
   const STORAGE_KEY = 'wander-travel-settings';
-  const defaults = { gpsEnabled: true };
+  const defaults = {
+    gpsEnabled: true,
+    noForeignLandEnabled: true,
+    iOverlanderEnabled: true,
+  };
 
   function loadSettings() {
     try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; }
@@ -17,17 +21,19 @@
   document.querySelector('#real-poi-button')?.remove();
   document.querySelector('#route-button')?.remove();
 
-  function addCard(id, title, description, checked) {
+  function addCard(id, title, description, checked, statusText = '') {
     if (!settingsList || document.querySelector(`#${id}`)) return null;
     const card = document.createElement('section');
     card.className = 'settings-card';
-    card.innerHTML = `<div><h3>${title}</h3><p>${description}</p></div><label class="settings-switch"><input id="${id}" type="checkbox" ${checked ? 'checked' : ''} /><span></span></label>`;
+    card.innerHTML = `<div><h3>${title}</h3><p>${description}</p>${statusText ? `<small style="display:block;margin-top:7px;color:#8a6c43;line-height:1.35">${statusText}</small>` : ''}</div><label class="settings-switch"><input id="${id}" type="checkbox" ${checked ? 'checked' : ''} /><span></span></label>`;
     settingsList.appendChild(card);
     return card.querySelector('input');
   }
 
   const stored = loadSettings();
   const gpsToggle = addCard('setting-gps-enabled', 'Ubicación GPS', 'Permite usar la ubicación real del dispositivo. Al desactivarlo, Wander usa solo la posición manual o simulada.', Boolean(stored.gpsEnabled));
+  const nflToggle = addCard('setting-noforeignland-enabled', 'POIs de NoForeignLand', 'Activa esta fuente cuando exista un conector oficial disponible para Wander.', Boolean(stored.noForeignLandEnabled), 'Fuente preparada, todavía sin conexión activa.');
+  const iOverlanderToggle = addCard('setting-ioverlander-enabled', 'POIs de iOverlander', 'Activa esta fuente cuando exista un conector oficial disponible para Wander.', Boolean(stored.iOverlanderEnabled), 'Fuente preparada, todavía sin conexión activa.');
 
   function applyGpsState(enabled) {
     if (!locateButton) return;
@@ -39,13 +45,18 @@
     locateButton.textContent = enabled ? 'Mi ubicación' : 'GPS desactivado';
   }
 
-  gpsToggle?.addEventListener('change', () => {
+  function persist() {
     const next = loadSettings();
-    next.gpsEnabled = gpsToggle.checked;
+    next.gpsEnabled = Boolean(gpsToggle?.checked);
+    next.noForeignLandEnabled = Boolean(nflToggle?.checked);
+    next.iOverlanderEnabled = Boolean(iOverlanderToggle?.checked);
     saveSettings(next);
-    applyGpsState(gpsToggle.checked);
-  });
+    applyGpsState(next.gpsEnabled);
+  }
 
+  gpsToggle?.addEventListener('change', persist);
+  nflToggle?.addEventListener('change', persist);
+  iOverlanderToggle?.addEventListener('change', persist);
   applyGpsState(Boolean(stored.gpsEnabled));
 
   const trackButton = document.querySelector('#track-route-button');
