@@ -43,6 +43,24 @@
       <article><span class="label">LATIDOS ESTIMADOS</span><strong id="heartbeats">—</strong></article>
     </section>
 
+    <section class="life-card">
+      <div class="life-summary">
+        <span class="label">ESTIMACIÓN POBLACIONAL</span>
+        <strong><span id="lifePercent">—</span>% de vida vivida</strong>
+        <p>Referencia: varón argentino de 44 años, expectativa estimada de 78 años.</p>
+      </div>
+      <div class="progress-wrap" aria-label="Porcentaje estimado de vida vivida">
+        <div class="progress life-progress"><span id="lifeProgress"></span></div>
+        <small id="remainingText">—</small>
+      </div>
+      <div class="remaining-grid">
+        <article><span class="label">AÑOS RESTANTES</span><strong id="remainingYears">—</strong></article>
+        <article><span class="label">DÍAS RESTANTES</span><strong id="remainingDays">—</strong></article>
+        <article><span class="label">FECHA ESTIMADA</span><strong id="estimatedDate">—</strong></article>
+      </div>
+      <p class="disclaimer">Esto no es una predicción médica individual. Es una referencia estadística y puede variar mucho según salud, hábitos, genética, entorno y avances médicos.</p>
+    </section>
+
     <section class="birthday-card">
       <div><span class="label">PRÓXIMO CUMPLEAÑOS</span><strong id="nextBirthday">—</strong></div>
       <div class="progress-wrap" aria-label="Progreso hasta el próximo cumpleaños">
@@ -67,6 +85,7 @@
           <option value="+00:00">UTC±0</option>
         </select>
       </label>
+      <label>Esperanza de vida estimada<input id="lifeExpectancy" type="number" min="45" max="120" step="0.1" value="78" required></label>
       <p class="hint">La configuración queda guardada solamente en este dispositivo.</p>
       <button class="save-btn" value="default">Guardar cambios</button>
     </form>
