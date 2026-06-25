@@ -1,5 +1,6 @@
 (() => {
   const message = document.querySelector('#wander-message');
+  const title = document.querySelector('#wander-title');
   const routeButton = document.querySelector('[data-message="route"]');
   const detailsButton = document.querySelector('[data-message="details"]');
   const skipButton = document.querySelector('[data-message="skip"]');
@@ -30,6 +31,16 @@
   function detectDestination() {
     if (!message || !routeButton) return;
     const text = message.textContent?.toLowerCase() || '';
+    const currentTitle = title?.textContent?.trim().toLowerCase() || '';
+    const explicit = window.wanderGuideDestination;
+
+    if (explicit && currentTitle && explicit.name?.toLowerCase() === currentTitle) {
+      routeButton.hidden = false;
+      routeButton.style.display = '';
+      document.dispatchEvent(new CustomEvent('wander:guide-destination', { detail: explicit }));
+      return;
+    }
+
     const items = [...document.querySelectorAll('#poi-debug-list .poi-debug-item strong')];
     let destination = null;
 
@@ -40,6 +51,8 @@
       if (destination) break;
     }
 
+    if (!destination && explicit && text.includes(String(explicit.name || '').toLowerCase())) destination = explicit;
+
     window.wanderGuideDestination = destination;
     routeButton.hidden = !destination;
     routeButton.style.display = destination ? '' : 'none';
@@ -49,5 +62,6 @@
   const observer = new MutationObserver(detectDestination);
   if (message) observer.observe(message, { childList: true, characterData: true, subtree: true });
   document.addEventListener('wander:interests-changed', () => setTimeout(detectDestination, 50));
+  document.addEventListener('wander:guide-destination', () => setTimeout(detectDestination, 0));
   window.setTimeout(detectDestination, 1500);
 })();
