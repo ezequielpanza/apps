@@ -61,81 +61,100 @@
     }
   });
 
-  function moveTabs(rightValue) {
-    important(tripTab, 'right', rightValue);
-    important(devTab, 'right', rightValue);
+  function panelEdge(panel) {
+    const width = Math.round(panel.getBoundingClientRect().width);
+    return `${width}px`;
+  }
+
+  function moveTabsToPanel(panel) {
+    const right = panelEdge(panel);
+    important(tripTab, 'right', right);
+    important(devTab, 'right', right);
+  }
+
+  function moveTabsClosed() {
+    important(tripTab, 'right', '0');
+    important(devTab, 'right', '0');
   }
 
   function refreshMap() {
     window.setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
   }
 
-  function animateTrip(open) {
-    tripAnimation?.cancel();
-    important(tripPanel, 'display', 'flex');
+  function animatePanel(panel, open, animationRefSetter) {
+    animationRefSetter('cancel');
     const from = open ? 'translateX(100%)' : 'translateX(0)';
     const to = open ? 'translateX(0)' : 'translateX(100%)';
-    important(tripPanel, 'transform', from);
-    tripPanel.getBoundingClientRect();
-    tripAnimation = tripPanel.animate([{ transform: from }, { transform: to }], ANIMATION);
-    tripAnimation.onfinish = () => {
-      important(tripPanel, 'transform', to);
-      tripAnimation = null;
+    important(panel, 'transform', from);
+    panel.getBoundingClientRect();
+    const animation = panel.animate([{ transform: from }, { transform: to }], ANIMATION);
+    animationRefSetter(animation);
+    animation.onfinish = () => {
+      important(panel, 'transform', to);
+      animationRefSetter(null);
     };
   }
 
-  function animateDeveloper(open) {
-    devAnimation?.cancel();
-    important(devPanel, 'display', 'block');
-    const from = open ? 'translateX(100%)' : 'translateX(0)';
-    const to = open ? 'translateX(0)' : 'translateX(100%)';
-    important(devPanel, 'transform', from);
-    devPanel.getBoundingClientRect();
-    devAnimation = devPanel.animate([{ transform: from }, { transform: to }], ANIMATION);
-    devAnimation.onfinish = () => {
-      important(devPanel, 'transform', to);
+  function setTripAnimation(value) {
+    if (value === 'cancel') {
+      tripAnimation?.cancel();
+      tripAnimation = null;
+    } else tripAnimation = value;
+  }
+
+  function setDevAnimation(value) {
+    if (value === 'cancel') {
+      devAnimation?.cancel();
       devAnimation = null;
-    };
+    } else devAnimation = value;
   }
 
   function closeAll() {
-    if (openPanel === 'trip') animateTrip(false);
+    if (openPanel === 'trip') animatePanel(tripPanel, false, setTripAnimation);
     else important(tripPanel, 'transform', 'translateX(100%)');
 
-    if (openPanel === 'developer') animateDeveloper(false);
+    if (openPanel === 'developer') animatePanel(devPanel, false, setDevAnimation);
     else important(devPanel, 'transform', 'translateX(100%)');
 
     shell.classList.add('panel-collapsed');
     devPanel.classList.add('dev-collapsed');
     document.body.classList.remove('dev-panel-open');
-    moveTabs('0');
+    moveTabsClosed();
     openPanel = null;
     refreshMap();
   }
 
   function openTrip() {
-    if (openPanel === 'developer') animateDeveloper(false);
+    if (openPanel === 'developer') animatePanel(devPanel, false, setDevAnimation);
     else important(devPanel, 'transform', 'translateX(100%)');
 
     shell.classList.remove('panel-collapsed');
     devPanel.classList.add('dev-collapsed');
     document.body.classList.remove('dev-panel-open');
-    moveTabs(PANEL_WIDTH);
     openPanel = 'trip';
-    requestAnimationFrame(() => requestAnimationFrame(() => animateTrip(true)));
+
+    requestAnimationFrame(() => {
+      important(tripPanel, 'display', 'flex');
+      moveTabsToPanel(tripPanel);
+      requestAnimationFrame(() => animatePanel(tripPanel, true, setTripAnimation));
+    });
     refreshMap();
   }
 
   function openDeveloper() {
-    if (openPanel === 'trip') animateTrip(false);
+    if (openPanel === 'trip') animatePanel(tripPanel, false, setTripAnimation);
     else important(tripPanel, 'transform', 'translateX(100%)');
 
     shell.classList.add('panel-collapsed');
     devPanel.classList.remove('dev-collapsed');
     document.body.classList.add('dev-panel-open');
-    moveTabs(PANEL_WIDTH);
     openPanel = 'developer';
-    requestAnimationFrame(() => requestAnimationFrame(() => animateDeveloper(true)));
+
+    requestAnimationFrame(() => {
+      important(devPanel, 'display', 'block');
+      moveTabsToPanel(devPanel);
+      requestAnimationFrame(() => animatePanel(devPanel, true, setDevAnimation));
+    });
     refreshMap();
   }
 
@@ -157,7 +176,12 @@
     closeAll();
   }, true);
 
+  window.addEventListener('resize', () => {
+    if (openPanel === 'trip') moveTabsToPanel(tripPanel);
+    if (openPanel === 'developer') moveTabsToPanel(devPanel);
+  });
+
   important(tripPanel, 'transform', 'translateX(100%)');
   important(devPanel, 'transform', 'translateX(100%)');
-  moveTabs('0');
+  moveTabsClosed();
 })();
