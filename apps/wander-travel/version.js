@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.16.0';
+  const version = 'v0.17.0';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
@@ -12,17 +12,15 @@
     document.head.appendChild(link);
   }
 
-  if (!document.querySelector('script[data-companion-actions]')) {
+  const loadScript = (src, dataKey) => {
+    if (document.querySelector(`script[data-${dataKey}]`)) return;
     const script = document.createElement('script');
-    script.src = 'companion-actions.js?v=20260625-1';
-    script.dataset.companionActions = 'true';
+    script.src = src;
+    script.dataset[dataKey.replace(/-([a-z])/g, (_, char) => char.toUpperCase())] = 'true';
     document.body.appendChild(script);
-  }
+  };
 
-  if (!document.querySelector('script[data-navigation]')) {
-    const script = document.createElement('script');
-    script.src = 'navigation.js?v=20260625-1';
-    script.dataset.navigation = 'true';
-    document.body.appendChild(script);
-  }
+  loadScript('companion-actions.js?v=20260625-1', 'companion-actions');
+  loadScript('navigation.js?v=20260625-1', 'navigation');
+  loadScript('weather-context.js?v=20260625-1', 'weather-context');
 })();
