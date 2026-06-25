@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = 'v0.12.2';
+  const APP_VERSION = 'v0.13.0';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
   document.title = `Wander Travel ${APP_VERSION}`;
@@ -15,14 +15,21 @@
 
   const modes = [
     { id: 'walk', label: 'Caminando', speedLabel: '5 km/h', kmh: 5 },
-    { id: 'bike', label: 'Bicicleta', speedLabel: '16 km/h', kmh: 16 },
-    { id: 'car', label: 'Auto', speedLabel: '42 km/h', kmh: 42 },
+    { id: 'bike', label: 'Bicicleta / monopatín', speedLabel: '16 km/h', kmh: 16 },
+    { id: 'car-slow', label: 'Auto lento', speedLabel: '30 km/h', kmh: 30 },
+    { id: 'car-medium', label: 'Auto medio', speedLabel: '50 km/h', kmh: 50 },
+    { id: 'car-fast', label: 'Auto rápido', speedLabel: '80 km/h', kmh: 80 },
   ];
 
   const directions = {
     north: [1, 0], south: [-1, 0], east: [0, 1], west: [0, -1],
     northeast: [Math.SQRT1_2, Math.SQRT1_2], northwest: [Math.SQRT1_2, -Math.SQRT1_2],
     southeast: [-Math.SQRT1_2, Math.SQRT1_2], southwest: [-Math.SQRT1_2, -Math.SQRT1_2],
+  };
+
+  const oppositeDirections = {
+    north: 'south', south: 'north', east: 'west', west: 'east',
+    northeast: 'southwest', southwest: 'northeast', northwest: 'southeast', southeast: 'northwest',
   };
 
   const directionLabels = {
@@ -96,14 +103,21 @@
     timer = window.setInterval(moveOneTick, TICK_MS);
   }
 
-  function startOrCycle(button) {
+  function startOrAdjust(button) {
     const direction = button.dataset.move;
     if (!directions[direction]) return;
-    if (activeDirection === direction && timer) modeIndex = Math.min(modeIndex + 1, modes.length - 1);
-    else {
+
+    if (timer && activeDirection === direction) {
+      modeIndex = Math.min(modeIndex + 1, modes.length - 1);
+    } else if (timer && oppositeDirections[activeDirection] === direction) {
+      modeIndex = Math.max(modeIndex - 1, 0);
+      activeDirection = direction;
+      activeButton = button;
+    } else {
       activeDirection = direction;
       activeButton = button;
     }
+
     updateUi();
     moveOneTick();
     restartTimer();
@@ -136,7 +150,7 @@
     button.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();
-      startOrCycle(button);
+      startOrAdjust(button);
     }, true);
   });
 
