@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = 'v0.13.1';
+  const APP_VERSION = 'v0.13.2';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
   document.title = `Wander Travel ${APP_VERSION}`;
@@ -45,24 +45,38 @@
   let followCursor = true;
   let stoppedForReverse = false;
 
-  function setButtonState(button, mode, speedLabel = null) {
+  function clearButtonStates() {
     buttons.forEach((item) => {
       item.classList.remove('is-active');
       item.removeAttribute('data-speed');
       item.setAttribute('aria-pressed', 'false');
     });
+    stopButton.classList.remove('is-active');
+    stopButton.removeAttribute('data-speed');
+    stopButton.setAttribute('aria-pressed', 'false');
+  }
+
+  function setButtonState(button, mode, speedLabel = null) {
+    clearButtonStates();
     if (!button) return;
     button.classList.add('is-active');
     button.dataset.speed = speedLabel || mode?.speedLabel || '';
     button.setAttribute('aria-pressed', 'true');
   }
 
+  function setStoppedButtonState() {
+    clearButtonStates();
+    stopButton.classList.add('is-active');
+    stopButton.dataset.speed = '0 km/h';
+    stopButton.setAttribute('aria-pressed', 'true');
+  }
+
   function updateUi() {
     if (stoppedForReverse) {
-      if (status) status.textContent = `Detenido · dirección ${directionLabels[activeDirection]} preparada · 0 km/h`;
+      if (status) status.textContent = 'Movimiento detenido · 0 km/h';
       if (modeMetric) modeMetric.textContent = 'Detenido';
       if (speedMetric) speedMetric.textContent = '0 km/h';
-      setButtonState(activeButton, null, '0 km/h');
+      setStoppedButtonState();
       return;
     }
 
@@ -112,11 +126,11 @@
     timer = window.setInterval(moveOneTick, TICK_MS);
   }
 
-  function prepareOppositeDirection(direction, button) {
+  function prepareOppositeDirection(direction) {
     if (timer) window.clearInterval(timer);
     timer = null;
     activeDirection = direction;
-    activeButton = button;
+    activeButton = null;
     modeIndex = 0;
     stoppedForReverse = true;
     updateUi();
@@ -145,7 +159,7 @@
         updateUi();
         return;
       }
-      prepareOppositeDirection(direction, button);
+      prepareOppositeDirection(direction);
       return;
     } else {
       activeDirection = direction;
@@ -164,7 +178,7 @@
     activeButton = null;
     modeIndex = 0;
     stoppedForReverse = false;
-    setButtonState(null, null);
+    clearButtonStates();
     if (status) status.textContent = 'Movimiento detenido · 0 km/h';
     if (modeMetric) modeMetric.textContent = 'Detenido';
     if (speedMetric) speedMetric.textContent = '0 km/h';
@@ -189,6 +203,7 @@
     }, true);
   });
 
+  stopButton.setAttribute('aria-pressed', 'false');
   stopButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
