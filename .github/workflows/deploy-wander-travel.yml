@@ -23,7 +23,8 @@ jobs:
         if: ${{ hashFiles('imports/wander-travel.zip.b64') != '' }}
         run: |
           mkdir -p apps/wander-travel
-          base64 -d imports/wander-travel.zip.b64 > /tmp/wander-travel.zip
+          tr -cd 'A-Za-z0-9+/=' < imports/wander-travel.zip.b64 | base64 --decode --ignore-garbage > /tmp/wander-travel.zip
+          unzip -t /tmp/wander-travel.zip
           unzip -o /tmp/wander-travel.zip -d apps/wander-travel
           rm imports/wander-travel.zip.b64
           rm -f apps/wander-travel/test.txt
