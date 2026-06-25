@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = 'v0.13.2';
+  const APP_VERSION = 'v0.13.3';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
   document.title = `Wander Travel ${APP_VERSION}`;
@@ -178,7 +178,7 @@
     activeButton = null;
     modeIndex = 0;
     stoppedForReverse = false;
-    clearButtonStates();
+    setStoppedButtonState();
     if (status) status.textContent = 'Movimiento detenido · 0 km/h';
     if (modeMetric) modeMetric.textContent = 'Detenido';
     if (speedMetric) speedMetric.textContent = '0 km/h';
