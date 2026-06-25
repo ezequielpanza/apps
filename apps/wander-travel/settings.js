@@ -1,10 +1,9 @@
 (() => {
-  const VERSION = 'v0.15.0';
+  const VERSION = 'v0.18.0';
   const STORAGE_KEY = 'wander-travel-settings';
   const defaults = {
     trackRouteByDefault: true,
     developerModeEnabled: true,
-    tourGuideEnabled: true,
   };
 
   const badge = document.querySelector('.app-version');
@@ -14,12 +13,11 @@
   const panel = document.querySelector('#settings-panel');
   const trackToggle = document.querySelector('#setting-track-default');
   const developerToggle = document.querySelector('#setting-developer-mode');
-  const guideToggle = document.querySelector('#setting-tour-guide');
   const status = document.querySelector('#settings-save-status');
   const trackButton = document.querySelector('#track-route-button');
   const trackBadge = document.querySelector('#track-status-badge');
 
-  if (!panel || !trackToggle || !developerToggle || !guideToggle) return;
+  if (!panel || !trackToggle || !developerToggle) return;
 
   function loadSettings() {
     try {
@@ -78,7 +76,6 @@
   const settings = loadSettings();
   trackToggle.checked = Boolean(settings.trackRouteByDefault);
   developerToggle.checked = Boolean(settings.developerModeEnabled);
-  guideToggle.checked = Boolean(settings.tourGuideEnabled);
 
   trackToggle.addEventListener('change', () => {
     const next = loadSettings();
@@ -92,13 +89,6 @@
     next.developerModeEnabled = developerToggle.checked;
     saveSettings(next);
     applyDeveloperMode(developerToggle.checked);
-  });
-
-  guideToggle.addEventListener('change', () => {
-    const next = loadSettings();
-    next.tourGuideEnabled = guideToggle.checked;
-    saveSettings(next);
-    document.dispatchEvent(new CustomEvent('wander:tour-guide-setting', { detail: { enabled: guideToggle.checked } }));
   });
 
   if (settings.trackRouteByDefault) window.setTimeout(ensureTrackingEnabled, 80);
