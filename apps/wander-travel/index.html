@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wander Travel Mockup</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIINfQ7C+8LW2dqf9jHZnQE7M2qKpWwE1HE="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell panel-collapsed" aria-label="Wander Travel">
+      <section class="map-stage" aria-label="Mapa y recorrido">
+        <div id="wander-map" aria-label="Mapa interactivo"></div>
+
+        <header class="top-bar">
+          <div>
+            <p class="eyebrow">Wander Travel</p>
+            <h1>Explorando Great Inagua</h1>
+          </div>
+          <button class="round-button" type="button" aria-label="Auriculares conectados">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+              <path d="M4 14h3v6H4z" />
+              <path d="M17 14h3v6h-3z" />
+            </svg>
+          </button>
+        </header>
+        <div class="map-tools" aria-label="Controles del mapa">
+          <div class="zoom-tools" aria-label="Zoom del mapa">
+            <button id="zoom-in-button" class="zoom-tool" type="button" aria-label="Acercar mapa">+</button>
+            <button id="zoom-out-button" class="zoom-tool" type="button" aria-label="Alejar mapa">-</button>
+          </div>
+          <button id="locate-button" class="map-tool" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2v3" />
+              <path d="M12 19v3" />
+              <path d="M2 12h3" />
+              <path d="M19 12h3" />
+              <circle cx="12" cy="12" r="7" />
+              <circle cx="12" cy="12" r="2" />
+            </svg>
+            Mi ubicacion
+          </button>
+
+          <button id="real-poi-button" class="map-tool privacy-action" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 10c0 6-9 12-9 12S3 16 3 10a9 9 0 1 1 18 0Z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            Buscar POIs reales
+          </button>
+          <button id="route-button" class="map-tool" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              <path d="M18 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              <path d="M8.5 14.5 15.5 9.5" />
+            </svg>
+            Ver ruta
+          </button>
+          <button id="track-route-button" class="map-tool" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12h4" />
+              <path d="M17 12h4" />
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 3v4" />
+              <path d="M12 17v4" />
+            </svg>
+            Registrar camino
+          </button>
+        </div>
+
+        <div id="manual-location-hint" class="manual-location-hint" hidden>
+          Toca el mapa para fijar tu posicion de prueba
+        </div>
+        <div id="location-readout" class="location-readout" aria-label="Coordenadas actuales">
+          <span>Ubicacion</span>
+          <strong>Sin fijar</strong>
+          <small>GPS pendiente</small>
+        </div>
+        <aside class="status-rail" aria-label="Estado de viaje">
+          <div class="metric"><span>Modo</span><strong>Caminando</strong></div>
+          <div class="metric"><span>Ritmo</span><strong>4.8 km/h</strong></div>
+          <div class="metric"><span>Grupo</span><strong>Ana + Martin</strong></div>
+        </aside>
+
+        <section class="companion-panel is-hidden" aria-label="Mensaje de Wander">
+          <div class="voice-header">
+            <div class="voice-orb" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div><p class="eyebrow">Wander</p><h2 id="wander-title">Listo para explorar</h2></div>
+            <button id="hide-companion" class="panel-icon-button" type="button" aria-label="Ocultar Wander">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+            </button>
+          </div>
+          <p id="wander-message">Busca POIs reales cerca de tu posicion y te cuento que lugares valen la pena sin inventar paradas.</p>
+          <div class="quick-actions" aria-label="Acciones rapidas">
+            <button type="button" data-message="details">Mas detalles</button>
+            <button type="button" data-message="route">Llevame</button>
+            <button type="button" data-message="skip">Otra opcion</button>
+            <button id="ask-wander-button" type="button">Consultar</button>
+          </div>
+        </section>
+
+        <button id="show-companion" class="companion-tab has-unread" type="button" aria-label="Mostrar Wander">
+          <span class="voice-mini" aria-hidden="true"></span>Wander
+        </button>
+      </section>
+
+      <aside class="control-panel" aria-label="Controles del viaje">
+        <section class="control-section">
+          <div class="section-title">
+            <h2>Viaje actual</h2>
+            <button id="collapse-panel" class="icon-button" type="button" aria-label="Minimizar panel de viaje">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+            </button>
+            <button class="icon-button" type="button" aria-label="Editar viajeros">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+            </button>
+          </div>
+          <div class="travelers">
+            <button class="traveler active" type="button"><span>A</span>Ana</button>
+            <button class="traveler active" type="button"><span>M</span>Martin</button>
+            <button class="traveler" type="button"><span>+</span>Invitar</button>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <h2>Contexto</h2>
+          <div class="context-list">
+            <div><span>Hora</span><strong>17:42</strong></div>
+            <div><span>Clima</span><strong>22 C, templado</strong></div>
+            <div><span>Proxima hora</span><strong>Lluvia posible</strong></div>
+          </div>
+        </section>
+
+        <section class="control-section route-tracker-section">
+          <div class="section-title"><h2>Camino</h2><span id="track-status-badge" class="dev-badge">OFF</span></div>
+          <p id="track-summary" class="developer-note">Sin recorrido grabado.</p>
+          <div class="route-tracker-actions">
+            <button id="save-route-button" class="secondary-action" type="button">Guardar .geojson</button>
+            <button id="share-route-button" class="secondary-action" type="button">Compartir</button>
+          </div>
+        </section>
+
+        <section class="control-section guide-section">
+          <div class="section-title guide-title">
+            <h2>Guia personal</h2>
+            <button id="toggle-guide-settings" class="icon-button" type="button" aria-label="Configurar Guia personal">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" /><circle cx="12" cy="12" r="3" /></svg>
+            </button>
+            <label class="switch-control"><input id="guide-toggle" type="checkbox" checked /><span></span></label>
+          </div>
+          <div id="guide-settings" class="guide-settings" hidden>
+            <label class="field-label" for="interest-input">Me interesa que Wander me cuente sobre</label>
+            <div class="tag-input-row">
+              <input id="interest-input" type="text" value="historia local, cafes antiguos, arquitectura rara" aria-label="Intereses de Guia Personal separados por comas" />
+              <button id="apply-interests" type="button">Agregar</button>
+            </div>
+            <div id="interest-tags" class="tag-list" aria-label="Intereses activos"></div>
+            <p class="section-kicker">Ideas para sumar</p>
+            <div class="suggested-tags" aria-label="Ideas de intereses">
+              <button type="button" data-suggest-tag="leyendas urbanas">leyendas urbanas</button>
+              <button type="button" data-suggest-tag="fiestas populares">fiestas populares</button>
+              <button type="button" data-suggest-tag="lugares tranquilos">lugares tranquilos</button>
+              <button type="button" data-suggest-tag="comida callejera">comida callejera</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="control-section message-section">
+          <div class="section-title message-title"><h2>Mensajes activos</h2><span id="active-count" class="active-count">3</span></div>
+          <div id="active-feed" class="message-feed" aria-label="Historial activo de Wander"></div>
+        </section>
+
+        <section class="control-section compact">
+          <button class="primary-action" id="talk-toggle" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><path d="M12 19v3" /></svg>
+            Escuchar comando
+          </button>
+          <button class="secondary-action" id="pause-toggle" type="button">Pausar Wander</button>
+        </section>
+      </aside>
+
+      <aside id="developer-panel" class="developer-side-panel dev-collapsed">
+        <section class="control-section developer-panel">
+          <div class="section-title"><h2>Desarrollador</h2><span class="dev-badge">ON</span></div>
+          <p class="developer-note">Simular movimiento del viajero</p>
+          <button id="manual-location-button" class="map-tool" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v20" /><path d="M2 12h20" /><circle cx="12" cy="12" r="3" /></svg>
+            Fijar posicion
+          </button>
+          <div class="move-pad" aria-label="Controles de movimiento simulado">
+            <button class="move-button move-nw" type="button" data-move="northwest" aria-label="Mover al noroeste">&#8598;</button>
+            <button class="move-button move-up" type="button" data-move="north" aria-label="Mover al norte">&uarr;</button>
+            <button class="move-button move-ne" type="button" data-move="northeast" aria-label="Mover al noreste">&#8599;</button>
+            <button class="move-button move-left" type="button" data-move="west" aria-label="Mover al oeste">&larr;</button>
+            <button class="move-button stop-button" type="button" data-stop-move aria-label="Parar movimiento">Parar</button>
+            <button class="move-button move-right" type="button" data-move="east" aria-label="Mover al este">&rarr;</button>
+            <button class="move-button move-sw" type="button" data-move="southwest" aria-label="Mover al suroeste">&#8601;</button>
+            <button class="move-button move-down" type="button" data-move="south" aria-label="Mover al sur">&darr;</button>
+            <button class="move-button move-se" type="button" data-move="southeast" aria-label="Mover al sureste">&#8600;</button>
+          </div>
+          <p id="simulator-status" class="simulator-status">Movimiento detenido</p>
+        </section>
+      </aside>
+
+      <button id="show-dev-panel" class="dev-panel-tab" type="button" aria-label="Alternar panel desarrollador"><span>Desarrollador</span></button>
+      <button id="show-panel" class="side-panel-tab" type="button" aria-label="Alternar panel de viaje"><span>Viaje</span></button>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="app.js?v=great-inagua-1"></script>
+  </body>
+</html>
