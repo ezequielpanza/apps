@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - "apps/wander-travel/**"
-      - "imports/wander-travel.zip.b64"
+      - "imports/wander-travel-cloudflare-pages.zip"
       - ".github/workflows/deploy-wander-travel.yml"
   workflow_dispatch:
 
@@ -20,53 +20,24 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Import Wander Travel source archive
-        if: ${{ hashFiles('imports/wander-travel.zip.b64') != '' }}
+        if: ${{ hashFiles('imports/wander-travel-cloudflare-pages.zip') != '' }}
         run: |
+          rm -rf apps/wander-travel
           mkdir -p apps/wander-travel
-          tr -cd 'A-Za-z0-9+/=' < imports/wander-travel.zip.b64 | base64 --decode --ignore-garbage > /tmp/wander-travel.zip
-          unzip -t /tmp/wander-travel.zip
-          unzip -o /tmp/wander-travel.zip -d apps/wander-travel
-          rm imports/wander-travel.zip.b64
-          rm -f apps/wander-travel/test.txt
-          cat > apps/wander-travel/README.md <<'EOF'
-          # Wander Travel
-
-          Asistente de viaje experimental basado en mapas, ubicación, puntos de interés y mensajes contextuales.
-
-          ## Tecnología
-
-          - HTML, CSS y JavaScript estáticos
-          - Leaflet y OpenStreetMap
-          - Wikipedia y Overpass API
-          - Integración opcional con OpenAI desde el navegador
-
-          ## Desarrollo local
-
-          ```bash
-          python -m http.server 8000 --directory apps/wander-travel
-          ```
-
-          ## Deploy
-
-          - Proyecto Cloudflare Pages: `wander-travel`
-          - URL: `https://wander-travel.pages.dev`
-
-          ## Seguridad
-
-          No hay claves incrustadas. La integración actual con OpenAI guarda la clave aportada por el usuario en `localStorage`; debe reemplazarse por un Worker o Pages Function antes de usar una clave compartida de producción.
-          EOF
-          cat > APPS.md <<'EOF'
-          # Aplicaciones publicadas
-
-          | App | Carpeta | Proyecto Cloudflare | URL | Tecnología |
-          |---|---|---|---|---|
-          | Wander Travel | `apps/wander-travel` | `wander-travel` | https://wander-travel.pages.dev | HTML/CSS/JS |
-          EOF
+          unzip -t imports/wander-travel-cloudflare-pages.zip
+          unzip -o imports/wander-travel-cloudflare-pages.zip -d apps/wander-travel
+          rm imports/wander-travel-cloudflare-pages.zip
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/wander-travel APPS.md imports/wander-travel.zip.b64
-          git commit -m "Import Wander Travel app from Google Drive"
+          git add apps/wander-travel imports/wander-travel-cloudflare-pages.zip
+          git commit -m "Import Wander Travel app source"
           git push
+
+      - name: Verify app files
+        run: |
+          test -f apps/wander-travel/index.html
+          test -f apps/wander-travel/styles.css
+          test -f apps/wander-travel/app.js
 
       - name: Ensure Cloudflare Pages project exists
         env:
