@@ -22,6 +22,10 @@
     return getSettings().tourGuideEnabled !== false;
   }
 
+  function historicalNearbyEnabled() {
+    return getSettings().guideHistoricalNearbyEnabled !== false;
+  }
+
   function getMemory() {
     try {
       const parsed = JSON.parse(localStorage.getItem(MEMORY_KEY) || '{}');
@@ -119,7 +123,7 @@
   }
 
   async function evaluateGuideMoment(force = false) {
-    if (!guideEnabled() || busy) return;
+    if (!guideEnabled() || !historicalNearbyEnabled() || busy) return;
 
     const now = Date.now();
     if (!force && now - lastMessageAt < MIN_SECONDS_BETWEEN_MESSAGES * 1000) return;
@@ -146,9 +150,9 @@
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          message: 'Actuá como guía de turismo. Los intereses enviados son gustos confirmados del usuario y debés hablar como alguien que ya los conoce. Si recomendás algo relacionado, decí por ejemplo: Como te gustan los museos, te propongo este lugar; o Como te interesa la historia, te cuento esto. No uses frases condicionales como si te interesan los museos cuando museos ya figura entre sus intereses. Escribí texto limpio y natural, pensado para ser leído en voz alta, sin Markdown, asteriscos, listas, títulos ni enlaces. No repitas temas ya contados. Si no hay suficiente información verificable o no vale la pena interrumpir, respondé exactamente SILENCIO.',
+          message: 'Actuá como guía de turismo. Los intereses enviados son gustos confirmados del usuario y debés hablar como alguien que ya los conoce. Contá datos históricos o curiosidades de lo que hay cerca y priorizá lo que coincida con esos intereses. Si recomendás algo relacionado, decí por ejemplo: Como te gustan los museos, te propongo este lugar; o Como te interesa la historia, te cuento esto. No uses frases condicionales cuando el interés ya figura entre sus preferencias. Escribí texto limpio y natural, pensado para ser leído en voz alta, sin Markdown, asteriscos, listas, títulos ni enlaces. No repitas temas ya contados. Si no hay suficiente información verificable o no vale la pena interrumpir, respondé exactamente SILENCIO.',
           context: {
-            mode: 'tour_guide',
+            mode: 'tour_guide_historical_nearby',
             location: { lat: point.lat, lng: point.lng },
             place,
             nearby_pois: pois,
@@ -179,7 +183,7 @@
   }
 
   document.addEventListener('wander:tour-guide-setting', (event) => {
-    if (event.detail?.enabled) {
+    if (event.detail?.enabled && event.detail?.historicalNearbyEnabled !== false) {
       lastCheckedPosition = marker.getLatLng();
       window.setTimeout(() => evaluateGuideMoment(true), 1200);
     }
@@ -187,6 +191,6 @@
 
   window.setInterval(() => evaluateGuideMoment(false), CHECK_MS);
   window.setTimeout(() => {
-    if (guideEnabled()) evaluateGuideMoment(true);
+    if (guideEnabled() && historicalNearbyEnabled()) evaluateGuideMoment(true);
   }, 3500);
 })();
