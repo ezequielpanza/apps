@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = 'v0.10.0';
+  const APP_VERSION = 'v0.11.1';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
   document.title = `Wander Travel ${APP_VERSION}`;
@@ -10,7 +10,6 @@
   const interestInput = document.querySelector('#interest-input');
   const applyInterests = document.querySelector('#apply-interests');
   const speedMetric = document.querySelector('.status-rail .metric:nth-child(2) strong');
-  const modeMetric = document.querySelector('.status-rail .metric:nth-child(1) strong');
 
   if (!developerPanel) return;
 
@@ -24,11 +23,15 @@
       </div>
       <button id="refresh-pois-button" class="secondary-action" type="button">Actualizar</button>
     </div>
+    <div class="poi-view-toggle" role="group" aria-label="Vista de POIs en desarrollador">
+      <button id="poi-view-all" class="is-active" type="button" aria-pressed="true">Todos</button>
+      <button id="poi-view-filtered" type="button" aria-pressed="false">Solo etiquetas</button>
+    </div>
     <div class="poi-debug-stats">
       <div><span>Método</span><strong id="poi-mode">-</strong></div>
       <div><span>Alcance</span><strong id="poi-radius">-</strong></div>
       <div><span>Total</span><strong id="poi-total">0</strong></div>
-      <div><span>Usuario</span><strong id="poi-filtered">0</strong></div>
+      <div><span>Filtrados</span><strong id="poi-filtered">0</strong></div>
     </div>
     <p id="poi-debug-status" class="poi-debug-status">Esperando ubicación...</p>
     <div id="poi-debug-list" class="poi-debug-list" aria-label="POIs dentro del área de interés"></div>
@@ -39,6 +42,7 @@
   style.textContent = `
     .poi-debug-section{margin-top:20px;padding-top:18px;border-top:1px solid rgba(24,32,27,.12)}
     .poi-debug-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.poi-debug-header h3{margin:2px 0 0;font-size:1rem}
+    .poi-view-toggle{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0;padding:4px;border-radius:12px;background:#efedf5}.poi-view-toggle button{padding:9px 10px;border:0;border-radius:9px;background:transparent;color:#6f687c;font-size:.74rem;font-weight:800;cursor:pointer}.poi-view-toggle button.is-active{background:#fff;color:#4d3e7a;box-shadow:0 3px 10px rgba(24,32,27,.1)}
     .poi-debug-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.poi-debug-stats div{padding:10px;border-radius:12px;background:#f5f3fa}.poi-debug-stats span{display:block;font-size:.66rem;color:#766e88;text-transform:uppercase;letter-spacing:.05em}.poi-debug-stats strong{display:block;margin-top:3px;font-size:.88rem;color:#342d52}
     .poi-debug-status{margin:8px 0;padding:9px 10px;border-radius:10px;background:rgba(20,125,120,.08);color:#356b68;font-size:.76rem;font-weight:700}
     .poi-debug-list{display:grid;gap:7px;max-height:38vh;overflow:auto;padding-right:3px}.poi-debug-item{display:grid;grid-template-columns:1fr auto;gap:8px;padding:9px 10px;border:1px solid rgba(24,32,27,.1);border-radius:11px;background:white}.poi-debug-item strong{display:block;font-size:.8rem}.poi-debug-item span{display:block;margin-top:2px;font-size:.68rem;color:#777}.poi-debug-item em{align-self:center;font-size:.66rem;font-style:normal;font-weight:800;color:#6c5aa8}.poi-debug-item.user-match{border-color:rgba(20,125,120,.35);background:rgba(20,125,120,.04)}
@@ -53,6 +57,8 @@
     status: document.querySelector('#poi-debug-status'),
     list: document.querySelector('#poi-debug-list'),
     refresh: document.querySelector('#refresh-pois-button'),
+    viewAll: document.querySelector('#poi-view-all'),
+    viewFiltered: document.querySelector('#poi-view-filtered'),
   };
 
   const userLayer = L.layerGroup().addTo(map);
@@ -63,10 +69,10 @@
   let lastModeId = null;
   let allPois = [];
   let loading = false;
+  let developerView = 'all';
 
   function parseSpeed() {
-    const text = speedMetric?.textContent || '';
-    const value = Number.parseFloat(text.replace(',', '.'));
+    const value = Number.parseFloat((speedMetric?.textContent || '').replace(',', '.'));
     return Number.isFinite(value) ? value : 5;
   }
 
@@ -88,7 +94,7 @@
     if (tags.tourism === 'museum' || tags.amenity === 'museum') return 'museo';
     if (tags.historic) return 'historia';
     if (tags.tourism === 'viewpoint') return 'mirador';
-    if (['park','garden'].includes(tags.leisure)) return 'naturaleza';
+    if (['park','garden','nature_reserve'].includes(tags.leisure)) return 'naturaleza';
     if (['gallery','artwork'].includes(tags.tourism) || tags.amenity === 'arts_centre') return 'arte';
     if (tags.tourism === 'attraction') return 'atraccion';
     if (tags.shop) return 'tienda';
@@ -99,7 +105,7 @@
     if (!interests.length) return false;
     const text = `${poi.name} ${poi.category} ${poi.tags?.description || ''}`.toLowerCase();
     const synonyms = {
-      cafe: ['cafe','cafes','cafeteria'], comida: ['comida','gastronomia','restaurant','bar'],
+      cafe: ['cafe','cafes','cafeteria'], comida: ['comida','gastronomia','restaurant','restaurante','bar'],
       historia: ['historia','historico','patrimonio','arquitectura'], museo: ['museo','arte','cultura'],
       mirador: ['vista','mirador','paisaje'], naturaleza: ['naturaleza','parque','jardin','playa'],
       arte: ['arte','galeria','mural'], atraccion: ['explorar','atraccion','turismo'], tienda: ['compras','tienda']
@@ -120,34 +126,39 @@
 
   function createMarker(poi, matched) {
     const color = matched ? '#147d78' : '#6c5aa8';
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="width:18px;height:18px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,.25)"></div>`,
-      iconSize: [18, 18], iconAnchor: [9, 9],
-    });
+    const icon = L.divIcon({ className: '', html: `<div style="width:18px;height:18px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,.25)"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
     return L.marker(poi.point, { icon }).bindPopup(`<strong>${poi.name}</strong><br>${poi.category}<br>${formatDistance(poi.distance)} · ${poi.minutes} min`);
+  }
+
+  function setDeveloperView(mode) {
+    developerView = mode;
+    ui.viewAll.classList.toggle('is-active', mode === 'all');
+    ui.viewFiltered.classList.toggle('is-active', mode === 'filtered');
+    ui.viewAll.setAttribute('aria-pressed', String(mode === 'all'));
+    ui.viewFiltered.setAttribute('aria-pressed', String(mode === 'filtered'));
+    render();
   }
 
   function render() {
     const mode = getMode();
     const interests = getInterests();
     const filtered = allPois.filter((poi) => matchesInterests(poi, interests));
+    const developerPois = developerView === 'filtered' ? filtered : allPois;
 
     userLayer.clearLayers();
     developerLayer.clearLayers();
-
     filtered.forEach((poi) => createMarker(poi, true).addTo(userLayer));
-    allPois.forEach((poi) => createMarker(poi, matchesInterests(poi, interests)).addTo(developerLayer));
+    developerPois.forEach((poi) => createMarker(poi, matchesInterests(poi, interests)).addTo(developerLayer));
 
     ui.mode.textContent = `${mode.label} · ${mode.speed.toFixed(0)} km/h`;
     ui.radius.textContent = formatDistance(mode.radius);
     ui.total.textContent = String(allPois.length);
     ui.filtered.textContent = String(filtered.length);
 
-    ui.list.innerHTML = allPois.length ? allPois.map((poi) => {
+    ui.list.innerHTML = developerPois.length ? developerPois.map((poi) => {
       const matched = matchesInterests(poi, interests);
-      return `<article class="poi-debug-item${matched ? ' user-match' : ''}"><div><strong>${poi.name}</strong><span>${poi.category} · ${formatDistance(poi.distance)} · ${poi.minutes} min</span></div><em>${matched ? 'Usuario' : 'Solo dev'}</em></article>`;
-    }).join('') : '<p class="developer-note">No se encontraron POIs dentro del área.</p>';
+      return `<article class="poi-debug-item${matched ? ' user-match' : ''}"><div><strong>${poi.name}</strong><span>${poi.category} · ${formatDistance(poi.distance)} · ${poi.minutes} min</span></div><em>${matched ? 'Etiqueta' : 'Sin filtro'}</em></article>`;
+    }).join('') : `<p class="developer-note">No hay POIs para la vista ${developerView === 'filtered' ? 'filtrada' : 'completa'}.</p>`;
 
     const devOpen = document.body.classList.contains('dev-panel-open');
     if (devOpen) {
@@ -166,20 +177,15 @@
     if (loading) return;
     const mode = getMode();
     const position = marker.getLatLng();
-
     if (!force && lastFetchPosition && lastModeId === mode.id && map.distance(lastFetchPosition, position) < mode.threshold) return;
 
     loading = true;
     ui.status.textContent = 'Buscando todos los POIs alcanzables...';
     ui.refresh.disabled = true;
-
     const query = `[out:json][timeout:25];(node(around:${mode.radius},${position.lat},${position.lng})[tourism];node(around:${mode.radius},${position.lat},${position.lng})[historic];node(around:${mode.radius},${position.lat},${position.lng})[amenity~"cafe|restaurant|bar|pub|fast_food|museum|library|arts_centre|theatre|cinema"];node(around:${mode.radius},${position.lat},${position.lng})[leisure~"park|garden|nature_reserve"];node(around:${mode.radius},${position.lat},${position.lng})[shop];way(around:${mode.radius},${position.lat},${position.lng})[tourism];way(around:${mode.radius},${position.lat},${position.lng})[historic];way(around:${mode.radius},${position.lat},${position.lng})[leisure~"park|garden|nature_reserve"];);out center tags 300;`;
 
     try {
-      const response = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        body: new URLSearchParams({ data: query }),
-      });
+      const response = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: new URLSearchParams({ data: query }) });
       if (!response.ok) throw new Error(`Overpass ${response.status}`);
       const data = await response.json();
       const seen = new Set();
@@ -201,7 +207,7 @@
       lastModeId = mode.id;
       ui.status.textContent = `${allPois.length} POIs encontrados dentro de ${formatDistance(mode.radius)}.`;
       render();
-    } catch (error) {
+    } catch {
       ui.status.textContent = 'No se pudieron actualizar los POIs. Reintentar.';
     } finally {
       loading = false;
@@ -209,15 +215,16 @@
     }
   }
 
+  ui.viewAll.addEventListener('click', () => setDeveloperView('all'));
+  ui.viewFiltered.addEventListener('click', () => setDeveloperView('filtered'));
   ui.refresh.addEventListener('click', () => fetchPois(true));
   applyInterests?.addEventListener('click', () => setTimeout(render, 0));
   interestInput?.addEventListener('change', render);
+  document.addEventListener('wander:interests-changed', render);
 
   const panelObserver = new MutationObserver(render);
   panelObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-
   map.on('moveend', () => fetchPois(false));
   setInterval(() => fetchPois(false), 5000);
-
   fetchPois(true);
 })();
