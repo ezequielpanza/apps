@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - "apps/wander-travel/**"
-      - "imports/wander-clean/**"
       - ".github/workflows/deploy-wander-travel.yml"
   workflow_dispatch:
 
@@ -19,18 +18,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build source archive
+      - name: Verify source
         run: |
-          cat imports/wander-clean/chunk00.b64 imports/wander-clean/chunk01.b64 imports/wander-clean/rem00.b64 imports/wander-clean/rem01.b64 imports/wander-clean/rem02.b64 imports/wander-clean/rem03a.txt imports/wander-clean/rem03b00.txt imports/wander-clean/rem03b01.txt imports/wander-clean/rem03b0200.txt > /tmp/source.b64
-          cat imports/wander-clean/tailhex00.txt imports/wander-clean/tailhex01.txt imports/wander-clean/tailhex02a.txt imports/wander-clean/tailhex02b00.txt imports/wander-clean/tailhex02b01.txt imports/wander-clean/tailhex03.txt | xxd -r -p >> /tmp/source.b64
-          base64 -d /tmp/source.b64 > /tmp/source.zip
-          unzip -o /tmp/source.zip -d /tmp/wander-travel
-
-      - name: Check source
-        run: |
-          test -f /tmp/wander-travel/index.html
-          test -f /tmp/wander-travel/styles.css
-          test -f /tmp/wander-travel/app.js
+          test -f apps/wander-travel/index.html
+          test -f apps/wander-travel/styles.css
+          test -f apps/wander-travel/app.js
 
       - name: Create Pages project
         env:
@@ -42,4 +34,4 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@latest pages deploy /tmp/wander-travel --project-name=wander-travel
+        run: npx --yes wrangler@latest pages deploy apps/wander-travel --project-name=wander-travel
