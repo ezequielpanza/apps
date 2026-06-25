@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = 'v0.13.0';
+  const APP_VERSION = 'v0.13.1';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
   document.title = `Wander Travel ${APP_VERSION}`;
@@ -43,20 +43,29 @@
   let modeIndex = 0;
   let activeButton = null;
   let followCursor = true;
+  let stoppedForReverse = false;
 
-  function setButtonState(button, mode) {
+  function setButtonState(button, mode, speedLabel = null) {
     buttons.forEach((item) => {
       item.classList.remove('is-active');
       item.removeAttribute('data-speed');
       item.setAttribute('aria-pressed', 'false');
     });
-    if (!button || !mode) return;
+    if (!button) return;
     button.classList.add('is-active');
-    button.dataset.speed = mode.speedLabel;
+    button.dataset.speed = speedLabel || mode?.speedLabel || '';
     button.setAttribute('aria-pressed', 'true');
   }
 
   function updateUi() {
+    if (stoppedForReverse) {
+      if (status) status.textContent = `Detenido · dirección ${directionLabels[activeDirection]} preparada · 0 km/h`;
+      if (modeMetric) modeMetric.textContent = 'Detenido';
+      if (speedMetric) speedMetric.textContent = '0 km/h';
+      setButtonState(activeButton, null, '0 km/h');
+      return;
+    }
+
     const mode = modes[modeIndex];
     if (status) {
       const viewState = followCursor ? '' : ' · Vista libre';
@@ -87,7 +96,7 @@
   }
 
   function moveOneTick() {
-    if (!activeDirection) return;
+    if (!activeDirection || stoppedForReverse) return;
     const mode = modes[modeIndex];
     const [northFactor, eastFactor] = directions[activeDirection];
     const meters = (mode.kmh * 1000 / 3600) * (TICK_MS / 1000);
@@ -103,16 +112,41 @@
     timer = window.setInterval(moveOneTick, TICK_MS);
   }
 
+  function prepareOppositeDirection(direction, button) {
+    if (timer) window.clearInterval(timer);
+    timer = null;
+    activeDirection = direction;
+    activeButton = button;
+    modeIndex = 0;
+    stoppedForReverse = true;
+    updateUi();
+  }
+
   function startOrAdjust(button) {
     const direction = button.dataset.move;
     if (!directions[direction]) return;
 
+    if (stoppedForReverse) {
+      activeDirection = direction;
+      activeButton = button;
+      modeIndex = 0;
+      stoppedForReverse = false;
+      updateUi();
+      moveOneTick();
+      restartTimer();
+      return;
+    }
+
     if (timer && activeDirection === direction) {
       modeIndex = Math.min(modeIndex + 1, modes.length - 1);
     } else if (timer && oppositeDirections[activeDirection] === direction) {
-      modeIndex = Math.max(modeIndex - 1, 0);
-      activeDirection = direction;
-      activeButton = button;
+      if (modeIndex > 0) {
+        modeIndex -= 1;
+        updateUi();
+        return;
+      }
+      prepareOppositeDirection(direction, button);
+      return;
     } else {
       activeDirection = direction;
       activeButton = button;
@@ -129,6 +163,7 @@
     activeDirection = null;
     activeButton = null;
     modeIndex = 0;
+    stoppedForReverse = false;
     setButtonState(null, null);
     if (status) status.textContent = 'Movimiento detenido · 0 km/h';
     if (modeMetric) modeMetric.textContent = 'Detenido';
