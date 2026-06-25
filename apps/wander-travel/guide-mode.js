@@ -6,6 +6,7 @@
 
   if (typeof marker === 'undefined' || typeof map === 'undefined') return;
 
+  const internetLayer = L.layerGroup().addTo(map);
   let lastCheckedPosition = marker.getLatLng();
   let lastMessageAt = 0;
   let busy = false;
@@ -24,6 +25,10 @@
 
   function historicalNearbyEnabled() {
     return getSettings().guideHistoricalNearbyEnabled !== false;
+  }
+
+  function internetDiscoveryEnabled() {
+    return getSettings().guideInternetDiscoveryEnabled !== false;
   }
 
   function getMemory() {
@@ -65,7 +70,7 @@
       .map((item) => {
         const name = item.querySelector('strong')?.textContent?.trim();
         const detail = item.querySelector('span')?.textContent?.trim();
-        return name ? { name, detail } : null;
+        return name ? { name, detail, source: 'map' } : null;
       })
       .filter(Boolean);
   }
@@ -90,6 +95,76 @@
     } catch {
       return null;
     }
+  }
+
+  async function fetchWikipediaNearby(point) {
+    if (!internetDiscoveryEnabled()) return [];
+
+    async function search(language) {
+      const url = new URL(`https://${language}.wikipedia.org/w/api.php`);
+      url.searchParams.set('action', 'query');
+      url.searchParams.set('generator', 'geosearch');
+      url.searchParams.set('ggsprimary', 'all');
+      url.searchParams.set('ggsnamespace', '0');
+      url.searchParams.set('ggsradius', '10000');
+      url.searchParams.set('ggslimit', '12');
+      url.searchParams.set('ggscoord', `${point.lat}|${point.lng}`);
+      url.searchParams.set('prop', 'coordinates|extracts|info');
+      url.searchParams.set('exintro', '1');
+      url.searchParams.set('explaintext', '1');
+      url.searchParams.set('inprop', 'url');
+      url.searchParams.set('format', 'json');
+      url.searchParams.set('origin', '*');
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Object.values(data?.query?.pages || {}).map((page) => {
+        const coordinate = page.coordinates?.[0];
+        if (!coordinate) return null;
+        return {
+          id: `wikipedia-${language}-${page.pageid}`,
+          name: page.title,
+          summary: String(page.extract || '').slice(0, 500),
+          lat: coordinate.lat,
+          lng: coordinate.lon,
+          url: page.fullurl || null,
+          source: `Wikipedia ${language.toUpperCase()}`,
+          distance: map.distance(point, [coordinate.lat, coordinate.lon]),
+        };
+      }).filter(Boolean);
+    }
+
+    try {
+      let results = await search('es');
+      if (results.length < 4) {
+        const english = await search('en');
+        const known = new Set(results.map((item) => item.name.toLowerCase()));
+        results = results.concat(english.filter((item) => !known.has(item.name.toLowerCase())));
+      }
+      return results.sort((a, b) => a.distance - b.distance).slice(0, 12);
+    } catch {
+      return [];
+    }
+  }
+
+  function renderInternetPois(pois) {
+    internetLayer.clearLayers();
+    window.wanderInternetPois = pois;
+
+    pois.forEach((poi) => {
+      const icon = L.divIcon({
+        className: '',
+        html: '<div style="width:18px;height:18px;border-radius:50%;background:#b06f32;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,.25)"></div>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      });
+      const distance = poi.distance < 1000 ? `${Math.round(poi.distance)} m` : `${(poi.distance / 1000).toFixed(1)} km`;
+      L.marker([poi.lat, poi.lng], { icon })
+        .bindPopup(`<strong>${poi.name}</strong><br>Descubierto en internet<br>${distance}`)
+        .addTo(internetLayer);
+    });
+
+    document.dispatchEvent(new CustomEvent('wander:internet-pois-updated', { detail: pois }));
   }
 
   function topicKey(place, pois, point) {
@@ -123,7 +198,7 @@
   }
 
   async function evaluateGuideMoment(force = false) {
-    if (!guideEnabled() || !historicalNearbyEnabled() || busy) return;
+    if (!guideEnabled() || busy) return;
 
     const now = Date.now();
     if (!force && now - lastMessageAt < MIN_SECONDS_BETWEEN_MESSAGES * 1000) return;
@@ -136,26 +211,41 @@
     lastCheckedPosition = L.latLng(point.lat, point.lng);
 
     try {
-      const [place, pois] = await Promise.all([
+      const [place, internetPois] = await Promise.all([
         reverseGeocode(point),
-        Promise.resolve(nearbyPois()),
+        fetchWikipediaNearby(point),
       ]);
+      renderInternetPois(internetPois);
+
+      const mapPois = nearbyPois();
+      const allPois = [...mapPois, ...internetPois.map((poi) => ({
+        name: poi.name,
+        detail: poi.summary,
+        source: poi.source,
+        distance: poi.distance,
+      }))];
 
       const memory = getMemory();
-      const key = topicKey(place, pois, point);
+      const key = topicKey(place, allPois, point);
       if (!force && memory.topics.includes(key)) return;
 
       const selectedInterests = interests();
+      const enabledTopics = [];
+      if (historicalNearbyEnabled()) enabledTopics.push('datos históricos y curiosidades cercanas');
+      if (internetDiscoveryEnabled()) enabledTopics.push('información y lugares descubiertos en internet que no figuran en el mapa');
+      if (!enabledTopics.length) return;
+
       const response = await fetch('/api/assistant', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          message: 'Actuá como guía de turismo. Los intereses enviados son gustos confirmados del usuario y debés hablar como alguien que ya los conoce. Contá datos históricos o curiosidades de lo que hay cerca y priorizá lo que coincida con esos intereses. Si recomendás algo relacionado, decí por ejemplo: Como te gustan los museos, te propongo este lugar; o Como te interesa la historia, te cuento esto. No uses frases condicionales cuando el interés ya figura entre sus preferencias. Escribí texto limpio y natural, pensado para ser leído en voz alta, sin Markdown, asteriscos, listas, títulos ni enlaces. No repitas temas ya contados. Si no hay suficiente información verificable o no vale la pena interrumpir, respondé exactamente SILENCIO.',
+          message: `Actuá como guía de turismo. Podés hablar sobre: ${enabledTopics.join(' y ')}. Los intereses enviados son gustos confirmados del usuario y debés hablar como alguien que ya los conoce. Priorizá lo más interesante y no repitas temas. Escribí texto limpio y natural, preparado para voz, sin Markdown, listas ni enlaces. Si no hay suficiente información verificable o no vale la pena interrumpir, respondé exactamente SILENCIO.`,
           context: {
-            mode: 'tour_guide_historical_nearby',
+            mode: 'tour_guide',
             location: { lat: point.lat, lng: point.lng },
             place,
-            nearby_pois: pois,
+            nearby_pois: mapPois,
+            internet_discovered_pois: internetPois,
             interests: selectedInterests,
             interests_are_confirmed_preferences: true,
             movement: {
@@ -183,7 +273,11 @@
   }
 
   document.addEventListener('wander:tour-guide-setting', (event) => {
-    if (event.detail?.enabled && event.detail?.historicalNearbyEnabled !== false) {
+    if (!event.detail?.internetDiscoveryEnabled) {
+      internetLayer.clearLayers();
+      window.wanderInternetPois = [];
+    }
+    if (event.detail?.enabled) {
       lastCheckedPosition = marker.getLatLng();
       window.setTimeout(() => evaluateGuideMoment(true), 1200);
     }
@@ -191,6 +285,6 @@
 
   window.setInterval(() => evaluateGuideMoment(false), CHECK_MS);
   window.setTimeout(() => {
-    if (guideEnabled() && historicalNearbyEnabled()) evaluateGuideMoment(true);
+    if (guideEnabled()) evaluateGuideMoment(true);
   }, 3500);
 })();
