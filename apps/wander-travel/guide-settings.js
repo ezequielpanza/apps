@@ -6,12 +6,28 @@
     guideInternetDiscoveryEnabled: true,
   };
 
+  const panelList = document.querySelector('#guide-panel .settings-list');
   const masterToggle = document.querySelector('#setting-tour-guide');
   const historicalToggle = document.querySelector('#setting-guide-history-nearby');
-  const internetToggle = document.querySelector('#setting-guide-internet-discovery');
   const status = document.querySelector('#guide-settings-save-status');
 
-  if (!masterToggle || !historicalToggle || !internetToggle) return;
+  if (!panelList || !masterToggle || !historicalToggle) return;
+
+  if (!document.querySelector('#setting-guide-internet-discovery')) {
+    const card = document.createElement('section');
+    card.className = 'settings-card';
+    card.innerHTML = `
+      <div>
+        <h3>Buscar información y lugares en internet</h3>
+        <p>Amplía el recorrido con sitios e historias que no aparecen en el mapa ni en los POIs locales.</p>
+      </div>
+      <label class="settings-switch"><input id="setting-guide-internet-discovery" type="checkbox" checked /><span></span></label>
+    `;
+    panelList.appendChild(card);
+  }
+
+  const internetToggle = document.querySelector('#setting-guide-internet-discovery');
+  if (!internetToggle) return;
 
   function loadSettings() {
     try {
