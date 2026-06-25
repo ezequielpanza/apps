@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wander Travel v0.9.0</title>
+  <title>Wander Travel v0.10.1</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="styles.css?v=20260625-2" />
   <style>
@@ -17,7 +17,7 @@
 
       <header class="top-bar">
         <div>
-          <div class="app-brand-line"><p class="eyebrow">Wander Travel</p><span class="app-version">v0.9.0</span></div>
+          <div class="app-brand-line"><p class="eyebrow">Wander Travel</p><span class="app-version">v0.10.1</span></div>
           <h1>Explorando Great Inagua</h1>
         </div>
         <button class="round-button" type="button" aria-label="Auriculares conectados">🎧</button>
@@ -94,27 +94,37 @@
         </div>
       </section>
 
-      <section class="control-section guide-section">
-        <div class="section-title guide-title">
-          <h2>Guia personal</h2>
-          <button id="toggle-guide-settings" class="icon-button" type="button">⚙</button>
-          <label class="switch-control"><input id="guide-toggle" type="checkbox" checked /><span></span></label>
-        </div>
-        <div id="guide-settings" class="guide-settings" hidden>
-          <label class="field-label" for="interest-input">Me interesa que Wander me cuente sobre</label>
-          <div class="tag-input-row">
-            <input id="interest-input" type="text" value="historia local, cafes antiguos, arquitectura rara" />
-            <button id="apply-interests" type="button">Agregar</button>
+      <section class="control-section interest-section" aria-labelledby="interest-title">
+        <div class="interest-section-header">
+          <div>
+            <h2 id="interest-title">Intereses</h2>
+            <p class="interest-help">Wander solo mostrará al usuario POIs que coincidan con estas etiquetas.</p>
           </div>
-          <div id="interest-tags" class="tag-list"></div>
-          <p class="section-kicker">Ideas para sumar</p>
-          <div class="suggested-tags">
-            <button type="button" data-suggest-tag="leyendas urbanas">leyendas urbanas</button>
-            <button type="button" data-suggest-tag="fiestas populares">fiestas populares</button>
-            <button type="button" data-suggest-tag="lugares tranquilos">lugares tranquilos</button>
-            <button type="button" data-suggest-tag="comida callejera">comida callejera</button>
-          </div>
+          <span id="selected-interest-summary" class="selected-interest-summary">5 intereses seleccionados</span>
         </div>
+
+        <div id="interest-selector" class="interest-chip-grid" role="group" aria-label="Seleccionar intereses">
+          <button type="button" class="interest-chip is-selected" data-interest-tag="Cafés" aria-pressed="true">Cafés</button>
+          <button type="button" class="interest-chip is-selected" data-interest-tag="Restaurantes" aria-pressed="true">Restaurantes</button>
+          <button type="button" class="interest-chip is-selected" data-interest-tag="Sitios históricos" aria-pressed="true">Sitios históricos</button>
+          <button type="button" class="interest-chip is-selected" data-interest-tag="Naturaleza" aria-pressed="true">Naturaleza</button>
+          <button type="button" class="interest-chip is-selected" data-interest-tag="Museos" aria-pressed="true">Museos</button>
+          <button type="button" class="interest-chip" data-interest-tag="Miradores" aria-pressed="false">Miradores</button>
+          <button type="button" class="interest-chip" data-interest-tag="Arte" aria-pressed="false">Arte</button>
+          <button type="button" class="interest-chip" data-interest-tag="Compras" aria-pressed="false">Compras</button>
+          <button type="button" class="interest-chip" data-interest-tag="Vida nocturna" aria-pressed="false">Vida nocturna</button>
+          <button type="button" class="interest-chip" data-interest-tag="Playas" aria-pressed="false">Playas</button>
+        </div>
+
+        <div id="custom-interest-tags" class="custom-interest-tags"></div>
+
+        <div class="interest-custom-row">
+          <input id="custom-interest-input" type="text" placeholder="Agregar otro interés" aria-label="Agregar otro interés" />
+          <button id="add-custom-interest" type="button">Agregar</button>
+        </div>
+
+        <input id="interest-input" class="interest-input-hidden" type="text" value="Cafés, Restaurantes, Sitios históricos, Naturaleza, Museos" aria-hidden="true" tabindex="-1" />
+        <button id="apply-interests" type="button" hidden>Aplicar intereses</button>
       </section>
 
       <section class="control-section message-section">
@@ -154,7 +164,9 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="app.js?v=20260625-3"></script>
-  <script src="movement-simulator.js?v=20260625-2"></script>
+  <script src="interest-tags.js?v=20260625-1"></script>
+  <script src="movement-simulator.js?v=20260625-3"></script>
+  <script src="poi-engine.js?v=20260625-1"></script>
   <script src="panels.js?v=20260625-4"></script>
 </body>
 </html>
