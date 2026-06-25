@@ -128,3 +128,11 @@
     stopMovement();
   }, true);
 })();
+
+(() => {
+  if (document.querySelector('script[data-map-recenter]')) return;
+  const script = document.createElement('script');
+  script.src = 'map-recenter.js?v=20260625-1';
+  script.dataset.mapRecenter = 'true';
+  document.body.appendChild(script);
+})();
