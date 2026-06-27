@@ -35,9 +35,9 @@
   }
 
   function profileFor(mode) {
-    if (mode === 'bike') return { base: 'https://routing.openstreetmap.de/routed-bike/route/v1/driving', speed: 16, label: 'en bici/monopatín' };
-    if (mode === 'car') return { base: 'https://router.project-osrm.org/route/v1/driving', speed: 45, label: 'en auto' };
-    return { base: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving', speed: 5, label: 'caminando' };
+    if (mode === 'bike') return { bases: ['https://routing.openstreetmap.de/routed-bike/route/v1/driving'], speed: 16, label: 'en bici/monopatín', mode: 'bike' };
+    if (mode === 'car') return { bases: ['https://router.project-osrm.org/route/v1/driving'], speed: 45, label: 'en auto', mode: 'car' };
+    return { bases: ['https://routing.openstreetmap.de/routed-foot/route/v1/foot', 'https://routing.openstreetmap.de/routed-foot/route/v1/driving'], speed: 5, label: 'caminando', mode: 'walk' };
   }
 
   function currentProfile() {
@@ -64,17 +64,45 @@
     return destination;
   }
 
+  function drawDirectRoute(origin, destination, profile, fit, reason = 'Ruta directa aproximada') {
+    if (navigationLayer) map.removeLayer(navigationLayer);
+    navigationLayer = L.polyline([[origin.lat, origin.lng], [destination.lat, destination.lng]], { weight: 6, opacity: 0.75, dashArray: '10 8', color: '#147d78' }).addTo(map);
+    const directDistance = map.distance(origin, [destination.lat, destination.lng]);
+    const minutes = Math.max(1, Math.round((directDistance / 1000) / profile.speed * 60));
+    showStatus(`${reason} a ${destination.name || 'el destino'} · ${profile.label} · ${formatDistance(directDistance)} · ${minutes} min`);
+    if (fit) map.fitBounds(navigationLayer.getBounds().pad(0.2));
+    lastRouteOrigin = L.latLng(origin.lat, origin.lng);
+  }
+
+  async function fetchRouteFromBases(profile, origin, destination) {
+    let lastError = null;
+    for (const base of profile.bases) {
+      try {
+        const url = `${base}/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Routing ${response.status}`);
+        const data = await response.json();
+        const routes = (data.routes || []).filter((route) => route?.geometry?.coordinates?.length);
+        if (routes.length) return routes.sort((a, b) => a.distance - b.distance)[0];
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error('Sin ruta');
+  }
+
   async function buildRoute(destination, fit = true) {
     const origin = marker.getLatLng();
     const profile = currentProfile();
-    const url = `${profile.base}/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&steps=true`;
+    const directDistance = map.distance(origin, [destination.lat, destination.lng]);
 
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Routing ${response.status}`);
-      const data = await response.json();
-      const route = data.routes?.[0];
-      if (!route?.geometry?.coordinates?.length) throw new Error('Sin ruta');
+      const route = await fetchRouteFromBases(profile, origin, destination);
+      const tooLongForWalk = profile.mode === 'walk' && directDistance > 0 && route.distance / directDistance > 1.75 && route.distance - directDistance > 250;
+      if (tooLongForWalk) {
+        drawDirectRoute(origin, destination, profile, fit, 'Camino más corto aproximado');
+        return;
+      }
 
       const latLngs = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
       if (navigationLayer) map.removeLayer(navigationLayer);
@@ -88,13 +116,7 @@
       if (fit) map.fitBounds(navigationLayer.getBounds().pad(0.16));
       lastRouteOrigin = L.latLng(origin.lat, origin.lng);
     } catch {
-      if (navigationLayer) map.removeLayer(navigationLayer);
-      navigationLayer = L.polyline([[origin.lat, origin.lng], [destination.lat, destination.lng]], { weight: 6, opacity: 0.75, dashArray: '10 8', color: '#147d78' }).addTo(map);
-      const directDistance = map.distance(origin, [destination.lat, destination.lng]);
-      const minutes = Math.max(1, Math.round((directDistance / 1000) / currentProfile().speed * 60));
-      showStatus(`Ruta aproximada a ${destination.name || 'el destino'} · ${profile.label} · ${formatDistance(directDistance)} · ${minutes} min`);
-      if (fit) map.fitBounds(navigationLayer.getBounds().pad(0.2));
-      lastRouteOrigin = L.latLng(origin.lat, origin.lng);
+      drawDirectRoute(origin, destination, profile, fit, 'Ruta aproximada');
     }
   }
 
