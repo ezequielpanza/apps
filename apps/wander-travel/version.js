@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.22.0';
+  const version = 'v0.23.0';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
