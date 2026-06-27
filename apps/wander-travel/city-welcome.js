@@ -3,6 +3,7 @@
 
   const STORAGE_KEY = 'wander-travel-settings';
   const MEMORY_KEY = 'wander-travel-city-welcome-memory';
+  const STATE_KEY = 'wander-travel-city-welcome-state';
   let busy = false;
 
   function settings() {
@@ -17,6 +18,16 @@
 
   function saveMemory(next) {
     localStorage.setItem(MEMORY_KEY, JSON.stringify(next));
+  }
+
+  function state() {
+    try { return JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); }
+    catch { return {}; }
+  }
+
+  function saveState(next) {
+    localStorage.setItem(STATE_KEY, JSON.stringify(next));
+    document.dispatchEvent(new CustomEvent('wander:city-welcome-state', { detail: next }));
   }
 
   function interests() {
@@ -54,9 +65,13 @@
 
     const key = city.toLowerCase();
     const seen = memory();
-    if (!force && seen[key]) return;
+    if (!force && seen[key]) {
+      saveState({ city, status: 'already_shown', shownAt: seen[key], poiAllowedAt: Date.now() + 2500 });
+      return;
+    }
 
     busy = true;
+    saveState({ city, status: 'pending', startedAt: Date.now(), poiAllowedAt: Date.now() + 9000 });
     try {
       const point = marker.getLatLng();
       const routeOptions = window.WanderHumanRouteContext?.buildRouteOptions?.({ city }) || [];
@@ -71,9 +86,9 @@
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          message: `Empezá exactamente con: Bienvenido a ${city}. Después presentá la ciudad como guía de turismo por auriculares. Proponé alternativas para empezar a moverse según los intereses del usuario. Usá orientación humana, no referencias al mapa ni a la pantalla. No digas arriba, abajo, arriba a la derecha, abajo a la izquierda ni puntos cardinales. Si no sabés hacia dónde mira la persona, usá cerca de tu posición actual, a tantos minutos o a tantas cuadras. Largo ${lengthText}. Sumá ${humorText}. ${useTime ? 'Incluí una referencia temporal natural del día, sin decir la hora exacta.' : 'No menciones el momento del día.'} ${useWeather ? 'Podés mencionar clima o temperatura solo si aporta al recorrido.' : 'No menciones clima ni temperatura.'} Texto limpio para voz, sin Markdown, sin listas ni enlaces.`,
+          message: `Empezá exactamente con: Bienvenido a ${city}. Después presentá la ciudad como guía de turismo por auriculares. Todavía no enumeres POIs puntuales ni detalles de lugares específicos: primero da una bienvenida general, contexto de la ciudad y una orientación inicial. Al final podés decir que en unos segundos vas a proponer alternativas concretas. Usá orientación humana, no referencias al mapa ni a la pantalla. No digas arriba, abajo, arriba a la derecha, abajo a la izquierda ni puntos cardinales. Si no sabés hacia dónde mira la persona, usá cerca de tu posición actual, a tantos minutos o a tantas cuadras. Largo ${lengthText}. Sumá ${humorText}. ${useTime ? 'Incluí una referencia temporal natural del día, sin decir la hora exacta.' : 'No menciones el momento del día.'} ${useWeather ? 'Podés mencionar clima o temperatura solo si aporta al recorrido.' : 'No menciones clima ni temperatura.'} Texto limpio para voz, sin Markdown, sin listas ni enlaces.`,
           context: {
-            mode: 'tour_guide',
+            mode: 'city_welcome',
             city,
             location: { lat: point.lat, lng: point.lng },
             interests: interests(),
@@ -98,7 +113,12 @@
         show(text);
         seen[key] = Date.now();
         saveMemory(seen);
+        saveState({ city, status: 'shown', shownAt: Date.now(), poiAllowedAt: Date.now() + 12000 });
+      } else {
+        saveState({ city, status: 'failed', failedAt: Date.now(), poiAllowedAt: Date.now() + 4000 });
       }
+    } catch {
+      saveState({ city, status: 'failed', failedAt: Date.now(), poiAllowedAt: Date.now() + 4000 });
     } finally {
       busy = false;
     }
@@ -106,11 +126,11 @@
 
   document.addEventListener('wander:developer-city-changed', (event) => {
     const city = event.detail?.city?.shortName || event.detail?.city?.name;
-    window.setTimeout(() => welcome(city, false), 1800);
+    window.setTimeout(() => welcome(city, false), 1200);
   });
 
   window.setTimeout(() => {
     const title = document.querySelector('.top-bar h1')?.textContent?.replace(/^Explorando\s+/i, '').trim();
     if (title) welcome(title, false);
-  }, 5000);
+  }, 1600);
 })();
