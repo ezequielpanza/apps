@@ -1,16 +1,8 @@
 (() => {
-  const version = 'v0.32.0';
+  const version = 'v0.33.0';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
-
-  if (!document.querySelector('link[data-movement-overlay-width-fix]')) {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'movement-overlay-width-fix.css?v=20260625-3';
-    link.dataset.movementOverlayWidthFix = 'true';
-    document.head.appendChild(link);
-  }
 
   const loadScript = (src, dataKey) => {
     if (document.querySelector(`script[data-${dataKey}]`)) return;
@@ -28,6 +20,7 @@
   loadScript('system-controls.js?v=20260625-3', 'system-controls');
   loadScript('poi-interactions.js?v=20260625-1', 'poi-interactions');
   loadScript('poi-click-resolver.js?v=20260625-1', 'poi-click-resolver');
+  loadScript('unified-poi-internet-bridge.js?v=20260625-1', 'unified-poi-internet-bridge');
   loadScript('developer-city.js?v=20260625-1', 'developer-city');
   loadScript('human-route-context.js?v=20260625-2', 'human-route-context');
   loadScript('city-welcome.js?v=20260625-2', 'city-welcome');
