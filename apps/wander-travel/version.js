@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.23.0';
+  const version = 'v0.24.0';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
@@ -27,4 +27,5 @@
   loadScript('system-controls.js?v=20260625-3', 'system-controls');
   loadScript('poi-interactions.js?v=20260625-1', 'poi-interactions');
   loadScript('developer-city.js?v=20260625-1', 'developer-city');
+  loadScript('human-route-context.js?v=20260625-1', 'human-route-context');
 })();
