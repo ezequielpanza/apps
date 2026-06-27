@@ -31,6 +31,17 @@
     return getSettings().guideInternetDiscoveryEnabled !== false;
   }
 
+  function guidePreferences() {
+    const settings = getSettings();
+    return {
+      welcomeEnabled: settings.guideWelcomeEnabled !== false,
+      humorLevel: settings.guideHumorLevel || 'medio',
+      welcomeLength: settings.guideWelcomeLength || 'normal',
+      useWeatherContext: settings.guideUseWeatherContext !== false,
+      useTimeContext: settings.guideUseTimeContext !== false,
+    };
+  }
+
   function getMemory() {
     try {
       const parsed = JSON.parse(localStorage.getItem(MEMORY_KEY) || '{}');
@@ -167,8 +178,22 @@
     document.dispatchEvent(new CustomEvent('wander:internet-pois-updated', { detail: pois }));
   }
 
+  function cityName(place) {
+    return place?.address?.city || place?.address?.town || place?.address?.village || place?.address?.island || place?.address?.municipality || null;
+  }
+
+  function dayMoment() {
+    const hour = new Date().getHours();
+    if (hour < 6) return 'madrugada';
+    if (hour < 11) return 'mañana';
+    if (hour < 14) return 'mediodía';
+    if (hour < 18) return 'tarde';
+    if (hour < 21) return 'atardecer';
+    return 'noche';
+  }
+
   function topicKey(place, pois, point) {
-    const area = place?.address?.city || place?.address?.town || place?.address?.village || place?.address?.island || place?.display_name || '';
+    const area = cityName(place) || place?.display_name || '';
     const poiPart = pois.slice(0, 3).map((poi) => poi.name.toLowerCase()).join('|');
     return `${area.toLowerCase()}|${poiPart}|${point.lat.toFixed(3)},${point.lng.toFixed(3)}`;
   }
@@ -195,6 +220,17 @@
       while (feed.children.length > 12) feed.lastElementChild?.remove();
       if (count) count.textContent = String(feed.children.length);
     }
+  }
+
+  async function askWander(messageText, context) {
+    const response = await fetch('/api/assistant', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: messageText, context }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.ok) return null;
+    return data.message?.trim() || null;
   }
 
   async function evaluateGuideMoment(force = false) {
@@ -226,46 +262,62 @@
       }))];
 
       const memory = getMemory();
+      const selectedInterests = interests();
+      const preferences = guidePreferences();
+      const city = cityName(place) || document.querySelector('.top-bar h1')?.textContent?.replace(/^Explorando\s+/i, '').trim() || 'este lugar';
+      const welcomeKey = `welcome:${city.toLowerCase()}`;
+
+      const baseContext = {
+        mode: 'tour_guide',
+        location: { lat: point.lat, lng: point.lng },
+        place,
+        city,
+        nearby_pois: mapPois,
+        internet_discovered_pois: internetPois,
+        interests: selectedInterests,
+        interests_are_confirmed_preferences: true,
+        guide_preferences: preferences,
+        temporal_context: preferences.useTimeContext ? { day_moment: dayMoment(), instruction: 'Usar referencias como mañana, mediodía, tarde, atardecer o noche, sin decir la hora exacta.' } : null,
+        weather_context: preferences.useWeatherContext ? (window.wanderWeatherContext || null) : null,
+        movement: {
+          mode: document.querySelector('.status-rail .metric:nth-child(1) strong')?.textContent || null,
+          speed: document.querySelector('.status-rail .metric:nth-child(2) strong')?.textContent || null,
+        },
+        already_told_topics: memory.topics.slice(-30),
+        recent_messages: memory.messages.slice(-10),
+      };
+
+      if (force && preferences.welcomeEnabled && city && !memory.topics.includes(welcomeKey)) {
+        const welcomeLengthText = preferences.welcomeLength === 'breve' ? 'muy breve, unos 45 a 65 palabras' : preferences.welcomeLength === 'detallada' ? 'algo más completa, hasta 150 palabras' : 'normal, entre 80 y 110 palabras';
+        const humorText = preferences.humorLevel === 'bajo' ? 'humor muy sutil o ninguno' : preferences.humorLevel === 'alto' ? 'un toque de humor más presente pero sin hacer stand-up' : 'un toque de humor suave';
+        const welcome = await askWander(`Dale la bienvenida al usuario a ${city}. Presentá la ciudad o pueblo con una lectura útil, proponé 2 o 3 líneas posibles de recorrido según sus intereses y mencioná paradas de energía como café, restaurante, bar o sombra si tiene sentido. Usá ${welcomeLengthText}. Sumá ${humorText}. ${preferences.useTimeContext ? 'Incluí una referencia temporal natural del momento del día, pero no digas la hora exacta.' : 'No menciones el momento del día.'} ${preferences.useWeatherContext ? 'Podés mencionar clima o temperatura solo si aporta a decidir el recorrido.' : 'No menciones clima ni temperatura.'} Texto limpio para voz, sin Markdown, sin listas ni enlaces.`, baseContext);
+        if (welcome && welcome.toUpperCase() !== 'SILENCIO') {
+          showGuideMessage(welcome);
+          lastMessageAt = Date.now();
+          memory.topics.push(welcomeKey);
+          memory.messages.push(welcome);
+          saveMemory(memory);
+          return;
+        }
+      }
+
       const key = topicKey(place, allPois, point);
       if (!force && memory.topics.includes(key)) return;
 
-      const selectedInterests = interests();
       const enabledTopics = [];
       if (historicalNearbyEnabled()) enabledTopics.push('datos históricos y curiosidades cercanas');
       if (internetDiscoveryEnabled()) enabledTopics.push('información y lugares descubiertos en internet que no figuran en el mapa');
       if (!enabledTopics.length) return;
 
-      const response = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          message: `Actuá como guía de turismo. Podés hablar sobre: ${enabledTopics.join(' y ')}. Los intereses enviados son gustos confirmados del usuario y debés hablar como alguien que ya los conoce. Priorizá lo más interesante y no repitas temas. Escribí texto limpio y natural, preparado para voz, sin Markdown, listas ni enlaces. Si no hay suficiente información verificable o no vale la pena interrumpir, respondé exactamente SILENCIO.`,
-          context: {
-            mode: 'tour_guide',
-            location: { lat: point.lat, lng: point.lng },
-            place,
-            nearby_pois: mapPois,
-            internet_discovered_pois: internetPois,
-            interests: selectedInterests,
-            interests_are_confirmed_preferences: true,
-            movement: {
-              mode: document.querySelector('.status-rail .metric:nth-child(1) strong')?.textContent || null,
-              speed: document.querySelector('.status-rail .metric:nth-child(2) strong')?.textContent || null,
-            },
-            already_told_topics: memory.topics.slice(-30),
-            recent_messages: memory.messages.slice(-10),
-          },
-        }),
-      });
+      const humorText = preferences.humorLevel === 'bajo' ? 'humor mínimo' : preferences.humorLevel === 'alto' ? 'humor presente pero breve' : 'humor suave';
+      const guideText = await askWander(`Actuá como guía de turismo. Podés hablar sobre: ${enabledTopics.join(' y ')}. Los intereses enviados son gustos confirmados del usuario y debés hablar como alguien que ya los conoce. Priorizá lo más interesante y no repitas temas. Usá ${humorText}. ${preferences.useTimeContext ? 'Podés usar una referencia temporal natural del día, pero no digas la hora exacta.' : 'No menciones el momento del día.'} ${preferences.useWeatherContext ? 'Podés usar clima o temperatura si realmente aporta al recorrido.' : 'No menciones clima ni temperatura.'} Escribí texto limpio y natural, preparado para voz, sin Markdown, listas ni enlaces. Si no hay suficiente información verificable o no vale la pena interrumpir, respondé exactamente SILENCIO.`, baseContext);
 
-      const data = await response.json().catch(() => null);
-      const text = data?.message?.trim();
-      if (!response.ok || !data?.ok || !text || text.toUpperCase() === 'SILENCIO') return;
+      if (!guideText || guideText.toUpperCase() === 'SILENCIO') return;
 
-      showGuideMessage(text);
+      showGuideMessage(guideText);
       lastMessageAt = Date.now();
       memory.topics.push(key);
-      memory.messages.push(text);
+      memory.messages.push(guideText);
       saveMemory(memory);
     } finally {
       busy = false;
@@ -281,6 +333,11 @@
       lastCheckedPosition = marker.getLatLng();
       window.setTimeout(() => evaluateGuideMoment(true), 1200);
     }
+  });
+
+  document.addEventListener('wander:developer-city-changed', () => {
+    lastCheckedPosition = marker.getLatLng();
+    window.setTimeout(() => evaluateGuideMoment(true), 1200);
   });
 
   window.setInterval(() => evaluateGuideMoment(false), CHECK_MS);
