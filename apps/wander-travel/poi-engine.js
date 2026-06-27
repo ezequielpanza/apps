@@ -1,8 +1,7 @@
 (() => {
-  const APP_VERSION = 'v0.11.1';
+  const APP_VERSION = 'v0.27.0';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
-  document.title = `Wander Travel ${APP_VERSION}`;
 
   if (typeof map === 'undefined' || typeof marker === 'undefined' || typeof L === 'undefined') return;
 
@@ -101,6 +100,12 @@
     return 'otro';
   }
 
+  function sourceLabel(poi) {
+    const labels = ['OSM'];
+    if (poi.tags?.wikidata || poi.tags?.wikipedia) labels.push('Wiki');
+    return labels.join(' + ');
+  }
+
   function matchesInterests(poi, interests) {
     if (!interests.length) return false;
     const text = `${poi.name} ${poi.category} ${poi.tags?.description || ''}`.toLowerCase();
@@ -124,10 +129,43 @@
     return Math.max(1, Math.round((distance / 1000) / Math.max(speedKmh, 1) * 60));
   }
 
+  function openPoiPanel(poi) {
+    const panel = document.querySelector('.companion-panel');
+    const title = document.querySelector('#wander-title');
+    const message = document.querySelector('#wander-message');
+    const routeButton = document.querySelector('[data-message="route"]');
+    if (!panel || !title || !message) return;
+
+    const source = sourceLabel(poi);
+    title.textContent = `${poi.name} · ${source}`;
+    const details = [poi.category, `${formatDistance(poi.distance)} · ${poi.minutes} min`, `Fuente: ${source}`];
+    if (poi.tags?.description) details.push(poi.tags.description);
+    if (poi.tags?.opening_hours) details.push(`Horario: ${poi.tags.opening_hours}`);
+    if (poi.tags?.cuisine) details.push(`Cocina: ${poi.tags.cuisine}`);
+    message.textContent = details.filter(Boolean).join('. ');
+    panel.classList.remove('is-hidden');
+
+    window.wanderGuideDestination = {
+      name: poi.name,
+      lat: poi.point[0],
+      lng: poi.point[1],
+      source,
+    };
+    routeButton.hidden = false;
+    routeButton.style.display = '';
+    routeButton.textContent = 'Llévame';
+    document.dispatchEvent(new CustomEvent('wander:guide-destination', { detail: window.wanderGuideDestination }));
+  }
+
   function createMarker(poi, matched) {
     const color = matched ? '#147d78' : '#6c5aa8';
+    const source = sourceLabel(poi);
     const icon = L.divIcon({ className: '', html: `<div style="width:18px;height:18px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,.25)"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
-    return L.marker(poi.point, { icon }).bindPopup(`<strong>${poi.name}</strong><br>${poi.category}<br>${formatDistance(poi.distance)} · ${poi.minutes} min`);
+    const markerLayer = L.marker(poi.point, { icon });
+    markerLayer.wanderPoi = { name: poi.name, lat: poi.point[0], lng: poi.point[1], source, category: poi.category };
+    markerLayer.bindPopup(`<strong>${poi.name} · ${source}</strong><br>${poi.category}<br>${formatDistance(poi.distance)} · ${poi.minutes} min`);
+    markerLayer.on('click', () => openPoiPanel(poi));
+    return markerLayer;
   }
 
   function setDeveloperView(mode) {
@@ -147,7 +185,7 @@
 
     userLayer.clearLayers();
     developerLayer.clearLayers();
-    filtered.forEach((poi) => createMarker(poi, true).addTo(userLayer));
+    allPois.forEach((poi) => createMarker(poi, matchesInterests(poi, interests)).addTo(userLayer));
     developerPois.forEach((poi) => createMarker(poi, matchesInterests(poi, interests)).addTo(developerLayer));
 
     ui.mode.textContent = `${mode.label} · ${mode.speed.toFixed(0)} km/h`;
@@ -157,7 +195,8 @@
 
     ui.list.innerHTML = developerPois.length ? developerPois.map((poi) => {
       const matched = matchesInterests(poi, interests);
-      return `<article class="poi-debug-item${matched ? ' user-match' : ''}"><div><strong>${poi.name}</strong><span>${poi.category} · ${formatDistance(poi.distance)} · ${poi.minutes} min</span></div><em>${matched ? 'Etiqueta' : 'Sin filtro'}</em></article>`;
+      const source = sourceLabel(poi);
+      return `<article class="poi-debug-item${matched ? ' user-match' : ''}"><div><strong>${poi.name} · ${source}</strong><span>${poi.category} · ${formatDistance(poi.distance)} · ${poi.minutes} min · Fuente: ${source}</span></div><em>${matched ? 'Etiqueta' : 'Sin filtro'}</em></article>`;
     }).join('') : `<p class="developer-note">No hay POIs para la vista ${developerView === 'filtered' ? 'filtrada' : 'completa'}.</p>`;
 
     const devOpen = document.body.classList.contains('dev-panel-open');
@@ -207,6 +246,7 @@
       lastModeId = mode.id;
       ui.status.textContent = `${allPois.length} POIs encontrados dentro de ${formatDistance(mode.radius)}.`;
       render();
+      document.dispatchEvent(new CustomEvent('wander:poi-updated', { detail: allPois }));
     } catch {
       ui.status.textContent = 'No se pudieron actualizar los POIs. Reintentar.';
     } finally {
