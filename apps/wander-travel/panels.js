@@ -20,8 +20,20 @@
   const collapseTrip = document.querySelector('#collapse-panel');
   const collapseGuide = document.querySelector('#collapse-guide-panel');
   const collapseSettings = document.querySelector('#collapse-settings-panel');
+  let collapseDeveloper = document.querySelector('#collapse-dev-panel');
 
   if (!shell || Object.values(panels).some((panel) => !panel) || Object.values(tabs).some((tab) => !tab)) return;
+
+  if (!collapseDeveloper) {
+    const devTitle = panels.developer.querySelector('.section-title');
+    collapseDeveloper = document.createElement('button');
+    collapseDeveloper.id = 'collapse-dev-panel';
+    collapseDeveloper.className = 'icon-button';
+    collapseDeveloper.type = 'button';
+    collapseDeveloper.setAttribute('aria-label', 'Cerrar desarrollador');
+    collapseDeveloper.textContent = '×';
+    devTitle?.appendChild(collapseDeveloper);
+  }
 
   const PANEL_WIDTH = 'min(380px, 90vw)';
   const ANIMATION = { duration: 280, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' };
@@ -143,7 +155,7 @@
     }, true);
   });
 
-  [collapseTrip, collapseGuide, collapseSettings].forEach((button) => button?.addEventListener('click', (event) => {
+  [collapseTrip, collapseGuide, collapseSettings, collapseDeveloper].forEach((button) => button?.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
     closeAll();
