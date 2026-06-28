@@ -13,7 +13,7 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    body.wander-map-heading #wander-map{transform:rotate(var(--wander-map-rotation,0deg)) scale(1.42);transform-origin:50% 50%;transition:transform .18s ease;overflow:visible!important}
+    body.wander-map-heading #wander-map{transform:rotate(var(--wander-map-rotation,0deg));transform-origin:50% 50%;transition:transform .18s ease;overflow:visible!important}
     body.wander-map-heading .leaflet-map-pane{rotate:0deg!important;transform-origin:50% 50%!important}
     .wander-user-arrow{width:30px;height:30px;display:grid;place-items:center;transform:rotate(var(--wander-user-bearing,0deg))}
     .wander-user-arrow::before{content:"";width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:22px solid #173f3b;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))}
