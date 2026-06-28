@@ -6,9 +6,11 @@
   const LEGACY_TABS = ['#show-panel', '#show-guide-panel', '#show-dev-panel', '#show-settings-panel'];
   const ORIENTATION_MODES = ['center', 'route', 'compass', 'north'];
   let locateMode = 0;
-  let lastPoint = marker.getLatLng();
+  let lastGpsPoint = marker.getLatLng();
   let routeBearing = 0;
   let compassBearing = null;
+  let compassStarted = false;
+  let gpsWatchStarted = false;
 
   const style = document.createElement('style');
   style.textContent = `
@@ -16,12 +18,14 @@
     body.wander-clean-ui #show-panel,body.wander-clean-ui #show-guide-panel,body.wander-clean-ui #show-dev-panel,body.wander-clean-ui #show-settings-panel,body.wander-clean-ui .side-panel-tab,body.wander-clean-ui .guide-panel-tab,body.wander-clean-ui .dev-panel-tab,body.wander-clean-ui .settings-panel-tab{display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important}
     body.wander-clean-ui #real-poi-button,body.wander-clean-ui #route-button,body.wander-clean-ui .zoom-tools{display:none!important}
     body.wander-clean-ui .map-tools{top:18px!important;right:18px!important;left:auto!important;align-items:flex-end!important;gap:10px!important;z-index:900!important}
-    body.wander-clean-ui .map-tool,body.wander-clean-ui .clean-menu-button{width:50px!important;height:50px!important;min-width:50px!important;min-height:50px!important;padding:0!important;border:0!important;border-radius:50%!important;display:grid!important;place-items:center!important;background:rgba(255,255,255,.97)!important;color:#173f3b!important;box-shadow:0 10px 26px rgba(20,35,55,.18)!important;font-size:0!important;line-height:0!important;cursor:pointer!important;overflow:hidden!important}
+    body.wander-clean-ui .map-tool,body.wander-clean-ui .clean-menu-button{width:50px!important;height:50px!important;min-width:50px!important;min-height:50px!important;padding:0!important;border:0!important;border-radius:50%!important;display:grid!important;place-items:center!important;background:rgba(255,255,255,.97)!important;color:#173f3b!important;box-shadow:0 10px 26px rgba(20,35,55,.18)!important;font-size:0!important;line-height:0!important;cursor:pointer!important;overflow:hidden!important;position:relative!important}
     body.wander-clean-ui .map-tool svg,body.wander-clean-ui .clean-menu-button svg{display:block!important;width:26px!important;height:26px!important;stroke:currentColor!important;stroke-width:2.2!important;fill:none!important;stroke-linecap:round!important;stroke-linejoin:round!important;pointer-events:none!important;transition:transform .18s ease!important}
-    body.wander-clean-ui #locate-button .locate-arrow{fill:currentColor!important;stroke:none!important}
-    body.wander-clean-ui #locate-button .locate-n{display:none;font:800 8px system-ui;fill:currentColor;stroke:none}
+    body.wander-clean-ui #locate-button .solid{fill:currentColor!important;stroke:none!important}
+    body.wander-clean-ui #locate-button[data-orientation="route"]{background:#fff7e7!important;color:#8b5a13!important}
     body.wander-clean-ui #locate-button[data-orientation="compass"]{background:#173f3b!important;color:#fff!important}
-    body.wander-clean-ui #locate-button[data-orientation="north"] .locate-n{display:block!important}
+    body.wander-clean-ui #locate-button[data-orientation="north"]{background:#ffffff!important;color:#173f3b!important}
+    body.wander-clean-ui #locate-button .mode-badge{position:absolute!important;right:5px!important;bottom:4px!important;min-width:15px!important;height:15px!important;border-radius:999px!important;background:rgba(23,63,59,.92)!important;color:#fff!important;font:800 8px/15px system-ui!important;text-align:center!important;letter-spacing:0!important}
+    body.wander-clean-ui #locate-button[data-orientation="compass"] .mode-badge{background:#fff!important;color:#173f3b!important}
     body.wander-clean-ui #track-route-button.active{background:#d84848!important;color:#fff!important}
     body.wander-clean-ui #track-route-button .record-dot{fill:currentColor!important;stroke:none!important}
     body.wander-clean-ui .location-readout{display:none!important}
@@ -77,17 +81,19 @@
     if (active) trackButton?.click();
   }
 
-  function locateIcon() {
-    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="locate-arrow" d="M12 3.2 19.7 20.8 12 17.2 4.3 20.8 12 3.2Z"/><text class="locate-n" x="12" y="8.2" text-anchor="middle">N</text></svg>';
+  function iconForMode(mode) {
+    if (mode === 'route') return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c3-7 11-1 14-10"/><path class="solid" d="M12 2.8 19.6 20.8 12 17.1 4.4 20.8 12 2.8Z"/></svg><span class="mode-badge">R</span>';
+    if (mode === 'compass') return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path class="solid" d="M12 3.2 16.2 14.6 12 12.8 7.8 14.6 12 3.2Z"/></svg><span class="mode-badge">B</span>';
+    if (mode === 'north') return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V5"/><path d="m6 11 6-6 6 6"/><text x="12" y="5.7" text-anchor="middle" style="font:800 5px system-ui;fill:currentColor;stroke:none">N</text></svg><span class="mode-badge">N</span>';
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M2 12h4"/><path d="M18 12h4"/><circle cx="12" cy="12" r="4"/></svg><span class="mode-badge">•</span>';
   }
 
   function iconizeButtons() {
     const locate = $('#locate-button');
     if (locate) {
-      locate.innerHTML = locateIcon();
       locate.setAttribute('aria-label', 'Orientación y centrado');
       locate.title = 'Orientación';
-      locate.dataset.orientation = ORIENTATION_MODES[locateMode];
+      renderLocateMode();
     }
     const track = $('#track-route-button');
     if (track) {
@@ -175,41 +181,24 @@
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   }
 
-  function setLocateIconRotation(degrees = 0) {
+  function normalizeDegrees(value) { return ((Number(value) || 0) % 360 + 360) % 360; }
+
+  function rotateLocateIcon(degrees = 0) {
     const svg = $('#locate-button svg');
-    if (svg) svg.style.transform = `rotate(${degrees}deg)`;
+    if (svg) svg.style.transform = `rotate(${normalizeDegrees(degrees)}deg)`;
   }
 
-  function updateLocateState() {
+  function renderLocateMode() {
     const locate = $('#locate-button');
     if (!locate) return;
-    locate.dataset.orientation = ORIENTATION_MODES[locateMode] || 'center';
-    locate.title = locateMode === 0 ? 'Modo centrado' : locateMode === 1 ? 'Modo ruta' : locateMode === 2 ? 'Modo brújula' : 'Norte arriba';
+    const mode = ORIENTATION_MODES[locateMode] || 'center';
+    locate.dataset.orientation = mode;
+    locate.innerHTML = iconForMode(mode);
+    locate.title = mode === 'center' ? 'Centrado' : mode === 'route' ? 'Movimiento' : mode === 'compass' ? 'Brújula' : 'Norte arriba';
+    if (mode === 'route') rotateLocateIcon(routeBearing);
+    else if (mode === 'compass') rotateLocateIcon(Number.isFinite(compassBearing) ? compassBearing : 0);
+    else rotateLocateIcon(0);
   }
-
-  async function ensureCompass() {
-    if (typeof DeviceOrientationEvent === 'undefined') return false;
-    try {
-      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        return (await DeviceOrientationEvent.requestPermission()) === 'granted';
-      }
-      return true;
-    } catch { return false; }
-  }
-
-  window.addEventListener('deviceorientationabsolute', (event) => { if (Number.isFinite(event.alpha)) compassBearing = event.alpha; });
-  window.addEventListener('deviceorientation', (event) => {
-    if (Number.isFinite(event.webkitCompassHeading)) compassBearing = event.webkitCompassHeading;
-    else if (Number.isFinite(event.alpha)) compassBearing = 360 - event.alpha;
-  });
-
-  window.setInterval(() => {
-    const current = marker.getLatLng();
-    if (map.distance(lastPoint, current) > 2) routeBearing = bearing(lastPoint, current);
-    lastPoint = L.latLng(current.lat, current.lng);
-    if (locateMode === 1) setLocateIconRotation(routeBearing);
-    if (locateMode === 2 && Number.isFinite(compassBearing)) setLocateIconRotation(compassBearing);
-  }, 1000);
 
   function isUserCentered(target) {
     const centerPoint = map.latLngToContainerPoint(map.getCenter());
@@ -223,24 +212,59 @@
     window.setTimeout(() => map.invalidateSize(true), 80);
   }
 
-  function refreshMarkerFromGpsThenMaybeCenter() {
-    const fallback = () => panToUserOnlyIfNeeded(marker.getLatLng());
-    if (!navigator.geolocation) return fallback();
-    navigator.geolocation.getCurrentPosition((position) => {
-      const point = L.latLng(position.coords.latitude, position.coords.longitude);
-      marker.setLatLng(point);
-      panToUserOnlyIfNeeded(point);
-    }, fallback, { enableHighAccuracy: true, timeout: 6000, maximumAge: 3000 });
+  function updateLocation(point, heading) {
+    if (!point) return;
+    marker.setLatLng(point);
+    if (Number.isFinite(heading) && heading >= 0) routeBearing = normalizeDegrees(heading);
+    else if (lastGpsPoint && map.distance(lastGpsPoint, point) > 1.5) routeBearing = bearing(lastGpsPoint, point);
+    lastGpsPoint = L.latLng(point.lat, point.lng);
+    if (locateMode === 1) rotateLocateIcon(routeBearing);
+    panToUserOnlyIfNeeded(point);
   }
 
-  function applyLocateMode() {
-    if (locateMode === 0) setLocateIconRotation(0);
-    else if (locateMode === 1) setLocateIconRotation(routeBearing || 0);
-    else if (locateMode === 2) {
-      if (Number.isFinite(compassBearing)) setLocateIconRotation(compassBearing);
-      else setLocateIconRotation(0);
-    } else setLocateIconRotation(0);
-    updateLocateState();
+  function startGpsWatch() {
+    if (gpsWatchStarted || !navigator.geolocation) return;
+    gpsWatchStarted = true;
+    navigator.geolocation.watchPosition((position) => {
+      const point = L.latLng(position.coords.latitude, position.coords.longitude);
+      updateLocation(point, position.coords.heading);
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+  }
+
+  function startCompassListeners() {
+    if (compassStarted) return;
+    compassStarted = true;
+    const update = (value) => {
+      if (!Number.isFinite(value)) return;
+      compassBearing = normalizeDegrees(value);
+      if (locateMode === 2) rotateLocateIcon(compassBearing);
+    };
+    window.addEventListener('deviceorientationabsolute', (event) => update(event.alpha));
+    window.addEventListener('deviceorientation', (event) => {
+      if (Number.isFinite(event.webkitCompassHeading)) update(event.webkitCompassHeading);
+      else if (event.absolute && Number.isFinite(event.alpha)) update(event.alpha);
+      else if (Number.isFinite(event.alpha)) update(360 - event.alpha);
+    });
+  }
+
+  async function ensureCompass() {
+    if (typeof DeviceOrientationEvent === 'undefined') return false;
+    try {
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const permission = await DeviceOrientationEvent.requestPermission();
+        if (permission !== 'granted') return false;
+      }
+      startCompassListeners();
+      return true;
+    } catch { return false; }
+  }
+
+  function maybeRefreshGpsOnce() {
+    if (!navigator.geolocation) return panToUserOnlyIfNeeded(marker.getLatLng());
+    navigator.geolocation.getCurrentPosition((position) => {
+      const point = L.latLng(position.coords.latitude, position.coords.longitude);
+      updateLocation(point, position.coords.heading);
+    }, () => panToUserOnlyIfNeeded(marker.getLatLng()), { enableHighAccuracy: true, timeout: 6000, maximumAge: 2000 });
   }
 
   function installLocateCycle() {
@@ -249,25 +273,26 @@
     locate.addEventListener('click', async (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();
-
+      startGpsWatch();
       locateMode = (locateMode + 1) % ORIENTATION_MODES.length;
-      if (locateMode === 2) {
+      if (ORIENTATION_MODES[locateMode] === 'compass') {
         const ok = await ensureCompass();
         if (!ok) {
-          tell('Brújula no disponible', 'No pude activar la orientación por brújula en este dispositivo. Sigo con el siguiente modo.');
+          tell('Brújula no disponible', 'El navegador no entregó orientación del móvil. Paso al modo Norte arriba.');
           locateMode = 3;
         }
       }
-      applyLocateMode();
-      refreshMarkerFromGpsThenMaybeCenter();
+      renderLocateMode();
+      maybeRefreshGpsOnce();
     }, true);
-    applyLocateMode();
+    renderLocateMode();
   }
 
   iconizeButtons();
   createMenu();
   addVisualSettings();
   installLocateCycle();
+  startGpsWatch();
   hardHideLegacyTabs();
   new MutationObserver(hardHideLegacyTabs).observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
   window.setInterval(hardHideLegacyTabs, 500);
