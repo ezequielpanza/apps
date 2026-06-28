@@ -4,45 +4,35 @@
   const SETTINGS_KEY = 'wander-travel-settings';
   const $ = (selector) => document.querySelector(selector);
   const LEGACY_TABS = ['#show-panel', '#show-guide-panel', '#show-dev-panel', '#show-settings-panel'];
+  const ORIENTATION_MODES = ['center', 'route', 'compass', 'north'];
+  let locateMode = 0;
+  let lastPoint = marker.getLatLng();
+  let routeBearing = 0;
+  let compassBearing = null;
 
   const style = document.createElement('style');
   style.textContent = `
     body.wander-clean-ui .round-button[aria-label*="Auriculares"]{display:none!important}
-    body.wander-clean-ui #show-panel,
-    body.wander-clean-ui #show-guide-panel,
-    body.wander-clean-ui #show-dev-panel,
-    body.wander-clean-ui #show-settings-panel,
-    body.wander-clean-ui .side-panel-tab,
-    body.wander-clean-ui .guide-panel-tab,
-    body.wander-clean-ui .dev-panel-tab,
-    body.wander-clean-ui .settings-panel-tab{display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important}
-    body.wander-clean-ui #real-poi-button,
-    body.wander-clean-ui #route-button,
-    body.wander-clean-ui .zoom-tools{display:none!important}
+    body.wander-clean-ui #show-panel,body.wander-clean-ui #show-guide-panel,body.wander-clean-ui #show-dev-panel,body.wander-clean-ui #show-settings-panel,body.wander-clean-ui .side-panel-tab,body.wander-clean-ui .guide-panel-tab,body.wander-clean-ui .dev-panel-tab,body.wander-clean-ui .settings-panel-tab{display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important}
+    body.wander-clean-ui #real-poi-button,body.wander-clean-ui #route-button,body.wander-clean-ui .zoom-tools{display:none!important}
     body.wander-clean-ui .map-tools{top:18px!important;right:18px!important;left:auto!important;align-items:flex-end!important;gap:10px!important;z-index:900!important}
-    body.wander-clean-ui .map-tool,
-    body.wander-clean-ui .clean-menu-button{width:50px!important;height:50px!important;min-width:50px!important;min-height:50px!important;padding:0!important;border:0!important;border-radius:50%!important;display:grid!important;place-items:center!important;background:rgba(255,255,255,.97)!important;color:#173f3b!important;box-shadow:0 10px 26px rgba(20,35,55,.18)!important;font-size:0!important;line-height:0!important;cursor:pointer!important;overflow:hidden!important}
-    body.wander-clean-ui .map-tool svg,
-    body.wander-clean-ui .clean-menu-button svg{display:block!important;width:26px!important;height:26px!important;stroke:currentColor!important;stroke-width:2.2!important;fill:none!important;stroke-linecap:round!important;stroke-linejoin:round!important;pointer-events:none!important}
+    body.wander-clean-ui .map-tool,body.wander-clean-ui .clean-menu-button{width:50px!important;height:50px!important;min-width:50px!important;min-height:50px!important;padding:0!important;border:0!important;border-radius:50%!important;display:grid!important;place-items:center!important;background:rgba(255,255,255,.97)!important;color:#173f3b!important;box-shadow:0 10px 26px rgba(20,35,55,.18)!important;font-size:0!important;line-height:0!important;cursor:pointer!important;overflow:hidden!important}
+    body.wander-clean-ui .map-tool svg,body.wander-clean-ui .clean-menu-button svg{display:block!important;width:26px!important;height:26px!important;stroke:currentColor!important;stroke-width:2.2!important;fill:none!important;stroke-linecap:round!important;stroke-linejoin:round!important;pointer-events:none!important;transition:transform .18s ease!important}
     body.wander-clean-ui #locate-button .locate-arrow{fill:currentColor!important;stroke:none!important}
-    body.wander-clean-ui #track-route-button.active{background:#d84848!important;color:#fff!important}
-    body.wander-clean-ui #track-route-button .record-dot{fill:currentColor!important;stroke:none!important}
-    body.wander-clean-ui #locate-button[data-orientation="route"] svg{transform:rotate(35deg)!important}
+    body.wander-clean-ui #locate-button .locate-n{display:none;font:800 8px system-ui;fill:currentColor;stroke:none}
     body.wander-clean-ui #locate-button[data-orientation="compass"]{background:#173f3b!important;color:#fff!important}
     body.wander-clean-ui #locate-button[data-orientation="north"] .locate-n{display:block!important}
-    body.wander-clean-ui #locate-button .locate-n{display:none;font:800 8px system-ui;fill:currentColor;stroke:none}
+    body.wander-clean-ui #track-route-button.active{background:#d84848!important;color:#fff!important}
+    body.wander-clean-ui #track-route-button .record-dot{fill:currentColor!important;stroke:none!important}
     body.wander-clean-ui .location-readout{display:none!important}
     body.wander-clean-ui .status-rail{display:none!important}
-    body.wander-clean-ui.show-movement-mode .status-rail,
-    body.wander-clean-ui.show-movement-pace .status-rail,
-    body.wander-clean-ui.show-movement-group .status-rail{display:flex!important}
+    body.wander-clean-ui.show-movement-mode .status-rail,body.wander-clean-ui.show-movement-pace .status-rail,body.wander-clean-ui.show-movement-group .status-rail{display:flex!important}
     body.wander-clean-ui .status-rail .metric{display:none!important}
     body.wander-clean-ui.show-movement-mode .status-rail .metric:nth-child(1){display:block!important}
     body.wander-clean-ui.show-movement-pace .status-rail .metric:nth-child(2){display:block!important}
     body.wander-clean-ui.show-movement-group .status-rail .metric:nth-child(3){display:block!important}
     .clean-menu{position:absolute;z-index:1200;right:18px;top:78px;display:none;min-width:220px;padding:8px;border-radius:16px;background:#fff;box-shadow:0 18px 50px rgba(20,35,55,.25)}
-    .clean-menu.is-open{display:grid;gap:6px}
-    .clean-menu button{border:0;background:#f5f7f9;border-radius:12px;padding:12px 13px;text-align:left;font-weight:800;color:#173f3b;cursor:pointer}
+    .clean-menu.is-open{display:grid;gap:6px}.clean-menu button{border:0;background:#f5f7f9;border-radius:12px;padding:12px 13px;text-align:left;font-weight:800;color:#173f3b;cursor:pointer}
     .clean-menu-backdrop{position:absolute;inset:0;z-index:1100;background:transparent;display:none}.clean-menu-backdrop.is-open{display:block}
     body.wander-clean-ui .top-bar{right:84px}
     @media(max-width:820px){body.wander-clean-ui .top-bar{display:none!important}body.wander-clean-ui .map-tools{top:14px!important;right:14px!important}.clean-menu{right:14px;top:72px}.companion-panel{bottom:76px!important;width:calc(100% - 24px)!important}.companion-tab{bottom:18px!important}}
@@ -77,10 +67,8 @@
 
   function disableStartupTracking() {
     const settings = loadSettings();
-    if (settings.trackRouteByDefault !== false) {
-      settings.trackRouteByDefault = false;
-      saveSettings(settings);
-    }
+    settings.trackRouteByDefault = false;
+    saveSettings(settings);
     const toggle = $('#setting-track-default');
     if (toggle) toggle.checked = false;
     const trackButton = $('#track-route-button');
@@ -97,9 +85,9 @@
     const locate = $('#locate-button');
     if (locate) {
       locate.innerHTML = locateIcon();
-      locate.setAttribute('aria-label', 'Mi ubicación y orientación');
-      locate.title = 'Mi ubicación';
-      locate.dataset.orientation = 'center';
+      locate.setAttribute('aria-label', 'Orientación y centrado');
+      locate.title = 'Orientación';
+      locate.dataset.orientation = ORIENTATION_MODES[locateMode];
     }
     const track = $('#track-route-button');
     if (track) {
@@ -178,11 +166,6 @@
     apply();
   }
 
-  let locateMode = 0;
-  let lastPoint = marker.getLatLng();
-  let routeBearing = 0;
-  let compassBearing = null;
-
   function bearing(a, b) {
     const lat1 = a.lat * Math.PI / 180;
     const lat2 = b.lat * Math.PI / 180;
@@ -200,17 +183,15 @@
   function updateLocateState() {
     const locate = $('#locate-button');
     if (!locate) return;
-    const states = ['center', 'route', 'compass', 'north'];
-    locate.dataset.orientation = states[locateMode] || 'center';
-    locate.title = locateMode === 0 ? 'Centrar ubicación' : locateMode === 1 ? 'Orientar por ruta' : locateMode === 2 ? 'Orientar por brújula' : 'Norte arriba';
+    locate.dataset.orientation = ORIENTATION_MODES[locateMode] || 'center';
+    locate.title = locateMode === 0 ? 'Modo centrado' : locateMode === 1 ? 'Modo ruta' : locateMode === 2 ? 'Modo brújula' : 'Norte arriba';
   }
 
   async function ensureCompass() {
     if (typeof DeviceOrientationEvent === 'undefined') return false;
     try {
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        const permission = await DeviceOrientationEvent.requestPermission();
-        return permission === 'granted';
+        return (await DeviceOrientationEvent.requestPermission()) === 'granted';
       }
       return true;
     } catch { return false; }
@@ -230,19 +211,36 @@
     if (locateMode === 2 && Number.isFinite(compassBearing)) setLocateIconRotation(compassBearing);
   }, 1000);
 
-  function centerOnCurrentOrGps() {
-    const fallback = () => {
-      const current = marker.getLatLng();
-      map.setView(current, Math.max(map.getZoom(), 16), { animate: true });
-      window.setTimeout(() => map.invalidateSize(true), 80);
-    };
+  function isUserCentered(target) {
+    const centerPoint = map.latLngToContainerPoint(map.getCenter());
+    const targetPoint = map.latLngToContainerPoint(target);
+    return centerPoint.distanceTo(targetPoint) < 36;
+  }
+
+  function panToUserOnlyIfNeeded(target) {
+    if (!target || isUserCentered(target)) return;
+    map.panTo(target, { animate: true });
+    window.setTimeout(() => map.invalidateSize(true), 80);
+  }
+
+  function refreshMarkerFromGpsThenMaybeCenter() {
+    const fallback = () => panToUserOnlyIfNeeded(marker.getLatLng());
     if (!navigator.geolocation) return fallback();
     navigator.geolocation.getCurrentPosition((position) => {
       const point = L.latLng(position.coords.latitude, position.coords.longitude);
       marker.setLatLng(point);
-      map.setView(point, Math.max(map.getZoom(), 16), { animate: true });
-      window.setTimeout(() => map.invalidateSize(true), 80);
+      panToUserOnlyIfNeeded(point);
     }, fallback, { enableHighAccuracy: true, timeout: 6000, maximumAge: 3000 });
+  }
+
+  function applyLocateMode() {
+    if (locateMode === 0) setLocateIconRotation(0);
+    else if (locateMode === 1) setLocateIconRotation(routeBearing || 0);
+    else if (locateMode === 2) {
+      if (Number.isFinite(compassBearing)) setLocateIconRotation(compassBearing);
+      else setLocateIconRotation(0);
+    } else setLocateIconRotation(0);
+    updateLocateState();
   }
 
   function installLocateCycle() {
@@ -251,27 +249,19 @@
     locate.addEventListener('click', async (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();
-      centerOnCurrentOrGps();
-      if (locateMode === 0) {
-        setLocateIconRotation(0);
-      } else if (locateMode === 1) {
-        setLocateIconRotation(routeBearing || 0);
-      } else if (locateMode === 2) {
+
+      locateMode = (locateMode + 1) % ORIENTATION_MODES.length;
+      if (locateMode === 2) {
         const ok = await ensureCompass();
-        if (ok && Number.isFinite(compassBearing)) setLocateIconRotation(compassBearing);
-        else {
-          tell('Brújula no disponible', 'No pude activar la orientación por brújula en este dispositivo. Mantengo el mapa con Norte arriba.');
+        if (!ok) {
+          tell('Brújula no disponible', 'No pude activar la orientación por brújula en este dispositivo. Sigo con el siguiente modo.');
           locateMode = 3;
-          setLocateIconRotation(0);
         }
-      } else {
-        setLocateIconRotation(0);
       }
-      updateLocateState();
-      locateMode = (locateMode + 1) % 4;
-      window.setTimeout(() => map.invalidateSize(true), 120);
+      applyLocateMode();
+      refreshMarkerFromGpsThenMaybeCenter();
     }, true);
-    updateLocateState();
+    applyLocateMode();
   }
 
   iconizeButtons();
