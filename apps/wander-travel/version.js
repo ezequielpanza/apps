@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.33.0';
+  const version = 'v0.36.0';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
@@ -24,4 +24,5 @@
   loadScript('developer-city.js?v=20260625-1', 'developer-city');
   loadScript('human-route-context.js?v=20260625-2', 'human-route-context');
   loadScript('city-welcome.js?v=20260625-2', 'city-welcome');
+  loadScript('clean-mobile-ui.js?v=20260625-3', 'clean-mobile-ui-latest');
 })();
