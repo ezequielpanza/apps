@@ -11,6 +11,8 @@
   let rawCompassBearing = null;
   let lastCompassAppliedAt = 0;
   let lastPoint = marker.getLatLng();
+  let lastPointAt = Date.now();
+  let lastSpeedMps = 0;
   let isMoving = false;
   let recording = false;
   let recordedPoints = [];
@@ -32,10 +34,7 @@
 
   function normalize(value) { return ((Number(value) || 0) % 360 + 360) % 360; }
   function angleDelta(from, to) { return ((normalize(to) - normalize(from) + 540) % 360) - 180; }
-  function smoothAngle(previous, next, alpha) {
-    if (!Number.isFinite(previous)) return normalize(next);
-    return normalize(previous + angleDelta(previous, next) * alpha);
-  }
+  function smoothAngle(previous, next, alpha) { if (!Number.isFinite(previous)) return normalize(next); return normalize(previous + angleDelta(previous, next) * alpha); }
   function bearing(a, b) {
     const lat1 = a.lat * Math.PI / 180;
     const lat2 = b.lat * Math.PI / 180;
@@ -43,6 +42,24 @@
     const y = Math.sin(dLng) * Math.cos(lat2);
     const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
     return normalize(Math.atan2(y, x) * 180 / Math.PI);
+  }
+  function knotsFromMps(value) { return Number.isFinite(value) ? value * 1.943844 : 0; }
+
+  function publishMotionContext(point) {
+    const speedKnots = knotsFromMps(lastSpeedMps);
+    const likelyBoat = speedKnots >= 3.5;
+    window.wanderMotionContext = {
+      transport_mode: likelyBoat ? 'boat' : 'walking_or_land',
+      likely_boat: likelyBoat,
+      speed_mps: lastSpeedMps,
+      speed_knots: speedKnots,
+      heading_degrees: routeBearing,
+      moving: isMoving,
+      on_water_hint: likelyBoat,
+      location: point ? { lat: point.lat, lng: point.lng } : null,
+      updated_at: new Date().toISOString(),
+    };
+    document.dispatchEvent(new CustomEvent('wander:motion-context', { detail: window.wanderMotionContext }));
   }
 
   function isCentered(point) {
@@ -58,9 +75,7 @@
     window.setTimeout(() => map.invalidateSize(true), 80);
   }
 
-  function setMapRotation(degrees) {
-    document.documentElement.style.setProperty('--wander-map-rotation', `${-normalize(degrees)}deg`);
-  }
+  function setMapRotation(degrees) { document.documentElement.style.setProperty('--wander-map-rotation', `${-normalize(degrees)}deg`); }
 
   function applyMapMode() {
     const mode = MODES[modeIndex];
@@ -71,10 +86,7 @@
     if (mode === 'route') setMapRotation(routeBearing);
     else if (mode === 'compass') setMapRotation(Number.isFinite(compassBearing) ? compassBearing : 0);
     else setMapRotation(0);
-    window.setTimeout(() => {
-      if (point) map.panTo(point, { animate: false });
-      map.invalidateSize(true);
-    }, 80);
+    window.setTimeout(() => { if (point) map.panTo(point, { animate: false }); map.invalidateSize(true); }, 80);
   }
 
   function iconForMode(mode) {
@@ -121,16 +133,22 @@
     }
   }
 
-  function updatePosition(point, heading) {
+  function updatePosition(point, heading, gpsSpeed) {
     if (!point) return;
+    const now = Date.now();
     const movedMeters = lastPoint ? map.distance(lastPoint, point) : 0;
+    const elapsedSeconds = Math.max(0.2, (now - lastPointAt) / 1000);
+    if (Number.isFinite(gpsSpeed) && gpsSpeed >= 0) lastSpeedMps = gpsSpeed;
+    else if (movedMeters > 0.5) lastSpeedMps = movedMeters / elapsedSeconds;
     if (Number.isFinite(heading) && heading >= 0) routeBearing = normalize(heading);
     else if (movedMeters > 1.5) routeBearing = bearing(lastPoint, point);
-    isMoving = movedMeters > 1.5;
+    isMoving = movedMeters > 1.5 || lastSpeedMps > 0.6;
     lastPoint = L.latLng(point.lat, point.lng);
+    lastPointAt = now;
     marker.setLatLng(point);
     setUserIcon();
     addRecordedPoint(point);
+    publishMotionContext(point);
     centerOnlyIfNeeded(point, MODES[modeIndex] === 'route' || MODES[modeIndex] === 'compass');
     if (MODES[modeIndex] === 'route') setMapRotation(routeBearing);
     renderLocateButton();
@@ -138,7 +156,7 @@
 
   function startGps() {
     if (!navigator.geolocation) return;
-    navigator.geolocation.watchPosition((position) => updatePosition(L.latLng(position.coords.latitude, position.coords.longitude), position.coords.heading), () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+    navigator.geolocation.watchPosition((position) => updatePosition(L.latLng(position.coords.latitude, position.coords.longitude), position.coords.heading, position.coords.speed), () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
   }
 
   function startCompass() {
@@ -152,11 +170,7 @@
       if (Math.abs(angleDelta(compassBearing, rawCompassBearing)) < COMPASS_MIN_CHANGE_DEG) compassBearing = rawCompassBearing;
       if (now - lastCompassAppliedAt < COMPASS_MIN_INTERVAL_MS) return;
       lastCompassAppliedAt = now;
-      if (MODES[modeIndex] === 'compass') {
-        setMapRotation(compassBearing);
-        centerOnlyIfNeeded(marker.getLatLng(), true);
-        renderLocateButton();
-      }
+      if (MODES[modeIndex] === 'compass') { setMapRotation(compassBearing); centerOnlyIfNeeded(marker.getLatLng(), true); renderLocateButton(); }
     };
     window.addEventListener('deviceorientationabsolute', (event) => update(event.alpha));
     window.addEventListener('deviceorientation', (event) => {
@@ -224,6 +238,7 @@
   replaceLocateButton();
   replaceTrackButton();
   setUserIcon();
+  publishMotionContext(marker.getLatLng());
   startGps();
   startCompass();
 })();
