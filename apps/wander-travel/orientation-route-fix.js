@@ -2,9 +2,14 @@
   if (typeof map === 'undefined' || typeof marker === 'undefined' || typeof L === 'undefined') return;
 
   const MODES = ['center', 'route', 'compass', 'north'];
+  const COMPASS_SMOOTHING = 0.16;
+  const COMPASS_MIN_CHANGE_DEG = 1.2;
+  const COMPASS_MIN_INTERVAL_MS = 90;
   let modeIndex = 0;
   let routeBearing = 0;
   let compassBearing = null;
+  let rawCompassBearing = null;
+  let lastCompassAppliedAt = 0;
   let lastPoint = marker.getLatLng();
   let isMoving = false;
   let recording = false;
@@ -13,7 +18,7 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    body.wander-map-heading #wander-map{transform:rotate(var(--wander-map-rotation,0deg));transform-origin:50% 50%;transition:transform .18s ease;overflow:visible!important}
+    body.wander-map-heading #wander-map{transform:rotate(var(--wander-map-rotation,0deg));transform-origin:50% 50%;transition:transform .22s linear;overflow:visible!important}
     body.wander-map-heading .leaflet-map-pane{rotate:0deg!important;transform-origin:50% 50%!important}
     .wander-user-arrow{width:30px;height:30px;display:grid;place-items:center;transform:rotate(var(--wander-user-bearing,0deg))}
     .wander-user-arrow::before{content:"";width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:22px solid #173f3b;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))}
@@ -26,6 +31,11 @@
   const trackLine = L.polyline([], { weight: 5, opacity: 0.85 }).addTo(map);
 
   function normalize(value) { return ((Number(value) || 0) % 360 + 360) % 360; }
+  function angleDelta(from, to) { return ((normalize(to) - normalize(from) + 540) % 360) - 180; }
+  function smoothAngle(previous, next, alpha) {
+    if (!Number.isFinite(previous)) return normalize(next);
+    return normalize(previous + angleDelta(previous, next) * alpha);
+  }
   function bearing(a, b) {
     const lat1 = a.lat * Math.PI / 180;
     const lat2 = b.lat * Math.PI / 180;
@@ -136,7 +146,12 @@
     compassReady = true;
     const update = (degrees) => {
       if (!Number.isFinite(degrees)) return;
-      compassBearing = normalize(degrees);
+      const now = Date.now();
+      rawCompassBearing = normalize(degrees);
+      compassBearing = smoothAngle(compassBearing, rawCompassBearing, COMPASS_SMOOTHING);
+      if (Math.abs(angleDelta(compassBearing, rawCompassBearing)) < COMPASS_MIN_CHANGE_DEG) compassBearing = rawCompassBearing;
+      if (now - lastCompassAppliedAt < COMPASS_MIN_INTERVAL_MS) return;
+      lastCompassAppliedAt = now;
       if (MODES[modeIndex] === 'compass') {
         setMapRotation(compassBearing);
         centerOnlyIfNeeded(marker.getLatLng(), true);
