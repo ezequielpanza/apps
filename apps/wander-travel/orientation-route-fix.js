@@ -13,7 +13,8 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    body.wander-map-heading .leaflet-map-pane{rotate:var(--wander-map-rotation,0deg);transform-origin:50% 50%;transition:rotate .18s ease}
+    body.wander-map-heading #wander-map{transform:rotate(var(--wander-map-rotation,0deg)) scale(1.42);transform-origin:50% 50%;transition:transform .18s ease;overflow:visible!important}
+    body.wander-map-heading .leaflet-map-pane{rotate:0deg!important;transform-origin:50% 50%!important}
     .wander-user-arrow{width:30px;height:30px;display:grid;place-items:center;transform:rotate(var(--wander-user-bearing,0deg))}
     .wander-user-arrow::before{content:"";width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:22px solid #173f3b;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))}
     .wander-user-dot{width:18px;height:18px;border-radius:50%;background:#173f3b;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)}
@@ -24,10 +25,7 @@
 
   const trackLine = L.polyline([], { weight: 5, opacity: 0.85 }).addTo(map);
 
-  function normalize(value) {
-    return ((Number(value) || 0) % 360 + 360) % 360;
-  }
-
+  function normalize(value) { return ((Number(value) || 0) % 360 + 360) % 360; }
   function bearing(a, b) {
     const lat1 = a.lat * Math.PI / 180;
     const lat2 = b.lat * Math.PI / 180;
@@ -43,8 +41,9 @@
     return center.distanceTo(target) < 36;
   }
 
-  function centerOnlyIfNeeded(point) {
-    if (!point || isCentered(point)) return;
+  function centerOnlyIfNeeded(point, force = false) {
+    if (!point) return;
+    if (!force && isCentered(point)) return;
     map.panTo(point, { animate: true });
     window.setTimeout(() => map.invalidateSize(true), 80);
   }
@@ -56,10 +55,16 @@
   function applyMapMode() {
     const mode = MODES[modeIndex];
     const shouldRotate = mode === 'route' || mode === 'compass';
+    const point = marker.getLatLng();
+    if (point) map.panTo(point, { animate: false });
     document.body.classList.toggle('wander-map-heading', shouldRotate);
     if (mode === 'route') setMapRotation(routeBearing);
     else if (mode === 'compass') setMapRotation(Number.isFinite(compassBearing) ? compassBearing : 0);
     else setMapRotation(0);
+    window.setTimeout(() => {
+      if (point) map.panTo(point, { animate: false });
+      map.invalidateSize(true);
+    }, 80);
   }
 
   function iconForMode(mode) {
@@ -116,16 +121,14 @@
     marker.setLatLng(point);
     setUserIcon();
     addRecordedPoint(point);
-    centerOnlyIfNeeded(point);
+    centerOnlyIfNeeded(point, MODES[modeIndex] === 'route' || MODES[modeIndex] === 'compass');
     if (MODES[modeIndex] === 'route') setMapRotation(routeBearing);
     renderLocateButton();
   }
 
   function startGps() {
     if (!navigator.geolocation) return;
-    navigator.geolocation.watchPosition((position) => {
-      updatePosition(L.latLng(position.coords.latitude, position.coords.longitude), position.coords.heading);
-    }, () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+    navigator.geolocation.watchPosition((position) => updatePosition(L.latLng(position.coords.latitude, position.coords.longitude), position.coords.heading), () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
   }
 
   function startCompass() {
@@ -136,6 +139,7 @@
       compassBearing = normalize(degrees);
       if (MODES[modeIndex] === 'compass') {
         setMapRotation(compassBearing);
+        centerOnlyIfNeeded(marker.getLatLng(), true);
         renderLocateButton();
       }
     };
@@ -155,9 +159,7 @@
       }
       startCompass();
       return true;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
 
   function replaceLocateButton() {
@@ -179,7 +181,7 @@
       }
       applyMapMode();
       renderLocateButton();
-      centerOnlyIfNeeded(marker.getLatLng());
+      centerOnlyIfNeeded(marker.getLatLng(), MODES[modeIndex] === 'route' || MODES[modeIndex] === 'compass');
     });
   }
 
