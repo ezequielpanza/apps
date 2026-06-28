@@ -1,8 +1,8 @@
 (() => {
   const OPEN_MARGIN = '22px';
   const CLOSED_OFFSET = 'calc(100% + 120px)';
-  const WANDER_TAB_BOTTOM = 'calc(env(safe-area-inset-bottom,0px) + 96px)';
-  const WANDER_PANEL_BOTTOM = 'calc(env(safe-area-inset-bottom,0px) + 158px)';
+  const WANDER_TAB_BOTTOM = 'calc(env(safe-area-inset-bottom,0px) + 142px)';
+  const WANDER_PANEL_BOTTOM = 'calc(env(safe-area-inset-bottom,0px) + 206px)';
 
   const style = document.createElement('style');
   style.textContent = `
@@ -25,7 +25,7 @@
       body.wander-clean-ui .companion-panel{
         bottom:${WANDER_PANEL_BOTTOM}!important;
         width:calc(100vw - 44px)!important;
-        max-height:calc(100dvh - 220px)!important;
+        max-height:calc(100dvh - 286px)!important;
         overflow-y:auto!important;
         z-index:1500!important;
       }
@@ -122,7 +122,7 @@
     if (companionPanel) {
       setImportant(companionPanel, 'bottom', WANDER_PANEL_BOTTOM);
       setImportant(companionPanel, 'width', 'calc(100vw - 44px)');
-      setImportant(companionPanel, 'max-height', 'calc(100dvh - 220px)');
+      setImportant(companionPanel, 'max-height', 'calc(100dvh - 286px)');
       setImportant(companionPanel, 'overflow-y', 'auto');
       setImportant(companionPanel, 'z-index', '1500');
     }
