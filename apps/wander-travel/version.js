@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.48.0';
+  const version = 'v0.49.0';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
@@ -25,6 +25,8 @@
   loadScript('clean-mobile-ui.js?v=20260625-4', 'clean-mobile-ui-latest');
   loadScript('orientation-route-fix.js?v=20260625-5', 'heading-track');
   loadScript('mobile-panel-fix.js?v=20260625-3', 'mobile-panel-fix');
+  loadScript('context-engine.js?v=20260629-1', 'context-engine');
   loadScript('settings-gear.js?v=20260628-1', 'settings-gear');
-  loadScript('boat-menu-placeholder.js?v=20260628-1', 'boat-menu-placeholder');
+  loadScript('settings-structure.js?v=20260629-1', 'settings-structure');
+  loadScript('boat-menu-placeholder.js?v=20260629-1', 'boat-menu-placeholder');
 })();
