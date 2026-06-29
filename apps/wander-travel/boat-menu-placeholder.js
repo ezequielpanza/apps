@@ -1,11 +1,12 @@
 (() => {
   function tellBoatPending() {
+    window.WanderContextEngine?.noteBoatPlaceholder?.();
     const panel = document.querySelector('.companion-panel');
     const title = document.querySelector('#wander-title');
     const message = document.querySelector('#wander-message');
     if (!panel || !title || !message) return;
     title.textContent = 'Wander Boat';
-    message.textContent = 'Boat queda reservado para la vida a bordo, fondeos, autonomía, energía y herramientas náuticas. Todavía está desactivado hasta que escribamos sus funciones.';
+    message.textContent = 'Boat queda reservado para la vida a bordo, fondeos, autonomía, energía, agua, combustible y POIs náuticos. Todavía está desactivado hasta que escribamos sus funciones.';
     panel.classList.remove('is-hidden');
   }
 
