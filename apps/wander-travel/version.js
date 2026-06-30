@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.51.0';
+  const version = 'v0.51.1';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
@@ -31,4 +31,5 @@
   loadScript('boat-menu-placeholder.js?v=20260629-1', 'boat-menu-placeholder');
   loadScript('mobile-icon-polish.js?v=20260629-2', 'mobile-icon-polish');
   loadScript('context-menu-structure.js?v=20260629-1', 'context-menu-structure');
+  loadScript('compass-toggle-fix.js?v=20260629-1', 'compass-toggle-fix');
 })();
