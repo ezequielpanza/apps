@@ -3,12 +3,27 @@
   window.__wanderCompassToggleFix = true;
 
   const MODES = ['center', 'route', 'compass', 'north'];
+  const COMPASS_SMOOTHING = 0.12;
+  const COMPASS_MIN_CHANGE_DEG = 2.5;
+  const COMPASS_MAX_JUMP_DEG = 55;
+  const COMPASS_MIN_INTERVAL_MS = 180;
   let modeIndex = 0;
   let compassBearing = null;
+  let lastRawCompass = null;
+  let lastAppliedAt = 0;
   let compassStarted = false;
 
   function normalize(value) {
     return ((Number(value) || 0) % 360 + 360) % 360;
+  }
+
+  function delta(from, to) {
+    return ((normalize(to) - normalize(from) + 540) % 360) - 180;
+  }
+
+  function smooth(previous, next, alpha) {
+    if (!Number.isFinite(previous)) return normalize(next);
+    return normalize(previous + delta(previous, next) * alpha);
   }
 
   function point() {
@@ -72,12 +87,34 @@
     render();
   }
 
+  function acceptCompass(rawDegrees) {
+    if (!Number.isFinite(rawDegrees)) return false;
+    const raw = normalize(rawDegrees);
+    const now = Date.now();
+
+    if (Number.isFinite(lastRawCompass)) {
+      const rawJump = Math.abs(delta(lastRawCompass, raw));
+      if (rawJump > COMPASS_MAX_JUMP_DEG && now - lastAppliedAt < 900) {
+        lastRawCompass = raw;
+        return false;
+      }
+    }
+
+    lastRawCompass = raw;
+    const next = smooth(compassBearing, raw, COMPASS_SMOOTHING);
+    if (Number.isFinite(compassBearing) && Math.abs(delta(compassBearing, next)) < COMPASS_MIN_CHANGE_DEG) return false;
+    if (now - lastAppliedAt < COMPASS_MIN_INTERVAL_MS) return false;
+
+    compassBearing = next;
+    lastAppliedAt = now;
+    return true;
+  }
+
   function startCompass() {
     if (compassStarted) return true;
     compassStarted = true;
     const update = (degrees) => {
-      if (!Number.isFinite(degrees)) return;
-      compassBearing = normalize(degrees);
+      if (!acceptCompass(degrees)) return;
       if (MODES[modeIndex] === 'compass') apply();
     };
     window.addEventListener('deviceorientationabsolute', (event) => update(event.alpha));
