@@ -3,7 +3,7 @@
   window.__wanderSpeedHeadingMetrics = true;
 
   const STORAGE_KEY = 'wander.travel.heading_display';
-  let headingDisplay = localStorage.getItem(STORAGE_KEY) || 'cardinal';
+  let headingDisplay = localStorage.getItem(STORAGE_KEY) || 'degrees';
   let lastMotion = null;
 
   function metricByLabel(label) {
@@ -35,8 +35,8 @@
   function formatHeading(ctx = {}) {
     const deg = ((Number(ctx.heading_degrees) || 0) % 360 + 360) % 360;
     if (!(ctx.moving || Number(ctx.speed_mps) > 0.4)) return '—';
-    if (headingDisplay === 'degrees') return `${Math.round(deg)}°`;
-    return cardinal(deg);
+    if (headingDisplay === 'cardinal') return cardinal(deg);
+    return `${Math.round(deg)}°`;
   }
 
   function writeMetric(metric, labelText, valueText) {
@@ -67,8 +67,8 @@
       <label class="setting-row">
         <span>Mostrar rumbo como</span>
         <select id="wander-heading-display-select">
-          <option value="cardinal">Cardinal: N, NE, S, SO</option>
           <option value="degrees">Grados: 0°–359°</option>
+          <option value="cardinal">Cardinal: N, NE, S, SO</option>
         </select>
       </label>
     `;
