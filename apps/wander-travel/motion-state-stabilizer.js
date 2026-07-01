@@ -3,11 +3,11 @@
   window.__wanderMotionStateStabilizer = true;
   if (typeof marker === 'undefined' || typeof L === 'undefined') return;
 
-  const MOVING_SPEED_MPS = 0.85;
-  const STILL_SPEED_MPS = 0.25;
-  const MOVING_DISTANCE_M = 3;
-  const STILL_DISTANCE_M = 1.2;
-  const MOVING_CONFIRMATIONS = 2;
+  const MOVING_SPEED_MPS = 0.6;
+  const STILL_SPEED_MPS = 0.18;
+  const MOVING_DISTANCE_M = 2;
+  const STILL_DISTANCE_M = 1;
+  const MOVING_CONFIRMATIONS = 1;
   const STILL_CONFIRMATIONS = 5;
   const STILL_TIME_MS = 4500;
 
@@ -58,8 +58,9 @@
     const point = detail.location;
     const moved = distanceMeters(lastPoint, point);
     const now = Date.now();
-    const movingSignal = speed >= MOVING_SPEED_MPS || moved >= MOVING_DISTANCE_M;
-    const stillSignal = speed <= STILL_SPEED_MPS && moved <= STILL_DISTANCE_M;
+    const explicitMoving = detail.moving === true;
+    const movingSignal = explicitMoving || speed >= MOVING_SPEED_MPS || moved >= MOVING_DISTANCE_M;
+    const stillSignal = !explicitMoving && speed <= STILL_SPEED_MPS && moved <= STILL_DISTANCE_M;
 
     if (movingSignal) {
       movingScore += 1;
