@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = 'v0.13.4';
+  const APP_VERSION = 'v0.13.5';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
   document.title = `Wander Travel ${APP_VERSION}`;
@@ -14,8 +14,8 @@
 
   if (!buttons.length || !stopButton || typeof marker === 'undefined' || typeof map === 'undefined') return;
 
-  if (manualLocationButton && !manualLocationButton.textContent.trim()) manualLocationButton.textContent = '📍';
   if (manualLocationButton) {
+    manualLocationButton.textContent = '📍';
     manualLocationButton.setAttribute('aria-label', 'Fijar posición simulada');
     manualLocationButton.title = 'Fijar posición simulada';
   }
@@ -53,7 +53,7 @@
   let activeDirection = null;
   let modeIndex = 0;
   let activeButton = null;
-  let followCursor = true;
+  let followCursor = false;
   let stoppedForReverse = false;
   let lastSimulatedMotion = null;
 
@@ -116,7 +116,7 @@
 
     const mode = modes[modeIndex];
     if (status) {
-      const viewState = followCursor ? '' : ' · Vista libre';
+      const viewState = followCursor ? ' · Siguiendo cursor' : ' · Vista libre';
       status.textContent = `Moviendo hacia ${directionLabels[activeDirection]} · ${mode.label} · ${mode.speedLabel}${viewState}`;
     }
     if (modeMetric) modeMetric.textContent = mode.label;
@@ -230,6 +230,7 @@
   locateButton?.addEventListener('click', () => {
     followCursor = true;
     if (activeDirection) updateUi();
+    if (window.WanderSimulationActive) map.panTo(marker.getLatLng(), { animate: true });
   }, true);
 
   manualLocationButton?.addEventListener('click', () => {
@@ -238,6 +239,7 @@
 
   document.addEventListener('wander:motion-context', (event) => {
     if (!window.WanderSimulationActive || event.detail?.simulated || !lastSimulatedMotion) return;
+    event.stopImmediatePropagation();
     window.setTimeout(() => {
       window.wanderMotionContext = lastSimulatedMotion;
       marker.setLatLng(L.latLng(lastSimulatedMotion.location.lat, lastSimulatedMotion.location.lng));
