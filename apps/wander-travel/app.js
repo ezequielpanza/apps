@@ -1,4 +1,74 @@
-const center=[20.975,-73.665];const map=L.map('wander-map',{zoomControl:false}).setView(center,13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);let marker=L.marker(center,{draggable:true}).addTo(map);let route=L.polyline([], {weight:5,opacity:.8}).addTo(map);let tracking=false,manual=false,points=[];const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];const readout=$('#location-readout');const panel=$('.companion-panel');const title=$('#wander-title');const message=$('#wander-message');function setPosition(latlng,label='Ubicacion actual'){marker.setLatLng(latlng);map.panTo(latlng);readout.querySelector('strong').textContent=`${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;readout.querySelector('small').textContent=label;if(tracking){points.push([latlng.lat,latlng.lng]);route.setLatLngs(points);updateTrack()}}function updateTrack(){const km=points.length<2?0:points.slice(1).reduce((n,p,i)=>n+map.distance(points[i],p),0)/1000;$('#track-summary').textContent=`${points.length} puntos · ${km.toFixed(2)} km`;$('#track-status-badge').textContent=tracking?'ON':'OFF'}function tell(t,m){title.textContent=t;message.textContent=m;panel.classList.remove('is-hidden');$('#show-companion').classList.remove('has-unread')}marker.on('dragend',e=>setPosition(e.target.getLatLng(),'Posicion ajustada'));map.on('click',e=>{if(manual){manual=false;$('#manual-location-hint').hidden=true;setPosition(e.latlng,'Posicion de prueba')}});$('#zoom-in-button')?.addEventListener('click',()=>map.zoomIn());$('#zoom-out-button')?.addEventListener('click',()=>map.zoomOut());$('#locate-button')?.addEventListener('click',()=>{if(!navigator.geolocation)return tell('GPS no disponible','Este navegador no ofrece geolocalizacion. Usa Fijar posicion.');navigator.geolocation.getCurrentPosition(p=>setPosition(L.latLng(p.coords.latitude,p.coords.longitude),'GPS'),()=>tell('No pude obtener la ubicacion','Permite el acceso al GPS o fija una posicion manualmente.'),{enableHighAccuracy:true,timeout:10000})});$('#manual-location-button')?.addEventListener('click',()=>{manual=true;$('#manual-location-hint').hidden=false});$('#route-button')?.addEventListener('click',()=>{if(points.length<2){points=[center,marker.getLatLng()];route.setLatLngs(points)}map.fitBounds(route.getBounds().pad(.25))});$('#track-route-button')?.addEventListener('click',e=>{tracking=!tracking;e.currentTarget.classList.toggle('active',tracking);if(tracking&&points.length===0)points.push([marker.getLatLng().lat,marker.getLatLng().lng]);updateTrack()});$('#save-route-button')?.addEventListener('click',()=>{const data={type:'Feature',geometry:{type:'LineString',coordinates:points.map(p=>[p[1],p[0]])},properties:{name:'Wander Travel'}};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/geo+json'}));a.download='wander-route.geojson';a.click();URL.revokeObjectURL(a.href)});$('#share-route-button')?.addEventListener('click',async()=>{const text=`Ruta Wander Travel con ${points.length} puntos.`;if(navigator.share)await navigator.share({title:'Wander Travel',text});else await navigator.clipboard.writeText(text)});$('#real-poi-button')?.addEventListener('click',async()=>{const p=marker.getLatLng();tell('Buscando lugares cercanos','Consultando OpenStreetMap alrededor de tu posicion...');const q=`[out:json][timeout:20];(node(around:2500,${p.lat},${p.lng})[tourism];node(around:2500,${p.lat},${p.lng})[amenity~"cafe|restaurant|bar|museum|library"];way(around:2500,${p.lat},${p.lng})[tourism];);out center 12;`;try{const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:q});const d=await r.json();const places=d.elements.filter(x=>x.tags?.name);if(!places.length)return tell('Sin resultados','No encontre POIs con nombre en un radio de 2,5 km.');const layers=[];places.slice(0,8).forEach(x=>{const lat=x.lat??x.center?.lat,lng=x.lon??x.center?.lon;if(lat&&lng){const m=L.marker([lat,lng]).addTo(map).bindPopup(`<strong>${x.tags.name}</strong><br>${x.tags.amenity||x.tags.tourism||'Lugar'}`);layers.push(m)}});if(layers.length)map.fitBounds(L.featureGroup(layers).getBounds().pad(.2));tell('Lugares encontrados',places.slice(0,5).map(x=>x.tags.name).join(' · '))}catch{tell('Busqueda no disponible','La consulta de lugares reales fallo temporalmente. Intenta nuevamente.')}});$('#hide-companion')?.addEventListener('click',()=>panel.classList.add('is-hidden'));$('#show-companion')?.addEventListener('click',()=>panel.classList.toggle('is-hidden'));$$('[data-message]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.message;if(k==='details')tell('Detalle','Wander combina tu posicion, tus intereses y datos publicos del lugar.');if(k==='route')map.flyTo(marker.getLatLng(),16);if(k==='skip')tell('Otra opcion','Busca POIs reales para descubrir una alternativa cercana.')}));$('#ask-wander-button')?.addEventListener('click',()=>{const q=prompt('Que queres preguntarle a Wander?');if(q)tell('Consulta recibida',`Todavia no hay una clave de IA configurada. Tu consulta fue: ${q}`)});$('#collapse-panel')?.addEventListener('click',()=>$('.app-shell').classList.add('panel-collapsed'));$('#show-panel')?.addEventListener('click',()=>$('.app-shell').classList.toggle('panel-collapsed'));$('#toggle-guide-settings')?.addEventListener('click',()=>{const e=$('#guide-settings');e.hidden=!e.hidden});function renderTags(){const tags=$('#interest-input')?.value.split(',').map(x=>x.trim()).filter(Boolean)||[];$('#interest-tags').innerHTML=tags.map(x=>`<span>${x}</span>`).join('')}$('#apply-interests')?.addEventListener('click',renderTags);$$('[data-suggest-tag]').forEach(b=>b.addEventListener('click',()=>{const i=$('#interest-input');const t=b.dataset.suggestTag;if(!i.value.includes(t))i.value+=(i.value?', ':'')+t;renderTags()}));const feed=['Wander listo para explorar.','GPS pendiente.','Busca POIs reales cuando fijes tu ubicacion.'];$('#active-feed').innerHTML=feed.map(x=>`<div class="message-card">${x}</div>`).join('');$('#active-count').textContent=feed.length;$$('[data-move]').forEach(b=>b.addEventListener('click',()=>{const p=marker.getLatLng(),s=.0015,d=b.dataset.move;setPosition(L.latLng(p.lat+(d.includes('north')?s:d.includes('south')?-s:0),p.lng+(d.includes('east')?s:d.includes('west')?-s:0)),'Movimiento simulado');$('#simulator-status').textContent=`Moviendo ${d}`}));$('[data-stop-move]')?.addEventListener('click',()=>$('#simulator-status').textContent='Movimiento detenido');renderTags();setPosition(L.latLng(center),'Great Inagua');setTimeout(()=>map.invalidateSize(),100);
+const center=[0,0];
+const map=L.map('wander-map',{zoomControl:false}).setView(center,2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+let marker=L.marker(center,{draggable:true}).addTo(map);
+let route=L.polyline([], {weight:5,opacity:.8}).addTo(map);
+let tracking=false,manual=false,points=[];
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+const readout=$('#location-readout');
+const panel=$('.companion-panel');
+const title=$('#wander-title');
+const message=$('#wander-message');
 
-// Side panels: keep only one open at a time and make both tabs usable on desktop and mobile.
-(()=>{const shell=$('.app-shell');const trip=$('.control-panel');const dev=$('#developer-panel');const tripTab=$('#show-panel');const devTab=$('#show-dev-panel');if(!shell||!trip||!dev||!tripTab||!devTab)return;const style=document.createElement('style');style.textContent=`.side-panel-tab,.dev-panel-tab{display:grid!important;position:fixed!important;right:0!important;left:auto!important;z-index:1000!important;min-width:44px!important;place-items:center!important;border:0!important;border-radius:10px 0 0 10px!important;padding:10px 8px!important;color:#fff!important;cursor:pointer!important;box-shadow:0 12px 30px rgba(20,35,55,.22)!important}.side-panel-tab{top:calc(50% - 78px)!important;min-height:112px!important;background:#173f3b!important}.dev-panel-tab{top:calc(50% + 58px)!important;min-height:138px!important;background:#6c5aa8!important}.side-panel-tab span,.dev-panel-tab span{writing-mode:vertical-rl!important;transform:rotate(180deg)!important}.developer-side-panel{display:block!important;position:fixed!important;top:0!important;right:0!important;left:auto!important;width:min(340px,90vw)!important;height:100vh!important;z-index:950!important;background:#fff!important;border-left:1px solid #dfe5eb!important;padding:18px!important;overflow:auto!important;box-shadow:-15px 0 40px rgba(20,35,55,.18)!important;transition:transform .22s ease!important}.developer-side-panel.dev-collapsed{transform:translateX(100%)!important}.app-shell:not(.panel-collapsed) .side-panel-tab{right:340px!important}.app-shell:not(.panel-collapsed) .dev-panel-tab{right:340px!important}body.dev-panel-open .side-panel-tab,body.dev-panel-open .dev-panel-tab{right:min(340px,90vw)!important}.control-panel{transition:transform .22s ease!important}.app-shell.panel-collapsed .control-panel{display:none!important}@media(max-width:820px){.app-shell:not(.panel-collapsed) .side-panel-tab,.app-shell:not(.panel-collapsed) .dev-panel-tab{right:min(340px,90vw)!important}}`;document.head.append(style);function closeTrip(){shell.classList.add('panel-collapsed')}function closeDev(){document.body.classList.remove('dev-panel-open');dev.classList.add('dev-collapsed')}function openTrip(){closeDev();shell.classList.remove('panel-collapsed');setTimeout(()=>map.invalidateSize(),240)}function openDev(){closeTrip();document.body.classList.add('dev-panel-open');dev.classList.remove('dev-collapsed');setTimeout(()=>map.invalidateSize(),240)}tripTab.addEventListener('click',e=>{e.preventDefault();shell.classList.contains('panel-collapsed')?openTrip():closeTrip()});devTab.addEventListener('click',e=>{e.preventDefault();dev.classList.contains('dev-collapsed')?openDev():closeDev()});$('#collapse-panel')?.addEventListener('click',e=>{e.preventDefault();closeTrip();setTimeout(()=>map.invalidateSize(),240)});closeDev();})();
+function setPosition(latlng,label='Ubicación actual'){
+  marker.setLatLng(latlng);
+  if(readout){
+    readout.querySelector('strong').textContent=`${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+    readout.querySelector('small').textContent=label;
+  }
+  if(tracking){points.push([latlng.lat,latlng.lng]);route.setLatLngs(points);updateTrack();}
+}
+function updateTrack(){
+  const km=points.length<2?0:points.slice(1).reduce((n,p,i)=>n+map.distance(points[i],p),0)/1000;
+  const summary=$('#track-summary');
+  const badge=$('#track-status-badge');
+  if(summary) summary.textContent=`${points.length} puntos · ${km.toFixed(2)} km`;
+  if(badge) badge.textContent=tracking?'ON':'OFF';
+}
+function tell(t,m){
+  if(title) title.textContent=t;
+  if(message) message.textContent=m;
+  panel?.classList.remove('is-hidden');
+  $('#show-companion')?.classList.remove('has-unread');
+}
+
+marker.on('dragend',e=>setPosition(e.target.getLatLng(),'Posición ajustada'));
+map.on('click',e=>{if(manual){manual=false;const hint=$('#manual-location-hint');if(hint) hint.hidden=true;setPosition(e.latlng,'Posición de prueba');}});
+$('#zoom-in-button')?.addEventListener('click',()=>map.zoomIn());
+$('#zoom-out-button')?.addEventListener('click',()=>map.zoomOut());
+$('#manual-location-button')?.addEventListener('click',()=>{manual=true;const hint=$('#manual-location-hint');if(hint) hint.hidden=false;});
+$('#track-route-button')?.addEventListener('click',e=>{tracking=!tracking;e.currentTarget.classList.toggle('active',tracking);if(tracking&&points.length===0)points.push([marker.getLatLng().lat,marker.getLatLng().lng]);updateTrack();});
+$('#save-route-button')?.addEventListener('click',()=>{
+  const data={type:'Feature',geometry:{type:'LineString',coordinates:points.map(p=>[p[1],p[0]])},properties:{name:'Wander Travel'}};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/geo+json'}));
+  a.download='wander-route.geojson';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+$('#share-route-button')?.addEventListener('click',async()=>{
+  const text=`Ruta Wander Travel con ${points.length} puntos.`;
+  if(navigator.share) await navigator.share({title:'Wander Travel',text});
+  else await navigator.clipboard.writeText(text);
+});
+$('#hide-companion')?.addEventListener('click',()=>panel?.classList.add('is-hidden'));
+$('#show-companion')?.addEventListener('click',()=>panel?.classList.toggle('is-hidden'));
+$$('[data-message]').forEach(b=>b.addEventListener('click',()=>{
+  const k=b.dataset.message;
+  if(k==='details') tell('Detalle','Wander combina tu posición, tus intereses y datos públicos del lugar.');
+  if(k==='route') tell('Ruta','La navegación automática está desactivada mientras reconstruimos esta función.');
+  if(k==='skip') tell('Otra opción','Busca POIs reales para descubrir una alternativa cercana.');
+}));
+$('#ask-wander-button')?.addEventListener('click',()=>{const q=prompt('Qué querés preguntarle a Wander?');if(q)tell('Consulta recibida',`Todavía no hay una clave de IA configurada. Tu consulta fue: ${q}`);});
+$('#collapse-panel')?.addEventListener('click',()=>$('.app-shell')?.classList.add('panel-collapsed'));
+$('#show-panel')?.addEventListener('click',()=>$('.app-shell')?.classList.toggle('panel-collapsed'));
+function renderTags(){const tags=$('#interest-input')?.value.split(',').map(x=>x.trim()).filter(Boolean)||[];const box=$('#interest-tags');if(box) box.innerHTML=tags.map(x=>`<span>${x}</span>`).join('');}
+$('#apply-interests')?.addEventListener('click',renderTags);
+const feed=['Wander listo.','GPS pendiente.'];
+const activeFeed=$('#active-feed');
+if(activeFeed) activeFeed.innerHTML=feed.map(x=>`<div class="message-card">${x}</div>`).join('');
+const activeCount=$('#active-count');
+if(activeCount) activeCount.textContent=feed.length;
+renderTags();
+setTimeout(()=>map.invalidateSize(),100);
