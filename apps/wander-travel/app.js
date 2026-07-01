@@ -1,7 +1,8 @@
 const center=[0,0];
+const stoppedIcon=L.divIcon({className:'',html:'<div class="wander-user-dot" style="width:18px;height:18px;border-radius:50%;background:#173f3b;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>',iconSize:[18,18],iconAnchor:[9,9]});
 const map=L.map('wander-map',{zoomControl:false}).setView(center,2);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
-let marker=L.marker(center,{draggable:true}).addTo(map);
+let marker=L.marker(center,{draggable:true,icon:stoppedIcon}).addTo(map);
 let route=L.polyline([], {weight:5,opacity:.8}).addTo(map);
 let tracking=false,manual=false,points=[];
 const $=s=>document.querySelector(s);
