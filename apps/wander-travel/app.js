@@ -2,7 +2,7 @@ const center=[0,0];
 const stoppedIcon=L.divIcon({className:'',html:'<div class="wander-user-dot" style="width:18px;height:18px;border-radius:50%;background:#173f3b;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>',iconSize:[18,18],iconAnchor:[9,9]});
 const map=L.map('wander-map',{zoomControl:false}).setView(center,2);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
-let marker=L.marker(center,{draggable:true,icon:stoppedIcon}).addTo(map);
+let marker=L.marker(center,{draggable:true,icon:stoppedIcon,opacity:0}).addTo(map);
 let route=L.polyline([], {weight:5,opacity:.8}).addTo(map);
 let tracking=false,manual=false,points=[];
 const $=s=>document.querySelector(s);
@@ -12,7 +12,9 @@ const panel=$('.companion-panel');
 const title=$('#wander-title');
 const message=$('#wander-message');
 
+function revealMarker(){try{marker.setOpacity(1)}catch{}}
 function setPosition(latlng,label='Ubicación actual'){
+  revealMarker();
   marker.setLatLng(latlng);
   if(readout){
     readout.querySelector('strong').textContent=`${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
@@ -34,6 +36,7 @@ function tell(t,m){
   $('#show-companion')?.classList.remove('has-unread');
 }
 
+window.WanderRevealMarker=revealMarker;
 marker.on('dragend',e=>setPosition(e.target.getLatLng(),'Posición ajustada'));
 map.on('click',e=>{if(manual){manual=false;const hint=$('#manual-location-hint');if(hint) hint.hidden=true;setPosition(e.latlng,'Posición de prueba');}});
 $('#zoom-in-button')?.addEventListener('click',()=>map.zoomIn());
