@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = 'v0.13.3';
+  const APP_VERSION = 'v0.13.4';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
   document.title = `Wander Travel ${APP_VERSION}`;
@@ -10,8 +10,15 @@
   const modeMetric = document.querySelector('.status-rail .metric:nth-child(1) strong');
   const speedMetric = document.querySelector('.status-rail .metric:nth-child(2) strong');
   const locateButton = document.querySelector('#locate-button');
+  const manualLocationButton = document.querySelector('#manual-location-button');
 
   if (!buttons.length || !stopButton || typeof marker === 'undefined' || typeof map === 'undefined') return;
+
+  if (manualLocationButton && !manualLocationButton.textContent.trim()) manualLocationButton.textContent = '📍';
+  if (manualLocationButton) {
+    manualLocationButton.setAttribute('aria-label', 'Fijar posición simulada');
+    manualLocationButton.title = 'Fijar posición simulada';
+  }
 
   const modes = [
     { id: 'walk', label: 'Caminando', speedLabel: '5 km/h', kmh: 5 },
@@ -25,6 +32,10 @@
     north: [1, 0], south: [-1, 0], east: [0, 1], west: [0, -1],
     northeast: [Math.SQRT1_2, Math.SQRT1_2], northwest: [Math.SQRT1_2, -Math.SQRT1_2],
     southeast: [-Math.SQRT1_2, Math.SQRT1_2], southwest: [-Math.SQRT1_2, -Math.SQRT1_2],
+  };
+
+  const directionBearing = {
+    north: 0, northeast: 45, east: 90, southeast: 135, south: 180, southwest: 225, west: 270, northwest: 315,
   };
 
   const oppositeDirections = {
@@ -44,6 +55,28 @@
   let activeButton = null;
   let followCursor = true;
   let stoppedForReverse = false;
+  let lastSimulatedMotion = null;
+
+  function publishSimulatedMotion(point, mode, moving = true) {
+    const speedMps = moving ? mode.kmh / 3.6 : 0;
+    const heading = activeDirection ? directionBearing[activeDirection] : 0;
+    lastSimulatedMotion = {
+      transport_mode: 'walking_or_land',
+      likely_boat: false,
+      speed_mps: speedMps,
+      speed_knots: speedMps * 1.943844,
+      heading_degrees: heading,
+      moving,
+      on_water_hint: false,
+      location: { lat: point.lat, lng: point.lng },
+      simulated: true,
+      updated_at: new Date().toISOString(),
+    };
+    window.WanderSimulationActive = true;
+    window.WanderSimulatedMotion = lastSimulatedMotion;
+    window.wanderMotionContext = lastSimulatedMotion;
+    document.dispatchEvent(new CustomEvent('wander:motion-context', { detail: lastSimulatedMotion }));
+  }
 
   function clearButtonStates() {
     buttons.forEach((item) => {
@@ -77,6 +110,7 @@
       if (modeMetric) modeMetric.textContent = 'Detenido';
       if (speedMetric) speedMetric.textContent = '0 km/h';
       setStoppedButtonState();
+      publishSimulatedMotion(marker.getLatLng(), modes[0], false);
       return;
     }
 
@@ -106,6 +140,7 @@
         if (typeof updateTrack === 'function') updateTrack();
       }
     } catch (_) {}
+    publishSimulatedMotion(next, mode, true);
     if (followCursor) map.panTo(next, { animate: false });
   }
 
@@ -139,6 +174,8 @@
   function startOrAdjust(button) {
     const direction = button.dataset.move;
     if (!directions[direction]) return;
+
+    window.WanderSimulationActive = true;
 
     if (stoppedForReverse) {
       activeDirection = direction;
@@ -182,6 +219,7 @@
     if (status) status.textContent = 'Movimiento detenido · 0 km/h';
     if (modeMetric) modeMetric.textContent = 'Detenido';
     if (speedMetric) speedMetric.textContent = '0 km/h';
+    publishSimulatedMotion(marker.getLatLng(), modes[0], false);
   }
 
   map.on('dragstart', () => {
@@ -192,6 +230,19 @@
   locateButton?.addEventListener('click', () => {
     followCursor = true;
     if (activeDirection) updateUi();
+  }, true);
+
+  manualLocationButton?.addEventListener('click', () => {
+    window.WanderSimulationActive = true;
+  }, true);
+
+  document.addEventListener('wander:motion-context', (event) => {
+    if (!window.WanderSimulationActive || event.detail?.simulated || !lastSimulatedMotion) return;
+    window.setTimeout(() => {
+      window.wanderMotionContext = lastSimulatedMotion;
+      marker.setLatLng(L.latLng(lastSimulatedMotion.location.lat, lastSimulatedMotion.location.lng));
+      document.dispatchEvent(new CustomEvent('wander:motion-context', { detail: lastSimulatedMotion }));
+    }, 0);
   }, true);
 
   buttons.forEach((button) => {
