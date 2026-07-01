@@ -7,6 +7,10 @@
   let lastAt = Date.now();
   let lastHeading = 0;
   let lastSpeed = 0;
+  let initialCentered = false;
+  let lastGpsPoint = null;
+  let lastGpsSpeed = 0;
+  let lastGpsHeading = 0;
 
   function normalize(value) { return ((Number(value) || 0) % 360 + 360) % 360; }
   function bearing(a, b) {
@@ -34,8 +38,19 @@
     window.wanderMotionContext = detail;
     document.dispatchEvent(new CustomEvent('wander:motion-context', { detail }));
   }
-  function update(point, gpsSpeed, gpsHeading) {
-    if (window.WanderSimulationActive) return;
+  function setReadout(point, label) {
+    const readout = document.querySelector('#location-readout');
+    if (!readout) return;
+    const strong = readout.querySelector('strong');
+    const small = readout.querySelector('small');
+    if (strong) strong.textContent = `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
+    if (small) small.textContent = label;
+  }
+  function update(point, gpsSpeed, gpsHeading, options = {}) {
+    lastGpsPoint = point;
+    lastGpsSpeed = Number.isFinite(gpsSpeed) && gpsSpeed >= 0 ? gpsSpeed : lastGpsSpeed;
+    lastGpsHeading = Number.isFinite(gpsHeading) && gpsHeading >= 0 ? gpsHeading : lastGpsHeading;
+    if (window.WanderSimulationActive && !options.forceReal) return;
     const now = Date.now();
     const elapsed = Math.max(0.2, (now - lastAt) / 1000);
     let speed = Number.isFinite(gpsSpeed) && gpsSpeed >= 0 ? gpsSpeed : 0;
@@ -50,14 +65,17 @@
     lastSpeed = speed;
     lastHeading = heading;
     try { marker.setLatLng(point); } catch {}
-    const readout = document.querySelector('#location-readout');
-    if (readout) {
-      const strong = readout.querySelector('strong');
-      const small = readout.querySelector('small');
-      if (strong) strong.textContent = `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
-      if (small) small.textContent = 'GPS';
+    setReadout(point, 'GPS');
+    if (!initialCentered && typeof map !== 'undefined') {
+      initialCentered = true;
+      try { map.setView(point, Math.max(map.getZoom(), 14), { animate: false }); } catch {}
     }
     publish(point, speed, heading);
+  }
+  function returnToGps() {
+    window.WanderSimulationActive = false;
+    window.WanderSimulatedMotion = null;
+    if (lastGpsPoint) update(lastGpsPoint, lastGpsSpeed, lastGpsHeading, { forceReal: true });
   }
   function start() {
     if (!navigator.geolocation) {
@@ -70,6 +88,8 @@
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
     );
   }
+  window.WanderGpsContext = { returnToGps, last: () => lastGpsPoint };
+  document.addEventListener('wander:simulation-closed', returnToGps);
   publish(marker.getLatLng(), 0, 0);
   start();
 })();
