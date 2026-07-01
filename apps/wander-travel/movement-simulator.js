@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = 'v0.13.5';
+  const APP_VERSION = 'v0.13.6';
   const versionBadge = document.querySelector('.app-version');
   if (versionBadge) versionBadge.textContent = APP_VERSION;
   document.title = `Wander Travel ${APP_VERSION}`;
@@ -9,7 +9,6 @@
   const status = document.querySelector('#simulator-status');
   const modeMetric = document.querySelector('.status-rail .metric:nth-child(1) strong');
   const speedMetric = document.querySelector('.status-rail .metric:nth-child(2) strong');
-  const locateButton = document.querySelector('#locate-button');
   const manualLocationButton = document.querySelector('#manual-location-button');
 
   if (!buttons.length || !stopButton || typeof marker === 'undefined' || typeof map === 'undefined') return;
@@ -53,7 +52,6 @@
   let activeDirection = null;
   let modeIndex = 0;
   let activeButton = null;
-  let followCursor = false;
   let stoppedForReverse = false;
   let lastSimulatedMotion = null;
 
@@ -115,10 +113,7 @@
     }
 
     const mode = modes[modeIndex];
-    if (status) {
-      const viewState = followCursor ? ' · Siguiendo cursor' : ' · Vista libre';
-      status.textContent = `Moviendo hacia ${directionLabels[activeDirection]} · ${mode.label} · ${mode.speedLabel}${viewState}`;
-    }
+    if (status) status.textContent = `Moviendo hacia ${directionLabels[activeDirection]} · ${mode.label} · ${mode.speedLabel} · Mapa libre`;
     if (modeMetric) modeMetric.textContent = mode.label;
     if (speedMetric) speedMetric.textContent = mode.speedLabel;
     setButtonState(activeButton, mode);
@@ -133,15 +128,7 @@
       if (strong) strong.textContent = `${next.lat.toFixed(5)}, ${next.lng.toFixed(5)}`;
       if (small) small.textContent = `Movimiento simulado · ${mode.label} · ${mode.speedLabel}`;
     }
-    try {
-      if (typeof tracking !== 'undefined' && tracking) {
-        points.push([next.lat, next.lng]);
-        route.setLatLngs(points);
-        if (typeof updateTrack === 'function') updateTrack();
-      }
-    } catch (_) {}
     publishSimulatedMotion(next, mode, true);
-    if (followCursor) map.panTo(next, { animate: false });
   }
 
   function moveOneTick() {
@@ -222,17 +209,6 @@
     publishSimulatedMotion(marker.getLatLng(), modes[0], false);
   }
 
-  map.on('dragstart', () => {
-    followCursor = false;
-    if (activeDirection) updateUi();
-  });
-
-  locateButton?.addEventListener('click', () => {
-    followCursor = true;
-    if (activeDirection) updateUi();
-    if (window.WanderSimulationActive) map.panTo(marker.getLatLng(), { animate: true });
-  }, true);
-
   manualLocationButton?.addEventListener('click', () => {
     window.WanderSimulationActive = true;
   }, true);
@@ -265,12 +241,6 @@
 })();
 
 (() => {
-  if (!document.querySelector('script[data-map-recenter]')) {
-    const script = document.createElement('script');
-    script.src = 'map-recenter.js?v=20260625-1';
-    script.dataset.mapRecenter = 'true';
-    document.body.appendChild(script);
-  }
   if (!document.querySelector('script[data-movement-overlay]')) {
     const script = document.createElement('script');
     script.src = 'movement-overlay.js?v=20260625-3';
