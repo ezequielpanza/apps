@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.55.1';
+  const version = 'v0.55.2';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
@@ -22,21 +22,17 @@
   loadScript('developer-city.js?v=20260625-1', 'developer-city');
   loadScript('human-route-context.js?v=20260625-2', 'human-route-context');
   loadScript('city-welcome.js?v=20260625-2', 'city-welcome');
-  loadScript('clean-mobile-ui.js?v=20260625-4', 'clean-mobile-ui-latest');
+  loadScript('clean-mobile-ui.js?v=20260701-1', 'clean-mobile-ui-latest');
   loadScript('mobile-panel-fix.js?v=20260625-3', 'mobile-panel-fix');
   loadScript('map-orientation-reset.js?v=20260701-1', 'map-orientation-reset');
   loadScript('gps-motion-context.js?v=20260701-1', 'gps-motion-context');
   loadScript('context-engine.js?v=20260629-1', 'context-engine');
   loadScript('settings-gear.js?v=20260628-1', 'settings-gear');
   loadScript('settings-structure.js?v=20260629-1', 'settings-structure');
-  loadScript('boat-menu-placeholder.js?v=20260629-1', 'boat-menu-placeholder');
-  loadScript('mobile-icon-polish.js?v=20260629-2', 'mobile-icon-polish');
-  loadScript('context-menu-structure.js?v=20260629-1', 'context-menu-structure');
   loadScript('motion-state-stabilizer.js?v=20260629-2', 'motion-state-stabilizer');
   loadScript('look-direction-context.js?v=20260629-1', 'look-direction-context');
   loadScript('self-check.js?v=20260629-1', 'self-check');
   loadScript('context-status-label.js?v=20260629-2', 'context-status-label');
   loadScript('speed-heading-metrics.js?v=20260629-2', 'speed-heading-metrics');
-  loadScript('simulator-main-menu.js?v=20260701-1', 'simulator-main-menu');
   loadScript('multi-track-recorder.js?v=20260701-1', 'multi-track-recorder');
 })();
