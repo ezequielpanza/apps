@@ -20,13 +20,12 @@
     button.title = 'Fijar posición simulada';
   }
 
-  function enforceSimulation(center = true) {
+  function enforceSimulation() {
     if (!window.WanderSimulationActive) return;
     const point = pointFromSim();
     if (!point) return;
     try {
       if (typeof marker !== 'undefined') marker.setLatLng(point);
-      if (center && typeof map !== 'undefined') map.panTo(point, { animate: false });
     } catch {}
   }
 
@@ -34,28 +33,24 @@
     if (!window.WanderSimulationActive) return;
     if (event.detail?.simulated) {
       window.WanderSimulatedMotion = event.detail;
-      enforceSimulation(true);
+      enforceSimulation();
       return;
     }
     event.stopImmediatePropagation();
-    enforceSimulation(true);
-    window.setTimeout(() => enforceSimulation(true), 0);
+    enforceSimulation();
+    window.setTimeout(enforceSimulation, 0);
   }, true);
 
   document.addEventListener('click', (event) => {
     if (event.target?.closest?.('#manual-location-button, .move-button, [data-move], [data-stop-move]')) {
       window.WanderSimulationActive = true;
-      window.setTimeout(() => enforceSimulation(true), 0);
+      window.setTimeout(enforceSimulation, 0);
     }
-  }, true);
-
-  window.addEventListener('pointerup', () => {
-    if (window.WanderSimulationActive) window.setTimeout(() => enforceSimulation(true), 80);
   }, true);
 
   window.setInterval(() => {
     fixPinButton();
-    enforceSimulation(true);
+    enforceSimulation();
   }, 400);
 
   fixPinButton();
