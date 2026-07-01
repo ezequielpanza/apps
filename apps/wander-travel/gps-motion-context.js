@@ -64,7 +64,7 @@
     lastAt = now;
     lastSpeed = speed;
     lastHeading = heading;
-    try { marker.setLatLng(point); } catch {}
+    try { window.WanderRevealMarker?.(); marker.setLatLng(point); } catch {}
     setReadout(point, 'GPS');
     if (!initialCentered && typeof map !== 'undefined') {
       initialCentered = true;
@@ -78,18 +78,14 @@
     if (lastGpsPoint) update(lastGpsPoint, lastGpsSpeed, lastGpsHeading, { forceReal: true });
   }
   function start() {
-    if (!navigator.geolocation) {
-      publish(marker.getLatLng(), lastSpeed, lastHeading);
-      return;
-    }
+    if (!navigator.geolocation) return;
     navigator.geolocation.watchPosition(
       (pos) => update(L.latLng(pos.coords.latitude, pos.coords.longitude), pos.coords.speed, pos.coords.heading),
-      () => publish(marker.getLatLng(), lastSpeed, lastHeading),
+      () => {},
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
     );
   }
   window.WanderGpsContext = { returnToGps, last: () => lastGpsPoint };
   document.addEventListener('wander:simulation-closed', returnToGps);
-  publish(marker.getLatLng(), 0, 0);
   start();
 })();
