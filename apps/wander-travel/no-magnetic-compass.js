@@ -4,9 +4,17 @@
 
   const MODES = ['center', 'route', 'north'];
   let modeIndex = 0;
+  let visualRotation = 0;
 
   function normalize(value) {
     return ((Number(value) || 0) % 360 + 360) % 360;
+  }
+
+  function shortestEquivalent(target, reference) {
+    let next = target;
+    while (next - reference > 180) next -= 360;
+    while (next - reference < -180) next += 360;
+    return next;
   }
 
   function currentRouteBearing() {
@@ -14,7 +22,14 @@
   }
 
   function setRotation(value) {
-    document.documentElement.style.setProperty('--wander-map-rotation', `${-normalize(value)}deg`);
+    const target = -normalize(value);
+    visualRotation = shortestEquivalent(target, visualRotation);
+    document.documentElement.style.setProperty('--wander-map-rotation', `${visualRotation}deg`);
+  }
+
+  function resetRotation() {
+    visualRotation = shortestEquivalent(0, visualRotation);
+    document.documentElement.style.setProperty('--wander-map-rotation', `${visualRotation}deg`);
   }
 
   function centerOnMarker(force = false) {
@@ -57,7 +72,7 @@
       setRotation(currentRouteBearing());
       centerOnMarker(true);
     } else {
-      setRotation(0);
+      resetRotation();
       if (mode === 'center') centerOnMarker(true);
     }
     render();
