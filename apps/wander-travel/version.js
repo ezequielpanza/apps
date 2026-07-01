@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.54.2';
+  const version = 'v0.54.3';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
@@ -36,8 +36,8 @@
   loadScript('look-direction-context.js?v=20260629-1', 'look-direction-context');
   loadScript('rotated-map-drag-fix.js?v=20260629-1', 'rotated-map-drag-fix');
   loadScript('self-check.js?v=20260629-1', 'self-check');
-  loadScript('no-magnetic-compass.js?v=20260629-1', 'no-magnetic-compass');
-  loadScript('context-status-label.js?v=20260629-1', 'context-status-label');
+  loadScript('no-magnetic-compass.js?v=20260629-2', 'no-magnetic-compass');
+  loadScript('context-status-label.js?v=20260629-2', 'context-status-label');
   loadScript('speed-heading-metrics.js?v=20260629-2', 'speed-heading-metrics');
   loadScript('simulation-lock-fix.js?v=20260629-1', 'simulation-lock-fix');
 })();
