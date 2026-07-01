@@ -1,1 +1,93 @@
-<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Wander Travel v0.55.5</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""><link rel="stylesheet" href="styles.css?v=20260625-2"><link rel="stylesheet" href="mobile-controls-restore.css?v=20260701-2"></head><body><main class="app-shell panel-collapsed"><section class="map-stage"><div id="wander-map"></div><header class="top-bar"><div><div class="app-brand-line"><p class="eyebrow">Wander Travel</p><span class="app-version">v0.55.5</span></div><h1>Explorando</h1></div></header><div class="map-tools"><div class="zoom-tools"><button id="zoom-in-button" class="zoom-tool" type="button">+</button><button id="zoom-out-button" class="zoom-tool" type="button">−</button></div><button id="locate-button" class="map-tool" type="button">Ubicacion</button><button id="real-poi-button" class="map-tool" type="button">POIs</button><button id="route-button" class="map-tool" type="button">Ruta</button><button id="track-route-button" class="map-tool" type="button">REC</button></div><div id="manual-location-hint" hidden>Fijar posicion</div><div id="location-readout"><span>Ubicacion</span><strong>Sin fijar</strong><small>GPS pendiente</small></div><aside class="status-rail"><div class="metric"><span>Estado</span><strong>Detenido</strong></div><div class="metric"><span>Velocidad</span><strong>0 km/h</strong></div><div class="metric"><span>Rumbo</span><strong>—</strong></div></aside><section class="companion-panel is-hidden"><div class="voice-header"><div class="voice-orb"><span></span><span></span><span></span></div><div><p class="eyebrow">Wander</p><h2 id="wander-title">Listo</h2></div><button id="hide-companion" class="panel-icon-button" type="button">×</button></div><p id="wander-message">Wander listo.</p><div class="quick-actions"><button type="button" data-message="details">Detalles</button><button type="button" data-message="route">Ir</button><button type="button" data-message="skip">Otra</button><button id="ask-wander-button" type="button">Preguntar</button></div></section><button id="show-companion" class="companion-tab" type="button"><span class="voice-mini"></span>Wander</button></section><aside class="control-panel"><section class="control-section"><div class="section-title"><h2>Viaje actual</h2><button id="collapse-panel" class="icon-button" type="button">←</button></div><div class="travelers"><button class="traveler active" type="button"><span>A</span>Ana</button></div></section><section class="control-section"><h2>Contexto</h2><div class="context-list"><div><span>Hora</span><strong>Actualizando...</strong></div><div><span>Clima</span><strong>Actualizando...</strong></div><div><span>Próxima hora</span><strong>Actualizando...</strong></div></div></section><section class="control-section route-tracker-section"><div class="section-title"><h2>Camino</h2><span id="track-status-badge" class="dev-badge">OFF</span></div><p id="track-summary" class="developer-note">Sin recorridos grabados.</p><div class="route-tracker-actions"><button id="save-route-button" type="button">Guardar</button><button id="share-route-button" type="button">Compartir</button></div></section><section class="control-section interest-section"><div id="interest-selector"><button type="button" class="interest-chip is-selected" data-interest-tag="Cafés">Cafés</button></div><div id="custom-interest-tags"></div><input id="custom-interest-input" type="text"><button id="add-custom-interest" type="button">Agregar</button><input id="interest-input" type="text" value="Cafés"><div id="interest-tags" hidden></div><button id="apply-interests" type="button" hidden>Aplicar</button><span id="selected-interest-summary"></span></section><section class="control-section message-section"><span id="active-count">0</span><div id="active-feed"></div></section><section class="control-section compact"><button id="talk-toggle" type="button">Hablar</button><button id="pause-toggle" type="button">Pausar</button></section></aside><aside id="guide-panel" class="guide-panel guide-collapsed"><button id="collapse-guide-panel" type="button">←</button><div class="settings-list"></div><p id="guide-settings-save-status"></p></aside><aside id="developer-panel" class="developer-side-panel dev-collapsed"><section class="control-section developer-panel"><div class="section-title"><h2>Desarrollador</h2><span class="dev-badge">ON</span></div><p class="developer-note">Simular movimiento</p><button id="manual-location-button" class="map-tool" type="button">📍</button><div class="move-pad"><button class="move-button move-nw" type="button" data-move="northwest">↖</button><button class="move-button move-up" type="button" data-move="north">↑</button><button class="move-button move-ne" type="button" data-move="northeast">↗</button><button class="move-button move-left" type="button" data-move="west">←</button><button class="move-button stop-button" type="button" data-stop-move>🛑</button><button class="move-button move-right" type="button" data-move="east">→</button><button class="move-button move-sw" type="button" data-move="southwest">↙</button><button class="move-button move-down" type="button" data-move="south">↓</button><button class="move-button move-se" type="button" data-move="southeast">↘</button></div><p id="simulator-status">Movimiento detenido</p></section></aside><aside id="settings-panel" class="settings-panel settings-collapsed"><div class="settings-title"><h2>Configuración</h2><button id="collapse-settings-panel" type="button">←</button></div><div class="settings-list"><section class="settings-card"><input id="setting-track-default" type="checkbox"><input id="setting-developer-mode" type="checkbox" checked></section></div><p id="settings-save-status"></p></aside><button id="show-panel" type="button">Viaje</button><button id="show-guide-panel" type="button">Guía</button><button id="show-dev-panel" type="button">Desarrollador</button><button id="show-settings-panel" type="button">Configuración</button></main><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script><script src="app.js?v=20260701-1"></script><script src="interest-tags.js?v=20260625-2"></script><script src="movement-simulator.js?v=20260701-6"></script><script src="poi-engine.js?v=20260625-3"></script><script src="settings.js?v=20260625-6"></script><script src="guide-settings.js?v=20260625-1"></script><script src="panels.js?v=20260625-6"></script><script src="assistant-client.js?v=20260625-1"></script><script src="guide-mode.js?v=20260625-2"></script><script src="version.js?v=20260701-5"></script><script src="gps-readout-update.js?v=20260625-1"></script></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Wander Travel v0.56.0</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css?v=20260625-2">
+  <link rel="stylesheet" href="mobile-controls-restore.css?v=20260701-2">
+</head>
+<body>
+  <main class="app-shell panel-collapsed" aria-label="Wander Travel">
+    <section class="map-stage" aria-label="Mapa">
+      <div id="wander-map"></div>
+
+      <header class="top-bar">
+        <div>
+          <div class="app-brand-line">
+            <p class="eyebrow">Wander Travel</p>
+            <span class="app-version">v0.56.0</span>
+          </div>
+          <h1>Explorando</h1>
+        </div>
+      </header>
+
+      <div class="map-tools" aria-label="Herramientas">
+        <button id="track-route-button" class="map-tool" type="button" aria-label="Grabar recorrido">REC</button>
+      </div>
+
+      <div id="manual-location-hint" hidden>Fijar posición</div>
+      <div id="location-readout"><span>Ubicación</span><strong>Sin fijar</strong><small>GPS pendiente</small></div>
+
+      <aside class="status-rail" aria-label="Estado actual">
+        <div class="metric"><span>Estado</span><strong>Detenido</strong></div>
+        <div class="metric"><span>Velocidad</span><strong>0.0 km/h</strong></div>
+        <div class="metric"><span>Rumbo</span><strong>—</strong></div>
+      </aside>
+
+      <section class="companion-panel is-hidden" aria-label="Wander">
+        <div class="voice-header">
+          <div class="voice-orb"><span></span><span></span><span></span></div>
+          <div><p class="eyebrow">Wander</p><h2 id="wander-title">Listo</h2></div>
+          <button id="hide-companion" class="panel-icon-button" type="button" aria-label="Cerrar">×</button>
+        </div>
+        <p id="wander-message">Wander listo.</p>
+        <div class="quick-actions">
+          <button type="button" data-message="details">Detalles</button>
+          <button type="button" data-message="route">Ir</button>
+          <button type="button" data-message="skip">Otra</button>
+          <button id="ask-wander-button" type="button">Preguntar</button>
+        </div>
+      </section>
+      <button id="show-companion" class="companion-tab" type="button">Wander</button>
+    </section>
+
+    <aside class="control-panel" aria-label="Panel Travel">
+      <section class="control-section"><div class="section-title"><h2>Travel</h2><button id="collapse-panel" class="icon-button" type="button">←</button></div></section>
+      <section class="control-section"><h2>Contexto</h2><div class="context-list"><div><span>Hora</span><strong>Actualizando...</strong></div><div><span>Clima</span><strong>Actualizando...</strong></div><div><span>Próxima hora</span><strong>Actualizando...</strong></div></div></section>
+      <section class="control-section route-tracker-section"><div class="section-title"><h2>Camino</h2><span id="track-status-badge" class="dev-badge">OFF</span></div><p id="track-summary" class="developer-note">0 tracks guardados</p><div class="route-tracker-actions"><button id="save-route-button" type="button">Guardar</button><button id="share-route-button" type="button">Compartir</button></div></section>
+    </aside>
+
+    <aside id="developer-panel" class="developer-side-panel dev-collapsed" aria-label="Desarrollador">
+      <section class="control-section developer-panel">
+        <div class="section-title"><h2>Desarrollador</h2><span class="dev-badge">ON</span></div>
+        <p class="developer-note">Herramientas de prueba.</p>
+        <button id="manual-location-button" class="map-tool" type="button">📍</button>
+        <div class="move-pad">
+          <button class="move-button move-nw" type="button" data-move="northwest">↖</button>
+          <button class="move-button move-up" type="button" data-move="north">↑</button>
+          <button class="move-button move-ne" type="button" data-move="northeast">↗</button>
+          <button class="move-button move-left" type="button" data-move="west">←</button>
+          <button class="move-button stop-button" type="button" data-stop-move>🛑</button>
+          <button class="move-button move-right" type="button" data-move="east">→</button>
+          <button class="move-button move-sw" type="button" data-move="southwest">↙</button>
+          <button class="move-button move-down" type="button" data-move="south">↓</button>
+          <button class="move-button move-se" type="button" data-move="southeast">↘</button>
+        </div>
+        <p id="simulator-status">Movimiento detenido</p>
+      </section>
+    </aside>
+
+    <aside id="settings-panel" class="settings-panel settings-collapsed" aria-label="Configuración">
+      <div class="settings-title"><h2>Configuración</h2><button id="collapse-settings-panel" type="button">←</button></div>
+      <div class="settings-list"><section class="settings-card"><div><h3>Tracks</h3><p>Grabación manual de recorridos.</p></div></section></div>
+      <p id="settings-save-status"></p>
+    </aside>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="app.js?v=20260701-2"></script>
+  <script src="version.js?v=20260701-6"></script>
+</body>
+</html>
