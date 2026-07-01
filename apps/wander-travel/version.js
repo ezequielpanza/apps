@@ -1,8 +1,9 @@
 (() => {
-  const version = 'v0.55.5';
+  const version = 'v0.56.0';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
+
   const loadScript = (src, dataKey) => {
     if (document.querySelector(`script[data-${dataKey}]`)) return;
     const script = document.createElement('script');
@@ -10,29 +11,6 @@
     script.dataset[dataKey.replace(/-([a-z])/g, (_, char) => char.toUpperCase())] = 'true';
     document.body.appendChild(script);
   };
-  loadScript('welcome-first-guard.js?v=20260625-1', 'welcome-first-guard');
-  loadScript('companion-actions.js?v=20260625-2', 'companion-actions');
-  loadScript('navigation.js?v=20260625-3', 'navigation');
-  loadScript('weather-context.js?v=20260625-1', 'weather-context');
-  loadScript('topic-actions.js?v=20260625-1', 'topic-actions');
-  loadScript('system-controls.js?v=20260625-3', 'system-controls');
-  loadScript('poi-interactions.js?v=20260625-1', 'poi-interactions');
-  loadScript('poi-click-resolver.js?v=20260625-1', 'poi-click-resolver');
-  loadScript('unified-poi-internet-bridge.js?v=20260625-1', 'unified-poi-internet-bridge');
-  loadScript('human-route-context.js?v=20260625-2', 'human-route-context');
-  loadScript('city-welcome.js?v=20260625-2', 'city-welcome');
-  loadScript('clean-mobile-ui.js?v=20260701-1', 'clean-mobile-ui-latest');
-  loadScript('mobile-panel-fix.js?v=20260625-3', 'mobile-panel-fix');
-  loadScript('map-orientation-reset.js?v=20260701-1', 'map-orientation-reset');
-  loadScript('gps-motion-context.js?v=20260701-2', 'gps-motion-context');
-  loadScript('context-engine.js?v=20260629-1', 'context-engine');
-  loadScript('settings-gear.js?v=20260628-1', 'settings-gear');
-  loadScript('settings-structure.js?v=20260629-1', 'settings-structure');
-  loadScript('motion-state-stabilizer.js?v=20260629-3', 'motion-state-stabilizer');
-  loadScript('look-direction-context.js?v=20260629-1', 'look-direction-context');
-  loadScript('self-check.js?v=20260629-1', 'self-check');
-  loadScript('context-status-label.js?v=20260629-2', 'context-status-label');
-  loadScript('speed-heading-metrics.js?v=20260629-2', 'speed-heading-metrics');
-  loadScript('multi-track-recorder.js?v=20260701-1', 'multi-track-recorder');
-  loadScript('disable-city-test.js?v=20260701-1', 'disable-city-test');
+
+  loadScript('wander-runtime.js?v=20260701-1', 'wander-runtime');
 })();
