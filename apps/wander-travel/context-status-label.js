@@ -19,13 +19,24 @@
     return (Number(ctx?.speed_mps) || 0) * 3.6;
   }
 
+  function hasBoatContext(ctx = {}) {
+    const context = window.WanderContext || {};
+    return Boolean(
+      ctx.likely_boat ||
+      ctx.transport_mode === 'boat' ||
+      ctx.on_water_hint ||
+      context.secondary_context === 'boat' ||
+      String(context.state || '').includes('boat')
+    );
+  }
+
   function statusFromContext(ctx = {}) {
     const kmh = speedKmh(ctx);
-    const knots = Number(ctx.speed_knots) || 0;
+    const knots = Number(ctx.speed_knots) || ((Number(ctx.speed_mps) || 0) * 1.943844);
     const moving = ctx.moving === true || kmh > 1.2;
 
-    if (ctx.likely_boat || ctx.transport_mode === 'boat' || ctx.on_water_hint) {
-      if (!moving || knots < 0.8) return 'Fondeado';
+    if (hasBoatContext(ctx)) {
+      if (!moving || knots < 0.4) return 'Fondeado';
       return 'Navegando';
     }
 
@@ -58,6 +69,7 @@
   }
 
   document.addEventListener('wander:motion-context', (event) => update(event.detail));
+  window.addEventListener('wander:context-updated', () => update(window.wanderMotionContext || {}));
 
   applyStatus(lastStatus);
   window.setInterval(() => {
