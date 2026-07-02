@@ -15,4 +15,5 @@
   load('runtime-ui.js?v=20260702-1', 'runtimeUi');
   load('runtime-panel.js?v=20260702-1', 'runtimePanel');
   load('runtime-tracks.js?v=20260702-1', 'runtimeTracks');
+  load('runtime-simulator.js?v=20260702-1', 'runtimeSimulator');
 })();
