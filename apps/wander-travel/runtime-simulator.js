@@ -73,7 +73,8 @@
   }
 
   $('#set-sim-position')?.addEventListener('click', () => {
-    base.centerOnMarker?.();
+    base.revealMarker?.();
+    map.setView(marker.getLatLng(), Math.max(map.getZoom(), 15));
     stop();
     setStatus('Posición visible · lista para simular');
   });
