@@ -40,6 +40,7 @@
     clearActiveButtons();
     $('[data-stop-move]')?.classList.add('is-active');
     window.WanderUI?.setMotion(false, 0, null);
+    window.WanderContext?.setMotion({ status: 'Detenido', speedKmh: 0, heading: null, source: 'simulator' });
     setStatus('Movimiento detenido · Mapa libre');
   }
 
@@ -56,6 +57,8 @@
     base.revealMarker?.();
     marker.setLatLng(next);
     window.WanderUI?.setMotion(true, kmh / 3.6, dir[2]);
+    window.WanderContext?.setLocation({ lat: next.lat, lng: next.lng, source: 'simulator', confidence: 0.9 });
+    window.WanderContext?.setMotion({ status: labels[speedIndex], speedKmh: kmh, heading: dir[2], source: 'simulator' });
     window.WanderTracks?.addPoint(next);
     setStatus('Moviendo ' + dir[3] + ' · ' + labels[speedIndex] + ' · ' + kmh + ' km/h');
   }
@@ -75,6 +78,7 @@
   $('#set-sim-position')?.addEventListener('click', () => {
     base.revealMarker?.();
     map.setView(marker.getLatLng(), Math.max(map.getZoom(), 15));
+    window.WanderContext?.setLocation({ lat: marker.getLatLng().lat, lng: marker.getLatLng().lng, source: 'simulator', confidence: 0.9 });
     stop();
     setStatus('Posición visible · lista para simular');
   });
