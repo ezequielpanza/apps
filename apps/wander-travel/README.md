@@ -8,20 +8,65 @@ Wander no es un buscador de POIs. Wander debe funcionar como un compañero de vi
 
 ## Estado actual
 
-Versión: v0.57.2
+Versión: v0.58.0
 
-Esta versión estabiliza el shell base antes de reactivar nuevas funciones. Incluye:
+Esta versión agrega la primera feature estructural: WanderContext, un motor central de contexto para que la app no reparta datos críticos entre módulos sueltos.
+
+Incluye:
 
 - Mapa base con Leaflet y OpenStreetMap.
 - Header con versión visible.
 - Menú principal minimalista con iconos/emojis.
 - Tarjeta Wander.
 - Panel Travel.
+- Panel Contexto inyectado por runtime.
 - Panel de configuración.
 - Panel de desarrollador/simulador.
 - Grabación local de tracks.
 - Exportación del último track.
 - Simulación de movimiento para pruebas.
+- Motor WanderContext con variables, fuente, actualización, TTL, confianza y vigencia.
+
+## WanderContext
+
+Archivo principal:
+
+```text
+runtime-context.js
+```
+
+Panel visible:
+
+```text
+runtime-context-panel.js
+```
+
+Variables iniciales:
+
+- app.version
+- time.now
+- time.dayPeriod
+- motion.status
+- motion.speedKmh
+- motion.heading
+- location.lat
+- location.lng
+- location.source
+- location.updatedAt
+- environment.weatherStatus
+- place.city
+- place.zone
+- user.intent
+- user.interests
+
+Cada variable puede tener:
+
+- value
+- source
+- updatedAt
+- ttlMs
+- confidence
+- status: fresh, stale, stable o pending
 
 ## Tecnología
 
@@ -62,13 +107,15 @@ URL pública: https://wander-travel.pages.dev
 - No mezclar restos de interfaces anteriores.
 - No publicar secretos en el frontend.
 - Actualizar versión en cada cambio relevante.
+- Toda feature nueva debe leer o escribir contexto a través de WanderContext.
 
 ## Próximas capas previstas
 
-1. Shell estable.
-2. Wander como compañero contextual.
-3. IA integrada.
-4. Bienvenida a ciudad.
-5. Guía turística contextual.
-6. Clima, fecha y eventos.
-7. Ruta viva adaptativa.
+1. WanderContext.
+2. Ubicación real.
+3. Contexto de ciudad/zona.
+4. IA integrada leyendo WanderContext.
+5. Bienvenida a ciudad.
+6. Guía turística contextual.
+7. Clima, fecha y eventos.
+8. Ruta viva adaptativa.
