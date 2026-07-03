@@ -21,11 +21,19 @@ jobs:
       - name: Verify source
         run: |
           test -s apps/wander-travel/index.html
-          test -s apps/wander-travel/styles.css
+          test -s apps/wander-travel/wander-ui.css
           test -s apps/wander-travel/app.js
-          test -s apps/wander-travel/functions/api/assistant.js
+          test -s apps/wander-travel/version.js
+          test -s apps/wander-travel/runtime-ui.js
+          test -s apps/wander-travel/runtime-panel.js
+          test -s apps/wander-travel/runtime-tracks.js
+          test -s apps/wander-travel/runtime-simulator.js
           node --check apps/wander-travel/app.js
-          node --check apps/wander-travel/assistant-client.js
+          node --check apps/wander-travel/version.js
+          node --check apps/wander-travel/runtime-ui.js
+          node --check apps/wander-travel/runtime-panel.js
+          node --check apps/wander-travel/runtime-tracks.js
+          node --check apps/wander-travel/runtime-simulator.js
 
       - name: Create Pages project
         env:
