@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.58.1';
+  const version = 'v0.58.2';
   document.title = `Wander Travel ${version}`;
   const badge = document.querySelector('.app-version');
   if (badge) badge.textContent = version;
@@ -16,7 +16,7 @@
   load('runtime-ui.js?v=20260703-2', 'runtimeUi');
   load('runtime-panel.js?v=20260703-1', 'runtimePanel');
   load('runtime-context-panel.js?v=20260703-2', 'runtimeContextPanel');
-  load('runtime-topbar.js?v=20260703-3', 'runtimeTopbar');
+  load('runtime-topbar.js?v=20260703-4', 'runtimeTopbar');
   load('runtime-tracks.js?v=20260703-2', 'runtimeTracks');
   load('runtime-simulator.js?v=20260703-2', 'runtimeSimulator');
 })();
