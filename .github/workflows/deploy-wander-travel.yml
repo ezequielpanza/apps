@@ -24,12 +24,16 @@ jobs:
           test -s apps/wander-travel/wander-ui.css
           test -s apps/wander-travel/app.js
           test -s apps/wander-travel/version.js
+          test -s apps/wander-travel/runtime-context.js
+          test -s apps/wander-travel/runtime-context-panel.js
           test -s apps/wander-travel/runtime-ui.js
           test -s apps/wander-travel/runtime-panel.js
           test -s apps/wander-travel/runtime-tracks.js
           test -s apps/wander-travel/runtime-simulator.js
           node --check apps/wander-travel/app.js
           node --check apps/wander-travel/version.js
+          node --check apps/wander-travel/runtime-context.js
+          node --check apps/wander-travel/runtime-context-panel.js
           node --check apps/wander-travel/runtime-ui.js
           node --check apps/wander-travel/runtime-panel.js
           node --check apps/wander-travel/runtime-tracks.js
