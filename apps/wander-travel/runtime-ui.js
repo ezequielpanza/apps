@@ -19,20 +19,23 @@
     setText('#metric-status', status);
     setText('#metric-speed', kmh.toFixed(1) + ' km/h');
     setText('#metric-heading', moving && Number.isFinite(heading) ? Math.round(heading) + '°' : '—');
+    window.WanderContext?.setMotion({ status, speedKmh: kmh, heading: Number.isFinite(heading) ? heading : null, source: 'ui' });
   }
 
   function updateClock() {
-    setText('#context-time', new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }));
+    const value = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    setText('#context-time', value);
+    window.WanderContext?.updateTime();
   }
 
   const messages = {
-    details: ['Wander', 'Soy tu compañero de viaje. Primero dejamos estable la base: mapa, menú, paneles, recorridos y simulador. Después reactivamos la guía contextual.'],
-    route: ['Ruta', 'La ruta viva vuelve en una próxima etapa. Antes estamos asegurando que la base funcione sin parches.'],
-    food: ['Comer', 'La recomendación gastronómica queda reservada para la capa de guía turística y contexto real.'],
-    ask: ['Preguntar', 'La IA contextual existe como módulo, pero todavía no está reactivada en esta pantalla estable.'],
+    details: ['Wander', 'Soy tu compañero de viaje. Ahora ya tengo un motor central de contexto para saber qué datos están vigentes, pendientes o desactualizados.'],
+    route: ['Ruta', 'La ruta viva vuelve después de consolidar ubicación y contexto. Primero necesito saber dónde estás y qué está pasando alrededor.'],
+    food: ['Comer', 'La recomendación gastronómica usará el contexto: hora, ubicación, clima, ritmo e intereses. Todavía no está conectada a lugares reales.'],
+    ask: ['Preguntar', 'La IA contextual será la próxima capa. Va a leer WanderContext en vez de datos sueltos de la pantalla.'],
   };
 
-  $('#wander-button')?.addEventListener('click', () => showWander('Bienvenido', 'Wander está listo para acompañar el viaje. Esta versión estabiliza la base antes de reactivar nuevas funciones.'));
+  $('#wander-button')?.addEventListener('click', () => showWander('Bienvenido', 'WanderContext ya está activo. Abrí 🧠 Contexto para ver qué sabe Wander y qué datos todavía están pendientes.'));
   $('#close-wander')?.addEventListener('click', () => { const card = $('#wander-card'); if (card) card.hidden = true; });
 
   document.querySelectorAll('[data-message]').forEach((button) => {
