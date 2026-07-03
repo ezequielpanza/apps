@@ -37,6 +37,7 @@
     const last = current.points[current.points.length - 1];
     if (last && map.distance([last.lat, last.lng], [point.lat, point.lng]) < 2) return;
     current.points.push({ lat: point.lat, lng: point.lng });
+    window.WanderContext?.setLocation({ lat: point.lat, lng: point.lng, source: 'track', confidence: 0.7 });
     if (line) line.setLatLngs(current.points.map((p) => [p.lat, p.lng]));
     render();
   }
@@ -46,6 +47,7 @@
     $('#record-button')?.classList.add('is-recording');
     if (line) line.setLatLngs([]);
     base.revealMarker?.();
+    window.WanderContext?.set('user.intent', 'Registrar recorrido', { source: 'track', ttlMs: 600000, confidence: 0.8 });
     addPoint(marker.getLatLng());
     window.WanderUI?.showWander('⏺️ Grabando', 'Wander empezó a registrar este recorrido. Tocá el botón rojo para detener.');
     render();
@@ -57,6 +59,7 @@
     current = null;
     $('#record-button')?.classList.remove('is-recording');
     save();
+    window.WanderContext?.set('user.intent', 'Descubrir', { source: 'track', ttlMs: 600000, confidence: 0.7 });
     window.WanderUI?.showWander('✅ Track guardado', 'El recorrido quedó guardado en este dispositivo.');
     render();
   }
@@ -67,6 +70,7 @@
     const points = track.points.map((p) => [p.lat, p.lng]);
     line.setLatLngs(points);
     map.fitBounds(points, { padding: [40, 40], maxZoom: 16 });
+    window.WanderContext?.set('user.intent', 'Revisar recorrido', { source: 'track', ttlMs: 600000, confidence: 0.7 });
     window.WanderUI?.showWander('🗺️ Recorrido', track.name + ' · ' + track.points.length + ' puntos.');
   }
 
