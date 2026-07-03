@@ -26,6 +26,7 @@ jobs:
           test -s apps/wander-travel/version.js
           test -s apps/wander-travel/runtime-context.js
           test -s apps/wander-travel/runtime-context-panel.js
+          test -s apps/wander-travel/runtime-topbar.js
           test -s apps/wander-travel/runtime-ui.js
           test -s apps/wander-travel/runtime-panel.js
           test -s apps/wander-travel/runtime-tracks.js
@@ -34,6 +35,7 @@ jobs:
           node --check apps/wander-travel/version.js
           node --check apps/wander-travel/runtime-context.js
           node --check apps/wander-travel/runtime-context-panel.js
+          node --check apps/wander-travel/runtime-topbar.js
           node --check apps/wander-travel/runtime-ui.js
           node --check apps/wander-travel/runtime-panel.js
           node --check apps/wander-travel/runtime-tracks.js
