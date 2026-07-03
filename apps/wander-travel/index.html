@@ -3,33 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-  <title>Wander Travel v0.57.1</title>
+  <title>Wander Travel v0.57.2</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="wander-ui.css?v=20260702-2">
+  <link rel="stylesheet" href="wander-ui.css?v=20260703-1">
 </head>
 <body>
   <main class="wander-app" data-panel="none">
-    <section class="map-stage" aria-label="Mapa">
+    <section class="map-stage" aria-label="Mapa de Wander Travel">
       <div id="wander-map"></div>
 
-      <header class="app-header">
+      <header class="app-header" aria-label="Estado de la app">
         <div>
-          <div class="app-kicker"><span>Wander Travel</span><strong class="app-version">v0.57.1</strong></div>
+          <div class="app-kicker"><span>Wander Travel</span><strong class="app-version">v0.57.2</strong></div>
           <h1>Explorando</h1>
         </div>
       </header>
 
       <nav class="map-tools" aria-label="Herramientas principales">
-        <button id="main-menu-button" class="round-button menu-button" type="button" aria-label="Menú"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 8.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"></path><path d="M6.5 12h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"></path><path d="M6.5 15.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"></path></svg></button>
-        <button id="record-button" class="round-button record-button" type="button" aria-label="Grabar recorrido"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"></circle></svg></button>
-        <button id="settings-button" class="round-button" type="button" aria-label="Configuración">⚙️</button>
+        <button id="main-menu-button" class="round-button menu-button" type="button" aria-label="Abrir menú" title="Menú">☰</button>
+        <button id="record-button" class="round-button record-button" type="button" aria-label="Grabar recorrido" title="Grabar recorrido">⏺️</button>
+        <button id="settings-button" class="round-button" type="button" aria-label="Abrir configuración" title="Configuración">⚙️</button>
       </nav>
 
       <nav id="main-menu" class="main-menu" aria-label="Menú principal" hidden>
-        <button type="button" data-action="open-travel">Travel</button>
-        <button type="button" data-action="boat">Barco</button>
-        <button type="button" data-action="open-developer">Desarrollador</button>
-        <button type="button" data-action="open-simulator">Simulador</button>
+        <button type="button" data-action="open-travel"><span>🧭</span> Travel</button>
+        <button type="button" data-action="boat"><span>⛵</span> Barco</button>
+        <button type="button" data-action="open-simulator"><span>🧪</span> Simulador</button>
+        <button type="button" data-action="open-settings"><span>⚙️</span> Ajustes</button>
       </nav>
 
       <aside class="status-rail" aria-label="Estado actual">
@@ -38,77 +38,80 @@
         <div class="metric"><span>Rumbo</span><strong id="metric-heading">—</strong></div>
       </aside>
 
-      <button id="wander-button" class="wander-button" type="button">Wander</button>
+      <button id="wander-button" class="wander-button" type="button">🧭 Wander</button>
 
-      <section id="wander-card" class="wander-card" hidden>
+      <section id="wander-card" class="wander-card" hidden aria-live="polite">
         <div class="card-title-row">
           <div><span>Wander</span><h2 id="wander-title">Listo</h2></div>
-          <button id="close-wander" type="button" aria-label="Cerrar">×</button>
+          <button id="close-wander" type="button" aria-label="Cerrar tarjeta">×</button>
         </div>
-        <p id="wander-message">Wander listo.</p>
-        <div class="quick-actions">
-          <button type="button" data-message="details">Detalles</button>
-          <button type="button" data-message="route">Ir</button>
-          <button type="button" data-message="skip">Otra</button>
-          <button type="button" data-message="ask">Preguntar</button>
+        <p id="wander-message">Wander listo para acompañar el viaje.</p>
+        <div class="quick-actions" aria-label="Acciones rápidas">
+          <button type="button" data-message="details">ℹ️ Detalles</button>
+          <button type="button" data-message="route">🗺️ Ruta</button>
+          <button type="button" data-message="food">🍽️ Comer</button>
+          <button type="button" data-message="ask">💬 Preguntar</button>
         </div>
       </section>
     </section>
 
-    <aside id="side-panel" class="side-panel" aria-label="Panel lateral">
+    <aside id="side-panel" class="side-panel" aria-label="Panel lateral" hidden>
       <div class="panel-header">
         <div><span id="panel-kicker">Travel</span><h2 id="panel-title">Panel</h2></div>
-        <button id="close-panel" type="button" aria-label="Cerrar">×</button>
+        <button id="close-panel" type="button" aria-label="Cerrar panel">×</button>
       </div>
 
-      <section id="travel-panel" class="panel-section">
-        <h3>Contexto</h3>
+      <section id="travel-panel" class="panel-section" hidden>
+        <h3>🧭 Contexto</h3>
         <div class="info-list">
           <div><span>Hora</span><strong id="context-time">Actualizando...</strong></div>
           <div><span>Clima</span><strong id="context-weather">Pendiente</strong></div>
-          <div><span>Próxima hora</span><strong id="context-next">Pendiente</strong></div>
+          <div><span>Próxima sugerencia</span><strong id="context-next">Abrir Wander</strong></div>
         </div>
-        <h3>Camino</h3>
+        <h3>🗺️ Recorridos</h3>
         <p id="track-summary">0 tracks guardados</p>
         <div class="button-row">
-          <button id="export-track-button" type="button">Exportar último</button>
-          <button id="clear-panel-button" type="button">Limpiar vista</button>
+          <button id="export-track-button" type="button">📤 Exportar</button>
+          <button id="clear-panel-button" type="button">🧹 Limpiar vista</button>
         </div>
         <div id="track-list" class="track-list"></div>
       </section>
 
       <section id="developer-panel" class="panel-section" hidden>
-        <h3>Desarrollador</h3>
-        <p>Herramientas de prueba.</p>
-        <button id="set-sim-position" class="primary-button" type="button"><span>📍</span> Fijar posición</button>
+        <h3>🧪 Simulador</h3>
+        <p>Herramienta temporal para probar movimiento, tracks y contexto sin GPS real.</p>
+        <button id="set-sim-position" class="primary-button" type="button">📍 Mostrar posición</button>
         <div class="move-pad" aria-label="Simulador de movimiento">
-          <button type="button" data-move="northwest">↖</button>
-          <button type="button" data-move="north">↑</button>
-          <button type="button" data-move="northeast">↗</button>
-          <button type="button" data-move="west">←</button>
-          <button type="button" data-stop>🛑</button>
-          <button type="button" data-move="east">→</button>
-          <button type="button" data-move="southwest">↙</button>
-          <button type="button" data-move="south">↓</button>
-          <button type="button" data-move="southeast">↘</button>
+          <button type="button" data-move="northwest" aria-label="Mover noroeste">↖</button>
+          <button type="button" data-move="north" aria-label="Mover norte">↑</button>
+          <button type="button" data-move="northeast" aria-label="Mover noreste">↗</button>
+          <button type="button" data-move="west" aria-label="Mover oeste">←</button>
+          <button type="button" data-stop-move aria-label="Detener movimiento">🛑</button>
+          <button type="button" data-move="east" aria-label="Mover este">→</button>
+          <button type="button" data-move="southwest" aria-label="Mover sudoeste">↙</button>
+          <button type="button" data-move="south" aria-label="Mover sur">↓</button>
+          <button type="button" data-move="southeast" aria-label="Mover sudeste">↘</button>
         </div>
         <p id="sim-status" class="sim-status">Movimiento detenido</p>
       </section>
 
       <section id="settings-panel" class="panel-section" hidden>
-        <h3>Configuración</h3>
+        <h3>⚙️ Configuración</h3>
         <div class="setting-card">
-          <div><strong>Tracks</strong><span>Grabación manual de recorridos.</span></div>
+          <div><strong>⏺️ Tracks</strong><span>Grabación manual de recorridos en este dispositivo.</span></div>
         </div>
         <div class="setting-card">
-          <div><strong>Mapa libre</strong><span>El mapa no sigue automáticamente al cursor.</span></div>
+          <div><strong>🗺️ Mapa libre</strong><span>El mapa no sigue automáticamente al cursor mientras se reconstruye la navegación.</span></div>
+        </div>
+        <div class="setting-card">
+          <div><strong>🧠 IA contextual</strong><span>Reservada para la siguiente etapa estable.</span></div>
         </div>
       </section>
     </aside>
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=20260702-1"></script>
-  <script src="version.js?v=20260702-2"></script>
+  <script src="app.js?v=20260703-1"></script>
+  <script src="version.js?v=20260703-1"></script>
 </body>
 </html>
