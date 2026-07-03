@@ -8,14 +8,14 @@ Wander no es un buscador de POIs. Wander debe funcionar como un compañero de vi
 
 ## Estado actual
 
-Versión: v0.58.0
+Versión: v0.58.1
 
-Esta versión agrega la primera feature estructural: WanderContext, un motor central de contexto para que la app no reparta datos críticos entre módulos sueltos.
+Esta versión moderniza la entrada principal a Wander con una barra superior flotante tipo consulta. Reemplaza el header visible anterior por una cápsula con menú, frase inicial y lupa.
 
 Incluye:
 
 - Mapa base con Leaflet y OpenStreetMap.
-- Header con versión visible.
+- Barra superior moderna: ☰ Preguntar a Wander 🔍.
 - Menú principal minimalista con iconos/emojis.
 - Tarjeta Wander.
 - Panel Travel.
@@ -26,6 +26,22 @@ Incluye:
 - Exportación del último track.
 - Simulación de movimiento para pruebas.
 - Motor WanderContext con variables, fuente, actualización, TTL, confianza y vigencia.
+
+## UI principal
+
+Archivo responsable de la barra superior moderna:
+
+```text
+runtime-topbar.js
+```
+
+La barra superior usa como frase inicial:
+
+```text
+Preguntar a Wander
+```
+
+El header anterior con nombre, versión y Explorando queda oculto. La versión se mantiene en WanderContext y en la documentación, no como elemento principal del mapa.
 
 ## WanderContext
 
@@ -111,7 +127,7 @@ URL pública: https://wander-travel.pages.dev
 
 ## Próximas capas previstas
 
-1. WanderContext.
+1. Ajustes finos de UI moderna.
 2. Ubicación real.
 3. Contexto de ciudad/zona.
 4. IA integrada leyendo WanderContext.
