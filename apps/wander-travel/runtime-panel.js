@@ -7,25 +7,28 @@
     developer: $('#developer-panel'),
     settings: $('#settings-panel'),
   };
+
   function openPanel(name) {
-    if (app) app.dataset.panel = name;
+    const normalized = sections[name] ? name : 'none';
+    if (app) app.dataset.panel = normalized;
     Object.entries(sections).forEach(([key, section]) => {
-      if (section) section.hidden = key !== name;
+      if (section) section.hidden = key !== normalized;
     });
-    if (side) side.hidden = name === 'none';
+    if (side) side.hidden = normalized === 'none';
+
     const labels = {
       travel: ['Travel', 'Panel Travel'],
       developer: ['Desarrollador', 'Simulador'],
       settings: ['Configuración', 'Ajustes'],
       none: ['Wander', 'Panel'],
     };
-    const label = labels[name] || labels.none;
-    const kicker = $('#panel-kicker');
-    const title = $('#panel-title');
-    if (kicker) kicker.textContent = label[0];
-    if (title) title.textContent = label[1];
-    if (window.map) setTimeout(() => window.map.invalidateSize(), 120);
+    const label = labels[normalized];
+    $('#panel-kicker') && ($('#panel-kicker').textContent = label[0]);
+    $('#panel-title') && ($('#panel-title').textContent = label[1]);
+
+    if (window.WanderBase?.map) setTimeout(() => window.WanderBase.map.invalidateSize(), 120);
   }
+
   function toggleMenu(open) {
     const menu = $('#main-menu');
     const button = $('#main-menu-button');
@@ -33,6 +36,7 @@
     menu.hidden = open == null ? !menu.hidden : !open;
     if (button) button.classList.toggle('is-active', !menu.hidden);
   }
+
   $('#main-menu-button')?.addEventListener('click', () => toggleMenu());
   $('#main-menu')?.addEventListener('click', (event) => {
     const action = event.target.closest('[data-action]')?.dataset.action;
@@ -40,10 +44,19 @@
     toggleMenu(false);
     if (action === 'open-travel') openPanel('travel');
     if (action === 'open-developer' || action === 'open-simulator') openPanel('developer');
-    if (action === 'boat') window.WanderUI?.showWander('Wander Boat', 'Boat queda reservado para funciones náuticas. Travel sigue activo.');
+    if (action === 'open-settings') openPanel('settings');
+    if (action === 'boat') window.WanderUI?.showWander('⛵ Barco', 'El modo barco queda reservado para funciones náuticas. Wander Travel sigue enfocado en la experiencia de viaje.');
   });
+
   $('#settings-button')?.addEventListener('click', () => openPanel('settings'));
   $('#close-panel')?.addEventListener('click', () => openPanel('none'));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      toggleMenu(false);
+      openPanel('none');
+    }
+  });
+
   window.WanderPanel = { open: openPanel };
   openPanel('none');
 })();
