@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.61.0';
+  const VERSION = 'v0.61.1';
   const listeners = new Set();
   const DEFAULT_TTL = {
     'app.version': Infinity,
@@ -127,32 +127,58 @@
     return entry.value == null || entry.value === '' ? 'Pendiente' : String(entry.value);
   }
 
-  const DISPLAY = [
-    ['app.version', 'Versión', '📦'],
+  const HUMAN = [
     ['time.now', 'Hora', '🕒'],
-    ['time.dayPeriod', 'Momento', '🌗'],
+    ['time.dayPeriod', 'Momento del día', '🌗'],
     ['location.status', 'Ubicación', '📍'],
     ['motion.status', 'Movimiento', '🚶'],
     ['motion.speedKmh', 'Velocidad', '💨'],
     ['motion.heading', 'Rumbo', '🧭'],
-    ['location.source', 'Fuente ubicación', '📡'],
-    ['location.lat', 'Latitud', '↕️'],
-    ['location.lng', 'Longitud', '↔️'],
-    ['environment.weatherStatus', 'Clima', '🌦️'],
     ['place.city', 'Ciudad', '🏙️'],
     ['place.zone', 'Zona', '🧱'],
     ['user.intent', 'Intención', '🎯'],
-    ['user.interests', 'Intereses', '🧠'],
   ];
 
-  function render() {
+  const TECHNICAL = [
+    'app.version',
+    'time.now',
+    'time.dayPeriod',
+    'location.status',
+    'location.lat',
+    'location.lng',
+    'location.source',
+    'location.updatedAt',
+    'motion.status',
+    'motion.speedKmh',
+    'motion.heading',
+    'environment.weatherStatus',
+    'place.city',
+    'place.zone',
+    'user.intent',
+    'user.interests',
+  ];
+
+  function renderHuman() {
     const list = document.querySelector('#context-list');
     if (!list) return;
-    list.innerHTML = DISPLAY.map(([key, label, icon]) => {
+    list.innerHTML = HUMAN.map(([key, label, icon]) => {
       const entry = get(key);
-      const status = statusFor(entry);
-      return '<div class="context-row" data-context-status="' + status + '"><div><strong>' + icon + ' ' + label + '</strong><span>' + key + '</span></div><div><b>' + readableValue(key, entry) + '</b><small>' + status + ' · ' + formatAge(entry) + '</small></div></div>';
+      return '<div class="context-row"><div><strong>' + icon + ' ' + label + '</strong></div><div><b>' + readableValue(key, entry) + '</b></div></div>';
     }).join('');
+  }
+
+  function renderTechnical() {
+    const list = document.querySelector('#context-technical');
+    if (!list) return;
+    list.innerHTML = TECHNICAL.map((key) => {
+      const entry = get(key);
+      return '<div class="technical-row"><code>' + key + '</code><span>' + readableValue(key, entry) + ' · ' + statusFor(entry) + ' · ' + formatAge(entry) + '</span></div>';
+    }).join('');
+  }
+
+  function render() {
+    renderHuman();
+    renderTechnical();
   }
 
   function init() {
