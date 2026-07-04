@@ -46,10 +46,10 @@
     applyLayout(normalized);
 
     const labels = {
-      travel: ['Travel', 'Panel Travel'],
-      context: ['Contexto', 'WanderContext'],
-      developer: ['Desarrollador', 'Simulador'],
-      settings: ['Configuración', 'Ajustes'],
+      travel: ['Wander', 'Travel'],
+      context: ['Wander', 'Contexto'],
+      developer: ['Wander', 'Simulador'],
+      settings: ['Wander', 'Ajustes'],
       none: ['Wander', 'Panel'],
     };
     const label = labels[normalized];
