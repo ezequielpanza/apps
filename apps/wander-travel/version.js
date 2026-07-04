@@ -1,5 +1,5 @@
 (() => {
-  const version = 'v0.60.1';
+  const version = 'v0.60.2';
   document.title = `Wander Travel ${version}`;
 
   function load(src, key) {
@@ -10,11 +10,11 @@
     document.body.appendChild(script);
   }
 
-  load('runtime-context.js?v=20260703-11', 'runtimeContext');
-  load('runtime-ui.js?v=20260703-11', 'runtimeUi');
-  load('runtime-panel.js?v=20260703-11', 'runtimePanel');
-  load('runtime-context-panel.js?v=20260703-11', 'runtimeContextPanel');
-  load('runtime-topbar.js?v=20260703-11', 'runtimeTopbar');
-  load('runtime-tracks.js?v=20260703-11', 'runtimeTracks');
-  load('runtime-simulator.js?v=20260703-11', 'runtimeSimulator');
+  load('runtime-context.js?v=20260704-12', 'runtimeContext');
+  load('runtime-ui.js?v=20260704-12', 'runtimeUi');
+  load('runtime-panel.js?v=20260704-12', 'runtimePanel');
+  load('runtime-context-panel.js?v=20260704-12', 'runtimeContextPanel');
+  load('runtime-topbar.js?v=20260704-12', 'runtimeTopbar');
+  load('runtime-tracks.js?v=20260704-12', 'runtimeTracks');
+  load('runtime-simulator.js?v=20260704-12', 'runtimeSimulator');
 })();
