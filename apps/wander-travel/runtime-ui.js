@@ -13,17 +13,42 @@
     setText('#wander-message', message);
   }
 
-  function setMotion(moving, speedMps, heading) {
+  function setLocationPending() {
+    setText('#metric-status', 'Ubicación pendiente');
+    setText('#metric-speed', '—');
+    setText('#metric-heading', '—');
+  }
+
+  function setMotion(moving, speedMps, heading, options = {}) {
+    const hasPosition = window.WanderBase?.hasPosition?.() === true;
+
+    if (!hasPosition && options.allowWithoutPosition !== true) {
+      setLocationPending();
+      return;
+    }
+
     const kmh = Number(speedMps || 0) * 3.6;
-    const status = moving ? (kmh < 8 ? 'Caminando' : kmh < 25 ? 'Bicicleta' : 'En movimiento') : 'Detenido';
+    const status = moving
+      ? (kmh < 8 ? 'Caminando' : kmh < 25 ? 'Bicicleta' : 'En movimiento')
+      : 'Detenido';
+
     setText('#metric-status', status);
     setText('#metric-speed', kmh.toFixed(1) + ' km/h');
     setText('#metric-heading', moving && Number.isFinite(heading) ? Math.round(heading) + '°' : '—');
-    window.WanderContext?.setMotion({ status, speedKmh: kmh, heading: Number.isFinite(heading) ? heading : null, source: 'ui' });
+
+    window.WanderContext?.setMotion({
+      status,
+      speedKmh: kmh,
+      heading: Number.isFinite(heading) ? heading : null,
+      source: options.source || 'ui',
+    });
   }
 
   function updateClock() {
-    const value = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    const value = new Date().toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     setText('#context-time', value);
     window.WanderContext?.updateTime();
   }
@@ -35,8 +60,10 @@
     ask: ['Preguntar', 'La IA contextual será la próxima capa. Va a leer WanderContext en vez de datos sueltos de la pantalla.'],
   };
 
-  $('#wander-button')?.addEventListener('click', () => showWander('Bienvenido', 'WanderContext ya está activo. Abrí 🧠 Contexto para ver qué sabe Wander y qué datos todavía están pendientes.'));
-  $('#close-wander')?.addEventListener('click', () => { const card = $('#wander-card'); if (card) card.hidden = true; });
+  $('#close-wander')?.addEventListener('click', () => {
+    const card = $('#wander-card');
+    if (card) card.hidden = true;
+  });
 
   document.querySelectorAll('[data-message]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -45,8 +72,14 @@
     });
   });
 
-  setMotion(false, 0, null);
+  setLocationPending();
   updateClock();
   setInterval(updateClock, 30000);
-  window.WanderUI = { setText, showWander, setMotion };
+
+  window.WanderUI = {
+    setText,
+    showWander,
+    setLocationPending,
+    setMotion,
+  };
 })();
