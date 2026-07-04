@@ -3,21 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<title>Wander Travel v0.61.1</title>
+<title>Wander Travel v0.62.0</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-<link rel="stylesheet" href="wander-ui.css?v=20260704-16">
+<link rel="stylesheet" href="wander-ui.css?v=20260704-17">
 </head>
 <body>
 <main class="wander-app" data-panel="none">
 <section class="map-stage" aria-label="Mapa de Wander Travel">
 <div id="wander-map"></div>
-<header id="wander-top-query-bar" class="wander-top-query-bar" aria-label="Consulta Wander">
-<button id="main-menu-button" class="top-bar-icon" type="button" aria-label="Abrir menú"><svg class="wander-menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"></path><path d="M5 12h14"></path><path d="M5 17h14"></path></svg></button>
+<header id="wander-top-query-bar" class="wander-top-controls" aria-label="Consulta Wander">
+<button id="main-menu-button" class="wander-brand-button" type="button" aria-label="Abrir Wander" aria-controls="main-menu" aria-expanded="false"><span class="wander-monogram" aria-hidden="true">W</span></button>
+<div class="wander-search-pill">
 <input id="wander-query-input" class="wander-query-input" type="text" placeholder="Preguntar a Wander" autocomplete="off" aria-label="Preguntar a Wander">
-<button id="wander-search-button" class="top-bar-icon" type="button" aria-label="Enviar pregunta a Wander"><svg class="wander-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M16 16l5 5"></path></svg></button>
+<button id="wander-search-button" class="wander-search-button" type="button" aria-label="Enviar pregunta a Wander"><svg class="wander-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M16 16l5 5"></path></svg></button>
+</div>
 </header>
 <nav id="main-menu" class="main-menu" aria-label="Menú principal" hidden>
-<div class="drawer-brand"><span class="drawer-eyebrow">Tu compañero de viaje</span><strong>Wander</strong><small id="drawer-version">v0.61.1</small></div>
+<div class="drawer-brand"><span class="drawer-eyebrow">Tu compañero de viaje</span><strong>Wander</strong><small id="drawer-version">v0.62.0</small></div>
 <button type="button" data-action="open-travel"><span>🧭</span> Travel</button>
 <button type="button" data-action="open-context"><span>🧠</span> Contexto</button>
 <button type="button" data-action="boat"><span>⛵</span> Barco</button>
@@ -36,13 +38,13 @@
 </aside>
 </main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="app.js?v=20260704-16"></script>
-<script src="runtime-context.js?v=20260704-16"></script>
-<script src="runtime-ui.js?v=20260704-16"></script>
-<script src="runtime-panel.js?v=20260704-16"></script>
-<script src="runtime-context-panel.js?v=20260704-16"></script>
-<script src="runtime-topbar.js?v=20260704-16"></script>
-<script src="runtime-tracks.js?v=20260704-16"></script>
-<script src="runtime-simulator.js?v=20260704-16"></script>
+<script src="app.js?v=20260704-17"></script>
+<script src="runtime-context.js?v=20260704-17"></script>
+<script src="runtime-ui.js?v=20260704-17"></script>
+<script src="runtime-panel.js?v=20260704-17"></script>
+<script src="runtime-context-panel.js?v=20260704-17"></script>
+<script src="runtime-topbar.js?v=20260704-17"></script>
+<script src="runtime-tracks.js?v=20260704-17"></script>
+<script src="runtime-simulator.js?v=20260704-17"></script>
 </body>
 </html>
