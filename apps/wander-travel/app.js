@@ -2,7 +2,13 @@ const DEFAULT_VIEW = [20, 0];
 
 const map = L.map('wander-map', {
   zoomControl: false,
+  attributionControl: false,
 }).setView(DEFAULT_VIEW, 2);
+
+L.control.attribution({
+  position: 'bottomright',
+  prefix: false,
+}).addTo(map);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
