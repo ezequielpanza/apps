@@ -1,53 +1,93 @@
-const INITIAL_CENTER = [0, 0];
-const stoppedIcon = L.divIcon({
-  className: '',
-  html: '<div class="wander-user-dot" style="width:18px;height:18px;border-radius:50%;background:#173f3b;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>',
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-});
+const DEFAULT_VIEW = [20, 0];
 
-const map = L.map('wander-map', { zoomControl: false }).setView(INITIAL_CENTER, 2);
+const map = L.map('wander-map', {
+  zoomControl: false,
+}).setView(DEFAULT_VIEW, 2);
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
   attribution: '&copy; OpenStreetMap',
 }).addTo(map);
 
-const marker = L.marker(INITIAL_CENTER, {
-  draggable: true,
-  icon: stoppedIcon,
-  opacity: 0,
+const userIcon = L.divIcon({
+  className: '',
+  html: '<div class="wander-user-dot"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
+
+const route = L.polyline([], {
+  weight: 5,
+  opacity: 0.8,
+  lineCap: 'round',
+  lineJoin: 'round',
 }).addTo(map);
 
-const route = L.polyline([], { weight: 5, opacity: 0.8 }).addTo(map);
+let marker = null;
+let position = null;
 
-window.WanderBase = {
-  map,
-  marker,
-  route,
-  revealMarker() {
-    try { marker.setOpacity(1); } catch {}
-  },
-};
-window.WanderRevealMarker = window.WanderBase.revealMarker;
+function createMarker(latlng) {
+  const nextMarker = L.marker(latlng, {
+    draggable: true,
+    icon: userIcon,
+  }).addTo(map);
 
-const $ = (selector) => document.querySelector(selector);
-function say(title, text) {
-  const panel = $('.companion-panel');
-  const titleEl = $('#wander-title');
-  const textEl = $('#wander-message');
-  if (titleEl) titleEl.textContent = title;
-  if (textEl) textEl.textContent = text;
-  panel?.classList.remove('is-hidden');
+  nextMarker.on('dragend', () => {
+    const next = nextMarker.getLatLng();
+    setPosition(next, { source: 'manual', confidence: 0.8 });
+    window.WanderUI?.setMotion(false, 0, null);
+    window.WanderTracks?.addPoint(next);
+  });
+
+  return nextMarker;
 }
 
-$('#zoom-in-button')?.addEventListener('click', () => map.zoomIn());
-$('#zoom-out-button')?.addEventListener('click', () => map.zoomOut());
-$('#hide-companion')?.addEventListener('click', () => $('.companion-panel')?.classList.add('is-hidden'));
-$('#show-companion')?.addEventListener('click', () => $('.companion-panel')?.classList.toggle('is-hidden'));
-$('#collapse-panel')?.addEventListener('click', () => $('.app-shell')?.classList.add('panel-collapsed'));
-$('[data-message="details"]')?.addEventListener('click', () => say('Detalle', 'Wander combina tu posición, tus intereses y datos públicos del lugar.'));
-$('[data-message="route"]')?.addEventListener('click', () => say('Ruta', 'La navegación automática está desactivada mientras reconstruimos esta función.'));
-$('[data-message="skip"]')?.addEventListener('click', () => say('Otra opción', 'Busca POIs reales para descubrir una alternativa cercana.'));
-$('#ask-wander-button')?.addEventListener('click', () => say('Consulta', 'La conexión con IA todavía no está configurada en esta app.'));
+function setPosition(latlng, options = {}) {
+  if (!latlng) return null;
+  const next = L.latLng(latlng);
+  if (!Number.isFinite(next.lat) || !Number.isFinite(next.lng)) return null;
+
+  position = next;
+
+  if (!marker) marker = createMarker(next);
+  else marker.setLatLng(next);
+
+  if (options.updateContext !== false) {
+    window.WanderContext?.setLocation({
+      lat: next.lat,
+      lng: next.lng,
+      source: options.source || 'app',
+      confidence: options.confidence ?? 0.8,
+    });
+  }
+
+  return next;
+}
+
+function clearPosition() {
+  position = null;
+  if (marker) {
+    map.removeLayer(marker);
+    marker = null;
+  }
+}
+
+function centerOnPosition(zoom = 15) {
+  if (!position) return false;
+  map.setView(position, Math.max(map.getZoom(), zoom));
+  return true;
+}
+
+window.map = map;
+window.WanderBase = {
+  map,
+  route,
+  hasPosition: () => Boolean(position),
+  getPosition: () => position ? L.latLng(position) : null,
+  getMarker: () => marker,
+  setPosition,
+  clearPosition,
+  centerOnPosition,
+};
 
 setTimeout(() => map.invalidateSize(), 100);
