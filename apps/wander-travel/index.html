@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-  <title>Wander Travel v0.60.0</title>
+  <title>Wander Travel v0.60.1</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="wander-ui.css?v=20260703-10">
+  <link rel="stylesheet" href="wander-ui.css?v=20260703-11">
 </head>
 <body>
   <main class="wander-app" data-panel="none">
@@ -46,12 +46,10 @@
         <button type="button" data-action="open-settings"><span>⚙️</span> Ajustes</button>
       </nav>
 
-      <button id="record-button" class="record-button" type="button" aria-label="Grabar recorrido" title="Grabar recorrido">⏺️</button>
-
       <aside class="status-rail" aria-label="Estado actual">
-        <div class="metric"><span>Estado</span><strong id="metric-status">Detenido</strong></div>
-        <div class="metric"><span>Velocidad</span><strong id="metric-speed">0.0 km/h</strong></div>
-        <div class="metric"><span>Rumbo</span><strong id="metric-heading">—</strong></div>
+        <div class="status-item"><span>🚶</span><strong id="metric-status">Detenido</strong></div>
+        <div class="status-item"><span>💨</span><strong id="metric-speed">0.0 km/h</strong></div>
+        <div class="status-item"><span>🧭</span><strong id="metric-heading">—</strong></div>
       </aside>
 
       <section id="wander-card" class="wander-card" hidden aria-live="polite">
@@ -86,6 +84,7 @@
         <h3>🗺️ Recorridos</h3>
         <p id="track-summary">0 tracks guardados</p>
         <div class="button-row">
+          <button id="record-button" type="button">⏺️ Grabar</button>
           <button id="export-track-button" type="button">📤 Exportar</button>
           <button id="clear-panel-button" type="button">🧹 Limpiar vista</button>
         </div>
@@ -104,7 +103,7 @@
       <section id="developer-panel" class="panel-section" hidden>
         <h3>🧪 Simulador</h3>
         <p>Herramienta temporal para probar movimiento, tracks y contexto sin GPS real.</p>
-        <button id="set-sim-position" class="primary-button" type="button">📍 Mostrar posición</button>
+        <button id="set-sim-position" class="primary-button" type="button">📍 Crear posición simulada</button>
         <div class="move-pad" aria-label="Simulador de movimiento">
           <button type="button" data-move="northwest" aria-label="Mover noroeste">↖</button>
           <button type="button" data-move="north" aria-label="Mover norte">↑</button>
@@ -116,20 +115,20 @@
           <button type="button" data-move="south" aria-label="Mover sur">↓</button>
           <button type="button" data-move="southeast" aria-label="Mover sudeste">↘</button>
         </div>
-        <p id="sim-status" class="sim-status">Movimiento detenido</p>
+        <p id="sim-status" class="sim-status">Sin posición simulada</p>
       </section>
 
       <section id="settings-panel" class="panel-section" hidden>
         <h3>⚙️ Configuración</h3>
-        <div class="setting-card"><div><strong>⏺️ Tracks</strong><span>Grabación manual de recorridos en este dispositivo.</span></div></div>
-        <div class="setting-card"><div><strong>🗺️ Mapa libre</strong><span>El mapa no sigue automáticamente al cursor mientras se reconstruye la navegación.</span></div></div>
+        <div class="setting-card"><div><strong>⏺️ Tracks</strong><span>Grabación manual desde el panel Travel.</span></div></div>
+        <div class="setting-card"><div><strong>🗺️ Mapa libre</strong><span>El mapa no representa una ubicación hasta recibir una posición válida.</span></div></div>
         <div class="setting-card"><div><strong>🧠 WanderContext</strong><span>Motor central de contexto activo.</span></div></div>
       </section>
     </aside>
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=20260703-1"></script>
-  <script src="version.js?v=20260703-10"></script>
+  <script src="app.js?v=20260703-11"></script>
+  <script src="version.js?v=20260703-11"></script>
 </body>
 </html>
