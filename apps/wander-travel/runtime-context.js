@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.60.1';
+  const VERSION = 'v0.60.3';
   const listeners = new Set();
   const DEFAULT_TTL = {
     'app.version': Infinity,
@@ -110,12 +110,13 @@
   }
 
   function setLocation({ lat, lng, source = 'unknown', confidence = 0.8 }) {
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
     set('location.status', 'Disponible', { source, ttlMs: 30000, confidence });
     set('location.lat', Number(lat.toFixed(6)), { source, ttlMs: 30000, confidence });
     set('location.lng', Number(lng.toFixed(6)), { source, ttlMs: 30000, confidence });
     set('location.source', source, { source, ttlMs: 30000, confidence });
     set('location.updatedAt', iso(), { source, ttlMs: 30000, confidence });
+    return true;
   }
 
   function readableValue(key, entry) {
@@ -130,10 +131,10 @@
     ['app.version', 'Versión', '📦'],
     ['time.now', 'Hora', '🕒'],
     ['time.dayPeriod', 'Momento', '🌗'],
+    ['location.status', 'Ubicación', '📍'],
     ['motion.status', 'Movimiento', '🚶'],
     ['motion.speedKmh', 'Velocidad', '💨'],
     ['motion.heading', 'Rumbo', '🧭'],
-    ['location.status', 'Ubicación', '📍'],
     ['location.source', 'Fuente ubicación', '📡'],
     ['location.lat', 'Latitud', '↕️'],
     ['location.lng', 'Longitud', '↔️'],
@@ -157,12 +158,12 @@
   function init() {
     set('app.version', VERSION, { source: 'app', ttlMs: Infinity });
     set('location.status', 'Pendiente', { source: 'init', ttlMs: 30000, confidence: 1 });
+    set('motion.status', 'Pendiente', { source: 'init', ttlMs: 15000, confidence: 1 });
     set('environment.weatherStatus', 'Pendiente', { source: 'placeholder', ttlMs: 1800000, confidence: 0.2 });
     set('place.city', 'Pendiente', { source: 'placeholder', ttlMs: 3600000, confidence: 0.2 });
     set('place.zone', 'Pendiente', { source: 'placeholder', ttlMs: 1800000, confidence: 0.2 });
     set('user.intent', 'Descubrir', { source: 'default', ttlMs: 600000, confidence: 0.5 });
     set('user.interests', [], { source: 'user', ttlMs: Infinity, confidence: 0.5 });
-    setMotion({ status: 'Detenido', speedKmh: 0, heading: null, source: 'init' });
     updateTime();
     setInterval(updateTime, 30000);
     setInterval(render, 15000);
