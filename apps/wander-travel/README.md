@@ -1,61 +1,51 @@
 # Wander Travel
 
-Wander Travel es un compañero-guía inteligente de viaje. La app debe acompañar al usuario mientras descubre una ciudad o lugar, entender su contexto y ayudarlo a decidir qué hacer, qué ver, dónde ir y qué conviene saber en cada momento.
+Wander Travel es un compañero-guía inteligente de viaje. Debe acompañar al usuario mientras descubre una ciudad o lugar, entender su contexto y ayudarlo a decidir qué hacer, qué ver, dónde ir y qué conviene saber en cada momento.
 
 ## Propósito
 
-Wander no es un buscador de POIs. Wander debe funcionar como un compañero de viaje y guía turístico personal: saluda al usuario al llegar a una ciudad, da contexto turístico, sugiere una ruta orgánica y adapta sus recomendaciones según ubicación, horario, clima, fecha, intereses y movimiento.
+Wander no es un buscador de POIs. Funciona como compañero de viaje y guía turístico personal: recibe al usuario, da contexto turístico, propone formas de descubrir el lugar y adapta sus recomendaciones según ubicación, horario, clima, fecha, intereses y movimiento.
 
 ## Estado actual
 
-Versión: v0.58.1
+Versión: v0.60.0
 
-Esta versión moderniza la entrada principal a Wander con una barra superior flotante tipo consulta. Reemplaza el header visible anterior por una cápsula con menú, frase inicial y lupa.
+La versión 0.60.0 reconstruye estructuralmente el shell de la app para eliminar la mezcla entre UI vieja y UI inyectada por runtimes.
 
 Incluye:
 
 - Mapa base con Leaflet y OpenStreetMap.
-- Barra superior moderna: ☰ Preguntar a Wander 🔍.
-- Menú principal minimalista con iconos/emojis.
-- Tarjeta Wander.
-- Panel Travel.
-- Panel Contexto inyectado por runtime.
-- Panel de configuración.
-- Panel de desarrollador/simulador.
-- Grabación local de tracks.
-- Exportación del último track.
-- Simulación de movimiento para pruebas.
-- Motor WanderContext con variables, fuente, actualización, TTL, confianza y vigencia.
+- Barra superior moderna definida directamente en HTML.
+- Campo editable "Preguntar a Wander".
+- Botón de menú SVG.
+- Envío de preguntas con Enter o lupa.
+- Menú principal único.
+- Panel lateral cerrado por defecto.
+- Paneles Travel, Contexto, Simulador y Ajustes definidos directamente en HTML.
+- Administrador central de paneles en runtime-panel.js.
+- WanderContext como motor central de contexto.
+- Tracks y simulador conectados al contexto.
 
-## UI principal
+## Arquitectura de UI
 
-Archivo responsable de la barra superior moderna:
+### HTML
 
-```text
-runtime-topbar.js
-```
+`index.html` contiene la estructura real de la interfaz. Los runtimes no deben crear headers, botones principales, menús ni paneles que ya forman parte del shell.
 
-La barra superior usa como frase inicial:
+### CSS
 
-```text
-Preguntar a Wander
-```
+`wander-ui.css` es la hoja de estilos única del shell. Fue reconstruida para eliminar reglas heredadas y contradicciones entre móvil y escritorio.
 
-El header anterior con nombre, versión y Explorando queda oculto. La versión se mantiene en WanderContext y en la documentación, no como elemento principal del mapa.
+### Runtimes
+
+- `runtime-panel.js`: única fuente de verdad para abrir/cerrar paneles y cambiar el layout.
+- `runtime-topbar.js`: comportamiento del input y envío de preguntas, sin inyectar UI ni CSS.
+- `runtime-context-panel.js`: sincronización y actualización del panel Contexto, sin crear paneles.
+- `runtime-context.js`: motor central WanderContext.
+- `runtime-tracks.js`: recorridos.
+- `runtime-simulator.js`: simulación de movimiento.
 
 ## WanderContext
-
-Archivo principal:
-
-```text
-runtime-context.js
-```
-
-Panel visible:
-
-```text
-runtime-context-panel.js
-```
 
 Variables iniciales:
 
@@ -75,7 +65,7 @@ Variables iniciales:
 - user.intent
 - user.interests
 
-Cada variable puede tener:
+Cada variable puede mantener:
 
 - value
 - source
@@ -84,19 +74,7 @@ Cada variable puede tener:
 - confidence
 - status: fresh, stale, stable o pending
 
-## Tecnología
-
-- HTML
-- CSS
-- JavaScript estático
-- Leaflet
-- OpenStreetMap
-- Cloudflare Pages
-- Cloudflare Pages Functions para futuras funciones de IA
-
 ## Desarrollo local
-
-Desde la raíz del repositorio:
 
 ```bash
 python -m http.server 8000 --directory apps/wander-travel
@@ -110,28 +88,16 @@ http://localhost:8000
 
 ## Deploy
 
-Proyecto Cloudflare Pages: wander-travel
-Carpeta publicada: apps/wander-travel
-URL pública: https://wander-travel.pages.dev
+Proyecto Cloudflare Pages: `wander-travel`
+
+URL pública: `https://wander-travel.pages.dev`
 
 ## Reglas de reconstrucción
 
 - No pasar a la siguiente feature hasta que la actual funcione bien.
 - No emparchar: corregir la causa estructural.
+- Eliminar código viejo o contradictorio cuando una estructura nueva lo reemplaza.
 - Mantener una UI consistente en toda la app.
-- Usar iconos/emojis en botones cuando ayuden a mantener una interfaz minimalista.
-- No mezclar restos de interfaces anteriores.
-- No publicar secretos en el frontend.
+- Usar iconos/emojis cuando ayuden a mantener una interfaz minimalista.
+- Toda feature nueva debe leer o escribir contexto a través de WanderContext cuando corresponda.
 - Actualizar versión en cada cambio relevante.
-- Toda feature nueva debe leer o escribir contexto a través de WanderContext.
-
-## Próximas capas previstas
-
-1. Ajustes finos de UI moderna.
-2. Ubicación real.
-3. Contexto de ciudad/zona.
-4. IA integrada leyendo WanderContext.
-5. Bienvenida a ciudad.
-6. Guía turística contextual.
-7. Clima, fecha y eventos.
-8. Ruta viva adaptativa.
