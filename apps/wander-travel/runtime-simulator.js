@@ -40,15 +40,19 @@
     clearActiveButtons();
     $('[data-stop-move]')?.classList.add('is-active');
 
-    window.WanderUI?.setMotion(false, 0, null);
-    window.WanderContext?.setMotion({
-      status: 'Detenido',
-      speedKmh: 0,
-      heading: null,
-      source: 'simulator',
-    });
-
-    setStatus(base.hasPosition() ? 'Movimiento detenido · posición simulada activa' : 'Sin posición simulada');
+    if (base.hasPosition()) {
+      window.WanderUI?.setMotion(false, 0, null, { source: 'simulator' });
+      window.WanderContext?.setMotion({
+        status: 'Detenido',
+        speedKmh: 0,
+        heading: null,
+        source: 'simulator',
+      });
+      setStatus('Movimiento detenido · posición simulada activa');
+    } else {
+      window.WanderUI?.setLocationPending();
+      setStatus('Sin posición simulada');
+    }
   }
 
   function createSimulationPosition() {
@@ -84,7 +88,7 @@
       confidence: 0.9,
     });
 
-    window.WanderUI?.setMotion(true, kmh / 3.6, dir[2]);
+    window.WanderUI?.setMotion(true, kmh / 3.6, dir[2], { source: 'simulator' });
     window.WanderContext?.setMotion({
       status: labels[speedIndex],
       speedKmh: kmh,
