@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app-shell">
+  <div class="app-shell" id="appShell">
     <header class="topbar">
       <div class="topbar-left">
         <button class="icon-button" aria-label="Menú">☰</button>
@@ -58,6 +58,7 @@
         <button class="import-button"><span>＋</span> Add asset</button>
       </div>
     </aside>
+    <div class="panel-resizer left-resizer" id="leftResizer" role="separator" aria-label="Cambiar ancho de Project" aria-orientation="vertical"></div>
 
     <main class="workspace">
       <div class="workspace-toolbar">
@@ -112,6 +113,7 @@
       </div>
     </main>
 
+    <div class="panel-resizer right-resizer" id="rightResizer" role="separator" aria-label="Cambiar ancho de Inspector" aria-orientation="vertical"></div>
     <aside class="inspector panel">
       <div class="inspector-head"><div><span class="panel-kicker">INSPECTOR</span><h2>Gideon Drift</h2></div><button class="tiny-button">•••</button></div>
       <div class="character-card"><div class="avatar large hero">G</div><div><strong>Character</strong><span>Playable protagonist</span></div></div>
