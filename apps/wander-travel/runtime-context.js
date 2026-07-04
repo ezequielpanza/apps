@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.58.0';
+  const VERSION = 'v0.60.1';
   const listeners = new Set();
   const DEFAULT_TTL = {
     'app.version': Infinity,
@@ -8,6 +8,7 @@
     'motion.status': 15000,
     'motion.speedKmh': 15000,
     'motion.heading': 15000,
+    'location.status': 30000,
     'location.lat': 30000,
     'location.lng': 30000,
     'location.source': 30000,
@@ -20,14 +21,8 @@
   };
 
   const state = {};
-
-  function now() {
-    return Date.now();
-  }
-
-  function iso(ts = now()) {
-    return new Date(ts).toISOString();
-  }
+  const now = () => Date.now();
+  const iso = (ts = now()) => new Date(ts).toISOString();
 
   function ttlFor(key, ttlMs) {
     if (ttlMs != null) return ttlMs;
@@ -35,31 +30,21 @@
   }
 
   function set(key, value, options = {}) {
-    const timestamp = options.updatedAt || now();
     const entry = {
       value,
       source: options.source || 'app',
-      updatedAt: timestamp,
+      updatedAt: options.updatedAt || now(),
       ttlMs: ttlFor(key, options.ttlMs),
       confidence: typeof options.confidence === 'number' ? options.confidence : 1,
-      label: options.label || null,
     };
     state[key] = entry;
     notify(key, entry);
     return entry;
   }
 
-  function get(key) {
-    return state[key] || null;
-  }
-
-  function value(key, fallback = null) {
-    return state[key] ? state[key].value : fallback;
-  }
-
-  function ageMs(entry) {
-    return entry ? now() - entry.updatedAt : Infinity;
-  }
+  const get = (key) => state[key] || null;
+  const value = (key, fallback = null) => state[key] ? state[key].value : fallback;
+  const ageMs = (entry) => entry ? now() - entry.updatedAt : Infinity;
 
   function statusFor(entry) {
     if (!entry) return 'pending';
@@ -125,8 +110,10 @@
   }
 
   function setLocation({ lat, lng, source = 'unknown', confidence = 0.8 }) {
-    if (typeof lat === 'number') set('location.lat', Number(lat.toFixed(6)), { source, ttlMs: 30000, confidence });
-    if (typeof lng === 'number') set('location.lng', Number(lng.toFixed(6)), { source, ttlMs: 30000, confidence });
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    set('location.status', 'Disponible', { source, ttlMs: 30000, confidence });
+    set('location.lat', Number(lat.toFixed(6)), { source, ttlMs: 30000, confidence });
+    set('location.lng', Number(lng.toFixed(6)), { source, ttlMs: 30000, confidence });
     set('location.source', source, { source, ttlMs: 30000, confidence });
     set('location.updatedAt', iso(), { source, ttlMs: 30000, confidence });
   }
@@ -146,7 +133,8 @@
     ['motion.status', 'Movimiento', '🚶'],
     ['motion.speedKmh', 'Velocidad', '💨'],
     ['motion.heading', 'Rumbo', '🧭'],
-    ['location.source', 'Fuente ubicación', '📍'],
+    ['location.status', 'Ubicación', '📍'],
+    ['location.source', 'Fuente ubicación', '📡'],
     ['location.lat', 'Latitud', '↕️'],
     ['location.lng', 'Longitud', '↔️'],
     ['environment.weatherStatus', 'Clima', '🌦️'],
@@ -164,13 +152,11 @@
       const status = statusFor(entry);
       return '<div class="context-row" data-context-status="' + status + '"><div><strong>' + icon + ' ' + label + '</strong><span>' + key + '</span></div><div><b>' + readableValue(key, entry) + '</b><small>' + status + ' · ' + formatAge(entry) + '</small></div></div>';
     }).join('');
-
-    const technical = document.querySelector('#context-technical');
-    if (technical) technical.textContent = JSON.stringify(snapshot(), null, 2);
   }
 
   function init() {
     set('app.version', VERSION, { source: 'app', ttlMs: Infinity });
+    set('location.status', 'Pendiente', { source: 'init', ttlMs: 30000, confidence: 1 });
     set('environment.weatherStatus', 'Pendiente', { source: 'placeholder', ttlMs: 1800000, confidence: 0.2 });
     set('place.city', 'Pendiente', { source: 'placeholder', ttlMs: 3600000, confidence: 0.2 });
     set('place.zone', 'Pendiente', { source: 'placeholder', ttlMs: 1800000, confidence: 0.2 });
