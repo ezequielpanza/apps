@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<title>Wander Travel v0.60.2</title>
+<title>Wander Travel v0.60.3</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-<link rel="stylesheet" href="wander-ui.css?v=20260704-12">
+<link rel="stylesheet" href="wander-ui.css?v=20260704-13">
 </head>
 <body>
 <main class="wander-app" data-panel="none">
@@ -23,7 +23,7 @@
 <button type="button" data-action="open-simulator"><span>🧪</span> Simulador</button>
 <button type="button" data-action="open-settings"><span>⚙️</span> Ajustes</button>
 </nav>
-<aside class="status-rail" aria-label="Estado actual"><div class="status-item"><span>🚶</span><strong id="metric-status">Detenido</strong></div><div class="status-item"><span>💨</span><strong id="metric-speed">0.0 km/h</strong></div><div class="status-item"><span>🧭</span><strong id="metric-heading">—</strong></div></aside>
+<aside class="status-rail" aria-label="Estado actual"><div class="status-item"><span>📍</span><strong id="metric-status">Ubicación pendiente</strong></div><div class="status-item"><span>💨</span><strong id="metric-speed">—</strong></div><div class="status-item"><span>🧭</span><strong id="metric-heading">—</strong></div></aside>
 <section id="wander-card" class="wander-card" hidden aria-live="polite"><div class="card-title-row"><div><span>Wander</span><h2 id="wander-title">Listo</h2></div><button id="close-wander" type="button" aria-label="Cerrar tarjeta">×</button></div><p id="wander-message">Wander listo para acompañar el viaje.</p><div class="quick-actions" aria-label="Acciones rápidas"><button type="button" data-message="details">ℹ️ Detalles</button><button type="button" data-message="route">🗺️ Ruta</button><button type="button" data-message="food">🍽️ Comer</button><button type="button" data-message="ask">💬 Preguntar</button></div></section>
 </section>
 <aside id="side-panel" class="side-panel" aria-label="Panel lateral" hidden>
@@ -35,7 +35,7 @@
 </aside>
 </main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="app.js?v=20260704-12"></script>
-<script src="version.js?v=20260704-12"></script>
+<script src="app.js?v=20260704-13"></script>
+<script src="version.js?v=20260704-13"></script>
 </body>
 </html>
