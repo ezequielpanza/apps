@@ -2,10 +2,10 @@
   const base = window.WanderBase;
   if (!base) return;
 
-  const marker = base.marker;
   const map = base.map;
-  const $ = (s) => document.querySelector(s);
-  const $$ = (s) => Array.from(document.querySelectorAll(s));
+  const $ = (selector) => document.querySelector(selector);
+  const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
   let timer = null;
   let directionKey = null;
   let speedIndex = 0;
@@ -39,57 +39,103 @@
     speedIndex = 0;
     clearActiveButtons();
     $('[data-stop-move]')?.classList.add('is-active');
+
     window.WanderUI?.setMotion(false, 0, null);
-    window.WanderContext?.setMotion({ status: 'Detenido', speedKmh: 0, heading: null, source: 'simulator' });
-    setStatus('Movimiento detenido · Mapa libre');
+    window.WanderContext?.setMotion({
+      status: 'Detenido',
+      speedKmh: 0,
+      heading: null,
+      source: 'simulator',
+    });
+
+    setStatus(base.hasPosition() ? 'Movimiento detenido · posición simulada activa' : 'Sin posición simulada');
+  }
+
+  function createSimulationPosition() {
+    const center = map.getCenter();
+    const position = base.setPosition(center, {
+      source: 'simulator',
+      confidence: 0.9,
+    });
+
+    if (!position) return false;
+
+    map.setView(position, Math.max(map.getZoom(), 15));
+    window.WanderSimulationActive = true;
+    stop();
+    setStatus('Posición simulada creada · lista para mover');
+    return true;
   }
 
   function tick() {
     const dir = dirs[directionKey];
-    if (!dir) return;
+    const current = base.getPosition();
+    if (!dir || !current) return;
+
     const kmh = speeds[speedIndex];
-    const current = marker.getLatLng();
     const meters = (kmh * 1000 / 3600) * 0.25;
     const next = L.latLng(
       current.lat + meters * dir[0] / 111320,
       current.lng + meters * dir[1] / (111320 * Math.max(0.15, Math.cos(current.lat * Math.PI / 180)))
     );
-    base.revealMarker?.();
-    marker.setLatLng(next);
+
+    base.setPosition(next, {
+      source: 'simulator',
+      confidence: 0.9,
+    });
+
     window.WanderUI?.setMotion(true, kmh / 3.6, dir[2]);
-    window.WanderContext?.setLocation({ lat: next.lat, lng: next.lng, source: 'simulator', confidence: 0.9 });
-    window.WanderContext?.setMotion({ status: labels[speedIndex], speedKmh: kmh, heading: dir[2], source: 'simulator' });
+    window.WanderContext?.setMotion({
+      status: labels[speedIndex],
+      speedKmh: kmh,
+      heading: dir[2],
+      source: 'simulator',
+    });
     window.WanderTracks?.addPoint(next);
+
     setStatus('Moviendo ' + dir[3] + ' · ' + labels[speedIndex] + ' · ' + kmh + ' km/h');
   }
 
   function move(key, button) {
     if (!dirs[key]) return;
+
+    if (!base.hasPosition() && !createSimulationPosition()) {
+      window.WanderUI?.showWander('📍 Sin posición', 'No se pudo crear una posición simulada.');
+      return;
+    }
+
     window.WanderSimulationActive = true;
-    if (directionKey === key && timer) speedIndex = Math.min(speedIndex + 1, speeds.length - 1);
-    else { directionKey = key; speedIndex = 0; }
+
+    if (directionKey === key && timer) {
+      speedIndex = Math.min(speedIndex + 1, speeds.length - 1);
+    } else {
+      directionKey = key;
+      speedIndex = 0;
+    }
+
     clearActiveButtons();
     if (button) button.classList.add('is-active');
     if (timer) clearInterval(timer);
+
     tick();
     timer = setInterval(tick, 250);
   }
 
-  $('#set-sim-position')?.addEventListener('click', () => {
-    base.revealMarker?.();
-    map.setView(marker.getLatLng(), Math.max(map.getZoom(), 15));
-    window.WanderContext?.setLocation({ lat: marker.getLatLng().lat, lng: marker.getLatLng().lng, source: 'simulator', confidence: 0.9 });
-    stop();
-    setStatus('Posición visible · lista para simular');
-  });
+  $('#set-sim-position')?.addEventListener('click', createSimulationPosition);
 
   $('#developer-panel')?.addEventListener('click', (event) => {
     const stopButton = event.target.closest('[data-stop-move]');
     const moveButton = event.target.closest('[data-move]');
+
     if (stopButton) stop();
     if (moveButton) move(moveButton.dataset.move, moveButton);
   });
 
-  window.WanderSimulator = { stop, move };
+  window.WanderSimulator = {
+    stop,
+    move,
+    createPosition: createSimulationPosition,
+  };
+
   stop();
 })();
