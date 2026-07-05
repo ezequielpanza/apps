@@ -22,6 +22,9 @@ const baseLayers = {
 };
 
 let activeBaseLayer = 'streets';
+let marker = null;
+let initialRealLocationCentered = false;
+
 baseLayers[activeBaseLayer].addTo(map);
 
 const userIcon = L.divIcon({
@@ -38,7 +41,18 @@ const route = L.polyline([], {
   lineJoin: 'round',
 }).addTo(map);
 
-let marker = null;
+function finiteCoordinate(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function realPosition() {
+  const lat = finiteCoordinate(window.WanderContext?.value('location.real.lat'));
+  const lng = finiteCoordinate(window.WanderContext?.value('location.real.lng'));
+  if (lat === null || lng === null) return null;
+  return L.latLng(lat, lng);
+}
 
 function effectivePosition() {
   const location = window.WanderContext?.getEffectiveLocation?.();
@@ -62,6 +76,15 @@ function syncEffectiveMarker() {
     marker.setLatLng(next);
   }
   return next;
+}
+
+function centerOnFirstRealLocation() {
+  if (initialRealLocationCentered) return false;
+  const position = realPosition();
+  if (!position) return false;
+  initialRealLocationCentered = true;
+  map.setView(position, Math.max(map.getZoom(), 15));
+  return true;
 }
 
 function centerOnPosition(zoom = 15) {
@@ -123,6 +146,7 @@ map.addControl(new MapActions());
 
 window.WanderContext?.subscribe((key) => {
   if (key === 'location.effective' || key.startsWith('location.effective.')) syncEffectiveMarker();
+  if (key === 'location.real' || key.startsWith('location.real.')) centerOnFirstRealLocation();
 });
 
 window.map = map;
@@ -131,9 +155,11 @@ window.WanderBase = {
   route,
   hasPosition: () => Boolean(effectivePosition()),
   getPosition: () => effectivePosition(),
+  getRealPosition: () => realPosition(),
   getMarker: () => marker,
   syncEffectiveMarker,
   centerOnPosition,
+  centerOnFirstRealLocation,
   setBaseLayer,
   toggleBaseLayer,
   getBaseLayer: () => activeBaseLayer,
@@ -146,4 +172,5 @@ if ('serviceWorker' in navigator) {
 }
 
 syncEffectiveMarker();
+centerOnFirstRealLocation();
 setTimeout(() => map.invalidateSize(), 100);
