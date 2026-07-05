@@ -22,6 +22,7 @@ jobs:
         run: |
           test -s apps/wander-travel/index.html
           test -s apps/wander-travel/wander-ui.css
+          test -s apps/wander-travel/wander-icons.svg
           test -s apps/wander-travel/app.js
           test -s apps/wander-travel/runtime-context.js
           test -s apps/wander-travel/runtime-context-panel.js
