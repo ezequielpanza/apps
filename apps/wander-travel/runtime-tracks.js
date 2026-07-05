@@ -24,7 +24,7 @@
     const button = $('#record-button');
     if (!button) return;
     button.classList.toggle('is-recording', Boolean(current));
-    button.textContent = current ? '⏹️ Detener' : '⏺️ Grabar';
+    button.textContent = current ? 'Detener' : 'Grabar';
   }
 
   function render() {
@@ -48,7 +48,7 @@
     list.innerHTML = rows.map((track) => (
       '<button class="track-row" type="button" data-track-id="' + track.id + '">' +
         '<div><strong>' + track.name + '</strong><span>' + track.points.length + ' puntos</span></div>' +
-        '<span>👁️</span>' +
+        '<span>Ver</span>' +
       '</button>'
     )).join('');
   }
@@ -69,7 +69,7 @@
     const position = base.getPosition();
     if (!position) {
       window.WanderUI?.showWander(
-        '📍 Falta ubicación',
+        'Falta ubicación',
         'Wander necesita una posición válida antes de empezar a grabar un recorrido.'
       );
       return false;
@@ -89,7 +89,7 @@
     });
 
     addPoint(position);
-    window.WanderUI?.showWander('⏺️ Grabando', 'Wander empezó a registrar este recorrido.');
+    window.WanderUI?.showWander('Grabando', 'Wander empezó a registrar este recorrido.');
     render();
     return true;
   }
@@ -107,7 +107,7 @@
       confidence: 0.7,
     });
 
-    window.WanderUI?.showWander('✅ Track finalizado', 'El recorrido quedó guardado si tuvo movimiento suficiente.');
+    window.WanderUI?.showWander('Track finalizado', 'El recorrido quedó guardado si tuvo movimiento suficiente.');
     render();
   }
 
@@ -124,13 +124,13 @@
       ttlMs: 600000,
       confidence: 0.7,
     });
-    window.WanderUI?.showWander('🗺️ Recorrido', track.name + ' · ' + track.points.length + ' puntos.');
+    window.WanderUI?.showWander('Recorrido', track.name + ' · ' + track.points.length + ' puntos.');
   }
 
   function exportLast() {
     const track = current || tracks[tracks.length - 1];
     if (!track) {
-      window.WanderUI?.showWander('📤 Exportar', 'Todavía no hay recorridos para exportar.');
+      window.WanderUI?.showWander('Exportar', 'Todavía no hay recorridos para exportar.');
       return;
     }
 
@@ -146,7 +146,7 @@
   $('#record-button')?.addEventListener('click', () => current ? stop() : start());
   $('#clear-panel-button')?.addEventListener('click', () => {
     line.setLatLngs([]);
-    window.WanderUI?.showWander('🧹 Vista limpia', 'Se limpió la línea visible del mapa. Los tracks guardados siguen disponibles.');
+    window.WanderUI?.showWander('Vista limpia', 'Se limpió la línea visible del mapa. Los tracks guardados siguen disponibles.');
   });
   $('#export-track-button')?.addEventListener('click', exportLast);
   $('#track-list')?.addEventListener('click', (event) => {
