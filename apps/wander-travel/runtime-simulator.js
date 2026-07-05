@@ -3,7 +3,6 @@
   const context = window.WanderContext;
   if (!base || !context) return;
 
-  const map = base.map;
   const $ = (selector) => document.querySelector(selector);
   let enabled = false;
   let timer = null;
@@ -29,16 +28,26 @@
     document.body.classList.toggle('simulation-enabled', enabled);
   }
 
-  function ensureOverridePosition() {
-    const existingLat = Number(context.value('location.override.lat'));
-    const existingLng = Number(context.value('location.override.lng'));
-    if (Number.isFinite(existingLat) && Number.isFinite(existingLng)) return L.latLng(existingLat, existingLng);
+  function existingOverridePosition() {
+    const lat = context.value('location.override.lat');
+    const lng = context.value('location.override.lng');
+    if (lat === null || lat === undefined || lng === null || lng === undefined) return null;
+    const numericLat = Number(lat);
+    const numericLng = Number(lng);
+    if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) return null;
+    return L.latLng(numericLat, numericLng);
+  }
 
-    const effective = context.getEffectiveLocation();
-    const seed = effective ? L.latLng(effective.lat, effective.lng) : map.getCenter();
-    if (!context.setLocationOverride({ lat: seed.lat, lng: seed.lng })) return null;
-    map.setView(seed, Math.max(map.getZoom(), 15));
-    return seed;
+  function seedOverrideFromReal() {
+    const real = base.getRealPosition?.();
+    if (!real) return null;
+    if (!context.setLocationOverride({ lat: real.lat, lng: real.lng })) return null;
+    base.map.setView(real, Math.max(base.map.getZoom(), 15));
+    return real;
+  }
+
+  function ensureOverridePosition() {
+    return existingOverridePosition() || seedOverrideFromReal();
   }
 
   function stopMotion({ updateContext = true } = {}) {
@@ -50,7 +59,7 @@
     const knob = $('#simulation-joystick-knob');
     if (knob) knob.style.transform = 'translate(0px, 0px)';
 
-    if (enabled && updateContext && context.getEffectiveLocation()) {
+    if (enabled && updateContext) {
       const current = ensureOverridePosition();
       if (current) context.setLocationOverride({ lat: current.lat, lng: current.lng, speedMps: 0 });
       window.WanderUI?.setMotion(false, 0, null, {
@@ -76,8 +85,12 @@
     window.WanderSimulationActive = enabled;
 
     if (enabled) {
-      ensureOverridePosition();
-      setPanelStatus('Simulación activa · ubicación efectiva controlada por override');
+      const seed = seedOverrideFromReal();
+      if (seed) {
+        setPanelStatus('Simulación activa · iniciada desde la última ubicación real conocida');
+      } else {
+        setPanelStatus('Simulación activa · esperando una ubicación real para inicializar');
+      }
       context.set('simulation.status', 'active', { source: 'simulator', ttlMs: Infinity, confidence: 1 });
     } else {
       context.clearLocationOverride();
@@ -164,6 +177,14 @@
     const hud = $('#simulation-hud-value');
     if (hud) hud.textContent = '0.0 km/h · —';
   }
+
+  context.subscribe((key) => {
+    if (!enabled || existingOverridePosition()) return;
+    if (key === 'location.real' || key.startsWith('location.real.')) {
+      const seeded = seedOverrideFromReal();
+      if (seeded) setPanelStatus('Simulación activa · iniciada desde la última ubicación real conocida');
+    }
+  });
 
   $('#simulation-toggle')?.addEventListener('change', (event) => setEnabled(event.target.checked));
 
