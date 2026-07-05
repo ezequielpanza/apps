@@ -34,6 +34,23 @@
     setTimeout(() => window.WanderBase?.map?.invalidateSize(), 120);
   }
 
+  function setActiveNavigation(panelName) {
+    const actionByPanel = {
+      travel: 'open-travel',
+      context: 'open-context',
+      developer: 'open-simulator',
+      settings: 'open-settings',
+    };
+    const activeAction = actionByPanel[panelName] || '';
+
+    menu?.querySelectorAll('[data-action]').forEach((button) => {
+      const active = button.dataset.action === activeAction;
+      button.classList.toggle('is-active', active);
+      if (active) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    });
+  }
+
   function openPanel(name) {
     const available = sections();
     const normalized = available[name] ? name : 'none';
@@ -44,6 +61,7 @@
     });
 
     applyLayout(normalized);
+    setActiveNavigation(normalized);
 
     const labels = {
       travel: ['Wander', 'Travel'],
@@ -83,7 +101,7 @@
     if (action === 'open-developer' || action === 'open-simulator') openPanel('developer');
     if (action === 'open-settings') openPanel('settings');
     if (action === 'boat') {
-      window.WanderUI?.showWander('⛵ Barco', 'El modo barco queda reservado para funciones náuticas. Wander Travel sigue enfocado en la experiencia de viaje.');
+      window.WanderUI?.showWander('Barco', 'El modo barco queda reservado para funciones náuticas. Wander Travel sigue enfocado en la experiencia de viaje.');
     }
   });
 
