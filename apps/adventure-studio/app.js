@@ -138,8 +138,10 @@ function renderNode(node){
     const rootDef=ROOT_DEFINITIONS.find(root=>root.id===node.id);
     return `<div class="tree-root ${node.open?'':'closed'}" data-node-id="${node.id}">
       <div class="tree-root-row${selected}">
-        <button class="tree-toggle" data-action="toggle" data-node-id="${node.id}">
+        <button class="tree-expander" data-action="toggle" data-node-id="${node.id}" aria-label="${node.open?'Cerrar':'Abrir'} ${escapeHtml(node.label)}">
           <span class="tree-chevron">⌄</span>
+        </button>
+        <button class="tree-node-select" data-action="select" data-node-id="${node.id}">
           <span class="tree-type-icon">${rootDef?.icon||'▱'}</span>
           <span class="tree-root-name">${escapeHtml(node.label)}</span>
           <span class="tree-count">${countItems(node)}</span>
@@ -153,8 +155,10 @@ function renderNode(node){
   if(node.kind==='folder'){
     return `<div class="tree-folder ${node.open?'':'closed'}" data-node-id="${node.id}">
       <div class="tree-folder-row${selected}">
-        <button class="tree-toggle" data-action="toggle" data-node-id="${node.id}">
+        <button class="tree-expander" data-action="toggle" data-node-id="${node.id}" aria-label="${node.open?'Cerrar':'Abrir'} ${escapeHtml(node.label)}">
           <span class="tree-chevron">⌄</span>
+        </button>
+        <button class="tree-node-select" data-action="select" data-node-id="${node.id}">
           <span class="tree-type-icon">▱</span>
           <span class="tree-folder-name">${escapeHtml(node.label)}</span>
         </button>
@@ -168,7 +172,8 @@ function renderNode(node){
   const def=ITEM_DEFINITIONS[node.itemType];
   return `<div class="tree-item" data-node-id="${node.id}">
     <div class="tree-item-row${selected}">
-      <button class="tree-item-select" data-action="select" data-node-id="${node.id}">
+      <span class="tree-expander-placeholder"></span>
+      <button class="tree-node-select" data-action="select" data-node-id="${node.id}">
         <span class="tree-type-icon">${def?.icon||'•'}</span>
         <span class="tree-item-name">${escapeHtml(node.label)}</span>
       </button>
@@ -201,7 +206,6 @@ function toggleNode(nodeId){
   const found=findNode(nodeId);
   if(!found||found.node.kind==='item')return;
   found.node.open=!found.node.open;
-  selectedNodeId=nodeId;
   saveProjectTree();
   renderProjectTree();
 }
