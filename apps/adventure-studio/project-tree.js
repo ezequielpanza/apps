@@ -1,6 +1,6 @@
 import{ROOTS,TYPES,findNode,walk,uid,createRoomSections,createReference}from'./project-model.js';
 
-export function createProjectTreeController({treeElement,menuElement,getTree,getSelectedId,setSelectedId,save,openEditor,onDeleteResource}){
+export function createProjectTreeController({treeElement,menuElement,getTree,getSelectedId,setSelectedId,save,openEditor,openRoomSectionEditor,onDeleteResource}){
   let activeCreateTargetId=null;let draggedId=null;let renameTimer=null;
   const tree=()=>getTree();
   const esc=v=>String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -39,7 +39,7 @@ export function createProjectTreeController({treeElement,menuElement,getTree,get
 
   function bind(){
     treeElement.addEventListener('click',e=>{const a=e.target.closest('[data-action]');if(!a)return;const{action,nodeId}=a.dataset;if(action==='toggle')toggle(nodeId);if(action==='select')select(nodeId);if(action==='rename')scheduleRename(nodeId);if(action==='delete')deleteNode(nodeId);if(action==='delete-reference')deleteReference(nodeId);if(action==='open-reference'){const f=findNode(tree(),nodeId);if(f?.node.kind==='reference')openEditor(f.node.resourceId);}if(action==='create-menu'){e.stopPropagation();select(nodeId);openMenu(nodeId,a);}});
-    treeElement.addEventListener('dblclick',e=>{cancelRename();const el=e.target.closest('[data-node-id]');if(!el)return;const f=findNode(tree(),el.dataset.nodeId);if(!f)return;if(f.node.kind==='reference')openEditor(f.node.resourceId);else if(f.node.kind==='item')openEditor(f.node.id);else openFolder(f.node.id);});
+    treeElement.addEventListener('dblclick',e=>{cancelRename();const el=e.target.closest('[data-node-id]');if(!el)return;const f=findNode(tree(),el.dataset.nodeId);if(!f)return;if(f.node.kind==='reference')openEditor(f.node.resourceId);else if(f.node.kind==='room-section'&&f.node.sectionKey==='backgrounds')openRoomSectionEditor(f.node.id);else if(f.node.kind==='item')openEditor(f.node.id);else openFolder(f.node.id);});
     treeElement.addEventListener('dragstart',e=>{cancelRename();const el=e.target.closest('[data-draggable-node="true"]');if(!el)return;draggedId=el.dataset.nodeId;el.classList.add('dragging-node');e.dataTransfer.effectAllowed='copyMove';e.dataTransfer.setData('text/plain',draggedId);closeMenu();});
     treeElement.addEventListener('dragover',e=>{if(!draggedId)return;const target=e.target.closest('[data-drop-container="true"]');if(!target)return;e.preventDefault();const valid=canDrop(draggedId,target.dataset.nodeId);e.dataTransfer.dropEffect=valid?(findNode(tree(),target.dataset.nodeId)?.node.kind==='room-section'?'copy':'move'):'none';treeElement.querySelectorAll('.drop-valid,.drop-invalid').forEach(el=>el.classList.remove('drop-valid','drop-invalid'));target.classList.add(valid?'drop-valid':'drop-invalid');});
     treeElement.addEventListener('drop',e=>{if(!draggedId)return;const target=e.target.closest('[data-drop-container="true"]');if(target){e.preventDefault();dropNode(draggedId,target.dataset.nodeId);}draggedId=null;clearDrop();});
