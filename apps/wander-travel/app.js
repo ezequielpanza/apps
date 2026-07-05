@@ -25,6 +25,8 @@ let activeBaseLayer = 'streets';
 let marker = null;
 let markerDragActive = false;
 let initialRealLocationCentered = false;
+let followMode = false;
+let centerButton = null;
 
 baseLayers[activeBaseLayer].addTo(map);
 
@@ -63,6 +65,50 @@ function effectivePosition() {
   const location = window.WanderContext?.getEffectiveLocation?.();
   if (!location) return null;
   return L.latLng(location.lat, location.lng);
+}
+
+function centerIconMarkup(active = false) {
+  const dotFill = active ? '#01E0CB' : 'none';
+  const dotStroke = active ? '#01E0CB' : 'currentColor';
+  return '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="12" cy="12" r="5" fill="' + dotFill + '" stroke="' + dotStroke + '"></circle>' +
+    '<path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path>' +
+    '</svg>';
+}
+
+function syncFollowButton() {
+  if (!centerButton) return;
+  centerButton.setAttribute('aria-pressed', String(followMode));
+  centerButton.setAttribute('aria-label', followMode ? 'Desactivar seguimiento centrado' : 'Centrar y seguir mi posición');
+  centerButton.title = followMode ? 'Desactivar seguimiento centrado' : 'Centrar y seguir mi posición';
+  centerButton.innerHTML = centerIconMarkup(followMode);
+  centerButton.style.color = followMode ? 'var(--accent)' : 'var(--green)';
+  centerButton.style.boxShadow = followMode ? '0 0 0 3px var(--accent-ring), var(--shadow)' : 'var(--shadow)';
+}
+
+function setFollowMode(next, { centerNow = true } = {}) {
+  followMode = Boolean(next);
+  syncFollowButton();
+
+  if (followMode && centerNow) {
+    const position = effectivePosition();
+    if (!position) {
+      followMode = false;
+      syncFollowButton();
+      return false;
+    }
+    map.setView(position, Math.max(map.getZoom(), 15));
+  }
+
+  return followMode;
+}
+
+function followEffectivePosition() {
+  if (!followMode || markerDragActive) return false;
+  const position = effectivePosition();
+  if (!position) return false;
+  map.panTo(position, { animate: false });
+  return true;
 }
 
 function syncMarkerDraggable() {
@@ -121,6 +167,7 @@ function syncEffectiveMarker() {
   }
 
   syncMarkerDraggable();
+  followEffectivePosition();
   return next;
 }
 
@@ -168,7 +215,8 @@ const MapActions = L.Control.extend({
   onAdd() {
     const wrap = L.DomUtil.create('div', 'wander-map-actions');
     const layerButton = mapButton('layers', 'Cambiar a mapa satélite');
-    const centerButton = mapButton('center', 'Centrar en mi posición');
+    centerButton = mapButton('center', 'Centrar y seguir mi posición');
+    centerButton.setAttribute('aria-pressed', 'false');
 
     layerButton.addEventListener('click', () => {
       const active = toggleBaseLayer();
@@ -178,17 +226,27 @@ const MapActions = L.Control.extend({
     });
 
     centerButton.addEventListener('click', () => {
-      if (!centerOnPosition()) {
-        window.WanderUI?.showWander('Sin ubicación', 'Todavía no hay una ubicación efectiva válida para centrar el mapa.');
+      if (followMode) {
+        setFollowMode(false, { centerNow: false });
+        return;
+      }
+
+      if (!setFollowMode(true)) {
+        window.WanderUI?.showWander('Sin ubicación', 'Todavía no hay una ubicación efectiva válida para activar el seguimiento.');
       }
     });
 
     wrap.append(layerButton, centerButton);
+    syncFollowButton();
     return wrap;
   },
 });
 
 map.addControl(new MapActions());
+
+map.on('dragstart', () => {
+  if (followMode) setFollowMode(false, { centerNow: false });
+});
 
 window.WanderContext?.subscribe((key) => {
   if (key === 'location.effective' || key.startsWith('location.effective.')) syncEffectiveMarker();
@@ -211,6 +269,8 @@ window.WanderBase = {
   syncMarkerDraggable,
   centerOnPosition,
   centerOnFirstRealLocation,
+  setFollowMode,
+  isFollowingPosition: () => followMode,
   setBaseLayer,
   toggleBaseLayer,
   getBaseLayer: () => activeBaseLayer,
