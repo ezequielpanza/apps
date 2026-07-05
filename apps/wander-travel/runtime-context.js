@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.64.0';
+  const VERSION = 'v0.65.0';
   const listeners = new Set();
   const DEFAULT_TTL = {
     'app.version': Infinity,
@@ -26,7 +26,7 @@
   const state = {};
   const now = () => Date.now();
   const iso = (ts = now()) => new Date(ts).toISOString();
-  const icon = (name) => '<svg class="section-icon" aria-hidden="true"><use href="#icon-' + name + '"></use></svg>';
+  const icon = (name) => '<svg class="section-icon" aria-hidden="true"><use href="wander-icons.svg#' + name + '"></use></svg>';
 
   function ttlFor(key, ttlMs) {
     if (ttlMs != null) return ttlMs;
