@@ -28,23 +28,11 @@
     </header>
 
     <aside class="sidebar panel">
-      <div class="panel-title-row">
-        <span class="panel-kicker">PROJECT</span>
-        <button class="tiny-button project-add-button" id="projectAddButton" aria-label="Crear elemento" aria-haspopup="menu" aria-expanded="false">＋</button>
-      </div>
+      <div class="panel-title-row"><span class="panel-kicker">PROJECT</span></div>
       <nav class="project-tree" id="projectTree" aria-label="Estructura del proyecto"></nav>
     </aside>
 
-    <div class="project-create-menu" id="projectCreateMenu" role="menu" aria-hidden="true">
-      <div class="create-menu-label">Create</div>
-      <button role="menuitem" data-create-type="room"><span>▧</span><div><strong>Room</strong><small>New scene or location</small></div></button>
-      <button role="menuitem" data-create-type="character"><span>◉</span><div><strong>Character</strong><small>Playable or non-playable</small></div></button>
-      <button role="menuitem" data-create-type="inventory"><span>◇</span><div><strong>Inventory Element</strong><small>Collectible or usable item</small></div></button>
-      <button role="menuitem" data-create-type="dialogue"><span>◌</span><div><strong>Dialogue</strong><small>Conversation tree</small></div></button>
-      <button role="menuitem" data-create-type="audio"><span>♪</span><div><strong>Audio</strong><small>Music, ambience or sound</small></div></button>
-      <div class="create-menu-separator"></div>
-      <button role="menuitem" data-create-type="folder"><span>▱</span><div><strong>Subfolder</strong><small>Inside selected category or folder</small></div></button>
-    </div>
+    <div class="tree-create-menu" id="treeCreateMenu" role="menu" aria-hidden="true"></div>
 
     <div class="panel-resizer left-resizer" id="leftResizer" role="separator" aria-label="Cambiar ancho de Project" aria-orientation="vertical"></div>
 
