@@ -9,9 +9,11 @@
   let heading = null;
   let speedKmh = 0;
   let pointerId = null;
+  let lastTickAt = null;
 
   const MAX_SPEED_KMH = 80;
   const TICK_MS = 100;
+  const MAX_DELTA_MS = 250;
 
   function setPanelStatus(message) {
     const item = $('#sim-status');
@@ -50,9 +52,20 @@
     return existingOverridePosition() || seedOverrideFromReal();
   }
 
-  function stopMotion({ updateContext = true } = {}) {
+  function stopTimer() {
     if (timer) clearInterval(timer);
     timer = null;
+    lastTickAt = null;
+  }
+
+  function startTimer() {
+    if (timer) return;
+    lastTickAt = performance.now();
+    timer = setInterval(tick, TICK_MS);
+  }
+
+  function stopMotion({ updateContext = true } = {}) {
+    stopTimer();
     heading = null;
     speedKmh = 0;
 
@@ -108,11 +121,20 @@
   }
 
   function tick() {
-    if (!enabled || !Number.isFinite(heading) || speedKmh <= 0) return;
+    const now = performance.now();
+    if (lastTickAt == null) {
+      lastTickAt = now;
+      return;
+    }
+
+    const elapsedMs = Math.min(Math.max(0, now - lastTickAt), MAX_DELTA_MS);
+    lastTickAt = now;
+
+    if (!enabled || !Number.isFinite(heading) || speedKmh <= 0 || elapsedMs <= 0) return;
     const current = ensureOverridePosition();
     if (!current) return;
 
-    const distanceMeters = (speedKmh * 1000 / 3600) * (TICK_MS / 1000);
+    const distanceMeters = (speedKmh * 1000 / 3600) * (elapsedMs / 1000);
     const radians = heading * Math.PI / 180;
     const north = Math.cos(radians) * distanceMeters;
     const east = Math.sin(radians) * distanceMeters;
@@ -166,8 +188,10 @@
     speedKmh = intensity * MAX_SPEED_KMH;
     heading = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
 
-    if (!timer) timer = setInterval(tick, TICK_MS);
-    tick();
+    startTimer();
+
+    const hud = $('#simulation-hud-value');
+    if (hud) hud.textContent = speedKmh.toFixed(1) + ' km/h · ' + Math.round(heading) + '°';
   }
 
   function releaseJoystick(event) {
