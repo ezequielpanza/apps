@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.62.0';
+  const VERSION = 'v0.63.0';
   const listeners = new Set();
   const DEFAULT_TTL = {
     'app.version': Infinity,
@@ -23,6 +23,7 @@
   const state = {};
   const now = () => Date.now();
   const iso = (ts = now()) => new Date(ts).toISOString();
+  const icon = (name) => '<svg class="section-icon" aria-hidden="true"><use href="#icon-' + name + '"></use></svg>';
 
   function ttlFor(key, ttlMs) {
     if (ttlMs != null) return ttlMs;
@@ -128,42 +129,29 @@
   }
 
   const HUMAN = [
-    ['time.now', 'Hora', '🕒'],
-    ['time.dayPeriod', 'Momento del día', '🌗'],
-    ['location.status', 'Ubicación', '📍'],
-    ['motion.status', 'Movimiento', '🚶'],
-    ['motion.speedKmh', 'Velocidad', '💨'],
-    ['motion.heading', 'Rumbo', '🧭'],
-    ['place.city', 'Ciudad', '🏙️'],
-    ['place.zone', 'Zona', '🧱'],
-    ['user.intent', 'Intención', '🎯'],
+    ['time.now', 'Hora', 'clock'],
+    ['time.dayPeriod', 'Momento del día', 'day'],
+    ['location.status', 'Ubicación', 'pin'],
+    ['motion.status', 'Movimiento', 'route'],
+    ['motion.speedKmh', 'Velocidad', 'speed'],
+    ['motion.heading', 'Rumbo', 'heading'],
+    ['place.city', 'Ciudad', 'city'],
+    ['place.zone', 'Zona', 'zone'],
+    ['user.intent', 'Intención', 'target'],
   ];
 
   const TECHNICAL = [
-    'app.version',
-    'time.now',
-    'time.dayPeriod',
-    'location.status',
-    'location.lat',
-    'location.lng',
-    'location.source',
-    'location.updatedAt',
-    'motion.status',
-    'motion.speedKmh',
-    'motion.heading',
-    'environment.weatherStatus',
-    'place.city',
-    'place.zone',
-    'user.intent',
-    'user.interests',
+    'app.version','time.now','time.dayPeriod','location.status','location.lat','location.lng',
+    'location.source','location.updatedAt','motion.status','motion.speedKmh','motion.heading',
+    'environment.weatherStatus','place.city','place.zone','user.intent','user.interests',
   ];
 
   function renderHuman() {
     const list = document.querySelector('#context-list');
     if (!list) return;
-    list.innerHTML = HUMAN.map(([key, label, icon]) => {
+    list.innerHTML = HUMAN.map(([key, label, iconName]) => {
       const entry = get(key);
-      return '<div class="context-row"><div><strong>' + icon + ' ' + label + '</strong></div><div><b>' + readableValue(key, entry) + '</b></div></div>';
+      return '<div class="context-row"><div class="context-label">' + icon(iconName) + '<strong>' + label + '</strong></div><div><b>' + readableValue(key, entry) + '</b></div></div>';
     }).join('');
   }
 
@@ -195,18 +183,6 @@
     setInterval(render, 15000);
   }
 
-  window.WanderContext = {
-    set,
-    get,
-    value,
-    snapshot,
-    subscribe,
-    updateTime,
-    setMotion,
-    setLocation,
-    render,
-    statusFor,
-  };
-
+  window.WanderContext = { set, get, value, snapshot, subscribe, updateTime, setMotion, setLocation, render, statusFor };
   init();
 })();
