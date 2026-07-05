@@ -105,6 +105,44 @@ function toggleBaseLayer() {
   return setBaseLayer(activeBaseLayer === 'streets' ? 'satellite' : 'streets');
 }
 
+function mapButton(iconName, label) {
+  const button = L.DomUtil.create('button', 'wander-map-action');
+  button.type = 'button';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="wander-icons.svg#' + iconName + '"></use></svg>';
+  L.DomEvent.disableClickPropagation(button);
+  L.DomEvent.disableScrollPropagation(button);
+  return button;
+}
+
+const MapActions = L.Control.extend({
+  options: { position: 'bottomright' },
+  onAdd() {
+    const wrap = L.DomUtil.create('div', 'wander-map-actions');
+    const centerButton = mapButton('center', 'Centrar en mi posición');
+    const layerButton = mapButton('layers', 'Cambiar a mapa satélite');
+
+    centerButton.addEventListener('click', () => {
+      if (!centerOnPosition()) {
+        window.WanderUI?.showWander('Sin ubicación', 'Todavía no hay una posición válida para centrar el mapa.');
+      }
+    });
+
+    layerButton.addEventListener('click', () => {
+      const active = toggleBaseLayer();
+      const nextLabel = active === 'streets' ? 'Cambiar a mapa satélite' : 'Cambiar a mapa de calles';
+      layerButton.setAttribute('aria-label', nextLabel);
+      layerButton.title = nextLabel;
+    });
+
+    wrap.append(centerButton, layerButton);
+    return wrap;
+  },
+});
+
+map.addControl(new MapActions());
+
 window.map = map;
 window.WanderBase = {
   map,
