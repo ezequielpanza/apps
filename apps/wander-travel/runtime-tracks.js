@@ -5,7 +5,7 @@
   const map = base.map;
   const line = base.route;
   const $ = (selector) => document.querySelector(selector);
-  const icon = (name, className = 'button-icon') => '<svg class="' + className + '" aria-hidden="true"><use href="#icon-' + name + '"></use></svg>';
+  const icon = (name, className = 'button-icon') => '<svg class="' + className + '" aria-hidden="true"><use href="wander-icons.svg#' + name + '"></use></svg>';
 
   let tracks = [];
   let current = null;
@@ -58,11 +58,9 @@
 
   function addPoint(point) {
     if (!current || !point) return;
-
     const next = L.latLng(point);
     const last = current.points[current.points.length - 1];
     if (last && map.distance([last.lat, last.lng], next) < 2) return;
-
     current.points.push({ lat: next.lat, lng: next.lng });
     line.setLatLngs(current.points.map((p) => [p.lat, p.lng]));
     render();
@@ -71,10 +69,7 @@
   function start() {
     const position = base.getPosition();
     if (!position) {
-      window.WanderUI?.showWander(
-        'Falta ubicación',
-        'Wander necesita una posición válida antes de empezar a grabar un recorrido.'
-      );
+      window.WanderUI?.showWander('Falta ubicación', 'Wander necesita una posición válida antes de empezar a grabar un recorrido.');
       return false;
     }
 
@@ -99,7 +94,6 @@
 
   function stop() {
     if (!current) return;
-
     if (current.points.length > 1) tracks.push(current);
     current = null;
     save();
@@ -117,11 +111,9 @@
   function showTrack(id) {
     const track = tracks.find((item) => item.id === id) || (current?.id === id ? current : null);
     if (!track || !track.points.length) return;
-
     const points = track.points.map((p) => [p.lat, p.lng]);
     line.setLatLngs(points);
     map.fitBounds(points, { padding: [40, 40], maxZoom: 16 });
-
     window.WanderContext?.set('user.intent', 'Revisar recorrido', {
       source: 'track',
       ttlMs: 600000,
