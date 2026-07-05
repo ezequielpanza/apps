@@ -10,10 +10,19 @@ L.control.attribution({
   prefix: false,
 }).addTo(map);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap',
-}).addTo(map);
+const baseLayers = {
+  streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap',
+  }),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: 'Tiles &copy; Esri',
+  }),
+};
+
+let activeBaseLayer = 'streets';
+baseLayers[activeBaseLayer].addTo(map);
 
 const userIcon = L.divIcon({
   className: '',
@@ -84,6 +93,18 @@ function centerOnPosition(zoom = 15) {
   return true;
 }
 
+function setBaseLayer(name) {
+  if (!baseLayers[name] || name === activeBaseLayer) return activeBaseLayer;
+  map.removeLayer(baseLayers[activeBaseLayer]);
+  baseLayers[name].addTo(map);
+  activeBaseLayer = name;
+  return activeBaseLayer;
+}
+
+function toggleBaseLayer() {
+  return setBaseLayer(activeBaseLayer === 'streets' ? 'satellite' : 'streets');
+}
+
 window.map = map;
 window.WanderBase = {
   map,
@@ -94,6 +115,9 @@ window.WanderBase = {
   setPosition,
   clearPosition,
   centerOnPosition,
+  setBaseLayer,
+  toggleBaseLayer,
+  getBaseLayer: () => activeBaseLayer,
 };
 
 setTimeout(() => map.invalidateSize(), 100);
