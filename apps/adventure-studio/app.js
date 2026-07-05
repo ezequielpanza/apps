@@ -100,6 +100,8 @@ function loadProjectTree(){
 let projectTree=loadProjectTree();
 let selectedNodeId=localStorage.getItem(STORAGE_KEYS.projectSelection)||'rooms';
 let activeCreateTargetId=null;
+let draggedNodeId=null;
+let activeDropTargetId=null;
 
 function saveProjectTree(){
   localStorage.setItem(STORAGE_KEYS.projectTree,JSON.stringify(projectTree));
@@ -136,11 +138,9 @@ function renderNode(node){
 
   if(node.kind==='root'){
     const rootDef=ROOT_DEFINITIONS.find(root=>root.id===node.id);
-    return `<div class="tree-root ${node.open?'':'closed'}" data-node-id="${node.id}">
+    return `<div class="tree-root ${node.open?'':'closed'}" data-node-id="${node.id}" data-drop-container="true">
       <div class="tree-root-row${selected}">
-        <button class="tree-expander" data-action="toggle" data-node-id="${node.id}" aria-label="${node.open?'Cerrar':'Abrir'} ${escapeHtml(node.label)}">
-          <span class="tree-chevron">⌄</span>
-        </button>
+        <button class="tree-expander" data-action="toggle" data-node-id="${node.id}" aria-label="${node.open?'Cerrar':'Abrir'} ${escapeHtml(node.label)}"><span class="tree-chevron">⌄</span></button>
         <button class="tree-node-select" data-action="select" data-node-id="${node.id}">
           <span class="tree-type-icon">${rootDef?.icon||'▱'}</span>
           <span class="tree-root-name">${escapeHtml(node.label)}</span>
@@ -153,11 +153,9 @@ function renderNode(node){
   }
 
   if(node.kind==='folder'){
-    return `<div class="tree-folder ${node.open?'':'closed'}" data-node-id="${node.id}">
+    return `<div class="tree-folder ${node.open?'':'closed'}" data-node-id="${node.id}" data-draggable-node="true" data-drop-container="true" draggable="true">
       <div class="tree-folder-row${selected}">
-        <button class="tree-expander" data-action="toggle" data-node-id="${node.id}" aria-label="${node.open?'Cerrar':'Abrir'} ${escapeHtml(node.label)}">
-          <span class="tree-chevron">⌄</span>
-        </button>
+        <button class="tree-expander" data-action="toggle" data-node-id="${node.id}" aria-label="${node.open?'Cerrar':'Abrir'} ${escapeHtml(node.label)}"><span class="tree-chevron">⌄</span></button>
         <button class="tree-node-select" data-action="select" data-node-id="${node.id}">
           <span class="tree-type-icon">▱</span>
           <span class="tree-folder-name">${escapeHtml(node.label)}</span>
@@ -170,7 +168,7 @@ function renderNode(node){
   }
 
   const def=ITEM_DEFINITIONS[node.itemType];
-  return `<div class="tree-item" data-node-id="${node.id}">
+  return `<div class="tree-item" data-node-id="${node.id}" data-draggable-node="true" draggable="true">
     <div class="tree-item-row${selected}">
       <span class="tree-expander-placeholder"></span>
       <button class="tree-node-select" data-action="select" data-node-id="${node.id}">
@@ -266,11 +264,10 @@ function createEntryInTarget(targetId,createType){
   if(createType==='folder'){
     const folder={id:createId('folder'),kind:'folder',label:'New Folder',rootId,open:false,children:[]};
     target.children.push(folder);
-    target.open=true;
     selectedNodeId=folder.id;
     saveProjectTree();
     renderProjectTree();
-    startInlineRename(folder.id);
+    if(target.open)startInlineRename(folder.id);
     return;
   }
 
@@ -279,11 +276,10 @@ function createEntryInTarget(targetId,createType){
 
   const item={id:createId(createType),kind:'item',label:nextDefaultName(createType),rootId,itemType:createType};
   target.children.push(item);
-  target.open=true;
   selectedNodeId=item.id;
   saveProjectTree();
   renderProjectTree();
-  startInlineRename(item.id);
+  if(target.open)startInlineRename(item.id);
 }
 
 function buildCreateMenu(targetId){
@@ -295,13 +291,11 @@ function buildCreateMenu(targetId){
 
   return `<div class="create-menu-label">Create in ${escapeHtml(found.node.label)}</div>
     <button role="menuitem" data-create-type="${rootDef.itemType}">
-      <span>${itemDef.icon}</span>
-      <div><strong>${escapeHtml(itemDef.label)}</strong><small>Add to this folder</small></div>
+      <span>${itemDef.icon}</span><div><strong>${escapeHtml(itemDef.label)}</strong><small>Add to this folder</small></div>
     </button>
     <div class="create-menu-separator"></div>
     <button role="menuitem" data-create-type="folder">
-      <span>▱</span>
-      <div><strong>Subfolder</strong><small>Create a nested folder</small></div>
+      <span>▱</span><div><strong>Subfolder</strong><small>Create a nested folder</small></div>
     </button>`;
 }
 
@@ -331,6 +325,50 @@ function closeCreateMenu(){
   treeCreateMenu.innerHTML='';
 }
 
+function isDescendant(containerNode,nodeId){
+  if(containerNode.kind==='item')return false;
+  return containerNode.children.some(child=>child.id===nodeId||(child.kind!=='item'&&isDescendant(child,nodeId)));
+}
+
+function canDropNode(dragId,targetId){
+  const dragged=findNode(dragId);
+  const target=findNode(targetId);
+  if(!dragged||!target)return false;
+  if(dragged.node.kind==='root'||target.node.kind==='item')return false;
+  if(dragged.node.id===target.node.id)return false;
+  if(dragged.rootId!==target.rootId)return false;
+  if(dragged.node.kind==='folder'&&isDescendant(dragged.node,target.node.id))return false;
+  if(dragged.parent?.id===target.node.id)return false;
+  return true;
+}
+
+function moveNode(dragId,targetId){
+  if(!canDropNode(dragId,targetId))return false;
+  const dragged=findNode(dragId);
+  const target=findNode(targetId);
+  if(!dragged?.parent||!target)return false;
+
+  const sourceIndex=dragged.parent.children.findIndex(child=>child.id===dragId);
+  if(sourceIndex<0)return false;
+
+  const [movedNode]=dragged.parent.children.splice(sourceIndex,1);
+  target.node.children.push(movedNode);
+  selectedNodeId=movedNode.id;
+  saveProjectTree();
+  renderProjectTree();
+  return true;
+}
+
+function clearDropFeedback(){
+  projectTreeElement.querySelectorAll('.drop-valid,.drop-invalid,.dragging-node').forEach(element=>element.classList.remove('drop-valid','drop-invalid','dragging-node'));
+  activeDropTargetId=null;
+}
+
+function setDropFeedback(targetElement,isValid){
+  projectTreeElement.querySelectorAll('.drop-valid,.drop-invalid').forEach(element=>element.classList.remove('drop-valid','drop-invalid'));
+  targetElement.classList.add(isValid?'drop-valid':'drop-invalid');
+}
+
 projectTreeElement.addEventListener('click',event=>{
   const target=event.target.closest('[data-action]');
   if(!target)return;
@@ -351,6 +389,58 @@ projectTreeElement.addEventListener('dblclick',event=>{
   if(!nodeElement)return;
   const found=findNode(nodeElement.dataset.nodeId);
   if(found&&found.node.kind!=='root')startInlineRename(found.node.id);
+});
+
+projectTreeElement.addEventListener('dragstart',event=>{
+  const draggable=event.target.closest('[data-draggable-node="true"]');
+  if(!draggable)return;
+  const nodeId=draggable.dataset.nodeId;
+  const found=findNode(nodeId);
+  if(!found||found.node.kind==='root'){event.preventDefault();return;}
+
+  draggedNodeId=nodeId;
+  draggable.classList.add('dragging-node');
+  event.dataTransfer.effectAllowed='move';
+  event.dataTransfer.setData('text/plain',nodeId);
+  closeCreateMenu();
+});
+
+projectTreeElement.addEventListener('dragover',event=>{
+  if(!draggedNodeId)return;
+  const container=event.target.closest('[data-drop-container="true"]');
+  if(!container)return;
+  const targetId=container.dataset.nodeId;
+  const valid=canDropNode(draggedNodeId,targetId);
+
+  event.preventDefault();
+  event.dataTransfer.dropEffect=valid?'move':'none';
+  activeDropTargetId=targetId;
+  setDropFeedback(container,valid);
+});
+
+projectTreeElement.addEventListener('dragleave',event=>{
+  const container=event.target.closest('[data-drop-container="true"]');
+  if(!container)return;
+  const related=event.relatedTarget;
+  if(related&&container.contains(related))return;
+  container.classList.remove('drop-valid','drop-invalid');
+});
+
+projectTreeElement.addEventListener('drop',event=>{
+  if(!draggedNodeId)return;
+  const container=event.target.closest('[data-drop-container="true"]');
+  if(!container){clearDropFeedback();draggedNodeId=null;return;}
+
+  event.preventDefault();
+  const targetId=container.dataset.nodeId;
+  moveNode(draggedNodeId,targetId);
+  clearDropFeedback();
+  draggedNodeId=null;
+});
+
+projectTreeElement.addEventListener('dragend',()=>{
+  clearDropFeedback();
+  draggedNodeId=null;
 });
 
 treeCreateMenu.addEventListener('click',event=>{
