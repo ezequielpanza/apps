@@ -10,7 +10,7 @@
   "theme_color": "#01E0CB",
   "icons": [
     {
-      "src": "wander-app-icon.svg",
+      "src": "wander-app-icon.svg?v=20260705-14",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
