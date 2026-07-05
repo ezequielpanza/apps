@@ -4,7 +4,7 @@ export function createProjectTreeController({treeElement,menuElement,getTree,get
   let activeCreateTargetId=null;let draggedId=null;let renameTimer=null;
   const tree=()=>getTree();
   const esc=v=>String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-  const countItems=node=>node.kind==='item'&&node.itemType!=='room'?1:Array.isArray(node.children)?node.children.reduce((s,c)=>s+countItems(c),0):0;
+  const countItems=node=>node.kind==='item'?1:Array.isArray(node.children)?node.children.reduce((s,c)=>s+countItems(c),0):0;
   const resourceLabel=id=>findNode(tree(),id)?.node?.label||'Missing resource';
 
   function renderNode(node){const selected=node.id===getSelectedId()?' selected':'';
