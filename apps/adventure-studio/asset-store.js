@@ -1,0 +1,7 @@
+function openDb(){return new Promise((resolve,reject)=>{const request=indexedDB.open('AdventureStudioAssets',1);request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('roomBackgrounds'))request.result.createObjectStore('roomBackgrounds');};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+
+export const roomBackgroundStore={
+  async put(id,blob){const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction('roomBackgrounds','readwrite');tx.objectStore('roomBackgrounds').put(blob,id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();},
+  async get(id){const db=await openDb();const value=await new Promise((resolve,reject)=>{const request=db.transaction('roomBackgrounds','readonly').objectStore('roomBackgrounds').get(id);request.onsuccess=()=>resolve(request.result||null);request.onerror=()=>reject(request.error);});db.close();return value;},
+  async remove(id){const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction('roomBackgrounds','readwrite');tx.objectStore('roomBackgrounds').delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();}
+};
