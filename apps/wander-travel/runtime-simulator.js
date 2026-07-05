@@ -1,6 +1,7 @@
 (() => {
   const base = window.WanderBase;
-  if (!base) return;
+  const context = window.WanderContext;
+  if (!base || !context) return;
 
   const map = base.map;
   const $ = (selector) => document.querySelector(selector);
@@ -28,13 +29,16 @@
     document.body.classList.toggle('simulation-enabled', enabled);
   }
 
-  function ensurePosition() {
-    if (base.hasPosition()) return true;
-    const center = map.getCenter();
-    const position = base.setPosition(center, { source: 'simulator', confidence: 1 });
-    if (!position) return false;
-    map.setView(position, Math.max(map.getZoom(), 15));
-    return true;
+  function ensureOverridePosition() {
+    const existingLat = Number(context.value('location.override.lat'));
+    const existingLng = Number(context.value('location.override.lng'));
+    if (Number.isFinite(existingLat) && Number.isFinite(existingLng)) return L.latLng(existingLat, existingLng);
+
+    const effective = context.getEffectiveLocation();
+    const seed = effective ? L.latLng(effective.lat, effective.lng) : map.getCenter();
+    if (!context.setLocationOverride({ lat: seed.lat, lng: seed.lng })) return null;
+    map.setView(seed, Math.max(map.getZoom(), 15));
+    return seed;
   }
 
   function stopMotion({ updateContext = true } = {}) {
@@ -46,7 +50,9 @@
     const knob = $('#simulation-joystick-knob');
     if (knob) knob.style.transform = 'translate(0px, 0px)';
 
-    if (enabled && updateContext && base.hasPosition()) {
+    if (enabled && updateContext && context.getEffectiveLocation()) {
+      const current = ensureOverridePosition();
+      if (current) context.setLocationOverride({ lat: current.lat, lng: current.lng, speedMps: 0 });
       window.WanderUI?.setMotion(false, 0, null, {
         source: 'simulator',
         motionStatus: 'stationary',
@@ -59,17 +65,24 @@
   }
 
   function setEnabled(next) {
-    enabled = Boolean(next);
-    window.WanderSimulationActive = enabled;
+    const shouldEnable = Boolean(next);
+    if (shouldEnable === enabled) {
+      syncVisualState();
+      return;
+    }
+
     stopMotion({ updateContext: false });
+    enabled = shouldEnable;
+    window.WanderSimulationActive = enabled;
 
     if (enabled) {
-      ensurePosition();
-      setPanelStatus('Simulación activa · controles disponibles sobre el mapa');
-      window.WanderContext?.set('simulation.status', 'active', { source: 'simulator', ttlMs: Infinity, confidence: 1 });
+      ensureOverridePosition();
+      setPanelStatus('Simulación activa · ubicación efectiva controlada por override');
+      context.set('simulation.status', 'active', { source: 'simulator', ttlMs: Infinity, confidence: 1 });
     } else {
-      setPanelStatus('Simulación desactivada · Wander usa contexto real');
-      window.WanderContext?.set('simulation.status', 'inactive', { source: 'simulator', ttlMs: Infinity, confidence: 1 });
+      context.clearLocationOverride();
+      setPanelStatus('Simulación desactivada · ubicación efectiva restaurada desde GPS real');
+      context.set('simulation.status', 'inactive', { source: 'simulator', ttlMs: Infinity, confidence: 1 });
     }
 
     syncVisualState();
@@ -83,9 +96,7 @@
 
   function tick() {
     if (!enabled || !Number.isFinite(heading) || speedKmh <= 0) return;
-    if (!ensurePosition()) return;
-
-    const current = base.getPosition();
+    const current = ensureOverridePosition();
     if (!current) return;
 
     const distanceMeters = (speedKmh * 1000 / 3600) * (TICK_MS / 1000);
@@ -98,7 +109,12 @@
     );
 
     const profile = profileForSpeed(speedKmh);
-    base.setPosition(next, { source: 'simulator', confidence: 1 });
+    context.setLocationOverride({
+      lat: next.lat,
+      lng: next.lng,
+      heading,
+      speedMps: speedKmh / 3.6,
+    });
     window.WanderUI?.setMotion(true, speedKmh / 3.6, heading, {
       source: 'simulator',
       motionStatus: 'moving',
@@ -126,6 +142,7 @@
     let dy = clientY - cy;
     const distance = Math.hypot(dx, dy);
     const limited = Math.min(distance, maxRadius);
+
     if (distance > 0) {
       dx = dx / distance * limited;
       dy = dy / distance * limited;
@@ -173,5 +190,6 @@
     stop: stopMotion,
   };
 
-  setEnabled(false);
+  context.set('simulation.status', 'inactive', { source: 'init', ttlMs: Infinity, confidence: 1 });
+  syncVisualState();
 })();
