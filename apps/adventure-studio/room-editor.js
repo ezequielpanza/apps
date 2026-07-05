@@ -1,56 +1,58 @@
-import {ensureResource} from './project-model.js';
+import{ensureResource,uid}from'./project-model.js';
 
 export function createRoomEditor({els,getActiveNode,getResources,save,renderWorkspace,assets}){
   let imageUrl=null;
-  const activeRoom=()=>{
-    const node=getActiveNode();
-    return node?.itemType==='room'?ensureResource(getResources(),node):null;
-  };
+  const activeRoom=()=>{const node=getActiveNode();return node?.itemType==='room'?ensureResource(getResources(),node):null;};
+  const defaultBackground=room=>room.backgrounds.find(bg=>bg.id===room.defaultBackgroundId)||room.backgrounds[0]||null;
   const release=()=>{if(imageUrl){URL.revokeObjectURL(imageUrl);imageUrl=null;}};
 
   async function render(room){
-    const zoom=room.zoom||100;
+    const bg=defaultBackground(room);
+    const zoom=bg?.zoom||100;
     els.roomZoomRange.value=zoom;
     els.roomZoomInput.value=zoom;
     els.roomZoomOutput.textContent=`${zoom}%`;
-    els.roomScaleMode.value=room.scaleMode||'manual';
-    els.roomImageName.value=room.background?.name||'None';
-    els.roomImageWidth.value=room.background?.width||'—';
-    els.roomImageHeight.value=room.background?.height||'—';
-    if(!room.background){release();els.roomCanvasEmpty.hidden=false;els.roomCanvasStage.hidden=true;return;}
-    const blob=await assets.get(room.id);
-    if(!blob){room.background=null;save();return render(room);}
-    release();
-    imageUrl=URL.createObjectURL(blob);
-    els.roomBackgroundImage.src=imageUrl;
-    els.roomBackgroundImage.style.width=`${room.background.width*zoom/100}px`;
-    els.roomCanvasEmpty.hidden=true;
-    els.roomCanvasStage.hidden=false;
+    els.roomScaleMode.value=bg?.scaleMode||'manual';
+    els.roomImageName.value=bg?.name||'None';
+    els.roomImageWidth.value=bg?.width||'—';
+    els.roomImageHeight.value=bg?.height||'—';
+    if(!bg){release();els.roomCanvasEmpty.hidden=false;els.roomCanvasStage.hidden=true;return;}
+    const blob=await assets.get(bg.assetKey);
+    if(!blob){release();els.roomCanvasEmpty.hidden=false;els.roomCanvasStage.hidden=true;return;}
+    release();imageUrl=URL.createObjectURL(blob);els.roomBackgroundImage.src=imageUrl;els.roomBackgroundImage.style.width=`${bg.width*zoom/100}px`;els.roomCanvasEmpty.hidden=true;els.roomCanvasStage.hidden=false;
   }
 
-  async function importBackground(file){
+  async function addDefaultBackground(file){
     const room=activeRoom();if(!room||!file)return;
-    const dims=await readDimensions(file);
-    await assets.put(room.id,file);
-    room.background={name:file.name,type:file.type,size:file.size,width:dims.width,height:dims.height};
-    room.zoom=100;room.scaleMode='manual';save();await renderWorkspace();
+    const dims=await readDimensions(file);const id=uid('background');const assetKey=`${room.id}:background:${id}`;
+    await assets.put(assetKey,file);
+    const bg={id,name:stripExtension(file.name)||'Background',assetKey,width:dims.width,height:dims.height,type:file.type,size:file.size,zoom:100,scaleMode:'manual'};
+    room.backgrounds.push(bg);if(!room.defaultBackgroundId)room.defaultBackgroundId=id;save();await renderWorkspace();
   }
 
-  function setZoom(value){const room=activeRoom();if(!room)return;room.zoom=Math.max(10,Math.min(300,Number(value)||100));room.scaleMode='manual';save();render(room);}
-  function fit(){const room=activeRoom();if(!room?.background)return;const box=els.roomCanvasShell.getBoundingClientRect();const value=Math.min((box.width-80)/room.background.width,(box.height-80)/room.background.height)*100;room.zoom=Math.max(10,Math.min(300,Math.round(value/5)*5));room.scaleMode='fit';save();render(room);}
-  async function remove(){const room=activeRoom();if(!room)return;await assets.remove(room.id);room.background=null;room.zoom=100;room.scaleMode='manual';save();renderWorkspace();}
+  async function replaceDefault(file){
+    const room=activeRoom();const bg=room&&defaultBackground(room);if(!room||!bg||!file)return;
+    const dims=await readDimensions(file);await assets.put(bg.assetKey,file);bg.name=stripExtension(file.name)||bg.name;bg.width=dims.width;bg.height=dims.height;bg.type=file.type;bg.size=file.size;save();await renderWorkspace();
+  }
+
+  function setZoom(value){const room=activeRoom();const bg=room&&defaultBackground(room);if(!bg)return;bg.zoom=Math.max(10,Math.min(300,Number(value)||100));bg.scaleMode='manual';save();render(room);}
+  function fit(){const room=activeRoom();const bg=room&&defaultBackground(room);if(!bg)return;const box=els.roomCanvasShell.getBoundingClientRect();const value=Math.min((box.width-80)/bg.width,(box.height-80)/bg.height)*100;bg.zoom=Math.max(10,Math.min(300,Math.round(value/5)*5));bg.scaleMode='fit';save();render(room);}
+  async function removeDefault(){const room=activeRoom();const bg=room&&defaultBackground(room);if(!room||!bg)return;await assets.remove(bg.assetKey);room.backgrounds=room.backgrounds.filter(item=>item.id!==bg.id);room.defaultBackgroundId=room.backgrounds[0]?.id||null;save();renderWorkspace();}
 
   function bind(){
-    [els.importBackgroundButton,els.emptyImportBackgroundButton,els.replaceBackgroundButton].forEach(button=>button.addEventListener('click',()=>els.backgroundFileInput.click()));
-    els.backgroundFileInput.addEventListener('change',async()=>{const file=els.backgroundFileInput.files?.[0];els.backgroundFileInput.value='';if(file)await importBackground(file);});
+    els.importBackgroundButton.addEventListener('click',()=>els.backgroundFileInput.click());
+    els.emptyImportBackgroundButton.addEventListener('click',()=>els.backgroundFileInput.click());
+    els.replaceBackgroundButton.addEventListener('click',()=>{const room=activeRoom();defaultBackground(room)?els.backgroundFileInput.click():els.backgroundFileInput.click();els.backgroundFileInput.dataset.mode='replace';});
+    els.backgroundFileInput.addEventListener('change',async()=>{const file=els.backgroundFileInput.files?.[0];const mode=els.backgroundFileInput.dataset.mode||'add';els.backgroundFileInput.value='';delete els.backgroundFileInput.dataset.mode;if(file){const room=activeRoom();const bg=room&&defaultBackground(room);if(mode==='replace'&&bg)await replaceDefault(file);else await addDefaultBackground(file);}});
     els.roomZoomRange.addEventListener('input',()=>setZoom(els.roomZoomRange.value));
     els.roomZoomInput.addEventListener('change',()=>setZoom(els.roomZoomInput.value));
     els.fitRoomButton.addEventListener('click',fit);
-    els.roomScaleMode.addEventListener('change',()=>{const room=activeRoom();if(!room)return;room.scaleMode=els.roomScaleMode.value;room.scaleMode==='fit'?fit():(save(),render(room));});
-    els.removeBackgroundButton.addEventListener('click',remove);
+    els.roomScaleMode.addEventListener('change',()=>{const room=activeRoom();const bg=room&&defaultBackground(room);if(!bg)return;bg.scaleMode=els.roomScaleMode.value;bg.scaleMode==='fit'?fit():(save(),render(room));});
+    els.removeBackgroundButton.addEventListener('click',removeDefault);
     window.addEventListener('beforeunload',release);
   }
-  return {bind,render};
+  return{bind,render};
 }
 
-function readDimensions(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file);const img=new Image();img.onload=()=>{resolve({width:img.naturalWidth,height:img.naturalHeight});URL.revokeObjectURL(url);};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Invalid image'));};img.src=url;});}
+function stripExtension(name){return name.replace(/\.[^.]+$/,'');}
+function readDimensions(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{resolve({width:img.naturalWidth,height:img.naturalHeight});URL.revokeObjectURL(url);};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Invalid image'));};img.src=url;});}
