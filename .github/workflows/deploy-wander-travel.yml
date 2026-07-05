@@ -23,6 +23,9 @@ jobs:
           test -s apps/wander-travel/index.html
           test -s apps/wander-travel/wander-ui.css
           test -s apps/wander-travel/wander-icons.svg
+          test -s apps/wander-travel/wander-app-icon.svg
+          test -s apps/wander-travel/manifest.webmanifest
+          test -s apps/wander-travel/sw.js
           test -s apps/wander-travel/app.js
           test -s apps/wander-travel/runtime-context.js
           test -s apps/wander-travel/runtime-context-panel.js
@@ -31,6 +34,7 @@ jobs:
           test -s apps/wander-travel/runtime-panel.js
           test -s apps/wander-travel/runtime-tracks.js
           test -s apps/wander-travel/runtime-simulator.js
+          node --check apps/wander-travel/sw.js
           node --check apps/wander-travel/app.js
           node --check apps/wander-travel/runtime-context.js
           node --check apps/wander-travel/runtime-context-panel.js
