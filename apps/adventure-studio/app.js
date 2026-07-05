@@ -102,6 +102,8 @@ let selectedNodeId=localStorage.getItem(STORAGE_KEYS.projectSelection)||'rooms';
 let activeCreateTargetId=null;
 let draggedNodeId=null;
 let activeDropTargetId=null;
+let renameClickTimer=null;
+let activeEditorNodeId=null;
 
 function saveProjectTree(){
   localStorage.setItem(STORAGE_KEYS.projectTree,JSON.stringify(projectTree));
@@ -131,7 +133,7 @@ function countItems(node){
 }
 
 function createId(prefix){return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;}
-function escapeHtml(value){return String(value).replace(/[&<>'\"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[char]));}
+function escapeHtml(value){return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));}
 
 function renderNode(node){
   const selected=node.id===selectedNodeId?' selected':'';
@@ -156,10 +158,8 @@ function renderNode(node){
     return `<div class="tree-folder ${node.open?'':'closed'}" data-node-id="${node.id}" data-draggable-node="true" data-drop-container="true" draggable="true">
       <div class="tree-folder-row${selected}">
         <button class="tree-expander" data-action="toggle" data-node-id="${node.id}" aria-label="${node.open?'Cerrar':'Abrir'} ${escapeHtml(node.label)}"><span class="tree-chevron">⌄</span></button>
-        <button class="tree-node-select" data-action="select" data-node-id="${node.id}">
-          <span class="tree-type-icon">▱</span>
-          <span class="tree-folder-name">${escapeHtml(node.label)}</span>
-        </button>
+        <span class="tree-type-icon tree-select-icon" data-action="select" data-node-id="${node.id}">▱</span>
+        <button class="tree-name-button" data-action="rename" data-node-id="${node.id}"><span class="tree-folder-name">${escapeHtml(node.label)}</span></button>
         <button class="tree-create" data-action="create-menu" data-node-id="${node.id}" aria-label="Crear en ${escapeHtml(node.label)}">＋</button>
         <button class="tree-delete" data-action="delete" data-node-id="${node.id}" aria-label="Eliminar carpeta">×</button>
       </div>
@@ -171,10 +171,8 @@ function renderNode(node){
   return `<div class="tree-item" data-node-id="${node.id}" data-draggable-node="true" draggable="true">
     <div class="tree-item-row${selected}">
       <span class="tree-expander-placeholder"></span>
-      <button class="tree-node-select" data-action="select" data-node-id="${node.id}">
-        <span class="tree-type-icon">${def?.icon||'•'}</span>
-        <span class="tree-item-name">${escapeHtml(node.label)}</span>
-      </button>
+      <span class="tree-type-icon tree-select-icon" data-action="select" data-node-id="${node.id}">${def?.icon||'•'}</span>
+      <button class="tree-name-button" data-action="rename" data-node-id="${node.id}"><span class="tree-item-name">${escapeHtml(node.label)}</span></button>
       <button class="tree-delete" data-action="delete" data-node-id="${node.id}" aria-label="Eliminar elemento">×</button>
     </div>
   </div>`;
@@ -208,10 +206,32 @@ function toggleNode(nodeId){
   renderProjectTree();
 }
 
+function openFolder(nodeId){
+  const found=findNode(nodeId);
+  if(!found||found.node.kind==='item')return;
+  if(!found.node.open){
+    found.node.open=true;
+    saveProjectTree();
+    renderProjectTree();
+  }
+}
+
+function openItemEditor(nodeId){
+  const found=findNode(nodeId);
+  if(!found||found.node.kind!=='item')return;
+  activeEditorNodeId=nodeId;
+  selectedNodeId=nodeId;
+  saveProjectTree();
+  renderProjectTree();
+  const editorLabel=ITEM_DEFINITIONS[found.node.itemType]?.label||'Item';
+  contextPill.innerHTML=`<span class="dot"></span> ${escapeHtml(editorLabel)} Editor / ${escapeHtml(found.node.label)}`;
+}
+
 function deleteNode(nodeId){
   const found=findNode(nodeId);
   if(!found||found.node.kind==='root'||!found.parent)return;
   found.parent.children=found.parent.children.filter(child=>child.id!==nodeId);
+  if(activeEditorNodeId===nodeId)activeEditorNodeId=null;
   selectedNodeId=found.parent.id;
   saveProjectTree();
   renderProjectTree();
@@ -230,10 +250,11 @@ function startInlineRename(nodeId){
     const found=findNode(nodeId);
     if(!row||!found)return;
 
+    selectedNodeId=nodeId;
     const input=document.createElement('input');
     input.className='tree-rename-input';
     input.value=found.node.label;
-    row.replaceWith(input);
+    row.parentElement.replaceWith(input);
     input.focus();
     input.select();
 
@@ -253,6 +274,21 @@ function startInlineRename(nodeId){
     });
     input.addEventListener('blur',commit,{once:true});
   });
+}
+
+function scheduleRename(nodeId){
+  clearTimeout(renameClickTimer);
+  renameClickTimer=setTimeout(()=>{
+    renameClickTimer=null;
+    startInlineRename(nodeId);
+  },220);
+}
+
+function cancelScheduledRename(){
+  if(renameClickTimer!==null){
+    clearTimeout(renameClickTimer);
+    renameClickTimer=null;
+  }
 }
 
 function createEntryInTarget(targetId,createType){
@@ -378,6 +414,7 @@ projectTreeElement.addEventListener('click',event=>{
 
   if(action==='toggle')toggleNode(nodeId);
   if(action==='select')selectNode(nodeId);
+  if(action==='rename')scheduleRename(nodeId);
   if(action==='delete')deleteNode(nodeId);
   if(action==='create-menu'){
     event.stopPropagation();
@@ -387,13 +424,18 @@ projectTreeElement.addEventListener('click',event=>{
 });
 
 projectTreeElement.addEventListener('dblclick',event=>{
+  cancelScheduledRename();
   const nodeElement=event.target.closest('[data-node-id]');
   if(!nodeElement)return;
   const found=findNode(nodeElement.dataset.nodeId);
-  if(found&&found.node.kind!=='root')startInlineRename(found.node.id);
+  if(!found)return;
+
+  if(found.node.kind==='root'||found.node.kind==='folder')openFolder(found.node.id);
+  if(found.node.kind==='item')openItemEditor(found.node.id);
 });
 
 projectTreeElement.addEventListener('dragstart',event=>{
+  cancelScheduledRename();
   const draggable=event.target.closest('[data-draggable-node="true"]');
   if(!draggable)return;
   const nodeId=draggable.dataset.nodeId;
@@ -480,6 +522,7 @@ playButton.addEventListener('click',startPlay);
 stopButton.addEventListener('click',stopPlay);
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
+    cancelScheduledRename();
     if(playOverlay.classList.contains('open'))stopPlay();
     else closeCreateMenu();
   }
