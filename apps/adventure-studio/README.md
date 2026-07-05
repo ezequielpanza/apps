@@ -4,13 +4,13 @@ Editor web para crear aventuras gráficas point & click.
 
 ## Versión actual
 
-`v0.5.0`
+`v0.6.0`
 
 ## Tecnología
 
 - HTML
 - CSS
-- JavaScript
+- JavaScript modular con ES modules
 - Sin build
 - `localStorage` para estructura, metadatos y configuración
 - IndexedDB para imágenes binarias importadas
@@ -34,21 +34,64 @@ python -m http.server 8000 --directory apps/adventure-studio
 - Subcarpetas anidables.
 - Creación contextual por carpeta.
 - Renombrado inline.
-- Drag & drop restringido a la categoría de origen.
-- Selección y expansión separadas.
 - Workspace Host central.
 - Estado `activeEditorId` persistente.
 - Apertura de editor por doble click según tipo de recurso.
 - Inspector contextual para el recurso activo.
 - Datos de recursos separados de la estructura visual del árbol.
 - Configuración global del juego separada de las propiedades de Room.
+- Código dividido en módulos de modelo, árbol, assets y Room Editor.
+
+## Rooms y referencias
+
+Cada Room contiene automáticamente categorías internas fijas:
+
+- Characters
+- Objects
+- Inventory
+- Audio
+- Dialogues
+- Hotspots
+- Walk Areas
+- Entrances
+
+Estas categorías internas:
+
+- no se renombran;
+- no se eliminan;
+- no se mueven fuera de la Room;
+- aceptan únicamente su tipo correspondiente.
+
+Los recursos maestros continúan viviendo en sus categorías globales. Al arrastrar un recurso maestro a una categoría compatible dentro de una Room se crea una referencia, no una copia.
+
+Ejemplo:
+
+```text
+Characters / Guybrush
+        ↓ drag
+Rooms / Tavern / Characters
+```
+
+Resultado:
+
+```text
+Rooms / Tavern / Characters / Guybrush ↗
+```
+
+La referencia conserva `resourceId` y apunta al recurso maestro. El mismo recurso puede ser usado por varias Rooms sin duplicarse.
+
+## Drag & drop
+
+- Dentro de categorías maestras, mover conserva la restricción de categoría.
+- Un Character solo puede referenciarse en `Room / Characters`.
+- Un Inventory Element solo puede referenciarse en `Room / Inventory`.
+- Un Audio solo puede referenciarse en `Room / Audio`.
+- Un Dialogue solo puede referenciarse en `Room / Dialogues`.
+- No se crean referencias duplicadas del mismo recurso dentro de la misma categoría de una Room.
 
 ## Game Settings
 
-La resolución lógica del framework se guarda globalmente:
-
-- Width
-- Height
+La resolución lógica del framework se guarda globalmente.
 
 Valor inicial:
 
@@ -58,7 +101,7 @@ Esta resolución representa el viewport lógico del juego. Una Room puede usar u
 
 ## Room Editor
 
-La versión `v0.5.0` incorpora:
+El Room Editor incorpora:
 
 - Importación real de imágenes PNG, JPEG, WebP y GIF.
 - Persistencia del archivo como Blob en IndexedDB.
@@ -66,9 +109,7 @@ La versión `v0.5.0` incorpora:
 - Lectura de dimensiones reales de la imagen.
 - Zoom manual entre 10% y 300%.
 - Fit al viewport del editor.
-- Reemplazo de background.
-- Eliminación de background.
-- Inspector de imagen y zoom.
+- Reemplazo y eliminación de background.
 
 ## Editores registrados
 
