@@ -4,7 +4,7 @@ Editor web para crear aventuras gráficas point & click.
 
 ## Versión actual
 
-`v0.6.0`
+`v0.7.0`
 
 ## Tecnología
 
@@ -36,16 +36,17 @@ python -m http.server 8000 --directory apps/adventure-studio
 - Renombrado inline.
 - Workspace Host central.
 - Estado `activeEditorId` persistente.
-- Apertura de editor por doble click según tipo de recurso.
-- Inspector contextual para el recurso activo.
+- Apertura de editor por doble click según tipo de recurso o sección especializada.
+- Inspector contextual para el recurso o sección activa.
 - Datos de recursos separados de la estructura visual del árbol.
 - Configuración global del juego separada de las propiedades de Room.
-- Código dividido en módulos de modelo, árbol, assets y Room Editor.
+- Código dividido en módulos de modelo, árbol, assets, Room Editor y Background Editor.
 
 ## Rooms y referencias
 
 Cada Room contiene automáticamente categorías internas fijas:
 
+- Backgrounds
 - Characters
 - Objects
 - Inventory
@@ -64,21 +65,58 @@ Estas categorías internas:
 
 Los recursos maestros continúan viviendo en sus categorías globales. Al arrastrar un recurso maestro a una categoría compatible dentro de una Room se crea una referencia, no una copia.
 
+## Backgrounds
+
+Una Room puede contener múltiples estados visuales completos.
+
 Ejemplo:
 
 ```text
-Characters / Guybrush
-        ↓ drag
-Rooms / Tavern / Characters
+Room / Tavern / Backgrounds
+├── Day
+├── Night
+├── Light On
+└── Light Off
 ```
 
-Resultado:
+El modelo de Room usa:
+
+- `backgrounds[]`
+- `defaultBackgroundId`
+
+Cada background conserva:
+
+- nombre;
+- archivo binario en IndexedDB;
+- dimensiones;
+- tipo MIME;
+- tamaño;
+- zoom;
+- modo de escala.
+
+El background predeterminado es el que muestra inicialmente el Room Editor.
+
+## Background Editor
+
+Doble click sobre:
 
 ```text
-Rooms / Tavern / Characters / Guybrush ↗
+Room / Backgrounds
 ```
 
-La referencia conserva `resourceId` y apunta al recurso maestro. El mismo recurso puede ser usado por varias Rooms sin duplicarse.
+abre el Background Editor.
+
+Funciones actuales:
+
+- importar uno o varios backgrounds;
+- ver la lista de estados;
+- previsualizar el seleccionado;
+- renombrar un estado;
+- elegir el background predeterminado;
+- eliminar un estado;
+- persistir archivos como Blob en IndexedDB.
+
+Los proyectos anteriores con un único `background` se migran automáticamente al nuevo modelo multi-background.
 
 ## Drag & drop
 
@@ -97,23 +135,21 @@ Valor inicial:
 
 `1280 × 720`
 
-Esta resolución representa el viewport lógico del juego. Una Room puede usar una imagen mayor o menor.
+Esta resolución representa el viewport lógico del juego. Una Room puede usar imágenes mayores o menores.
 
 ## Room Editor
 
-El Room Editor incorpora:
+El Room Editor muestra el background predeterminado de la Room e incorpora:
 
-- Importación real de imágenes PNG, JPEG, WebP y GIF.
-- Persistencia del archivo como Blob en IndexedDB.
-- Metadatos de background separados del árbol del proyecto.
-- Lectura de dimensiones reales de la imagen.
-- Zoom manual entre 10% y 300%.
-- Fit al viewport del editor.
-- Reemplazo y eliminación de background.
+- zoom manual entre 10% y 300%;
+- Fit al viewport del editor;
+- reemplazo del background predeterminado;
+- eliminación del background predeterminado.
 
 ## Editores registrados
 
 - Room Editor
+- Background Editor
 - Character Editor
 - Inventory Editor
 - Dialogue Editor
