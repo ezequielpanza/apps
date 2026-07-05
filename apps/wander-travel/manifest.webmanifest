@@ -1,0 +1,19 @@
+{
+  "name": "Wander Travel",
+  "short_name": "Wander",
+  "description": "Tu compañero inteligente de viaje",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F3F5F7",
+  "theme_color": "#01E0CB",
+  "icons": [
+    {
+      "src": "wander-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
