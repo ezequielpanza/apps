@@ -158,4 +158,10 @@ window.WanderBase = {
   getBaseLayer: () => activeBaseLayer,
 };
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
 setTimeout(() => map.invalidateSize(), 100);
