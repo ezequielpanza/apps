@@ -1,78 +1,37 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
   const app = $('.wander-app');
-  const side = $('#side-panel');
   const menu = $('#main-menu');
   const menuButton = $('#main-menu-button');
 
-  function sections() {
-    return {
-      travel: $('#travel-panel'),
-      context: $('#context-panel'),
-      developer: $('#developer-panel'),
-      settings: $('#settings-panel'),
-    };
+  function screens() {
+    return Array.from(document.querySelectorAll('[data-app-screen]'));
   }
 
-  function isDesktop() {
-    return window.matchMedia('(min-width: 821px)').matches;
-  }
-
-  function applyLayout(panelName) {
-    if (!app || !side) return;
-    const open = panelName !== 'none';
-
-    side.hidden = !open;
-    side.style.display = open ? '' : 'none';
-
-    if (isDesktop()) {
-      app.style.gridTemplateColumns = open ? 'minmax(0, 1fr) 420px' : 'minmax(0, 1fr)';
-    } else {
-      app.style.gridTemplateColumns = '';
-    }
-
-    setTimeout(() => window.WanderBase?.map?.invalidateSize(), 120);
-  }
-
-  function setActiveNavigation(panelName) {
-    const actionByPanel = {
-      travel: 'open-travel',
-      context: 'open-context',
-      developer: 'open-simulator',
-      settings: 'open-settings',
-    };
-    const activeAction = actionByPanel[panelName] || '';
-
-    menu?.querySelectorAll('[data-action]').forEach((button) => {
-      const active = button.dataset.action === activeAction;
+  function setActiveNavigation(screenName) {
+    menu?.querySelectorAll('[data-screen-target]').forEach((button) => {
+      const active = button.dataset.screenTarget === screenName;
       button.classList.toggle('is-active', active);
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
   }
 
-  function openPanel(name) {
-    const available = sections();
-    const normalized = available[name] ? name : 'none';
+  function openScreen(name) {
+    const target = screens().find((screen) => screen.dataset.appScreen === name);
+    const normalized = target ? name : 'map';
 
-    if (app) app.dataset.panel = normalized;
-    Object.entries(available).forEach(([key, section]) => {
-      if (section) section.hidden = key !== normalized;
+    screens().forEach((screen) => {
+      screen.hidden = screen.dataset.appScreen !== normalized;
     });
 
-    applyLayout(normalized);
+    if (app) app.dataset.screen = normalized;
     setActiveNavigation(normalized);
+    setMenuOpen(false);
 
-    const labels = {
-      travel: ['Wander', 'Travel'],
-      context: ['Wander', 'Contexto'],
-      developer: ['Wander', 'Simulador'],
-      settings: ['Wander', 'Ajustes'],
-      none: ['Wander', 'Panel'],
-    };
-    const label = labels[normalized];
-    if ($('#panel-kicker')) $('#panel-kicker').textContent = label[0];
-    if ($('#panel-title')) $('#panel-title').textContent = label[1];
+    if (normalized === 'map') {
+      setTimeout(() => window.WanderBase?.map?.invalidateSize(), 80);
+    }
   }
 
   function setMenuOpen(open) {
@@ -84,25 +43,16 @@
     document.body.classList.toggle('drawer-open', open);
   }
 
-  function toggleMenu() {
-    setMenuOpen(app?.dataset.menu !== 'open');
-  }
-
-  menuButton?.addEventListener('click', toggleMenu);
+  menuButton?.addEventListener('click', () => setMenuOpen(app?.dataset.menu !== 'open'));
 
   menu?.addEventListener('click', (event) => {
-    const action = event.target.closest('[data-action]')?.dataset.action;
-    if (!action) return;
+    const button = event.target.closest('[data-screen-target]');
+    if (!button) return;
+    openScreen(button.dataset.screenTarget);
+  });
 
-    setMenuOpen(false);
-
-    if (action === 'open-travel') openPanel('travel');
-    if (action === 'open-context') openPanel('context');
-    if (action === 'open-developer' || action === 'open-simulator') openPanel('developer');
-    if (action === 'open-settings') openPanel('settings');
-    if (action === 'boat') {
-      window.WanderUI?.showWander('Barco', 'El modo barco queda reservado para funciones náuticas. Wander Travel sigue enfocado en la experiencia de viaje.');
-    }
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('[data-close-screen]')) openScreen('map');
   });
 
   document.addEventListener('pointerdown', (event) => {
@@ -111,28 +61,30 @@
     setMenuOpen(false);
   });
 
-  $('#close-panel')?.addEventListener('click', () => openPanel('none'));
-
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
-    setMenuOpen(false);
-    openPanel('none');
+    if (app?.dataset.menu === 'open') {
+      setMenuOpen(false);
+      return;
+    }
+    if (app?.dataset.screen !== 'map') openScreen('map');
   });
 
-  window.addEventListener('resize', () => applyLayout(app?.dataset.panel || 'none'));
-
-  window.WanderPanel = {
-    open: openPanel,
-    applyLayout,
+  window.WanderScreen = {
+    open: openScreen,
+    current: () => app?.dataset.screen || 'map',
     openMenu: () => setMenuOpen(true),
     closeMenu: () => setMenuOpen(false),
   };
 
-  if (app) app.dataset.menu = 'closed';
+  if (app) {
+    app.dataset.screen = 'map';
+    app.dataset.menu = 'closed';
+  }
   if (menu) {
     menu.hidden = false;
     menu.setAttribute('aria-hidden', 'true');
   }
   menuButton?.setAttribute('aria-expanded', 'false');
-  openPanel('none');
+  openScreen('map');
 })();
