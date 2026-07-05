@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wander-travel-v0.68.0';
+const CACHE_NAME = 'wander-travel-v0.69.0';
 const APP_SHELL = [
   './',
   './index.html',
@@ -6,8 +6,9 @@ const APP_SHELL = [
   './wander-icons.svg',
   './wander-app-icon.svg',
   './manifest.webmanifest',
-  './app.js',
   './runtime-context.js',
+  './app.js',
+  './runtime-location.js',
   './runtime-ui.js',
   './runtime-panel.js',
   './runtime-context-panel.js',
