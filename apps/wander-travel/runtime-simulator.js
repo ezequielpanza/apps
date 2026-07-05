@@ -42,12 +42,7 @@
 
     if (base.hasPosition()) {
       window.WanderUI?.setMotion(false, 0, null, { source: 'simulator' });
-      window.WanderContext?.setMotion({
-        status: 'Detenido',
-        speedKmh: 0,
-        heading: null,
-        source: 'simulator',
-      });
+      window.WanderContext?.setMotion({ status: 'Detenido', speedKmh: 0, heading: null, source: 'simulator' });
       setStatus('Movimiento detenido · posición simulada activa');
     } else {
       window.WanderUI?.setLocationPending();
@@ -57,13 +52,8 @@
 
   function createSimulationPosition() {
     const center = map.getCenter();
-    const position = base.setPosition(center, {
-      source: 'simulator',
-      confidence: 0.9,
-    });
-
+    const position = base.setPosition(center, { source: 'simulator', confidence: 0.9 });
     if (!position) return false;
-
     map.setView(position, Math.max(map.getZoom(), 15));
     window.WanderSimulationActive = true;
     stop();
@@ -83,63 +73,39 @@
       current.lng + meters * dir[1] / (111320 * Math.max(0.15, Math.cos(current.lat * Math.PI / 180)))
     );
 
-    base.setPosition(next, {
-      source: 'simulator',
-      confidence: 0.9,
-    });
-
+    base.setPosition(next, { source: 'simulator', confidence: 0.9 });
     window.WanderUI?.setMotion(true, kmh / 3.6, dir[2], { source: 'simulator' });
-    window.WanderContext?.setMotion({
-      status: labels[speedIndex],
-      speedKmh: kmh,
-      heading: dir[2],
-      source: 'simulator',
-    });
+    window.WanderContext?.setMotion({ status: labels[speedIndex], speedKmh: kmh, heading: dir[2], source: 'simulator' });
     window.WanderTracks?.addPoint(next);
-
     setStatus('Moviendo ' + dir[3] + ' · ' + labels[speedIndex] + ' · ' + kmh + ' km/h');
   }
 
   function move(key, button) {
     if (!dirs[key]) return;
-
     if (!base.hasPosition() && !createSimulationPosition()) {
-      window.WanderUI?.showWander('📍 Sin posición', 'No se pudo crear una posición simulada.');
+      window.WanderUI?.showWander('Sin posición', 'No se pudo crear una posición simulada.');
       return;
     }
 
     window.WanderSimulationActive = true;
-
-    if (directionKey === key && timer) {
-      speedIndex = Math.min(speedIndex + 1, speeds.length - 1);
-    } else {
-      directionKey = key;
-      speedIndex = 0;
-    }
+    if (directionKey === key && timer) speedIndex = Math.min(speedIndex + 1, speeds.length - 1);
+    else { directionKey = key; speedIndex = 0; }
 
     clearActiveButtons();
     if (button) button.classList.add('is-active');
     if (timer) clearInterval(timer);
-
     tick();
     timer = setInterval(tick, 250);
   }
 
   $('#set-sim-position')?.addEventListener('click', createSimulationPosition);
-
   $('#developer-panel')?.addEventListener('click', (event) => {
     const stopButton = event.target.closest('[data-stop-move]');
     const moveButton = event.target.closest('[data-move]');
-
     if (stopButton) stop();
     if (moveButton) move(moveButton.dataset.move, moveButton);
   });
 
-  window.WanderSimulator = {
-    stop,
-    move,
-    createPosition: createSimulationPosition,
-  };
-
+  window.WanderSimulator = { stop, move, createPosition: createSimulationPosition };
   stop();
 })();
