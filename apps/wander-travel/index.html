@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<title>Wander Travel v0.63.0</title>
+<title>Wander Travel v0.64.0</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-<link rel="stylesheet" href="wander-ui.css?v=20260705-01">
+<link rel="stylesheet" href="wander-ui.css?v=20260705-02">
 </head>
 <body>
 <svg class="icon-sprite" aria-hidden="true">
@@ -43,12 +43,12 @@
 <div class="wander-search-pill"><input id="wander-query-input" class="wander-query-input" type="text" placeholder="Preguntar a Wander" autocomplete="off" aria-label="Preguntar a Wander"><button id="wander-search-button" class="wander-search-button" type="button" aria-label="Enviar pregunta a Wander"><svg class="ui-icon"><use href="#icon-search"></use></svg></button></div>
 </header>
 <nav id="main-menu" class="main-menu" aria-label="Menú principal" hidden>
-<div class="drawer-brand"><div class="drawer-logo" aria-hidden="true">W</div><div><strong>Wander</strong><span>Tu compañero de viaje</span><small id="drawer-version">v0.63.0</small></div></div>
+<div class="drawer-brand"><div class="drawer-logo" aria-hidden="true">W</div><div><strong>Wander</strong><span>Tu compañero de viaje</span><small id="drawer-version">v0.64.0</small></div></div>
 <div class="drawer-group"><button type="button" data-action="open-travel"><svg class="nav-icon"><use href="#icon-compass"></use></svg><span>Travel</span></button><button type="button" data-action="open-context"><svg class="nav-icon"><use href="#icon-brain"></use></svg><span>Contexto</span></button><button type="button" data-action="boat"><svg class="nav-icon"><use href="#icon-boat"></use></svg><span>Barco</span></button></div>
 <div class="drawer-divider"></div>
 <div class="drawer-group"><button type="button" data-action="open-simulator"><svg class="nav-icon"><use href="#icon-flask"></use></svg><span>Simulador</span></button><button type="button" data-action="open-settings"><svg class="nav-icon"><use href="#icon-settings"></use></svg><span>Ajustes</span></button></div>
 </nav>
-<aside class="status-rail" aria-label="Estado actual"><div class="status-item"><svg class="status-icon"><use href="#icon-pin"></use></svg><strong id="metric-status">Ubicación pendiente</strong></div><div class="status-item"><svg class="status-icon"><use href="#icon-speed"></use></svg><strong id="metric-speed">—</strong></div><div class="status-item"><svg class="status-icon"><use href="#icon-heading"></use></svg><strong id="metric-heading">—</strong></div></aside>
+<aside class="status-rail" aria-label="Estado actual"><div class="status-item"><svg class="status-icon"><use href="#icon-target"></use></svg><strong id="metric-status">Preparando contexto</strong></div><div class="status-item"><svg class="status-icon"><use href="#icon-speed"></use></svg><strong id="metric-speed">—</strong></div><div class="status-item"><svg class="status-icon"><use href="#icon-heading"></use></svg><strong id="metric-heading">—</strong></div></aside>
 <section id="wander-card" class="wander-card" hidden aria-live="polite"><div class="card-title-row"><div><span>Wander</span><h2 id="wander-title">Listo</h2></div><button id="close-wander" type="button" aria-label="Cerrar tarjeta"><svg class="ui-icon"><use href="#icon-close"></use></svg></button></div><p id="wander-message">Wander listo para acompañar el viaje.</p><div class="quick-actions" aria-label="Acciones rápidas"><button type="button" data-message="details"><svg class="button-icon"><use href="#icon-info"></use></svg>Detalles</button><button type="button" data-message="route"><svg class="button-icon"><use href="#icon-route"></use></svg>Ruta</button><button type="button" data-message="food"><svg class="button-icon"><use href="#icon-food"></use></svg>Comer</button><button type="button" data-message="ask"><svg class="button-icon"><use href="#icon-chat"></use></svg>Preguntar</button></div></section>
 </section>
 <aside id="side-panel" class="side-panel" aria-label="Panel lateral" hidden>
@@ -60,13 +60,13 @@
 </aside>
 </main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="app.js?v=20260705-01"></script>
-<script src="runtime-context.js?v=20260705-01"></script>
-<script src="runtime-ui.js?v=20260705-01"></script>
-<script src="runtime-panel.js?v=20260705-01"></script>
-<script src="runtime-context-panel.js?v=20260705-01"></script>
-<script src="runtime-topbar.js?v=20260705-01"></script>
-<script src="runtime-tracks.js?v=20260705-01"></script>
-<script src="runtime-simulator.js?v=20260705-01"></script>
+<script src="app.js?v=20260705-02"></script>
+<script src="runtime-context.js?v=20260705-02"></script>
+<script src="runtime-ui.js?v=20260705-02"></script>
+<script src="runtime-panel.js?v=20260705-02"></script>
+<script src="runtime-context-panel.js?v=20260705-02"></script>
+<script src="runtime-topbar.js?v=20260705-02"></script>
+<script src="runtime-tracks.js?v=20260705-02"></script>
+<script src="runtime-simulator.js?v=20260705-02"></script>
 </body>
 </html>
