@@ -1,6 +1,8 @@
 const DEFAULT_VIEW = [20, 0];
-const FOLLOW_ZONE_X_RATIO = 0.20;
-const FOLLOW_ZONE_Y_RATIO = 0.20;
+const FOLLOW_ZONE_STORAGE_KEY = 'wander.followZonePercent';
+const FOLLOW_ZONE_DEFAULT_PERCENT = 14;
+const FOLLOW_ZONE_MIN_PERCENT = 6;
+const FOLLOW_ZONE_MAX_PERCENT = 30;
 const FOLLOW_SETTLE_MS = 180;
 
 const map = L.map('wander-map', {
@@ -34,6 +36,7 @@ let mapDragActive = false;
 let pinchActive = false;
 let followSettleTimer = null;
 let centerButton = null;
+let followZonePercent = loadFollowZonePercent();
 
 baseLayers[activeBaseLayer].addTo(map);
 
@@ -55,6 +58,63 @@ function finiteCoordinate(value) {
   if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function clampFollowZonePercent(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return FOLLOW_ZONE_DEFAULT_PERCENT;
+  return Math.min(FOLLOW_ZONE_MAX_PERCENT, Math.max(FOLLOW_ZONE_MIN_PERCENT, Math.round(numeric)));
+}
+
+function loadFollowZonePercent() {
+  try {
+    const stored = localStorage.getItem(FOLLOW_ZONE_STORAGE_KEY);
+    return stored == null ? FOLLOW_ZONE_DEFAULT_PERCENT : clampFollowZonePercent(stored);
+  } catch {
+    return FOLLOW_ZONE_DEFAULT_PERCENT;
+  }
+}
+
+function saveFollowZonePercent(value) {
+  try { localStorage.setItem(FOLLOW_ZONE_STORAGE_KEY, String(value)); } catch {}
+}
+
+function syncFollowZoneSetting() {
+  const input = document.querySelector('#follow-zone-percent');
+  const output = document.querySelector('#follow-zone-value');
+  if (input) input.value = String(followZonePercent);
+  if (output) output.textContent = followZonePercent + '%';
+}
+
+function setFollowZonePercent(value, { persist = true } = {}) {
+  followZonePercent = clampFollowZonePercent(value);
+  if (persist) saveFollowZonePercent(followZonePercent);
+  syncFollowZoneSetting();
+  return followZonePercent;
+}
+
+function bindFollowZoneSetting() {
+  const input = document.querySelector('#follow-zone-percent');
+  if (!input) return;
+
+  input.min = String(FOLLOW_ZONE_MIN_PERCENT);
+  input.max = String(FOLLOW_ZONE_MAX_PERCENT);
+  input.value = String(followZonePercent);
+
+  input.addEventListener('input', () => {
+    const numeric = Number(input.value);
+    if (!Number.isFinite(numeric)) return;
+    const bounded = Math.min(FOLLOW_ZONE_MAX_PERCENT, Math.max(FOLLOW_ZONE_MIN_PERCENT, numeric));
+    followZonePercent = bounded;
+    const output = document.querySelector('#follow-zone-value');
+    if (output) output.textContent = Math.round(bounded) + '%';
+  });
+
+  input.addEventListener('change', () => {
+    setFollowZonePercent(input.value);
+  });
+
+  syncFollowZoneSetting();
 }
 
 function simulationEnabled() {
@@ -128,8 +188,9 @@ function isEffectivePositionInsideFollowZone() {
 
   const point = map.latLngToContainerPoint(position);
   const center = L.point(size.x / 2, size.y / 2);
-  const radiusX = Math.max(1, size.x * FOLLOW_ZONE_X_RATIO);
-  const radiusY = Math.max(1, size.y * FOLLOW_ZONE_Y_RATIO);
+  const ratio = followZonePercent / 100;
+  const radiusX = Math.max(1, size.x * ratio);
+  const radiusY = Math.max(1, size.y * ratio);
   const normalizedDistance = Math.pow((point.x - center.x) / radiusX, 2) + Math.pow((point.y - center.y) / radiusY, 2);
 
   return normalizedDistance <= 1;
@@ -367,6 +428,8 @@ window.WanderBase = {
   isFollowingPosition: () => followMode,
   isFollowSuspended: () => followSuspended,
   isEffectivePositionInsideFollowZone,
+  getFollowZonePercent: () => followZonePercent,
+  setFollowZonePercent,
   setBaseLayer,
   toggleBaseLayer,
   getBaseLayer: () => activeBaseLayer,
@@ -378,6 +441,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+bindFollowZoneSetting();
 syncEffectiveMarker();
 centerOnFirstRealLocation();
 setTimeout(() => map.invalidateSize(), 100);
