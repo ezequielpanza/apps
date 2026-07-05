@@ -1,13 +1,11 @@
 const DEFAULT_VIEW = [20, 0];
-const FOLLOW_ZONE_STORAGE_KEY = 'wander.followZonePercent';
-const FOLLOW_ZONE_DEFAULT_PERCENT = 14;
-const FOLLOW_ZONE_MIN_PERCENT = 6;
-const FOLLOW_ZONE_MAX_PERCENT = 30;
-const FOLLOW_SETTLE_MS = 180;
 
 const map = L.map('wander-map', {
   zoomControl: false,
   attributionControl: false,
+  scrollWheelZoom: true,
+  doubleClickZoom: true,
+  touchZoom: true,
 }).setView(DEFAULT_VIEW, 2);
 
 L.control.attribution({
@@ -32,12 +30,7 @@ let marker = null;
 let markerDragActive = false;
 let initialRealLocationCentered = false;
 let followMode = false;
-let followSuspended = false;
-let mapDragActive = false;
-let pinchActive = false;
-let followSettleTimer = null;
 let centerButton = null;
-let followZonePercent = loadFollowZonePercent();
 
 baseLayers[activeBaseLayer].addTo(map);
 
@@ -59,63 +52,6 @@ function finiteCoordinate(value) {
   if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
-}
-
-function clampFollowZonePercent(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return FOLLOW_ZONE_DEFAULT_PERCENT;
-  return Math.min(FOLLOW_ZONE_MAX_PERCENT, Math.max(FOLLOW_ZONE_MIN_PERCENT, Math.round(numeric)));
-}
-
-function loadFollowZonePercent() {
-  try {
-    const stored = localStorage.getItem(FOLLOW_ZONE_STORAGE_KEY);
-    return stored == null ? FOLLOW_ZONE_DEFAULT_PERCENT : clampFollowZonePercent(stored);
-  } catch {
-    return FOLLOW_ZONE_DEFAULT_PERCENT;
-  }
-}
-
-function saveFollowZonePercent(value) {
-  try { localStorage.setItem(FOLLOW_ZONE_STORAGE_KEY, String(value)); } catch {}
-}
-
-function syncFollowZoneSetting() {
-  const input = document.querySelector('#follow-zone-percent');
-  const output = document.querySelector('#follow-zone-value');
-  if (input) input.value = String(followZonePercent);
-  if (output) output.textContent = followZonePercent + '%';
-}
-
-function setFollowZonePercent(value, { persist = true } = {}) {
-  followZonePercent = clampFollowZonePercent(value);
-  if (persist) saveFollowZonePercent(followZonePercent);
-  syncFollowZoneSetting();
-  return followZonePercent;
-}
-
-function bindFollowZoneSetting() {
-  const input = document.querySelector('#follow-zone-percent');
-  if (!input) return;
-
-  input.min = String(FOLLOW_ZONE_MIN_PERCENT);
-  input.max = String(FOLLOW_ZONE_MAX_PERCENT);
-  input.value = String(followZonePercent);
-
-  input.addEventListener('input', () => {
-    const numeric = Number(input.value);
-    if (!Number.isFinite(numeric)) return;
-    const bounded = Math.min(FOLLOW_ZONE_MAX_PERCENT, Math.max(FOLLOW_ZONE_MIN_PERCENT, numeric));
-    followZonePercent = bounded;
-    const output = document.querySelector('#follow-zone-value');
-    if (output) output.textContent = Math.round(bounded) + '%';
-  });
-
-  input.addEventListener('change', () => {
-    setFollowZonePercent(input.value);
-  });
-
-  syncFollowZoneSetting();
 }
 
 function simulationEnabled() {
@@ -154,78 +90,34 @@ function syncFollowButton() {
   centerButton.style.boxShadow = followMode ? '0 0 0 3px var(--accent-ring), var(--shadow)' : 'var(--shadow)';
 }
 
-function clearFollowSettleTimer() {
-  if (followSettleTimer) clearTimeout(followSettleTimer);
-  followSettleTimer = null;
+function syncZoomAnchorMode() {
+  const mode = followMode ? 'center' : true;
+  map.options.scrollWheelZoom = mode;
+  map.options.doubleClickZoom = mode;
+  map.options.touchZoom = mode;
 }
 
 function setFollowMode(next, { centerNow = true } = {}) {
   followMode = Boolean(next);
-  followSuspended = false;
-  mapDragActive = false;
-  pinchActive = false;
-  clearFollowSettleTimer();
-  syncFollowButton();
 
   if (followMode && centerNow) {
     const position = effectivePosition();
     if (!position) {
       followMode = false;
+      syncZoomAnchorMode();
       syncFollowButton();
       return false;
     }
     map.panTo(position, { animate: false });
   }
 
+  syncZoomAnchorMode();
+  syncFollowButton();
   return followMode;
 }
 
-function isEffectivePositionInsideFollowZone() {
-  const position = effectivePosition();
-  if (!position) return false;
-
-  const size = map.getSize();
-  if (!size.x || !size.y) return false;
-
-  const point = map.latLngToContainerPoint(position);
-  const center = L.point(size.x / 2, size.y / 2);
-  const ratio = followZonePercent / 100;
-  const radiusX = Math.max(1, size.x * ratio);
-  const radiusY = Math.max(1, size.y * ratio);
-  const normalizedDistance = Math.pow((point.x - center.x) / radiusX, 2) + Math.pow((point.y - center.y) / radiusY, 2);
-
-  return normalizedDistance <= 1;
-}
-
-function settleFollowAfterUserInteraction() {
-  clearFollowSettleTimer();
-  if (!followMode || mapDragActive || pinchActive) return;
-
-  followSuspended = false;
-
-  if (!isEffectivePositionInsideFollowZone()) {
-    setFollowMode(false, { centerNow: false });
-    return;
-  }
-
-  const position = effectivePosition();
-  if (position) map.panTo(position, { animate: true, duration: 0.25, easeLinearity: 0.35 });
-}
-
-function suspendFollowForUserInteraction() {
-  if (!followMode) return;
-  clearFollowSettleTimer();
-  followSuspended = true;
-}
-
-function scheduleFollowSettlement(delay = FOLLOW_SETTLE_MS) {
-  if (!followMode) return;
-  clearFollowSettleTimer();
-  followSettleTimer = setTimeout(settleFollowAfterUserInteraction, delay);
-}
-
 function followEffectivePosition() {
-  if (!followMode || followSuspended || markerDragActive) return false;
+  if (!followMode || markerDragActive) return false;
   const position = effectivePosition();
   if (!position) return false;
   map.panTo(position, { animate: false });
@@ -366,43 +258,8 @@ const MapActions = L.Control.extend({
 map.addControl(new MapActions());
 
 map.on('dragstart', () => {
-  mapDragActive = true;
-  suspendFollowForUserInteraction();
+  if (followMode) setFollowMode(false, { centerNow: false });
 });
-
-map.on('dragend', () => {
-  mapDragActive = false;
-  scheduleFollowSettlement(90);
-});
-
-const mapContainer = map.getContainer();
-mapContainer.addEventListener('wheel', () => {
-  suspendFollowForUserInteraction();
-  scheduleFollowSettlement();
-}, { passive: true });
-
-mapContainer.addEventListener('dblclick', () => {
-  suspendFollowForUserInteraction();
-  scheduleFollowSettlement(260);
-}, { passive: true });
-
-mapContainer.addEventListener('touchstart', (event) => {
-  if (event.touches?.length < 2) return;
-  pinchActive = true;
-  suspendFollowForUserInteraction();
-}, { passive: true });
-
-mapContainer.addEventListener('touchend', (event) => {
-  if (!pinchActive || event.touches?.length >= 2) return;
-  pinchActive = false;
-  scheduleFollowSettlement(220);
-}, { passive: true });
-
-mapContainer.addEventListener('touchcancel', () => {
-  if (!pinchActive) return;
-  pinchActive = false;
-  scheduleFollowSettlement(220);
-}, { passive: true });
 
 window.WanderContext?.subscribe((key) => {
   if (key === 'location.effective' || key.startsWith('location.effective.')) syncEffectiveMarker();
@@ -427,10 +284,6 @@ window.WanderBase = {
   centerOnFirstRealLocation,
   setFollowMode,
   isFollowingPosition: () => followMode,
-  isFollowSuspended: () => followSuspended,
-  isEffectivePositionInsideFollowZone,
-  getFollowZonePercent: () => followZonePercent,
-  setFollowZonePercent,
   setBaseLayer,
   toggleBaseLayer,
   getBaseLayer: () => activeBaseLayer,
@@ -442,7 +295,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-bindFollowZoneSetting();
+syncZoomAnchorMode();
 syncEffectiveMarker();
 centerOnFirstRealLocation();
 setTimeout(() => map.invalidateSize(), 100);
