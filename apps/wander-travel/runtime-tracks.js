@@ -5,6 +5,7 @@
   const map = base.map;
   const line = base.route;
   const $ = (selector) => document.querySelector(selector);
+  const icon = (name, className = 'button-icon') => '<svg class="' + className + '" aria-hidden="true"><use href="#icon-' + name + '"></use></svg>';
 
   let tracks = [];
   let current = null;
@@ -24,7 +25,9 @@
     const button = $('#record-button');
     if (!button) return;
     button.classList.toggle('is-recording', Boolean(current));
-    button.textContent = current ? 'Detener' : 'Grabar';
+    button.innerHTML = current
+      ? icon('stop') + '<span>Detener</span>'
+      : icon('record') + '<span>Grabar</span>';
   }
 
   function render() {
@@ -48,7 +51,7 @@
     list.innerHTML = rows.map((track) => (
       '<button class="track-row" type="button" data-track-id="' + track.id + '">' +
         '<div><strong>' + track.name + '</strong><span>' + track.points.length + ' puntos</span></div>' +
-        '<span>Ver</span>' +
+        icon('eye', 'ui-icon track-eye') +
       '</button>'
     )).join('');
   }
