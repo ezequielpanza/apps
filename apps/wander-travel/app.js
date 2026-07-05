@@ -174,7 +174,7 @@ function setFollowMode(next, { centerNow = true } = {}) {
       syncFollowButton();
       return false;
     }
-    map.setView(position, Math.max(map.getZoom(), 15));
+    map.panTo(position, { animate: false });
   }
 
   return followMode;
@@ -301,10 +301,10 @@ function centerOnFirstRealLocation() {
   return true;
 }
 
-function centerOnPosition(zoom = 15) {
+function centerOnPosition() {
   const position = effectivePosition();
   if (!position) return false;
-  map.setView(position, Math.max(map.getZoom(), zoom));
+  map.panTo(position, { animate: false });
   return true;
 }
 
