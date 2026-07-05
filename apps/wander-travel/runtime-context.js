@@ -1,8 +1,9 @@
 (() => {
-  const VERSION = 'v0.65.0';
+  const VERSION = 'v0.66.0';
   const listeners = new Set();
   const DEFAULT_TTL = {
     'app.version': Infinity,
+    'simulation.status': Infinity,
     'context.status': 300000,
     'context.activity': 300000,
     'time.now': 70000,
@@ -153,7 +154,7 @@
   ];
 
   const TECHNICAL = [
-    'app.version','context.status','context.activity','time.now','time.dayPeriod','location.status',
+    'app.version','simulation.status','context.status','context.activity','time.now','time.dayPeriod','location.status',
     'location.lat','location.lng','location.source','location.updatedAt','motion.status','motion.mode',
     'motion.speedKmh','motion.heading','environment.weatherStatus','place.city','place.zone',
     'user.intent','user.interests',
@@ -184,6 +185,7 @@
 
   function init() {
     set('app.version', VERSION, { source: 'app', ttlMs: Infinity });
+    set('simulation.status', 'inactive', { source: 'init', ttlMs: Infinity, confidence: 1 });
     setContext({ status: 'Preparando contexto', activity: 'pending', source: 'init', confidence: 1 });
     set('location.status', 'Pendiente', { source: 'init', ttlMs: 30000, confidence: 1 });
     setMotion({ status: 'pending', mode: 'unknown', source: 'init' });
