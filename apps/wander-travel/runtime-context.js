@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.67.0';
+  const VERSION = 'v0.67.1';
   const listeners = new Set();
   const DEFAULT_TTL = {
     'app.version': Infinity,
