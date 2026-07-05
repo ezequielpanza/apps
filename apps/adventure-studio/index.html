@@ -14,7 +14,7 @@
         <button class="icon-button" aria-label="Menú">☰</button>
         <div class="brand-mark">A</div>
         <div class="project-title-wrap">
-          <div class="project-title">Adventure Studio · v0.4.0</div>
+          <div class="project-title">Adventure Studio · v0.5.0</div>
           <div class="project-subtitle">Untitled Project</div>
         </div>
       </div>
@@ -40,24 +40,31 @@
         <div class="empty-illustration"><span class="empty-frame"></span><span class="empty-dot"></span></div>
         <h1>No resource selected</h1>
         <p>Double click a project item to open its editor.</p>
-        <div class="empty-types" aria-label="Available editors">
-          <span>Room</span><span>Character</span><span>Inventory</span><span>Dialogue</span><span>Audio</span>
-        </div>
+        <div class="empty-types"><span>Room</span><span>Character</span><span>Inventory</span><span>Dialogue</span><span>Audio</span></div>
       </section>
 
       <section class="editor-workspace" id="editorWorkspace" hidden>
         <header class="editor-header">
-          <div class="editor-heading">
-            <span class="editor-icon" id="editorIcon">▧</span>
-            <div><span class="editor-kind" id="editorKind">Room Editor</span><h1 id="editorTitle">Untitled</h1></div>
-          </div>
-          <div class="editor-status">Editor shell</div>
+          <div class="editor-heading"><span class="editor-icon" id="editorIcon">▧</span><div><span class="editor-kind" id="editorKind">Room Editor</span><h1 id="editorTitle">Untitled</h1></div></div>
+          <div class="editor-status" id="editorStatus">Editor shell</div>
         </header>
+
         <div class="editor-placeholder" id="editorPlaceholder">
-          <div class="placeholder-card">
-            <span class="placeholder-icon" id="placeholderIcon">▧</span>
-            <h2 id="placeholderTitle">Room Editor</h2>
-            <p id="placeholderText">This workspace is ready for the next editor implementation.</p>
+          <div class="placeholder-card"><span class="placeholder-icon" id="placeholderIcon">▧</span><h2 id="placeholderTitle">Editor</h2><p id="placeholderText">This workspace is ready for the next editor implementation.</p></div>
+        </div>
+
+        <div class="room-editor" id="roomEditor" hidden>
+          <div class="room-toolbar">
+            <button class="room-tool active">↖ Select</button>
+            <button class="room-tool">✋ Pan</button>
+            <div class="toolbar-spacer"></div>
+            <button class="room-tool primary" id="importBackgroundButton">＋ Background</button>
+            <button class="room-tool" id="fitRoomButton">Fit</button>
+            <div class="room-zoom-control"><span>Zoom</span><input id="roomZoomRange" type="range" min="10" max="300" step="5" value="100" /><output id="roomZoomOutput">100%</output></div>
+          </div>
+          <div class="room-canvas-shell" id="roomCanvasShell">
+            <div class="room-canvas-empty" id="roomCanvasEmpty"><span>▧</span><h2>No background</h2><p>Import an image to define this Room.</p><button id="emptyImportBackgroundButton">Import Background</button></div>
+            <div class="room-canvas-stage" id="roomCanvasStage" hidden><img id="roomBackgroundImage" alt="Room background" /></div>
           </div>
         </div>
       </section>
@@ -66,31 +73,33 @@
     <div class="panel-resizer right-resizer" id="rightResizer" role="separator" aria-label="Cambiar ancho de Inspector" aria-orientation="vertical"></div>
 
     <aside class="inspector panel" id="inspectorPanel">
-      <div class="inspector-empty" id="inspectorEmpty">
-        <span class="panel-kicker">INSPECTOR</span>
-        <div class="inspector-empty-body"><span>◇</span><p>Select or open a resource to inspect it.</p></div>
-      </div>
+      <div class="inspector-empty" id="inspectorEmpty"><span class="panel-kicker">INSPECTOR</span><div class="inspector-empty-body"><span>◇</span><p>Select or open a resource to inspect it.</p></div></div>
       <div class="inspector-content" id="inspectorContent" hidden>
-        <div class="inspector-head">
-          <div><span class="panel-kicker">INSPECTOR</span><h2 id="inspectorTitle">Untitled</h2></div>
+        <div class="inspector-head"><div><span class="panel-kicker">INSPECTOR</span><h2 id="inspectorTitle">Untitled</h2></div></div>
+        <div class="inspector-resource-card"><span class="inspector-resource-icon" id="inspectorResourceIcon">▧</span><div><strong id="inspectorResourceType">Room</strong><span id="inspectorResourceState">Project resource</span></div></div>
+        <div class="property-section"><div class="property-heading">Resource</div><label>ID<input id="inspectorResourceId" readonly /></label><label>Type<input id="inspectorResourceKind" readonly /></label></div>
+        <div class="property-section" id="projectResolutionSection" hidden>
+          <div class="property-heading">Game Resolution</div>
+          <label>Width<input id="gameWidthInput" type="number" min="160" max="7680" step="1" /></label>
+          <label>Height<input id="gameHeightInput" type="number" min="120" max="4320" step="1" /></label>
+          <p class="property-help">Logical viewport used by the game framework.</p>
         </div>
-        <div class="inspector-resource-card">
-          <span class="inspector-resource-icon" id="inspectorResourceIcon">▧</span>
-          <div><strong id="inspectorResourceType">Room</strong><span id="inspectorResourceState">Project resource</span></div>
+        <div class="property-section" id="roomPropertiesSection" hidden>
+          <div class="property-heading">Room Background</div>
+          <label>Image<input id="roomImageName" readonly /></label>
+          <label>Width<input id="roomImageWidth" readonly /></label>
+          <label>Height<input id="roomImageHeight" readonly /></label>
+          <label>Zoom<input id="roomZoomInput" type="number" min="10" max="300" step="5" /></label>
+          <label>Scale mode<select id="roomScaleMode"><option value="manual">Manual</option><option value="fit">Fit viewport</option><option value="fill">Fill viewport</option></select></label>
+          <button class="inspector-action" id="replaceBackgroundButton">Replace background</button>
+          <button class="inspector-action danger" id="removeBackgroundButton">Remove background</button>
         </div>
-        <div class="property-section">
-          <div class="property-heading">Resource</div>
-          <label>ID<input id="inspectorResourceId" readonly /></label>
-          <label>Type<input id="inspectorResourceKind" readonly /></label>
-        </div>
-        <div class="property-section muted-section">
-          <div class="property-heading">Editor</div>
-          <p>Detailed properties will be added with each specialized editor.</p>
-        </div>
+        <div class="property-section muted-section" id="genericEditorSection"><div class="property-heading">Editor</div><p>Detailed properties will be added with each specialized editor.</p></div>
       </div>
     </aside>
   </div>
 
+  <input id="backgroundFileInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
   <script src="app.js"></script>
 </body>
 </html>
