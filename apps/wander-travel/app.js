@@ -103,6 +103,10 @@ function setFollowMode(next, { centerNow = true } = {}) {
   return followMode;
 }
 
+function disableFollowFromUserMapControl() {
+  if (followMode) setFollowMode(false, { centerNow: false });
+}
+
 function followEffectivePosition() {
   if (!followMode || markerDragActive) return false;
   const position = effectivePosition();
@@ -244,9 +248,14 @@ const MapActions = L.Control.extend({
 
 map.addControl(new MapActions());
 
-map.on('dragstart', () => {
-  if (followMode) setFollowMode(false, { centerNow: false });
-});
+map.on('dragstart', disableFollowFromUserMapControl);
+
+const mapContainer = map.getContainer();
+mapContainer.addEventListener('wheel', disableFollowFromUserMapControl, { passive: true });
+mapContainer.addEventListener('dblclick', disableFollowFromUserMapControl, { passive: true });
+mapContainer.addEventListener('touchstart', (event) => {
+  if (event.touches?.length >= 2) disableFollowFromUserMapControl();
+}, { passive: true });
 
 window.WanderContext?.subscribe((key) => {
   if (key === 'location.effective' || key.startsWith('location.effective.')) syncEffectiveMarker();
