@@ -1,11 +1,14 @@
 (() => {
-  const VERSION = 'v0.63.0';
+  const VERSION = 'v0.64.0';
   const listeners = new Set();
   const DEFAULT_TTL = {
     'app.version': Infinity,
+    'context.status': 300000,
+    'context.activity': 300000,
     'time.now': 70000,
     'time.dayPeriod': 300000,
     'motion.status': 15000,
+    'motion.mode': 15000,
     'motion.speedKmh': 15000,
     'motion.heading': 15000,
     'location.status': 30000,
@@ -104,8 +107,14 @@
     set('time.dayPeriod', dayPeriod(date), { source: 'clock', ttlMs: 300000 });
   }
 
-  function setMotion({ status, speedKmh, heading, source = 'motion' }) {
+  function setContext({ status, activity, source = 'context', confidence = 1 }) {
+    if (status != null) set('context.status', status, { source, ttlMs: 300000, confidence });
+    if (activity != null) set('context.activity', activity, { source, ttlMs: 300000, confidence });
+  }
+
+  function setMotion({ status, mode, speedKmh, heading, source = 'motion' }) {
     if (status != null) set('motion.status', status, { source, ttlMs: 15000 });
+    if (mode != null) set('motion.mode', mode, { source, ttlMs: 15000 });
     if (speedKmh != null) set('motion.speedKmh', Number(speedKmh), { source, ttlMs: 15000 });
     if (heading != null) set('motion.heading', heading, { source, ttlMs: 15000 });
   }
@@ -129,10 +138,13 @@
   }
 
   const HUMAN = [
+    ['context.status', 'Estado actual', 'target'],
+    ['context.activity', 'Actividad', 'route'],
     ['time.now', 'Hora', 'clock'],
     ['time.dayPeriod', 'Momento del día', 'day'],
     ['location.status', 'Ubicación', 'pin'],
-    ['motion.status', 'Movimiento', 'route'],
+    ['motion.status', 'Movimiento físico', 'route'],
+    ['motion.mode', 'Modo de movimiento', 'compass'],
     ['motion.speedKmh', 'Velocidad', 'speed'],
     ['motion.heading', 'Rumbo', 'heading'],
     ['place.city', 'Ciudad', 'city'],
@@ -141,9 +153,10 @@
   ];
 
   const TECHNICAL = [
-    'app.version','time.now','time.dayPeriod','location.status','location.lat','location.lng',
-    'location.source','location.updatedAt','motion.status','motion.speedKmh','motion.heading',
-    'environment.weatherStatus','place.city','place.zone','user.intent','user.interests',
+    'app.version','context.status','context.activity','time.now','time.dayPeriod','location.status',
+    'location.lat','location.lng','location.source','location.updatedAt','motion.status','motion.mode',
+    'motion.speedKmh','motion.heading','environment.weatherStatus','place.city','place.zone',
+    'user.intent','user.interests',
   ];
 
   function renderHuman() {
@@ -171,8 +184,9 @@
 
   function init() {
     set('app.version', VERSION, { source: 'app', ttlMs: Infinity });
+    setContext({ status: 'Preparando contexto', activity: 'pending', source: 'init', confidence: 1 });
     set('location.status', 'Pendiente', { source: 'init', ttlMs: 30000, confidence: 1 });
-    set('motion.status', 'Pendiente', { source: 'init', ttlMs: 15000, confidence: 1 });
+    setMotion({ status: 'pending', mode: 'unknown', source: 'init' });
     set('environment.weatherStatus', 'Pendiente', { source: 'placeholder', ttlMs: 1800000, confidence: 0.2 });
     set('place.city', 'Pendiente', { source: 'placeholder', ttlMs: 3600000, confidence: 0.2 });
     set('place.zone', 'Pendiente', { source: 'placeholder', ttlMs: 1800000, confidence: 0.2 });
@@ -183,6 +197,6 @@
     setInterval(render, 15000);
   }
 
-  window.WanderContext = { set, get, value, snapshot, subscribe, updateTime, setMotion, setLocation, render, statusFor };
+  window.WanderContext = { set, get, value, snapshot, subscribe, updateTime, setContext, setMotion, setLocation, render, statusFor };
   init();
 })();
