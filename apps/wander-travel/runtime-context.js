@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.66.0';
+  const VERSION = 'v0.67.0';
   const listeners = new Set();
   const DEFAULT_TTL = {
     'app.version': Infinity,
@@ -28,6 +28,12 @@
   const now = () => Date.now();
   const iso = (ts = now()) => new Date(ts).toISOString();
   const icon = (name) => '<svg class="section-icon" aria-hidden="true"><use href="wander-icons.svg#' + name + '"></use></svg>';
+
+  function syncVisibleVersion() {
+    document.title = 'Wander Travel ' + VERSION;
+    const drawerVersion = document.querySelector('#drawer-version');
+    if (drawerVersion) drawerVersion.textContent = VERSION;
+  }
 
   function ttlFor(key, ttlMs) {
     if (ttlMs != null) return ttlMs;
@@ -184,6 +190,7 @@
   }
 
   function init() {
+    syncVisibleVersion();
     set('app.version', VERSION, { source: 'app', ttlMs: Infinity });
     set('simulation.status', 'inactive', { source: 'init', ttlMs: Infinity, confidence: 1 });
     setContext({ status: 'Preparando contexto', activity: 'pending', source: 'init', confidence: 1 });
