@@ -11,7 +11,9 @@
   let speedIndex = 0;
 
   const speeds = [5, 16, 30, 50, 80];
-  const labels = ['Caminando', 'Bicicleta', 'Auto lento', 'Auto medio', 'Auto rápido'];
+  const modes = ['walking', 'cycling', 'driving', 'driving', 'driving'];
+  const contextStatuses = ['Caminando', 'Andando en bicicleta', 'Conduciendo', 'Conduciendo', 'Conduciendo'];
+  const activities = ['walking', 'cycling', 'driving', 'driving', 'driving'];
   const dirs = {
     northwest: [0.707, -0.707, 315, 'noroeste'],
     north: [1, 0, 0, 'norte'],
@@ -41,8 +43,14 @@
     $('[data-stop-move]')?.classList.add('is-active');
 
     if (base.hasPosition()) {
-      window.WanderUI?.setMotion(false, 0, null, { source: 'simulator' });
-      window.WanderContext?.setMotion({ status: 'Detenido', speedKmh: 0, heading: null, source: 'simulator' });
+      window.WanderUI?.setMotion(false, 0, null, {
+        source: 'simulator',
+        motionStatus: 'stationary',
+        motionMode: 'unknown',
+        contextStatus: 'En pausa',
+        contextActivity: 'paused',
+        confidence: 1,
+      });
       setStatus('Movimiento detenido · posición simulada activa');
     } else {
       window.WanderUI?.setLocationPending();
@@ -74,10 +82,16 @@
     );
 
     base.setPosition(next, { source: 'simulator', confidence: 0.9 });
-    window.WanderUI?.setMotion(true, kmh / 3.6, dir[2], { source: 'simulator' });
-    window.WanderContext?.setMotion({ status: labels[speedIndex], speedKmh: kmh, heading: dir[2], source: 'simulator' });
+    window.WanderUI?.setMotion(true, kmh / 3.6, dir[2], {
+      source: 'simulator',
+      motionStatus: 'moving',
+      motionMode: modes[speedIndex],
+      contextStatus: contextStatuses[speedIndex],
+      contextActivity: activities[speedIndex],
+      confidence: 1,
+    });
     window.WanderTracks?.addPoint(next);
-    setStatus('Moviendo ' + dir[3] + ' · ' + labels[speedIndex] + ' · ' + kmh + ' km/h');
+    setStatus('Moviendo ' + dir[3] + ' · ' + contextStatuses[speedIndex] + ' · ' + kmh + ' km/h');
   }
 
   function move(key, button) {
