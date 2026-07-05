@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Adventure Studio</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="project-tree.css" />
 </head>
 <body>
   <div class="app-shell" id="appShell">
@@ -19,10 +20,23 @@
     </header>
 
     <aside class="sidebar panel">
-      <div class="panel-title-row"><span class="panel-kicker">PROJECT</span></div>
+      <div class="panel-title-row">
+        <span class="panel-kicker">PROJECT</span>
+        <button class="tiny-button project-add-button" id="projectAddButton" aria-label="Crear elemento" aria-haspopup="menu" aria-expanded="false">＋</button>
+      </div>
       <nav class="project-tree" id="projectTree" aria-label="Estructura del proyecto"></nav>
       <div class="sidebar-footer"><button class="import-button"><span>＋</span> Add asset</button></div>
     </aside>
+    <div class="project-create-menu" id="projectCreateMenu" role="menu" aria-hidden="true">
+      <div class="create-menu-label">Create</div>
+      <button role="menuitem" data-create-type="room"><span>▧</span><div><strong>Room</strong><small>New scene or location</small></div></button>
+      <button role="menuitem" data-create-type="character"><span>◉</span><div><strong>Character</strong><small>Playable or non-playable</small></div></button>
+      <button role="menuitem" data-create-type="inventory"><span>◇</span><div><strong>Inventory Element</strong><small>Collectible or usable item</small></div></button>
+      <button role="menuitem" data-create-type="dialogue"><span>◌</span><div><strong>Dialogue</strong><small>Conversation tree</small></div></button>
+      <button role="menuitem" data-create-type="audio"><span>♪</span><div><strong>Audio</strong><small>Music, ambience or sound</small></div></button>
+      <div class="create-menu-separator"></div>
+      <button role="menuitem" data-create-type="folder"><span>▱</span><div><strong>Subfolder</strong><small>Inside selected category or folder</small></div></button>
+    </div>
     <div class="panel-resizer left-resizer" id="leftResizer" role="separator" aria-label="Cambiar ancho de Project" aria-orientation="vertical"></div>
 
     <main class="workspace">
@@ -32,28 +46,12 @@
         <div class="mode-tabs"><button class="mode-tab active">Objects</button><button class="mode-tab">Hotspots</button><button class="mode-tab">Walk areas</button><button class="mode-tab">Entrances</button></div>
         <div class="zoom-indicator">78%</div>
       </div>
-      <div class="canvas-wrap">
-        <div class="canvas-grid"></div>
-        <div class="room-stage" id="roomStage">
-          <div class="sky-glow"></div><div class="moon"></div><div class="cloud c1"></div><div class="cloud c2"></div>
-          <div class="sea"><div class="sea-line l1"></div><div class="sea-line l2"></div><div class="sea-line l3"></div></div><div class="island-shape"></div>
-          <div class="dock"><div class="plank p1"></div><div class="plank p2"></div><div class="plank p3"></div><div class="post post1"></div><div class="post post2"></div></div>
-          <div class="tavern"><div class="roof"></div><div class="window w1"></div><div class="window w2"></div><div class="door"></div><div class="sign">RUSTY<br>ANCHOR</div></div>
-          <div class="palm palm1"><div class="trunk"></div><div class="leaves">✦</div></div><div class="palm palm2"><div class="trunk"></div><div class="leaves">✦</div></div>
-          <div class="character hero-character selected-object"><div class="head"></div><div class="hair"></div><div class="body"></div><div class="legs"></div><div class="selection-label">Gideon Drift</div></div><div class="hotspot-door"><span>Tavern Door</span></div>
-        </div>
-      </div>
+      <div class="canvas-wrap"><div class="canvas-grid"></div><div class="room-stage" id="roomStage"><div class="sky-glow"></div><div class="moon"></div><div class="cloud c1"></div><div class="cloud c2"></div><div class="sea"><div class="sea-line l1"></div><div class="sea-line l2"></div><div class="sea-line l3"></div></div><div class="island-shape"></div><div class="dock"><div class="plank p1"></div><div class="plank p2"></div><div class="plank p3"></div><div class="post post1"></div><div class="post post2"></div></div><div class="tavern"><div class="roof"></div><div class="window w1"></div><div class="window w2"></div><div class="door"></div><div class="sign">RUSTY<br>ANCHOR</div></div><div class="palm palm1"><div class="trunk"></div><div class="leaves">✦</div></div><div class="palm palm2"><div class="trunk"></div><div class="leaves">✦</div></div><div class="character hero-character selected-object"><div class="head"></div><div class="hair"></div><div class="body"></div><div class="legs"></div><div class="selection-label">Gideon Drift</div></div><div class="hotspot-door"><span>Tavern Door</span></div></div></div>
       <div class="bottom-panel"><div class="bottom-tabs"><button class="bottom-tab active">Assets</button><button class="bottom-tab">Objects</button><button class="bottom-tab">Hotspots</button><button class="bottom-tab">Events</button></div><div class="asset-strip"><button class="asset-card selected"><div class="asset-preview room-thumb"></div><span>Moonlit Dock</span><small>Background</small></button><button class="asset-card"><div class="asset-preview hero-thumb">G</div><span>Gideon Drift</span><small>Character</small></button><button class="asset-card"><div class="asset-preview door-thumb"></div><span>Tavern Door</span><small>Object</small></button><button class="asset-card"><div class="asset-preview lamp-thumb">◉</div><span>Dock Lantern</span><small>Object</small></button><button class="asset-card add-card">＋<span>Import asset</span></button></div></div>
     </main>
 
     <div class="panel-resizer right-resizer" id="rightResizer" role="separator" aria-label="Cambiar ancho de Inspector" aria-orientation="vertical"></div>
-    <aside class="inspector panel">
-      <div class="inspector-head"><div><span class="panel-kicker">INSPECTOR</span><h2>Gideon Drift</h2></div><button class="tiny-button">•••</button></div>
-      <div class="character-card"><div class="avatar large hero">G</div><div><strong>Character</strong><span>Playable protagonist</span></div></div>
-      <div class="property-section"><button class="property-heading">Transform <span>⌄</span></button><label>Position<div class="field-pair"><input value="428"/><input value="472"/></div></label><label>Scale<input value="100%"/></label><label>Baseline<input value="Auto"/></label></div>
-      <div class="property-section"><button class="property-heading">Appearance <span>⌄</span></button><label>Sprite set<div class="select-like">Gideon_Default <span>⌄</span></div></label><label>Direction<div class="select-like">Right <span>⌄</span></div></label><div class="toggle-row"><span>Mirror animation</span><button class="switch on"><span></span></button></div></div>
-      <div class="property-section"><button class="property-heading">Interactions <span>⌄</span></button><button class="interaction-row"><span>👁 Look at</span><b>1 action</b></button><button class="interaction-row"><span>✋ Use</span><b>2 actions</b></button><button class="interaction-row"><span>💬 Talk to</span><b>Dialogue</b></button><button class="add-interaction">＋ Add interaction</button></div>
-    </aside>
+    <aside class="inspector panel"><div class="inspector-head"><div><span class="panel-kicker">INSPECTOR</span><h2>Gideon Drift</h2></div><button class="tiny-button">•••</button></div><div class="character-card"><div class="avatar large hero">G</div><div><strong>Character</strong><span>Playable protagonist</span></div></div><div class="property-section"><button class="property-heading">Transform <span>⌄</span></button><label>Position<div class="field-pair"><input value="428"/><input value="472"/></div></label><label>Scale<input value="100%"/></label><label>Baseline<input value="Auto"/></label></div><div class="property-section"><button class="property-heading">Appearance <span>⌄</span></button><label>Sprite set<div class="select-like">Gideon_Default <span>⌄</span></div></label><label>Direction<div class="select-like">Right <span>⌄</span></div></label><div class="toggle-row"><span>Mirror animation</span><button class="switch on"><span></span></button></div></div><div class="property-section"><button class="property-heading">Interactions <span>⌄</span></button><button class="interaction-row"><span>👁 Look at</span><b>1 action</b></button><button class="interaction-row"><span>✋ Use</span><b>2 actions</b></button><button class="interaction-row"><span>💬 Talk to</span><b>Dialogue</b></button><button class="add-interaction">＋ Add interaction</button></div></aside>
   </div>
 
   <div class="play-overlay" id="playOverlay" aria-hidden="true"><div class="playbar"><div><span class="live-dot"></span> Playtest / Moonlit Dock</div><button id="stopButton">■ Stop</button></div><div class="play-stage-copy" id="playStageCopy"></div><div class="game-ui"><button>Look at</button><button>Use</button><button>Talk to</button><div class="inventory-slot">Key</div><div class="inventory-slot">Map</div></div></div>
