@@ -24,32 +24,18 @@ function hideInspectorSections(){els.resourceSection.hidden=true;els.projectReso
 async function renderWorkspace(){
   const active=findNode(tree,activeEditorId);
   if(!active){activeEditorId=null;els.empty.hidden=false;els.workspace.hidden=true;els.inspectorEmpty.hidden=false;els.inspectorContent.hidden=true;els.context.innerHTML=`<span class="dot"></span> ${escapeHtml(findNode(tree,selectedId)?.node.label||'Project')}`;save();return;}
-
   els.empty.hidden=true;els.workspace.hidden=false;hideAllEditors();showInspector();hideInspectorSections();
 
   if(active.node.kind==='room-section'&&active.node.sectionKey==='backgrounds'){
-    const room=findNode(tree,active.node.roomId)?.node;
-    if(!room){activeEditorId=null;return renderWorkspace();}
+    const room=findNode(tree,active.node.roomId)?.node;if(!room){activeEditorId=null;return renderWorkspace();}
     const roomResource=ensureResource(resources,room);
-    els.editorIcon.textContent='▣';
-    els.editorKind.textContent='Background Editor';
-    els.editorTitle.textContent=room.label;
-    els.editorStatus.textContent=`${roomResource.backgrounds.length} state${roomResource.backgrounds.length===1?'':'s'}`;
-    els.context.innerHTML=`<span class="dot"></span> Background Editor / ${escapeHtml(room.label)}`;
-    els.backgroundEditor.hidden=false;
-    els.inspectorTitle.textContent='Backgrounds';
-    els.inspectorResourceIcon.textContent='▣';
-    els.inspectorResourceType.textContent='Background States';
-    els.inspectorResourceState.textContent=`Room / ${room.label}`;
-    els.backgroundInspectorSection.hidden=false;
-    await backgroundEditor.render();
-    save();return;
+    els.editorIcon.textContent='▣';els.editorKind.textContent='Background Editor';els.editorTitle.textContent=room.label;els.editorStatus.textContent=`${roomResource.backgrounds.length} state${roomResource.backgrounds.length===1?'':'s'}`;els.context.innerHTML=`<span class="dot"></span> Background Editor / ${escapeHtml(room.label)}`;els.backgroundEditor.hidden=false;
+    els.inspectorTitle.textContent='Backgrounds';els.inspectorResourceIcon.textContent='▣';els.inspectorResourceType.textContent='Background States';els.inspectorResourceState.textContent=`Room / ${room.label}`;els.backgroundInspectorSection.hidden=false;
+    await backgroundEditor.render();save();return;
   }
 
   if(active.node.kind!=='item'){activeEditorId=null;return renderWorkspace();}
-
-  const type=TYPES[active.node.itemType];
-  const resource=ensureResource(resources,active.node);
+  const type=TYPES[active.node.itemType],resource=ensureResource(resources,active.node);
   els.editorIcon.textContent=type.icon;els.editorKind.textContent=type.editor;els.editorTitle.textContent=active.node.label;els.context.innerHTML=`<span class="dot"></span> ${escapeHtml(type.editor)} / ${escapeHtml(active.node.label)}`;
   els.inspectorTitle.textContent=active.node.label;els.inspectorResourceIcon.textContent=type.icon;els.inspectorResourceType.textContent=type.label;els.inspectorResourceState.textContent='Active project resource';els.inspectorResourceId.value=active.node.id;els.inspectorResourceKind.value=active.node.itemType;els.resourceSection.hidden=false;
 
@@ -67,7 +53,7 @@ function openRoomSectionEditor(id){const found=findNode(tree,id);if(!found||foun
 function deleteResourceTree(node){
   const visit=current=>{
     if(current.kind==='item'){
-      const bucket=bucketFor(current.itemType);const resource=resources[bucket]?.[current.id];
+      const bucket=bucketFor(current.itemType),resource=resources[bucket]?.[current.id];
       if(current.itemType==='room'&&resource?.backgrounds)resource.backgrounds.forEach(bg=>roomBackgroundStore.remove(bg.assetKey).catch(()=>{}));
       delete resources[bucket]?.[current.id];removeReferencesTo(tree,current.id);if(activeEditorId===current.id)activeEditorId=null;
     }
@@ -76,7 +62,13 @@ function deleteResourceTree(node){
   visit(node);
 }
 
-const treeController=createProjectTreeController({treeElement:els.tree,menuElement:els.menu,getTree:()=>tree,getSelectedId:()=>selectedId,setSelectedId:id=>{selectedId=id;},save:()=>{save();renderWorkspace();},openEditor,openRoomSectionEditor,onDeleteResource:deleteResourceTree});
+function getRoomSectionCount(section){
+  if(section.sectionKey!=='backgrounds')return section.children.length;
+  const room=findNode(tree,section.roomId)?.node;if(!room)return 0;
+  return ensureResource(resources,room).backgrounds.length;
+}
+
+const treeController=createProjectTreeController({treeElement:els.tree,menuElement:els.menu,getTree:()=>tree,getSelectedId:()=>selectedId,setSelectedId:id=>{selectedId=id;},save:()=>{save();renderWorkspace();},openEditor,openRoomSectionEditor,onDeleteResource:deleteResourceTree,getRoomSectionCount});
 
 els.gameWidthInput.addEventListener('change',()=>{settings.width=Math.max(160,Math.min(7680,Number(els.gameWidthInput.value)||1280));save();renderWorkspace();});
 els.gameHeightInput.addEventListener('change',()=>{settings.height=Math.max(120,Math.min(4320,Number(els.gameHeightInput.value)||720));save();renderWorkspace();});
