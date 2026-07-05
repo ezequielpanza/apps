@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="project-tree.css" />
   <link rel="stylesheet" href="room-editor.css" />
+  <link rel="stylesheet" href="background-editor.css" />
 </head>
 <body>
   <div class="app-shell" id="appShell">
@@ -15,7 +16,7 @@
         <button class="icon-button" aria-label="Menú">☰</button>
         <div class="brand-mark">A</div>
         <div class="project-title-wrap">
-          <div class="project-title">Adventure Studio · v0.6.0</div>
+          <div class="project-title">Adventure Studio · v0.7.0</div>
           <div class="project-subtitle">Untitled Project</div>
         </div>
       </div>
@@ -49,9 +50,11 @@
           <div class="editor-heading"><span class="editor-icon" id="editorIcon">▧</span><div><span class="editor-kind" id="editorKind">Room Editor</span><h1 id="editorTitle">Untitled</h1></div></div>
           <div class="editor-status" id="editorStatus">Editor shell</div>
         </header>
+
         <div class="editor-placeholder" id="editorPlaceholder">
           <div class="placeholder-card"><span class="placeholder-icon" id="placeholderIcon">▧</span><h2 id="placeholderTitle">Editor</h2><p id="placeholderText">This workspace is ready for the next editor implementation.</p></div>
         </div>
+
         <div class="room-editor" id="roomEditor" hidden>
           <div class="room-toolbar">
             <button class="room-tool active">↖ Select</button>
@@ -62,8 +65,23 @@
             <div class="room-zoom-control"><span>Zoom</span><input id="roomZoomRange" type="range" min="10" max="300" step="5" value="100" /><output id="roomZoomOutput">100%</output></div>
           </div>
           <div class="room-canvas-shell" id="roomCanvasShell">
-            <div class="room-canvas-empty" id="roomCanvasEmpty"><span>▧</span><h2>No background</h2><p>Import an image to define this Room.</p><button id="emptyImportBackgroundButton">Import Background</button></div>
+            <div class="room-canvas-empty" id="roomCanvasEmpty"><span>▧</span><h2>No background</h2><p>Add a state from the Background Editor.</p><button id="emptyImportBackgroundButton">Add Background</button></div>
             <div class="room-canvas-stage" id="roomCanvasStage" hidden><img id="roomBackgroundImage" alt="Room background" /></div>
+          </div>
+        </div>
+
+        <div class="background-editor" id="backgroundEditor" hidden>
+          <div class="background-toolbar">
+            <button class="room-tool primary" id="addBackgroundStateButton">＋ Add Background</button>
+            <div class="background-toolbar-spacer"></div>
+            <span class="background-count" id="backgroundCount">0 backgrounds</span>
+          </div>
+          <div class="background-editor-body">
+            <aside class="background-list-panel"><div class="background-list" id="backgroundList"></div></aside>
+            <div class="background-preview-area">
+              <div class="background-editor-empty" id="backgroundEditorEmpty"><span>▣</span><h2>No backgrounds</h2><p>Import one or more Room states.</p><button class="room-tool primary" id="backgroundEditorImportButton">Import Background</button></div>
+              <div class="background-preview-pane" id="backgroundPreviewPane" hidden><img id="backgroundPreviewImage" alt="Background preview" /></div>
+            </div>
           </div>
         </div>
       </section>
@@ -75,15 +93,17 @@
       <div class="inspector-content" id="inspectorContent" hidden>
         <div class="inspector-head"><div><span class="panel-kicker">INSPECTOR</span><h2 id="inspectorTitle">Untitled</h2></div></div>
         <div class="inspector-resource-card"><span class="inspector-resource-icon" id="inspectorResourceIcon">▧</span><div><strong id="inspectorResourceType">Room</strong><span id="inspectorResourceState">Project resource</span></div></div>
-        <div class="property-section"><div class="property-heading">Resource</div><label>ID<input id="inspectorResourceId" readonly /></label><label>Type<input id="inspectorResourceKind" readonly /></label></div>
+        <div class="property-section" id="resourceSection"><div class="property-heading">Resource</div><label>ID<input id="inspectorResourceId" readonly /></label><label>Type<input id="inspectorResourceKind" readonly /></label></div>
         <div class="property-section" id="projectResolutionSection" hidden><div class="property-heading">Game Resolution</div><label>Width<input id="gameWidthInput" type="number" min="160" max="7680" step="1" /></label><label>Height<input id="gameHeightInput" type="number" min="120" max="4320" step="1" /></label><p class="property-help">Logical viewport used by the game framework.</p></div>
-        <div class="property-section" id="roomPropertiesSection" hidden><div class="property-heading">Room Background</div><label>Image<input id="roomImageName" readonly /></label><label>Width<input id="roomImageWidth" readonly /></label><label>Height<input id="roomImageHeight" readonly /></label><label>Zoom<input id="roomZoomInput" type="number" min="10" max="300" step="5" /></label><label>Scale mode<select id="roomScaleMode"><option value="manual">Manual</option><option value="fit">Fit viewport</option></select></label><button class="inspector-action" id="replaceBackgroundButton">Replace background</button><button class="inspector-action danger" id="removeBackgroundButton">Remove background</button></div>
+        <div class="property-section" id="roomPropertiesSection" hidden><div class="property-heading">Default Background</div><label>Image<input id="roomImageName" readonly /></label><label>Width<input id="roomImageWidth" readonly /></label><label>Height<input id="roomImageHeight" readonly /></label><label>Zoom<input id="roomZoomInput" type="number" min="10" max="300" step="5" /></label><label>Scale mode<select id="roomScaleMode"><option value="manual">Manual</option><option value="fit">Fit viewport</option></select></label><button class="inspector-action" id="replaceBackgroundButton">Replace default</button><button class="inspector-action danger" id="removeBackgroundButton">Remove default</button></div>
+        <div class="property-section" id="backgroundInspectorSection" hidden><div class="property-heading">Background State</div><label>Name<input id="backgroundNameInput" /></label><label>Size<input id="backgroundDimensions" readonly /></label><label class="background-inspector-check"><input id="backgroundDefaultCheck" type="checkbox" /> Default background</label><button class="inspector-action background-delete" id="deleteBackgroundStateButton">Delete background</button></div>
         <div class="property-section muted-section" id="genericEditorSection"><div class="property-heading">Editor</div><p>Detailed properties will be added with each specialized editor.</p></div>
       </div>
     </aside>
   </div>
 
   <input id="backgroundFileInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+  <input id="backgroundStateFileInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />
   <script type="module" src="app.js"></script>
 </body>
 </html>
