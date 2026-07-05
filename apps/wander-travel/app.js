@@ -120,14 +120,8 @@ const MapActions = L.Control.extend({
   options: { position: 'bottomright' },
   onAdd() {
     const wrap = L.DomUtil.create('div', 'wander-map-actions');
-    const centerButton = mapButton('center', 'Centrar en mi posición');
     const layerButton = mapButton('layers', 'Cambiar a mapa satélite');
-
-    centerButton.addEventListener('click', () => {
-      if (!centerOnPosition()) {
-        window.WanderUI?.showWander('Sin ubicación', 'Todavía no hay una posición válida para centrar el mapa.');
-      }
-    });
+    const centerButton = mapButton('center', 'Centrar en mi posición');
 
     layerButton.addEventListener('click', () => {
       const active = toggleBaseLayer();
@@ -136,7 +130,13 @@ const MapActions = L.Control.extend({
       layerButton.title = nextLabel;
     });
 
-    wrap.append(centerButton, layerButton);
+    centerButton.addEventListener('click', () => {
+      if (!centerOnPosition()) {
+        window.WanderUI?.showWander('Sin ubicación', 'Todavía no hay una posición válida para centrar el mapa.');
+      }
+    });
+
+    wrap.append(layerButton, centerButton);
     return wrap;
   },
 });
