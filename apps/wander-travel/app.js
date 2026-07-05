@@ -1,4 +1,7 @@
 const DEFAULT_VIEW = [20, 0];
+const FOLLOW_ZONE_X_RATIO = 0.20;
+const FOLLOW_ZONE_Y_RATIO = 0.20;
+const FOLLOW_SETTLE_MS = 180;
 
 const map = L.map('wander-map', {
   zoomControl: false,
@@ -26,6 +29,10 @@ let marker = null;
 let markerDragActive = false;
 let initialRealLocationCentered = false;
 let followMode = false;
+let followSuspended = false;
+let mapDragActive = false;
+let pinchActive = false;
+let followSettleTimer = null;
 let centerButton = null;
 
 baseLayers[activeBaseLayer].addTo(map);
@@ -86,8 +93,17 @@ function syncFollowButton() {
   centerButton.style.boxShadow = followMode ? '0 0 0 3px var(--accent-ring), var(--shadow)' : 'var(--shadow)';
 }
 
+function clearFollowSettleTimer() {
+  if (followSettleTimer) clearTimeout(followSettleTimer);
+  followSettleTimer = null;
+}
+
 function setFollowMode(next, { centerNow = true } = {}) {
   followMode = Boolean(next);
+  followSuspended = false;
+  mapDragActive = false;
+  pinchActive = false;
+  clearFollowSettleTimer();
   syncFollowButton();
 
   if (followMode && centerNow) {
@@ -103,12 +119,51 @@ function setFollowMode(next, { centerNow = true } = {}) {
   return followMode;
 }
 
-function disableFollowFromUserMapControl() {
-  if (followMode) setFollowMode(false, { centerNow: false });
+function isEffectivePositionInsideFollowZone() {
+  const position = effectivePosition();
+  if (!position) return false;
+
+  const size = map.getSize();
+  if (!size.x || !size.y) return false;
+
+  const point = map.latLngToContainerPoint(position);
+  const center = L.point(size.x / 2, size.y / 2);
+  const radiusX = Math.max(1, size.x * FOLLOW_ZONE_X_RATIO);
+  const radiusY = Math.max(1, size.y * FOLLOW_ZONE_Y_RATIO);
+  const normalizedDistance = Math.pow((point.x - center.x) / radiusX, 2) + Math.pow((point.y - center.y) / radiusY, 2);
+
+  return normalizedDistance <= 1;
+}
+
+function settleFollowAfterUserInteraction() {
+  clearFollowSettleTimer();
+  if (!followMode || mapDragActive || pinchActive) return;
+
+  followSuspended = false;
+
+  if (!isEffectivePositionInsideFollowZone()) {
+    setFollowMode(false, { centerNow: false });
+    return;
+  }
+
+  const position = effectivePosition();
+  if (position) map.panTo(position, { animate: true, duration: 0.25, easeLinearity: 0.35 });
+}
+
+function suspendFollowForUserInteraction() {
+  if (!followMode) return;
+  clearFollowSettleTimer();
+  followSuspended = true;
+}
+
+function scheduleFollowSettlement(delay = FOLLOW_SETTLE_MS) {
+  if (!followMode) return;
+  clearFollowSettleTimer();
+  followSettleTimer = setTimeout(settleFollowAfterUserInteraction, delay);
 }
 
 function followEffectivePosition() {
-  if (!followMode || markerDragActive) return false;
+  if (!followMode || followSuspended || markerDragActive) return false;
   const position = effectivePosition();
   if (!position) return false;
   map.panTo(position, { animate: false });
@@ -248,13 +303,43 @@ const MapActions = L.Control.extend({
 
 map.addControl(new MapActions());
 
-map.on('dragstart', disableFollowFromUserMapControl);
+map.on('dragstart', () => {
+  mapDragActive = true;
+  suspendFollowForUserInteraction();
+});
+
+map.on('dragend', () => {
+  mapDragActive = false;
+  scheduleFollowSettlement(90);
+});
 
 const mapContainer = map.getContainer();
-mapContainer.addEventListener('wheel', disableFollowFromUserMapControl, { passive: true });
-mapContainer.addEventListener('dblclick', disableFollowFromUserMapControl, { passive: true });
+mapContainer.addEventListener('wheel', () => {
+  suspendFollowForUserInteraction();
+  scheduleFollowSettlement();
+}, { passive: true });
+
+mapContainer.addEventListener('dblclick', () => {
+  suspendFollowForUserInteraction();
+  scheduleFollowSettlement(260);
+}, { passive: true });
+
 mapContainer.addEventListener('touchstart', (event) => {
-  if (event.touches?.length >= 2) disableFollowFromUserMapControl();
+  if (event.touches?.length < 2) return;
+  pinchActive = true;
+  suspendFollowForUserInteraction();
+}, { passive: true });
+
+mapContainer.addEventListener('touchend', (event) => {
+  if (!pinchActive || event.touches?.length >= 2) return;
+  pinchActive = false;
+  scheduleFollowSettlement(220);
+}, { passive: true });
+
+mapContainer.addEventListener('touchcancel', () => {
+  if (!pinchActive) return;
+  pinchActive = false;
+  scheduleFollowSettlement(220);
 }, { passive: true });
 
 window.WanderContext?.subscribe((key) => {
@@ -280,6 +365,8 @@ window.WanderBase = {
   centerOnFirstRealLocation,
   setFollowMode,
   isFollowingPosition: () => followMode,
+  isFollowSuspended: () => followSuspended,
+  isEffectivePositionInsideFollowZone,
   setBaseLayer,
   toggleBaseLayer,
   getBaseLayer: () => activeBaseLayer,
