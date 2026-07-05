@@ -1,61 +1,101 @@
-const STORAGE_KEYS={tree:'adventureStudioProjectTreeV1',selection:'adventureStudioProjectSelectionV1',activeEditor:'adventureStudioActiveEditorV1',resources:'adventureStudioResourcesV1',settings:'adventureStudioGameSettingsV1',projectWidth:'adventureStudioProjectWidth',inspectorWidth:'adventureStudioInspectorWidth'};
-const ROOTS=[{id:'rooms',label:'Rooms',itemType:'room',icon:'▧'},{id:'characters',label:'Characters',itemType:'character',icon:'◉'},{id:'inventory',label:'Inventory',itemType:'inventory',icon:'◇'},{id:'dialogues',label:'Dialogues',itemType:'dialogue',icon:'◌'},{id:'audio',label:'Audio',itemType:'audio',icon:'♪'}];
-const TYPES={room:{label:'Room',editor:'Room Editor',rootId:'rooms',icon:'▧',description:'Room workspace ready for canvas, background and scene tools.'},character:{label:'Character',editor:'Character Editor',rootId:'characters',icon:'◉',description:'Character workspace ready for sprites, animations and behavior.'},inventory:{label:'Inventory Element',editor:'Inventory Editor',rootId:'inventory',icon:'◇',description:'Inventory workspace ready for item visuals and interactions.'},dialogue:{label:'Dialogue',editor:'Dialogue Editor',rootId:'dialogues',icon:'◌',description:'Dialogue workspace ready for conversations, branches and conditions.'},audio:{label:'Audio',editor:'Audio Editor',rootId:'audio',icon:'♪',description:'Audio workspace ready for music, ambience, effects and voice.'}};
+import{STORAGE_KEYS,TYPES,bucketFor,ensureResource,findNode,loadResources,loadSettings,loadTree,removeReferencesTo,saveProject}from'./project-model.js';
+import{createProjectTreeController}from'./project-tree.js';
+import{createRoomEditor}from'./room-editor.js';
+import{roomBackgroundStore}from'./asset-store.js';
+
 const els={tree:document.getElementById('projectTree'),menu:document.getElementById('treeCreateMenu'),context:document.getElementById('contextPill'),empty:document.getElementById('workspaceEmpty'),workspace:document.getElementById('editorWorkspace'),editorIcon:document.getElementById('editorIcon'),editorKind:document.getElementById('editorKind'),editorTitle:document.getElementById('editorTitle'),editorStatus:document.getElementById('editorStatus'),placeholder:document.getElementById('editorPlaceholder'),placeholderIcon:document.getElementById('placeholderIcon'),placeholderTitle:document.getElementById('placeholderTitle'),placeholderText:document.getElementById('placeholderText'),roomEditor:document.getElementById('roomEditor'),roomCanvasShell:document.getElementById('roomCanvasShell'),roomCanvasEmpty:document.getElementById('roomCanvasEmpty'),roomCanvasStage:document.getElementById('roomCanvasStage'),roomBackgroundImage:document.getElementById('roomBackgroundImage'),roomZoomRange:document.getElementById('roomZoomRange'),roomZoomOutput:document.getElementById('roomZoomOutput'),importBackgroundButton:document.getElementById('importBackgroundButton'),emptyImportBackgroundButton:document.getElementById('emptyImportBackgroundButton'),fitRoomButton:document.getElementById('fitRoomButton'),backgroundFileInput:document.getElementById('backgroundFileInput'),inspectorEmpty:document.getElementById('inspectorEmpty'),inspectorContent:document.getElementById('inspectorContent'),inspectorTitle:document.getElementById('inspectorTitle'),inspectorResourceIcon:document.getElementById('inspectorResourceIcon'),inspectorResourceType:document.getElementById('inspectorResourceType'),inspectorResourceState:document.getElementById('inspectorResourceState'),inspectorResourceId:document.getElementById('inspectorResourceId'),inspectorResourceKind:document.getElementById('inspectorResourceKind'),projectResolutionSection:document.getElementById('projectResolutionSection'),gameWidthInput:document.getElementById('gameWidthInput'),gameHeightInput:document.getElementById('gameHeightInput'),roomPropertiesSection:document.getElementById('roomPropertiesSection'),roomImageName:document.getElementById('roomImageName'),roomImageWidth:document.getElementById('roomImageWidth'),roomImageHeight:document.getElementById('roomImageHeight'),roomZoomInput:document.getElementById('roomZoomInput'),roomScaleMode:document.getElementById('roomScaleMode'),replaceBackgroundButton:document.getElementById('replaceBackgroundButton'),removeBackgroundButton:document.getElementById('removeBackgroundButton'),genericEditorSection:document.getElementById('genericEditorSection')};
-let tree=loadTree();let resources=loadResources();let settings=loadSettings();let selectedId=localStorage.getItem(STORAGE_KEYS.selection)||'rooms';let activeEditorId=localStorage.getItem(STORAGE_KEYS.activeEditor)||null;let activeCreateTargetId=null;let draggedId=null;let renameTimer=null;let activeImageUrl=null;
-function initialTree(){return ROOTS.map(r=>({id:r.id,kind:'root',label:r.label,itemType:r.itemType,open:false,children:[]}));}
-function normalizeNode(node,rootId){if(!node||typeof node!=='object'||!['folder','item'].includes(node.kind)||typeof node.id!=='string'||typeof node.label!=='string')return null;if(node.kind==='folder')return{id:node.id,kind:'folder',label:node.label,rootId,open:node.open===true,children:Array.isArray(node.children)?node.children.map(c=>normalizeNode(c,rootId)).filter(Boolean):[]};const expected=ROOTS.find(r=>r.id===rootId)?.itemType;const itemType=TYPES[node.itemType]?.rootId===rootId?node.itemType:expected;return itemType?{id:node.id,kind:'item',label:node.label,rootId,itemType}:null;}
-function loadTree(){try{const parsed=JSON.parse(localStorage.getItem(STORAGE_KEYS.tree)||'null');if(!Array.isArray(parsed))return initialTree();return ROOTS.map(def=>{const saved=parsed.find(n=>n?.id===def.id&&n.kind==='root');return{id:def.id,kind:'root',label:def.label,itemType:def.itemType,open:saved?.open===true,children:Array.isArray(saved?.children)?saved.children.map(c=>normalizeNode(c,def.id)).filter(Boolean):[]};});}catch{return initialTree();}}
-function loadResources(){try{const r=JSON.parse(localStorage.getItem(STORAGE_KEYS.resources)||'null');return r&&typeof r==='object'?r:{rooms:{},characters:{},inventory:{},dialogues:{},audio:{}};}catch{return{rooms:{},characters:{},inventory:{},dialogues:{},audio:{}};}}
-function loadSettings(){try{const s=JSON.parse(localStorage.getItem(STORAGE_KEYS.settings)||'null');return{width:Number(s?.width)||1280,height:Number(s?.height)||720};}catch{return{width:1280,height:720};}}
-function save(){localStorage.setItem(STORAGE_KEYS.tree,JSON.stringify(tree));localStorage.setItem(STORAGE_KEYS.resources,JSON.stringify(resources));localStorage.setItem(STORAGE_KEYS.settings,JSON.stringify(settings));localStorage.setItem(STORAGE_KEYS.selection,selectedId);activeEditorId?localStorage.setItem(STORAGE_KEYS.activeEditor,activeEditorId):localStorage.removeItem(STORAGE_KEYS.activeEditor);}
-function walk(nodes,visitor,parent=null,rootId=null){for(const node of nodes){const current=node.kind==='root'?node.id:rootId;if(visitor(node,parent,current)===false)return false;if(node.kind!=='item'&&walk(node.children,visitor,node,current)===false)return false;}return true;}
-function findNode(id){let found=null;walk(tree,(node,parent,rootId)=>{if(node.id===id){found={node,parent,rootId};return false;}});return found;}
-function countItems(node){return node.kind==='item'?1:node.children.reduce((sum,c)=>sum+countItems(c),0);}
-function esc(v){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
-function uid(prefix){return`${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;}
-function bucketFor(type){return type==='room'?'rooms':type==='character'?'characters':type==='inventory'?'inventory':type==='dialogue'?'dialogues':'audio';}
-function ensureResource(node){if(!node||node.kind!=='item')return null;const bucket=bucketFor(node.itemType);resources[bucket]??={};if(!resources[bucket][node.id])resources[bucket][node.id]=node.itemType==='room'?{id:node.id,type:'room',zoom:100,scaleMode:'manual',background:null}:{id:node.id,type:node.itemType};return resources[bucket][node.id];}
-function deleteResource(node){if(!node||node.kind!=='item')return;const bucket=bucketFor(node.itemType);delete resources[bucket]?.[node.id];if(node.itemType==='room')deleteImageBlob(node.id);}
-function renderNode(node){const selected=node.id===selectedId?' selected':'';if(node.kind==='root'){const def=ROOTS.find(r=>r.id===node.id);return`<div class="tree-root ${node.open?'':'closed'}" data-node-id="${node.id}" data-drop-container="true"><div class="tree-root-row${selected}"><button class="tree-expander" data-action="toggle" data-node-id="${node.id}"><span class="tree-chevron">⌄</span></button><button class="tree-node-select" data-action="select" data-node-id="${node.id}"><span class="tree-type-icon">${def?.icon||'▱'}</span><span class="tree-root-name">${esc(node.label)}</span><span class="tree-count">${countItems(node)}</span></button><button class="tree-create" data-action="create-menu" data-node-id="${node.id}">＋</button></div><div class="tree-children">${node.children.length?node.children.map(renderNode).join(''):'<div class="tree-empty">Empty</div>'}</div></div>`;}if(node.kind==='folder')return`<div class="tree-folder ${node.open?'':'closed'}" data-node-id="${node.id}" data-draggable-node="true" data-drop-container="true" draggable="true"><div class="tree-folder-row${selected}"><button class="tree-expander" data-action="toggle" data-node-id="${node.id}"><span class="tree-chevron">⌄</span></button><span class="tree-type-icon tree-select-icon" data-action="select" data-node-id="${node.id}">▱</span><button class="tree-name-button" data-action="rename" data-node-id="${node.id}"><span class="tree-folder-name">${esc(node.label)}</span></button><button class="tree-create" data-action="create-menu" data-node-id="${node.id}">＋</button><button class="tree-delete" data-action="delete" data-node-id="${node.id}">×</button></div><div class="tree-children">${node.children.length?node.children.map(renderNode).join(''):'<div class="tree-empty">Empty</div>'}</div></div>`;const def=TYPES[node.itemType];return`<div class="tree-item" data-node-id="${node.id}" data-draggable-node="true" draggable="true"><div class="tree-item-row${selected}"><span class="tree-expander-placeholder"></span><span class="tree-type-icon tree-select-icon" data-action="select" data-node-id="${node.id}">${def?.icon||'•'}</span><button class="tree-name-button" data-action="rename" data-node-id="${node.id}"><span class="tree-item-name">${esc(node.label)}</span></button><button class="tree-delete" data-action="delete" data-node-id="${node.id}">×</button></div></div>`;}
-function renderTree(){if(!findNode(selectedId))selectedId='rooms';els.tree.innerHTML=tree.map(renderNode).join('');renderWorkspace();}
-async function renderWorkspace(){const active=findNode(activeEditorId);if(!active||active.node.kind!=='item'){activeEditorId=null;els.empty.hidden=false;els.workspace.hidden=true;els.inspectorEmpty.hidden=false;els.inspectorContent.hidden=true;els.context.innerHTML=`<span class="dot"></span> ${esc(findNode(selectedId)?.node.label||'Project')}`;save();return;}const type=TYPES[active.node.itemType];const resource=ensureResource(active.node);els.empty.hidden=true;els.workspace.hidden=false;els.editorIcon.textContent=type.icon;els.editorKind.textContent=type.editor;els.editorTitle.textContent=active.node.label;els.context.innerHTML=`<span class="dot"></span> ${esc(type.editor)} / ${esc(active.node.label)}`;els.inspectorEmpty.hidden=true;els.inspectorContent.hidden=false;els.inspectorTitle.textContent=active.node.label;els.inspectorResourceIcon.textContent=type.icon;els.inspectorResourceType.textContent=type.label;els.inspectorResourceState.textContent='Active project resource';els.inspectorResourceId.value=active.node.id;els.inspectorResourceKind.value=active.node.itemType;els.projectResolutionSection.hidden=active.node.itemType!=='room';els.roomPropertiesSection.hidden=active.node.itemType!=='room';els.genericEditorSection.hidden=active.node.itemType==='room';if(active.node.itemType==='room'){els.placeholder.hidden=true;els.roomEditor.hidden=false;els.editorStatus.textContent=`${settings.width} × ${settings.height}`;els.gameWidthInput.value=settings.width;els.gameHeightInput.value=settings.height;await renderRoom(resource);}else{els.roomEditor.hidden=true;els.placeholder.hidden=false;els.placeholderIcon.textContent=type.icon;els.placeholderTitle.textContent=type.editor;els.placeholderText.textContent=type.description;els.editorStatus.textContent='Editor shell';}save();}
-async function renderRoom(room){els.roomZoomRange.value=room.zoom||100;els.roomZoomInput.value=room.zoom||100;els.roomZoomOutput.textContent=`${room.zoom||100}%`;els.roomScaleMode.value=room.scaleMode||'manual';els.roomImageName.value=room.background?.name||'None';els.roomImageWidth.value=room.background?.width||'—';els.roomImageHeight.value=room.background?.height||'—';if(!room.background){releaseImageUrl();els.roomCanvasEmpty.hidden=false;els.roomCanvasStage.hidden=true;return;}const blob=await getImageBlob(room.id);if(!blob){room.background=null;save();return renderRoom(room);}releaseImageUrl();activeImageUrl=URL.createObjectURL(blob);els.roomBackgroundImage.src=activeImageUrl;els.roomBackgroundImage.style.width=`${room.background.width*(room.zoom||100)/100}px`;els.roomBackgroundImage.style.height='auto';els.roomCanvasEmpty.hidden=true;els.roomCanvasStage.hidden=false;}
-function releaseImageUrl(){if(activeImageUrl){URL.revokeObjectURL(activeImageUrl);activeImageUrl=null;}}
-function selectNode(id){if(!findNode(id))return;selectedId=id;save();renderTree();}
-function toggleNode(id){const f=findNode(id);if(!f||f.node.kind==='item')return;f.node.open=!f.node.open;save();renderTree();}
-function openFolder(id){const f=findNode(id);if(!f||f.node.kind==='item')return;if(!f.node.open){f.node.open=true;save();renderTree();}}
-function openEditor(id){const f=findNode(id);if(!f||f.node.kind!=='item')return;ensureResource(f.node);activeEditorId=id;selectedId=id;save();renderTree();}
-function deleteNode(id){const f=findNode(id);if(!f||f.node.kind==='root'||!f.parent)return;const removeDeep=node=>{if(node.kind==='item')deleteResource(node);else node.children.forEach(removeDeep);};removeDeep(f.node);f.parent.children=f.parent.children.filter(c=>c.id!==id);if(activeEditorId===id)activeEditorId=null;selectedId=f.parent.id;save();renderTree();}
-function startRename(id){requestAnimationFrame(()=>{const f=findNode(id);const name=els.tree.querySelector(`[data-node-id="${CSS.escape(id)}"] .tree-folder-name, [data-node-id="${CSS.escape(id)}"] .tree-item-name`);if(!f||!name)return;selectedId=id;const input=document.createElement('input');input.className='tree-rename-input';input.value=f.node.label;name.parentElement.replaceWith(input);input.focus();input.select();let done=false;const commit=()=>{if(done)return;done=true;const value=input.value.trim();if(value)f.node.label=value;save();renderTree();};input.addEventListener('keydown',e=>{if(e.key==='Enter')commit();if(e.key==='Escape'){done=true;renderTree();}});input.addEventListener('blur',commit,{once:true});});}
-function scheduleRename(id){clearTimeout(renameTimer);renameTimer=setTimeout(()=>{renameTimer=null;startRename(id);},220);}function cancelRename(){if(renameTimer!==null){clearTimeout(renameTimer);renameTimer=null;}}
-function nextName(type){let n=0;walk(tree,node=>{if(node.kind==='item'&&node.itemType===type)n++;});return`${TYPES[type].label} ${n+1}`;}
-function createEntry(targetId,type){const f=findNode(targetId);if(!f||f.node.kind==='item')return;const target=f.node;if(type==='folder'){const folder={id:uid('folder'),kind:'folder',label:'New Folder',rootId:f.rootId,open:false,children:[]};target.children.push(folder);target.open=true;selectedId=folder.id;save();renderTree();startRename(folder.id);return;}const root=ROOTS.find(r=>r.id===f.rootId);if(!root||type!==root.itemType)return;const item={id:uid(type),kind:'item',label:nextName(type),rootId:f.rootId,itemType:type};target.children.push(item);target.open=true;selectedId=item.id;ensureResource(item);save();renderTree();startRename(item.id);}
-function buildMenu(id){const f=findNode(id);if(!f||f.node.kind==='item')return'';const root=ROOTS.find(r=>r.id===f.rootId);const type=TYPES[root?.itemType];if(!root||!type)return'';return`<div class="create-menu-label">Create in ${esc(f.node.label)}</div><button data-create-type="${root.itemType}"><span>${type.icon}</span><div><strong>${esc(type.label)}</strong><small>Add to this folder</small></div></button><div class="create-menu-separator"></div><button data-create-type="folder"><span>▱</span><div><strong>Subfolder</strong><small>Create a nested folder</small></div></button>`;}
-function openMenu(id,anchor){const html=buildMenu(id);if(!html)return;activeCreateTargetId=id;els.menu.innerHTML=html;const r=anchor.getBoundingClientRect();els.menu.style.left=`${Math.min(innerWidth-228,Math.max(8,r.right+6))}px`;els.menu.style.top=`${Math.min(innerHeight-130,r.top-4)}px`;els.menu.classList.add('open');}
-function closeMenu(){activeCreateTargetId=null;els.menu.classList.remove('open');els.menu.innerHTML='';}
-function isDescendant(node,id){return node.kind!=='item'&&node.children.some(c=>c.id===id||(c.kind!=='item'&&isDescendant(c,id)));}
-function canDrop(dragId,targetId){const d=findNode(dragId),t=findNode(targetId);if(!d||!t||d.node.kind==='root'||t.node.kind==='item'||d.node.id===t.node.id||d.rootId!==t.rootId)return false;if(d.node.kind==='folder'&&isDescendant(d.node,t.node.id))return false;if(d.parent?.id===t.node.id)return false;return true;}
-function moveNode(dragId,targetId){if(!canDrop(dragId,targetId))return;const d=findNode(dragId),t=findNode(targetId);const i=d.parent.children.findIndex(c=>c.id===dragId);if(i<0)return;const[moved]=d.parent.children.splice(i,1);t.node.children.push(moved);selectedId=moved.id;save();renderTree();}
-function clearDrop(){els.tree.querySelectorAll('.drop-valid,.drop-invalid,.dragging-node').forEach(el=>el.classList.remove('drop-valid','drop-invalid','dragging-node'));}
-function activeRoom(){const f=findNode(activeEditorId);return f?.node.itemType==='room'?ensureResource(f.node):null;}
-async function importBackground(file){const room=activeRoom();if(!room||!file)return;const dims=await imageDimensions(file);await putImageBlob(room.id,file);room.background={name:file.name,type:file.type,size:file.size,width:dims.width,height:dims.height};room.zoom=100;room.scaleMode='manual';save();await renderWorkspace();}
-function imageDimensions(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file);const img=new Image();img.onload=()=>{resolve({width:img.naturalWidth,height:img.naturalHeight});URL.revokeObjectURL(url);};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Invalid image'));};img.src=url;});}
-function setRoomZoom(value){const room=activeRoom();if(!room)return;room.zoom=Math.max(10,Math.min(300,Number(value)||100));room.scaleMode='manual';save();renderRoom(room);}
-function fitRoom(){const room=activeRoom();if(!room?.background)return;const shell=els.roomCanvasShell.getBoundingClientRect();const zoom=Math.min((shell.width-80)/room.background.width,(shell.height-80)/room.background.height)*100;room.zoom=Math.max(10,Math.min(300,Math.round(zoom/5)*5));room.scaleMode='fit';save();renderRoom(room);}
-async function removeBackground(){const room=activeRoom();if(!room)return;await deleteImageBlob(room.id);room.background=null;room.zoom=100;room.scaleMode='manual';save();renderWorkspace();}
-function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open('AdventureStudioAssets',1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('roomBackgrounds'))req.result.createObjectStore('roomBackgrounds');};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
-async function putImageBlob(id,blob){const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction('roomBackgrounds','readwrite');tx.objectStore('roomBackgrounds').put(blob,id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();}
-async function getImageBlob(id){const db=await openDb();const blob=await new Promise((resolve,reject)=>{const req=db.transaction('roomBackgrounds','readonly').objectStore('roomBackgrounds').get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});db.close();return blob;}
-async function deleteImageBlob(id){const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction('roomBackgrounds','readwrite');tx.objectStore('roomBackgrounds').delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();}
-els.tree.addEventListener('click',e=>{const a=e.target.closest('[data-action]');if(!a)return;const{action,nodeId}=a.dataset;if(action==='toggle')toggleNode(nodeId);if(action==='select')selectNode(nodeId);if(action==='rename')scheduleRename(nodeId);if(action==='delete')deleteNode(nodeId);if(action==='create-menu'){e.stopPropagation();selectNode(nodeId);openMenu(nodeId,a);}});
-els.tree.addEventListener('dblclick',e=>{cancelRename();const el=e.target.closest('[data-node-id]');if(!el)return;const f=findNode(el.dataset.nodeId);if(!f)return;f.node.kind==='item'?openEditor(f.node.id):openFolder(f.node.id);});
-els.tree.addEventListener('dragstart',e=>{cancelRename();const el=e.target.closest('[data-draggable-node="true"]');if(!el)return;draggedId=el.dataset.nodeId;el.classList.add('dragging-node');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',draggedId);closeMenu();});
-els.tree.addEventListener('dragover',e=>{if(!draggedId)return;const target=e.target.closest('[data-drop-container="true"]');if(!target)return;e.preventDefault();const valid=canDrop(draggedId,target.dataset.nodeId);e.dataTransfer.dropEffect=valid?'move':'none';els.tree.querySelectorAll('.drop-valid,.drop-invalid').forEach(el=>el.classList.remove('drop-valid','drop-invalid'));target.classList.add(valid?'drop-valid':'drop-invalid');});
-els.tree.addEventListener('drop',e=>{if(!draggedId)return;const target=e.target.closest('[data-drop-container="true"]');if(target){e.preventDefault();moveNode(draggedId,target.dataset.nodeId);}draggedId=null;clearDrop();});els.tree.addEventListener('dragend',()=>{draggedId=null;clearDrop();});
-els.menu.addEventListener('click',e=>{const b=e.target.closest('[data-create-type]');if(!b||!activeCreateTargetId)return;const target=activeCreateTargetId;closeMenu();createEntry(target,b.dataset.createType);});
-els.importBackgroundButton.addEventListener('click',()=>els.backgroundFileInput.click());els.emptyImportBackgroundButton.addEventListener('click',()=>els.backgroundFileInput.click());els.replaceBackgroundButton.addEventListener('click',()=>els.backgroundFileInput.click());els.backgroundFileInput.addEventListener('change',async()=>{const file=els.backgroundFileInput.files?.[0];els.backgroundFileInput.value='';if(file)await importBackground(file);});els.roomZoomRange.addEventListener('input',()=>setRoomZoom(els.roomZoomRange.value));els.roomZoomInput.addEventListener('change',()=>setRoomZoom(els.roomZoomInput.value));els.fitRoomButton.addEventListener('click',fitRoom);els.roomScaleMode.addEventListener('change',()=>{const room=activeRoom();if(!room)return;room.scaleMode=els.roomScaleMode.value;if(room.scaleMode==='fit')fitRoom();else{save();renderRoom(room);}});els.removeBackgroundButton.addEventListener('click',removeBackground);
-els.gameWidthInput.addEventListener('change',()=>{settings.width=Math.max(160,Math.min(7680,Number(els.gameWidthInput.value)||1280));save();renderWorkspace();});els.gameHeightInput.addEventListener('change',()=>{settings.height=Math.max(120,Math.min(4320,Number(els.gameHeightInput.value)||720));save();renderWorkspace();});
-document.addEventListener('click',e=>{if(!els.menu.contains(e.target)&&!e.target.closest('[data-action="create-menu"]'))closeMenu();});document.addEventListener('keydown',e=>{if(e.key==='Escape'){cancelRename();closeMenu();}});window.addEventListener('beforeunload',releaseImageUrl);
-const panelLimits={project:{min:170,max:420,key:STORAGE_KEYS.projectWidth,css:'--project-width'},inspector:{min:220,max:480,key:STORAGE_KEYS.inspectorWidth,css:'--inspector-width'}};function clamp(v,min,max){return Math.min(Math.max(v,min),max);}function restoreWidths(){Object.values(panelLimits).forEach(p=>{const v=Number(localStorage.getItem(p.key));if(Number.isFinite(v)&&v>0)document.documentElement.style.setProperty(p.css,`${clamp(v,p.min,p.max)}px`);});}function setupResizer(id,side){const h=document.getElementById(id),p=panelLimits[side];let startX=0,startWidth=0,active=false;const move=e=>{if(!active)return;const delta=e.clientX-startX;document.documentElement.style.setProperty(p.css,`${clamp(side==='project'?startWidth+delta:startWidth-delta,p.min,p.max)}px`);};const end=()=>{if(!active)return;active=false;h.classList.remove('dragging');document.body.classList.remove('resizing-panels');const current=parseFloat(getComputedStyle(document.documentElement).getPropertyValue(p.css));localStorage.setItem(p.key,String(Math.round(current)));removeEventListener('pointermove',move);removeEventListener('pointerup',end);};h.addEventListener('pointerdown',e=>{active=true;startX=e.clientX;startWidth=(side==='project'?document.querySelector('.sidebar'):document.querySelector('.inspector')).getBoundingClientRect().width;h.classList.add('dragging');document.body.classList.add('resizing-panels');addEventListener('pointermove',move);addEventListener('pointerup',end);});h.addEventListener('dblclick',()=>{const d=side==='project'?232:286;document.documentElement.style.setProperty(p.css,`${d}px`);localStorage.removeItem(p.key);});}
-restoreWidths();renderTree();setupResizer('leftResizer','project');setupResizer('rightResizer','inspector');
+
+let tree=loadTree();
+let resources=loadResources();
+let settings=loadSettings();
+let selectedId=localStorage.getItem(STORAGE_KEYS.selection)||'rooms';
+let activeEditorId=localStorage.getItem(STORAGE_KEYS.activeEditor)||null;
+
+const save=()=>saveProject({tree,resources,settings,selectedId,activeEditorId});
+const getActiveNode=()=>findNode(tree,activeEditorId)?.node||null;
+
+const roomEditor=createRoomEditor({els,getActiveNode,getResources:()=>resources,save,renderWorkspace:()=>renderWorkspace(),assets:roomBackgroundStore});
+
+async function renderWorkspace(){
+  const active=findNode(tree,activeEditorId);
+  if(!active||active.node.kind!=='item'){
+    activeEditorId=null;
+    els.empty.hidden=false;
+    els.workspace.hidden=true;
+    els.inspectorEmpty.hidden=false;
+    els.inspectorContent.hidden=true;
+    els.context.innerHTML=`<span class="dot"></span> ${escapeHtml(findNode(tree,selectedId)?.node.label||'Project')}`;
+    save();
+    return;
+  }
+  const type=TYPES[active.node.itemType];
+  const resource=ensureResource(resources,active.node);
+  els.empty.hidden=true;
+  els.workspace.hidden=false;
+  els.editorIcon.textContent=type.icon;
+  els.editorKind.textContent=type.editor;
+  els.editorTitle.textContent=active.node.label;
+  els.context.innerHTML=`<span class="dot"></span> ${escapeHtml(type.editor)} / ${escapeHtml(active.node.label)}`;
+  els.inspectorEmpty.hidden=true;
+  els.inspectorContent.hidden=false;
+  els.inspectorTitle.textContent=active.node.label;
+  els.inspectorResourceIcon.textContent=type.icon;
+  els.inspectorResourceType.textContent=type.label;
+  els.inspectorResourceState.textContent='Active project resource';
+  els.inspectorResourceId.value=active.node.id;
+  els.inspectorResourceKind.value=active.node.itemType;
+  els.projectResolutionSection.hidden=active.node.itemType!=='room';
+  els.roomPropertiesSection.hidden=active.node.itemType!=='room';
+  els.genericEditorSection.hidden=active.node.itemType==='room';
+  if(active.node.itemType==='room'){
+    els.placeholder.hidden=true;
+    els.roomEditor.hidden=false;
+    els.editorStatus.textContent=`${settings.width} × ${settings.height}`;
+    els.gameWidthInput.value=settings.width;
+    els.gameHeightInput.value=settings.height;
+    await roomEditor.render(resource);
+  }else{
+    els.roomEditor.hidden=true;
+    els.placeholder.hidden=false;
+    els.placeholderIcon.textContent=type.icon;
+    els.placeholderTitle.textContent=type.editor;
+    els.placeholderText.textContent=`${type.editor} is ready for its specialized tools.`;
+    els.editorStatus.textContent='Editor shell';
+  }
+  save();
+}
+
+function openEditor(id){const found=findNode(tree,id);if(!found||found.node.kind!=='item')return;ensureResource(resources,found.node);activeEditorId=id;selectedId=id;save();treeController.render();renderWorkspace();}
+
+function deleteResourceTree(node){
+  const visit=current=>{
+    if(current.kind==='item'){
+      const bucket=bucketFor(current.itemType);
+      delete resources[bucket]?.[current.id];
+      removeReferencesTo(tree,current.id);
+      if(current.itemType==='room')roomBackgroundStore.remove(current.id).catch(()=>{});
+      if(activeEditorId===current.id)activeEditorId=null;
+    }
+    if(Array.isArray(current.children))current.children.forEach(visit);
+  };
+  visit(node);
+}
+
+const treeController=createProjectTreeController({treeElement:els.tree,menuElement:els.menu,getTree:()=>tree,getSelectedId:()=>selectedId,setSelectedId:id=>{selectedId=id;},save:()=>{save();renderWorkspace();},openEditor,onDeleteResource:deleteResourceTree});
+
+els.gameWidthInput.addEventListener('change',()=>{settings.width=Math.max(160,Math.min(7680,Number(els.gameWidthInput.value)||1280));save();renderWorkspace();});
+els.gameHeightInput.addEventListener('change',()=>{settings.height=Math.max(120,Math.min(4320,Number(els.gameHeightInput.value)||720));save();renderWorkspace();});
+
+const panelLimits={project:{min:170,max:420,key:STORAGE_KEYS.projectWidth,css:'--project-width'},inspector:{min:220,max:480,key:STORAGE_KEYS.inspectorWidth,css:'--inspector-width'}};
+function clamp(v,min,max){return Math.min(Math.max(v,min),max);}
+function restoreWidths(){Object.values(panelLimits).forEach(p=>{const v=Number(localStorage.getItem(p.key));if(Number.isFinite(v)&&v>0)document.documentElement.style.setProperty(p.css,`${clamp(v,p.min,p.max)}px`);});}
+function setupResizer(id,side){const handle=document.getElementById(id),panel=panelLimits[side];let startX=0,startWidth=0,active=false;const move=e=>{if(!active)return;const delta=e.clientX-startX;document.documentElement.style.setProperty(panel.css,`${clamp(side==='project'?startWidth+delta:startWidth-delta,panel.min,panel.max)}px`);};const end=()=>{if(!active)return;active=false;handle.classList.remove('dragging');document.body.classList.remove('resizing-panels');const current=parseFloat(getComputedStyle(document.documentElement).getPropertyValue(panel.css));localStorage.setItem(panel.key,String(Math.round(current)));removeEventListener('pointermove',move);removeEventListener('pointerup',end);};handle.addEventListener('pointerdown',e=>{active=true;startX=e.clientX;startWidth=(side==='project'?document.querySelector('.sidebar'):document.querySelector('.inspector')).getBoundingClientRect().width;handle.classList.add('dragging');document.body.classList.add('resizing-panels');addEventListener('pointermove',move);addEventListener('pointerup',end);});handle.addEventListener('dblclick',()=>{const value=side==='project'?232:286;document.documentElement.style.setProperty(panel.css,`${value}px`);localStorage.removeItem(panel.key);});}
+function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+
+restoreWidths();
+roomEditor.bind();
+treeController.bind();
+treeController.render();
+renderWorkspace();
+setupResizer('leftResizer','project');
+setupResizer('rightResizer','inspector');
