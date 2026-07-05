@@ -47,6 +47,10 @@ function finiteCoordinate(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function simulationEnabled() {
+  return window.WanderContext?.value('simulation.status') === 'active';
+}
+
 function realPosition() {
   const lat = finiteCoordinate(window.WanderContext?.value('location.real.lat'));
   const lng = finiteCoordinate(window.WanderContext?.value('location.real.lng'));
@@ -60,6 +64,28 @@ function effectivePosition() {
   return L.latLng(location.lat, location.lng);
 }
 
+function syncMarkerDraggable() {
+  if (!marker) return;
+  if (simulationEnabled()) marker.dragging?.enable();
+  else marker.dragging?.disable();
+}
+
+function bindMarkerDrag(nextMarker) {
+  nextMarker.on('dragend', () => {
+    if (!simulationEnabled()) {
+      syncEffectiveMarker();
+      return;
+    }
+
+    const next = nextMarker.getLatLng();
+    window.WanderContext?.setLocationOverride({
+      lat: next.lat,
+      lng: next.lng,
+      speedMps: 0,
+    });
+  });
+}
+
 function syncEffectiveMarker() {
   const next = effectivePosition();
   if (!next) {
@@ -71,10 +97,17 @@ function syncEffectiveMarker() {
   }
 
   if (!marker) {
-    marker = L.marker(next, { icon: userIcon, interactive: false }).addTo(map);
-  } else {
+    marker = L.marker(next, {
+      icon: userIcon,
+      interactive: true,
+      draggable: simulationEnabled(),
+    }).addTo(map);
+    bindMarkerDrag(marker);
+  } else if (!marker.dragging?.enabled()) {
     marker.setLatLng(next);
   }
+
+  syncMarkerDraggable();
   return next;
 }
 
@@ -147,6 +180,10 @@ map.addControl(new MapActions());
 window.WanderContext?.subscribe((key) => {
   if (key === 'location.effective' || key.startsWith('location.effective.')) syncEffectiveMarker();
   if (key === 'location.real' || key.startsWith('location.real.')) centerOnFirstRealLocation();
+  if (key === 'simulation.status') {
+    syncMarkerDraggable();
+    syncEffectiveMarker();
+  }
 });
 
 window.map = map;
@@ -158,6 +195,7 @@ window.WanderBase = {
   getRealPosition: () => realPosition(),
   getMarker: () => marker,
   syncEffectiveMarker,
+  syncMarkerDraggable,
   centerOnPosition,
   centerOnFirstRealLocation,
   setBaseLayer,
