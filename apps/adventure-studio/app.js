@@ -131,7 +131,7 @@ function countItems(node){
 }
 
 function createId(prefix){return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;}
-function escapeHtml(value){return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));}
+function escapeHtml(value){return String(value).replace(/[&<>'\"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[char]));}
 
 function renderNode(node){
   const selected=node.id===selectedNodeId?' selected':'';
@@ -264,10 +264,11 @@ function createEntryInTarget(targetId,createType){
   if(createType==='folder'){
     const folder={id:createId('folder'),kind:'folder',label:'New Folder',rootId,open:false,children:[]};
     target.children.push(folder);
+    target.open=true;
     selectedNodeId=folder.id;
     saveProjectTree();
     renderProjectTree();
-    if(target.open)startInlineRename(folder.id);
+    startInlineRename(folder.id);
     return;
   }
 
@@ -276,10 +277,11 @@ function createEntryInTarget(targetId,createType){
 
   const item={id:createId(createType),kind:'item',label:nextDefaultName(createType),rootId,itemType:createType};
   target.children.push(item);
+  target.open=true;
   selectedNodeId=item.id;
   saveProjectTree();
   renderProjectTree();
-  if(target.open)startInlineRename(item.id);
+  startInlineRename(item.id);
 }
 
 function buildCreateMenu(targetId){
