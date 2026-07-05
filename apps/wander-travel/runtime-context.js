@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.69.0';
+  const VERSION = 'v0.69.1';
   const listeners = new Set();
   const state = {};
 
@@ -156,6 +156,12 @@
     else if (heading != null) set('motion.heading', Number(heading), { source, ttlMs: 15000 });
   }
 
+  function finiteNumber(raw) {
+    if (raw === null || raw === undefined || raw === '') return null;
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
   function validCoordinate(lat, lng) {
     return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
   }
@@ -180,10 +186,10 @@
 
   function recomputeEffectiveLocation() {
     const overrideEnabled = value('location.override.enabled', false) === true;
-    const overrideLat = Number(value('location.override.lat'));
-    const overrideLng = Number(value('location.override.lng'));
-    const realLat = Number(value('location.real.lat'));
-    const realLng = Number(value('location.real.lng'));
+    const overrideLat = finiteNumber(value('location.override.lat'));
+    const overrideLng = finiteNumber(value('location.override.lng'));
+    const realLat = finiteNumber(value('location.real.lat'));
+    const realLng = finiteNumber(value('location.real.lng'));
 
     if (overrideEnabled && validCoordinate(overrideLat, overrideLng)) {
       copyLocationBranch('location.override', 'location.effective', 'simulator');
@@ -207,8 +213,8 @@
   }
 
   function setRealLocation(payload = {}) {
-    const lat = Number(payload.lat);
-    const lng = Number(payload.lng);
+    const lat = finiteNumber(payload.lat);
+    const lng = finiteNumber(payload.lng);
     if (!validCoordinate(lat, lng)) return false;
 
     const updatedAt = payload.updatedAt || now();
@@ -220,8 +226,8 @@
     write('location.real.updatedAt', iso(updatedAt), options, false);
 
     ['accuracy','altitude','heading','speedMps'].forEach((field) => {
-      const numeric = Number(payload[field]);
-      if (Number.isFinite(numeric)) write('location.real.' + field, numeric, options, false);
+      const numeric = finiteNumber(payload[field]);
+      if (numeric !== null) write('location.real.' + field, numeric, options, false);
       else remove('location.real.' + field, false);
     });
 
@@ -240,8 +246,8 @@
   }
 
   function setLocationOverride(payload = {}) {
-    const lat = Number(payload.lat);
-    const lng = Number(payload.lng);
+    const lat = finiteNumber(payload.lat);
+    const lng = finiteNumber(payload.lng);
     if (!validCoordinate(lat, lng)) return false;
 
     const updatedAt = payload.updatedAt || now();
@@ -254,8 +260,8 @@
     write('location.override.updatedAt', iso(updatedAt), options, false);
 
     ['accuracy','altitude','heading','speedMps'].forEach((field) => {
-      const numeric = Number(payload[field]);
-      if (Number.isFinite(numeric)) write('location.override.' + field, numeric, options, false);
+      const numeric = finiteNumber(payload[field]);
+      if (numeric !== null) write('location.override.' + field, numeric, options, false);
       else remove('location.override.' + field, false);
     });
 
@@ -272,8 +278,8 @@
   }
 
   function getEffectiveLocation() {
-    const lat = Number(value('location.effective.lat'));
-    const lng = Number(value('location.effective.lng'));
+    const lat = finiteNumber(value('location.effective.lat'));
+    const lng = finiteNumber(value('location.effective.lng'));
     if (!validCoordinate(lat, lng)) return null;
     return {
       lat,
