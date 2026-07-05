@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.69.6';
+  const VERSION = 'v0.69.7';
   const listeners = new Set();
   const state = {};
 
