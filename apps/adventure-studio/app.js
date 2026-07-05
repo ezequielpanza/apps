@@ -1,4 +1,4 @@
-const STORAGE_KEYS={projectTree:'adventureStudioProjectTreeV1',projectSelection:'adventureStudioProjectSelectionV1',projectWidth:'adventureStudioProjectWidth',inspectorWidth:'adventureStudioInspectorWidth'};
+const STORAGE_KEYS={projectTree:'adventureStudioProjectTreeV1',projectSelection:'adventureStudioProjectSelectionV1',projectTreeDefaultsVersion:'adventureStudioProjectTreeDefaultsV2',projectWidth:'adventureStudioProjectWidth',inspectorWidth:'adventureStudioInspectorWidth'};
 
 const ROOT_DEFINITIONS=[
   {id:'rooms',label:'Rooms',itemType:'room',icon:'▧'},
@@ -27,14 +27,7 @@ const roomStage=document.getElementById('roomStage');
 const playStageCopy=document.getElementById('playStageCopy');
 
 function createInitialProjectTree(){
-  return ROOT_DEFINITIONS.map(root=>({
-    id:root.id,
-    kind:'root',
-    label:root.label,
-    itemType:root.itemType,
-    open:true,
-    children:[]
-  }));
+  return ROOT_DEFINITIONS.map(root=>({id:root.id,kind:'root',label:root.label,itemType:root.itemType,open:false,children:[]}));
 }
 
 function isValidNode(node){
@@ -45,13 +38,19 @@ function isValidNode(node){
 }
 
 function normalizeNode(node,rootId){
-  if(!isValidNode(node))return null;
-  if(node.kind==='root')return null;
-  if(node.kind==='folder'){
-    return {id:node.id,kind:'folder',label:node.label,rootId,open:node.open!==false,children:(node.children||[]).map(child=>normalizeNode(child,rootId)).filter(Boolean)};
-  }
+  if(!isValidNode(node)||node.kind==='root')return null;
+  if(node.kind==='folder')return {id:node.id,kind:'folder',label:node.label,rootId,open:node.open===true,children:(node.children||[]).map(child=>normalizeNode(child,rootId)).filter(Boolean)};
   const type=ITEM_DEFINITIONS[node.itemType]?.rootId===rootId?node.itemType:ROOT_DEFINITIONS.find(root=>root.id===rootId)?.itemType;
   return type?{id:node.id,kind:'item',label:node.label,rootId,itemType:type}:null;
+}
+
+function closeEveryContainer(nodes){
+  nodes.forEach(node=>{
+    if(node.kind!=='item'){
+      node.open=false;
+      closeEveryContainer(node.children);
+    }
+  });
 }
 
 function loadProjectTree(){
@@ -60,17 +59,23 @@ function loadProjectTree(){
     if(!raw)return createInitialProjectTree();
     const parsed=JSON.parse(raw);
     if(!Array.isArray(parsed))return createInitialProjectTree();
-    return ROOT_DEFINITIONS.map(def=>{
+    const tree=ROOT_DEFINITIONS.map(def=>{
       const saved=parsed.find(node=>node&&node.id===def.id&&node.kind==='root');
       return {
         id:def.id,
         kind:'root',
         label:def.label,
         itemType:def.itemType,
-        open:saved?saved.open!==false:true,
+        open:saved?.open===true,
         children:saved&&Array.isArray(saved.children)?saved.children.map(child=>normalizeNode(child,def.id)).filter(Boolean):[]
       };
     });
+    if(localStorage.getItem(STORAGE_KEYS.projectTreeDefaultsVersion)!=='2'){
+      closeEveryContainer(tree);
+      localStorage.setItem(STORAGE_KEYS.projectTreeDefaultsVersion,'2');
+      localStorage.setItem(STORAGE_KEYS.projectTree,JSON.stringify(tree));
+    }
+    return tree;
   }catch{
     return createInitialProjectTree();
   }
@@ -106,35 +111,17 @@ function countItems(node){
   return node.children.reduce((sum,child)=>sum+countItems(child),0);
 }
 
-function createId(prefix){
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
-}
+function createId(prefix){return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;}
+function escapeHtml(value){return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));}
 
-function escapeHtml(value){
-  return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
-}
-
-function renderNode(node,depth=0){
+function renderNode(node){
   const selected=node.id===selectedNodeId?' selected':'';
   if(node.kind==='root'){
-    return `<div class="tree-root ${node.open?'':'closed'}" data-node-id="${node.id}">
-      <div class="tree-root-row${selected}">
-        <button class="tree-toggle" data-action="toggle" data-node-id="${node.id}">
-          <span class="tree-chevron">⌄</span><span class="tree-type-icon">${ROOT_DEFINITIONS.find(root=>root.id===node.id)?.icon||'▱'}</span>
-          <span class="tree-root-name">${escapeHtml(node.label)}</span><span class="tree-count">${countItems(node)}</span>
-        </button>
-      </div>
-      <div class="tree-children">${node.children.length?node.children.map(child=>renderNode(child,depth+1)).join(''):'<div class="tree-empty">Empty</div>'}</div>
-    </div>`;
+    const rootDef=ROOT_DEFINITIONS.find(root=>root.id===node.id);
+    return `<div class="tree-root ${node.open?'':'closed'}" data-node-id="${node.id}"><div class="tree-root-row${selected}"><button class="tree-toggle" data-action="toggle" data-node-id="${node.id}"><span class="tree-chevron">⌄</span><span class="tree-type-icon">${rootDef?.icon||'▱'}</span><span class="tree-root-name">${escapeHtml(node.label)}</span><span class="tree-count">${countItems(node)}</span></button></div><div class="tree-children">${node.children.length?node.children.map(renderNode).join(''):'<div class="tree-empty">Empty</div>'}</div></div>`;
   }
   if(node.kind==='folder'){
-    return `<div class="tree-folder ${node.open?'':'closed'}" data-node-id="${node.id}">
-      <div class="tree-folder-row${selected}">
-        <button class="tree-toggle" data-action="toggle" data-node-id="${node.id}"><span class="tree-chevron">⌄</span><span class="tree-type-icon">▱</span><span class="tree-folder-name">${escapeHtml(node.label)}</span></button>
-        <button class="tree-delete" data-action="delete" data-node-id="${node.id}" aria-label="Eliminar carpeta">×</button>
-      </div>
-      <div class="tree-children">${node.children.length?node.children.map(child=>renderNode(child,depth+1)).join(''):'<div class="tree-empty">Empty</div>'}</div>
-    </div>`;
+    return `<div class="tree-folder ${node.open?'':'closed'}" data-node-id="${node.id}"><div class="tree-folder-row${selected}"><button class="tree-toggle" data-action="toggle" data-node-id="${node.id}"><span class="tree-chevron">⌄</span><span class="tree-type-icon">▱</span><span class="tree-folder-name">${escapeHtml(node.label)}</span></button><button class="tree-delete" data-action="delete" data-node-id="${node.id}" aria-label="Eliminar carpeta">×</button></div><div class="tree-children">${node.children.length?node.children.map(renderNode).join(''):'<div class="tree-empty">Empty</div>'}</div></div>`;
   }
   const def=ITEM_DEFINITIONS[node.itemType];
   return `<div class="tree-item" data-node-id="${node.id}"><div class="tree-item-row${selected}"><button class="tree-item-select" data-action="select" data-node-id="${node.id}"><span class="tree-type-icon">${def?.icon||'•'}</span><span class="tree-item-name">${escapeHtml(node.label)}</span></button><button class="tree-delete" data-action="delete" data-node-id="${node.id}" aria-label="Eliminar elemento">×</button></div></div>`;
@@ -142,7 +129,7 @@ function renderNode(node,depth=0){
 
 function renderProjectTree(){
   if(!findNode(selectedNodeId))selectedNodeId='rooms';
-  projectTreeElement.innerHTML=projectTree.map(node=>renderNode(node)).join('');
+  projectTreeElement.innerHTML=projectTree.map(renderNode).join('');
   updateContextFromSelection();
 }
 
@@ -153,30 +140,9 @@ function updateContextFromSelection(){
   contextPill.innerHTML=`<span class="dot"></span> ${escapeHtml(prefix)} / ${escapeHtml(found.node.label)}`;
 }
 
-function selectNode(nodeId){
-  if(!findNode(nodeId))return;
-  selectedNodeId=nodeId;
-  saveProjectTree();
-  renderProjectTree();
-}
-
-function toggleNode(nodeId){
-  const found=findNode(nodeId);
-  if(!found||found.node.kind==='item')return;
-  found.node.open=!found.node.open;
-  selectedNodeId=nodeId;
-  saveProjectTree();
-  renderProjectTree();
-}
-
-function deleteNode(nodeId){
-  const found=findNode(nodeId);
-  if(!found||found.node.kind==='root'||!found.parent)return;
-  found.parent.children=found.parent.children.filter(child=>child.id!==nodeId);
-  selectedNodeId=found.parent.id;
-  saveProjectTree();
-  renderProjectTree();
-}
+function selectNode(nodeId){if(!findNode(nodeId))return;selectedNodeId=nodeId;saveProjectTree();renderProjectTree();}
+function toggleNode(nodeId){const found=findNode(nodeId);if(!found||found.node.kind==='item')return;found.node.open=!found.node.open;selectedNodeId=nodeId;saveProjectTree();renderProjectTree();}
+function deleteNode(nodeId){const found=findNode(nodeId);if(!found||found.node.kind==='root'||!found.parent)return;found.parent.children=found.parent.children.filter(child=>child.id!==nodeId);selectedNodeId=found.parent.id;saveProjectTree();renderProjectTree();}
 
 function getSelectedContainerForRoot(rootId){
   const selected=findNode(selectedNodeId);
@@ -235,7 +201,7 @@ function createProjectEntry(createType){
   if(createType==='folder'){
     const target=getFolderTarget();
     if(!target)return;
-    const folder={id:createId('folder'),kind:'folder',label:'New Folder',rootId:target.kind==='root'?target.id:target.rootId,open:true,children:[]};
+    const folder={id:createId('folder'),kind:'folder',label:'New Folder',rootId:target.kind==='root'?target.id:target.rootId,open:false,children:[]};
     target.children.push(folder);
     target.open=true;
     selectedNodeId=folder.id;
@@ -262,19 +228,8 @@ function positionCreateMenu(){
   projectCreateMenu.style.left=`${Math.max(8,buttonRect.right-242)}px`;
   projectCreateMenu.style.top=`${buttonRect.bottom+6}px`;
 }
-
-function openCreateMenu(){
-  positionCreateMenu();
-  projectCreateMenu.classList.add('open');
-  projectCreateMenu.setAttribute('aria-hidden','false');
-  projectAddButton.setAttribute('aria-expanded','true');
-}
-
-function closeCreateMenu(){
-  projectCreateMenu.classList.remove('open');
-  projectCreateMenu.setAttribute('aria-hidden','true');
-  projectAddButton.setAttribute('aria-expanded','false');
-}
+function openCreateMenu(){positionCreateMenu();projectCreateMenu.classList.add('open');projectCreateMenu.setAttribute('aria-hidden','false');projectAddButton.setAttribute('aria-expanded','true');}
+function closeCreateMenu(){projectCreateMenu.classList.remove('open');projectCreateMenu.setAttribute('aria-hidden','true');projectAddButton.setAttribute('aria-expanded','false');}
 
 projectTreeElement.addEventListener('click',event=>{
   const target=event.target.closest('[data-action]');
@@ -292,21 +247,9 @@ projectTreeElement.addEventListener('dblclick',event=>{
   if(found&&found.node.kind!=='root')startInlineRename(found.node.id);
 });
 
-projectAddButton.addEventListener('click',event=>{
-  event.stopPropagation();
-  projectCreateMenu.classList.contains('open')?closeCreateMenu():openCreateMenu();
-});
-
-projectCreateMenu.addEventListener('click',event=>{
-  const button=event.target.closest('[data-create-type]');
-  if(!button)return;
-  createProjectEntry(button.dataset.createType);
-  closeCreateMenu();
-});
-
-document.addEventListener('click',event=>{
-  if(!projectCreateMenu.contains(event.target)&&event.target!==projectAddButton)closeCreateMenu();
-});
+projectAddButton.addEventListener('click',event=>{event.stopPropagation();projectCreateMenu.classList.contains('open')?closeCreateMenu():openCreateMenu();});
+projectCreateMenu.addEventListener('click',event=>{const button=event.target.closest('[data-create-type]');if(!button)return;createProjectEntry(button.dataset.createType);closeCreateMenu();});
+document.addEventListener('click',event=>{if(!projectCreateMenu.contains(event.target)&&event.target!==projectAddButton)closeCreateMenu();});
 window.addEventListener('resize',()=>{if(projectCreateMenu.classList.contains('open'))positionCreateMenu();});
 
 function startPlay(){
