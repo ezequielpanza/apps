@@ -23,6 +23,7 @@ const baseLayers = {
 
 let activeBaseLayer = 'streets';
 let marker = null;
+let markerDragActive = false;
 let initialRealLocationCentered = false;
 
 baseLayers[activeBaseLayer].addTo(map);
@@ -67,17 +68,28 @@ function effectivePosition() {
 function syncMarkerDraggable() {
   if (!marker) return;
   if (simulationEnabled()) marker.dragging?.enable();
-  else marker.dragging?.disable();
+  else {
+    markerDragActive = false;
+    marker.dragging?.disable();
+  }
 }
 
 function bindMarkerDrag(nextMarker) {
+  nextMarker.on('dragstart', () => {
+    if (!simulationEnabled()) return;
+    markerDragActive = true;
+  });
+
   nextMarker.on('dragend', () => {
-    if (!simulationEnabled()) {
+    const wasSimulation = simulationEnabled();
+    const next = nextMarker.getLatLng();
+    markerDragActive = false;
+
+    if (!wasSimulation) {
       syncEffectiveMarker();
       return;
     }
 
-    const next = nextMarker.getLatLng();
     window.WanderContext?.setLocationOverride({
       lat: next.lat,
       lng: next.lng,
@@ -92,6 +104,7 @@ function syncEffectiveMarker() {
     if (marker) {
       map.removeLayer(marker);
       marker = null;
+      markerDragActive = false;
     }
     return null;
   }
@@ -103,7 +116,7 @@ function syncEffectiveMarker() {
       draggable: simulationEnabled(),
     }).addTo(map);
     bindMarkerDrag(marker);
-  } else if (!marker.dragging?.enabled()) {
+  } else if (!markerDragActive) {
     marker.setLatLng(next);
   }
 
