@@ -4,7 +4,7 @@ Editor web para crear aventuras gráficas point & click.
 
 ## Versión actual
 
-`v0.8.0`
+`v0.8.1`
 
 ## Tecnología
 
@@ -61,7 +61,9 @@ Reglas de bootstrap:
 - si no existe un proyecto inicializado, carga el proyecto de arranque;
 - si existe un proyecto legado sin identidad de bundle, inicializa el proyecto de arranque una sola vez;
 - después de la primera inicialización, las recargas preservan los cambios locales;
-- el proyecto empaquetado no se vuelve a copiar sobre el trabajo del usuario en cada recarga.
+- el proyecto empaquetado no se vuelve a copiar sobre el trabajo del usuario en cada recarga;
+- si el bundle activo declara assets empaquetados, estos se rehidratan en IndexedDB al arrancar;
+- la rehidratación es idempotente y sirve también para reparar un Blob faltante o corrupto sin sobrescribir el modelo del proyecto.
 
 ## Demo privado: Monkey Island 2 C
 
