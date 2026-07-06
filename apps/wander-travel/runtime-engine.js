@@ -1,50 +1,115 @@
 (() => {
-  const context = window.WanderContext;
-  if (!context) return;
+  const STORAGE_KEY = 'wander.engine.state.v1';
+  const listeners = new Set();
 
-  function inferMotionProfile(speedKmh) {
-    if (speedKmh <= 0.3) return { status: 'stationary', mode: 'unknown', label: 'En pausa', activity: 'paused', confidence: 0.95 };
-    if (speedKmh < 8) return { status: 'moving', mode: 'walking', label: 'Caminando', activity: 'walking', confidence: 0.8 };
-    if (speedKmh < 25) return { status: 'moving', mode: 'cycling', label: 'Andando en bicicleta', activity: 'cycling', confidence: 0.7 };
-    return { status: 'moving', mode: 'driving', label: 'Conduciendo', activity: 'driving', confidence: 0.75 };
-  }
-
-  function inferFromEffectiveLocation() {
-    const location = context.getEffectiveLocation();
-    if (!location) {
-      context.setMotion({ status: 'pending', mode: 'unknown', speedKmh: 0, heading: null, source: 'engine' });
-      context.setContext({ status: 'Preparando contexto', activity: 'pending', source: 'engine', confidence: 1 });
-      return null;
-    }
-
-    const speedKmh = Math.max(0, Number(location.speedMps || 0) * 3.6);
-    const profile = inferMotionProfile(speedKmh);
-    context.setMotion({
-      status: profile.status,
-      mode: profile.mode,
-      speedKmh,
-      heading: Number.isFinite(Number(location.heading)) ? Number(location.heading) : null,
-      source: 'engine',
-    });
-    context.setContext({
-      status: profile.label,
-      activity: profile.activity,
-      source: 'engine',
-      confidence: location.source === 'simulator' ? 1 : profile.confidence,
-    });
-    return profile;
-  }
-
-  function onContextChange(key) {
-    if (key === 'location.effective' || key.startsWith('location.effective.')) inferFromEffectiveLocation();
-  }
-
-  context.subscribe(onContextChange);
-
-  window.WanderEngine = {
-    inferFromEffectiveLocation,
-    inferMotionProfile,
+  const DEFAULT_STATE = {
+    schemaVersion: 1,
+    traveler: {
+      name: '',
+      preferredName: '',
+    },
+    profile: {
+      interests: {},
+      patterns: [],
+      tendencies: [],
+    },
+    travel: {
+      currentTrip: null,
+      plans: [],
+      destinations: [],
+      routes: [],
+    },
+    memory: {
+      interactions: [],
+      visitedPlaces: [],
+      acceptedSuggestions: [],
+      rejectedSuggestions: [],
+    },
   };
 
-  inferFromEffectiveLocation();
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function loadState() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (!stored || stored.schemaVersion !== DEFAULT_STATE.schemaVersion) return clone(DEFAULT_STATE);
+      return {
+        ...clone(DEFAULT_STATE),
+        ...stored,
+        traveler: { ...DEFAULT_STATE.traveler, ...(stored.traveler || {}) },
+        profile: { ...clone(DEFAULT_STATE.profile), ...(stored.profile || {}) },
+        travel: { ...clone(DEFAULT_STATE.travel), ...(stored.travel || {}) },
+        memory: { ...clone(DEFAULT_STATE.memory), ...(stored.memory || {}) },
+      };
+    } catch {
+      return clone(DEFAULT_STATE);
+    }
+  }
+
+  let state = loadState();
+
+  function persist() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  }
+
+  function snapshot() {
+    return clone(state);
+  }
+
+  function notify(reason = 'update') {
+    const current = snapshot();
+    listeners.forEach((listener) => {
+      try { listener(current, reason); } catch {}
+    });
+  }
+
+  function subscribe(listener) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  }
+
+  function update(mutator, reason = 'update') {
+    const draft = snapshot();
+    const next = mutator(draft) || draft;
+    state = next;
+    persist();
+    notify(reason);
+    return snapshot();
+  }
+
+  function observe(event = {}) {
+    if (!event || typeof event !== 'object' || !event.type) return false;
+    update((draft) => {
+      draft.memory.interactions.push({
+        ...clone(event),
+        at: event.at || new Date().toISOString(),
+      });
+      return draft;
+    }, 'observe:' + event.type);
+    return true;
+  }
+
+  function answer(questionId, answer) {
+    if (!questionId) return false;
+    return observe({ type: 'answer', questionId, answer });
+  }
+
+  function evaluate(contextSnapshot = null) {
+    return {
+      type: 'wait',
+      reason: 'no_decision_rule',
+      contextAvailable: Boolean(contextSnapshot),
+    };
+  }
+
+  window.WanderEngine = {
+    getState: snapshot,
+    subscribe,
+    update,
+    observe,
+    answer,
+    evaluate,
+  };
 })();
