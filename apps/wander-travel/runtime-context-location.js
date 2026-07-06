@@ -9,6 +9,7 @@
   const get = context.get;
   const value = context.value;
   const LOCATION_FIELDS = ['status','lat','lng','accuracy','altitude','heading','speedMps','updatedAt','source'];
+  const SEMANTIC_LOCATION_FIELDS = ['status','lat','lng','accuracy','altitude','heading','speedMps','source'];
 
   function finiteNumber(raw) {
     if (raw === null || raw === undefined || raw === '') return null;
@@ -27,7 +28,7 @@
   }
 
   function sameBranch(a, b) {
-    return LOCATION_FIELDS.every((field) => sameValue(a[field], b[field]));
+    return SEMANTIC_LOCATION_FIELDS.every((field) => sameValue(a[field], b[field]));
   }
 
   function copyLocationBranch(fromPrefix, toPrefix, sourceOverride = null) {
