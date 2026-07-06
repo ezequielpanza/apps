@@ -15,26 +15,19 @@ export function createProjectTreeController({treeElement,menuElement,getTree,get
 
   function renderNode(node){
     const selected=node.id===getSelectedId()?' selected':'';
-
     if(node.kind==='root'){
       const def=ROOTS.find(root=>root.id===node.id),count=rootCount(node),createButton=node.id==='game'?'':`<button class="tree-create" data-action="create-menu" data-node-id="${node.id}" title="Add to ${esc(node.label)}" aria-label="Add to ${esc(node.label)}">＋</button>`;
       return`<div class="tree-root ${node.open?'':'closed'}" data-node-id="${node.id}" data-drop-container="${node.id==='game'?'false':'true'}"><div class="tree-root-row${selected}"><button class="tree-main-action" data-action="activate" data-node-id="${node.id}">${chevron(node)}<span class="tree-type-icon">${def?.icon||'▱'}</span><span class="tree-root-name">${esc(node.label)}</span>${count===''?'':`<span class="tree-count">${count}</span>`}</button>${createButton}</div><div class="tree-children">${node.children.length?node.children.map(renderNode).join(''):'<div class="tree-empty">Empty</div>'}</div></div>`;
     }
-
     if(node.kind==='game-section')return`<div class="tree-game-section" data-node-id="${node.id}"><div class="tree-game-section-row${selected}"><button class="tree-main-action" data-action="activate" data-node-id="${node.id}"><span class="tree-chevron-placeholder"></span><span class="tree-type-icon">${node.icon}</span><span class="tree-section-name">${esc(node.label)}</span></button></div></div>`;
-
     if(node.kind==='folder')return`<div class="tree-folder ${node.open?'':'closed'}" data-node-id="${node.id}" data-draggable-node="true" data-drop-container="true" draggable="true"><div class="tree-folder-row${selected}"><button class="tree-main-action" data-action="activate" data-node-id="${node.id}">${chevron(node)}<span class="tree-type-icon">▱</span><span class="tree-folder-name">${esc(node.label)}</span></button><button class="tree-create" data-action="create-menu" data-node-id="${node.id}" title="Add to ${esc(node.label)}" aria-label="Add to ${esc(node.label)}">＋</button>${editButton(node)}${deleteButton(node)}</div><div class="tree-children">${node.children.length?node.children.map(renderNode).join(''):'<div class="tree-empty">Empty</div>'}</div></div>`;
-
     if(node.kind==='room-section')return`<div class="tree-room-section ${node.open?'':'closed'}" data-node-id="${node.id}" data-drop-container="true"><div class="tree-section-row${selected}"><button class="tree-main-action" data-action="activate" data-node-id="${node.id}">${chevron(node)}<span class="tree-type-icon">${node.icon}</span><span class="tree-section-name">${esc(node.label)}</span><span class="tree-count">${sectionCount(node)}</span></button></div><div class="tree-children">${node.children.length?node.children.map(renderNode).join(''):'<div class="tree-empty">Empty</div>'}</div></div>`;
-
     if(node.kind==='reference'){
       const type=TYPES[node.itemType];
       return`<div class="tree-reference" data-node-id="${node.id}"><div class="tree-reference-row${selected}"><button class="tree-main-action" data-action="activate" data-node-id="${node.id}"><span class="tree-chevron-placeholder"></span><span class="tree-reference-link">↗</span><span class="tree-type-icon">${type?.icon||'•'}</span><span class="tree-item-name">${esc(resourceLabel(node.resourceId))}</span></button><button class="tree-delete" data-action="delete-reference" data-node-id="${node.id}" title="Remove reference" aria-label="Remove reference">×</button></div></div>`;
     }
-
     const def=TYPES[node.itemType];
     if(node.itemType==='room')return`<div class="tree-item tree-room ${node.open?'':'closed'}" data-node-id="${node.id}" data-draggable-node="true" draggable="true"><div class="tree-item-row${selected}"><button class="tree-main-action" data-action="activate" data-node-id="${node.id}">${chevron(node)}<span class="tree-type-icon">${def.icon}</span><span class="tree-item-name">${esc(node.label)}</span></button>${editButton(node)}${deleteButton(node)}</div><div class="tree-children">${node.children.map(renderNode).join('')}</div></div>`;
-
     return`<div class="tree-item" data-node-id="${node.id}" data-draggable-node="true" draggable="true"><div class="tree-item-row${selected}"><button class="tree-main-action" data-action="activate" data-node-id="${node.id}"><span class="tree-chevron-placeholder"></span><span class="tree-type-icon">${def?.icon||'•'}</span><span class="tree-item-name">${esc(node.label)}</span></button>${editButton(node)}${deleteButton(node)}</div></div>`;
   }
 
@@ -45,24 +38,15 @@ export function createProjectTreeController({treeElement,menuElement,getTree,get
   function activate(id){
     const found=findNode(tree(),id);if(!found)return;
     const node=found.node;
-
-    if(node.kind==='root'){
-      setSelectedId(id);toggleNode(node);save();render();return;
-    }
-    if(node.kind==='game-section'){
-      setSelectedId(id);save();render();openGameSectionEditor(id);return;
-    }
-    if(node.kind==='folder'){
-      setSelectedId(id);toggleNode(node);save();render();return;
-    }
+    if(node.kind==='root'){setSelectedId(id);toggleNode(node);save();render();return;}
+    if(node.kind==='game-section'){setSelectedId(id);save();render();openGameSectionEditor(id);return;}
+    if(node.kind==='folder'){setSelectedId(id);toggleNode(node);save();render();return;}
     if(node.kind==='room-section'){
       setSelectedId(id);toggleNode(node);save();render();
       if(node.sectionKey==='backgrounds')openRoomSectionEditor(id);
       return;
     }
-    if(node.kind==='reference'){
-      openEditor(node.resourceId);return;
-    }
+    if(node.kind==='reference'){openEditor(node.resourceId);return;}
     if(node.kind==='item'){
       if(node.itemType==='room')toggleNode(node);
       openEditor(id);return;
@@ -79,6 +63,8 @@ export function createProjectTreeController({treeElement,menuElement,getTree,get
       const name=row.querySelector('.tree-folder-name,.tree-item-name');if(!name)return;
       setSelectedId(id);
       const input=document.createElement('input');input.className='tree-rename-input';input.value=found.node.label;
+      input.addEventListener('click',event=>event.stopPropagation());
+      input.addEventListener('pointerdown',event=>event.stopPropagation());
       name.replaceWith(input);input.focus();input.select();
       let done=false;
       const commit=()=>{if(done)return;done=true;const value=input.value.trim();if(value)found.node.label=value;save();render();};
