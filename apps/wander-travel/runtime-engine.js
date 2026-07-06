@@ -4,8 +4,9 @@
   const inference = window.WanderEngineInference;
   const transition = window.WanderEngineTransition;
   const memory = window.WanderEngineMemory;
+  const relevanceEngine = window.WanderEngineRelevance;
   const decision = window.WanderEngineDecision;
-  if (!context || !state || !inference || !transition || !memory || !decision) return;
+  if (!context || !state || !inference || !transition || !memory || !relevanceEngine || !decision) return;
 
   const evaluationListeners = new Set();
   let lastEvaluation = null;
@@ -78,6 +79,17 @@
     });
   }
 
+  function writeMemoryEvent(areaEvents, relevance) {
+    if (!areaEvents.length) return;
+    const selected = relevance?.areaEvent || areaEvents[areaEvents.length - 1];
+    context.set('history.areaEvent', selected, {
+      source: 'engine-memory',
+      kind: 'inferred',
+      ttlMs: 120000,
+      confidence: selected.confidence ?? 0.85,
+    });
+  }
+
   function sameMemoryMeaning(a, b) {
     if (!a || !b) return a === b;
     return a.cellId === b.cellId &&
@@ -122,7 +134,7 @@
   }
 
   function buildEvaluation(situation, transitionResult, memoryResult) {
-    const relevance = decision.evaluateRelevance({
+    const relevance = relevanceEngine.evaluate({
       situation,
       transitions: transitionResult.events,
       memory: memoryResult,
@@ -142,6 +154,7 @@
       },
       memory: {
         currentArea: memoryResult.currentArea,
+        areaEvents: memoryResult.areaEvents,
         closedEpisodes: memoryResult.closedEpisodes,
       },
       relevance,
@@ -151,19 +164,20 @@
   function evaluate() {
     const situation = inference.inferSituation(context);
     const currentArea = memory.getCurrentAreaSummary(situation);
-    const relevance = decision.evaluateRelevance({
+    const memorySnapshot = { currentArea, areaEvents: [], closedEpisodes: [] };
+    const relevance = relevanceEngine.evaluate({
       situation,
       transitions: [],
-      memory: { currentArea, closedEpisodes: [] },
+      memory: memorySnapshot,
     });
-    const action = decision.decideAction({ situation, relevance, memory: { currentArea } });
+    const action = decision.decideAction({ situation, relevance, memory: memorySnapshot });
     return {
       ...action,
       contextAvailable: situation.locationAvailable,
       situation,
       transitions: [],
       transitionState: transition.snapshot(),
-      memory: { currentArea, closedEpisodes: [] },
+      memory: memorySnapshot,
       relevance,
     };
   }
@@ -181,6 +195,7 @@
 
     writeSituation(situation);
     writeTransition(transitionResult.events, evaluation.relevance);
+    writeMemoryEvent(memoryResult.areaEvents, evaluation.relevance);
     writeMemoryContext(memoryResult.currentArea, at);
     scheduleTransitionCheck(transitionResult.nextCheckAt);
     publishEvaluation(evaluation, reason);
