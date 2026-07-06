@@ -31,18 +31,10 @@
 
   context.recomputeEffectiveLocation();
   context.setMotion({ status: 'pending', mode: 'unknown', source: 'init' });
-
-  context.set('user.intent', 'Descubrir', {
-    source: 'default',
-    kind: 'observed',
-    confidence: 0.5,
-  });
-
-  context.set('user.interests', [], {
-    source: 'user',
-    kind: 'config',
-    ttlMs: Infinity,
-    confidence: 0.5,
+  context.set('places.items', [], {
+    source: 'init',
+    kind: 'derived',
+    confidence: 0,
   });
 
   context.updateTime();
