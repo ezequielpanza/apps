@@ -1,7 +1,8 @@
 (() => {
   const base = window.WanderBase;
+  const body = window.WanderBody;
   const context = window.WanderContext;
-  if (!base || !context) return;
+  if (!base || !body || !context) return;
 
   const $ = (selector) => document.querySelector(selector);
   let enabled = false;
@@ -31,21 +32,18 @@
   }
 
   function existingOverridePosition() {
-    const lat = context.value('location.override.lat');
-    const lng = context.value('location.override.lng');
-    if (lat === null || lat === undefined || lng === null || lng === undefined) return null;
-    const numericLat = Number(lat);
-    const numericLng = Number(lng);
-    if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) return null;
-    return L.latLng(numericLat, numericLng);
+    const override = body.getLocationOverride();
+    if (!override?.enabled || override.status !== 'available') return null;
+    return L.latLng(override.lat, override.lng);
   }
 
   function seedOverrideFromReal() {
-    const real = base.getRealPosition?.();
-    if (!real) return null;
-    if (!context.setLocationOverride({ lat: real.lat, lng: real.lng })) return null;
-    base.map.setView(real, Math.max(base.map.getZoom(), 15));
-    return real;
+    const real = body.getRealLocation();
+    if (!real || real.status !== 'available') return null;
+    if (!body.setLocationOverride({ lat: real.lat, lng: real.lng, speedMps: 0 })) return null;
+    const seeded = L.latLng(real.lat, real.lng);
+    base.map.setView(seeded, Math.max(base.map.getZoom(), 15));
+    return seeded;
   }
 
   function ensureOverridePosition() {
@@ -64,26 +62,15 @@
     timer = setInterval(tick, TICK_MS);
   }
 
-  function stopMotion({ updateContext = true } = {}) {
+  function stopMotion() {
     stopTimer();
     heading = null;
     speedKmh = 0;
-
     const knob = $('#simulation-joystick-knob');
     if (knob) knob.style.transform = 'translate(0px, 0px)';
-
-    if (enabled && updateContext) {
-      const current = ensureOverridePosition();
-      if (current) context.setLocationOverride({ lat: current.lat, lng: current.lng, speedMps: 0 });
-      window.WanderUI?.setMotion(false, 0, null, {
-        source: 'simulator',
-        motionStatus: 'stationary',
-        motionMode: 'unknown',
-        contextStatus: 'En pausa',
-        contextActivity: 'paused',
-        confidence: 1,
-      });
-    }
+    if (!enabled) return;
+    const current = ensureOverridePosition();
+    if (current) body.setLocationOverride({ lat: current.lat, lng: current.lng, speedMps: 0 });
   }
 
   function setEnabled(next) {
@@ -93,31 +80,23 @@
       return;
     }
 
-    stopMotion({ updateContext: false });
+    stopMotion();
     enabled = shouldEnable;
     window.WanderSimulationActive = enabled;
 
     if (enabled) {
       const seed = seedOverrideFromReal();
-      if (seed) {
-        setPanelStatus('Simulación activa · iniciada desde la última ubicación real conocida');
-      } else {
-        setPanelStatus('Simulación activa · esperando una ubicación real para inicializar');
-      }
+      setPanelStatus(seed
+        ? 'Simulación activa · iniciada desde la última ubicación real conocida'
+        : 'Simulación activa · esperando una ubicación real para inicializar');
       context.set('simulation.status', 'active', { source: 'simulator', ttlMs: Infinity, confidence: 1 });
     } else {
-      context.clearLocationOverride();
+      body.clearLocationOverride();
       setPanelStatus('Simulación desactivada · ubicación efectiva restaurada desde GPS real');
       context.set('simulation.status', 'inactive', { source: 'simulator', ttlMs: Infinity, confidence: 1 });
     }
 
     syncVisualState();
-  }
-
-  function profileForSpeed(kmh) {
-    if (kmh < 8) return { mode: 'walking', status: 'Caminando', activity: 'walking' };
-    if (kmh < 25) return { mode: 'cycling', status: 'Andando en bicicleta', activity: 'cycling' };
-    return { mode: 'driving', status: 'Conduciendo', activity: 'driving' };
   }
 
   function tick() {
@@ -129,8 +108,8 @@
 
     const elapsedMs = Math.min(Math.max(0, now - lastTickAt), MAX_DELTA_MS);
     lastTickAt = now;
-
     if (!enabled || !Number.isFinite(heading) || speedKmh <= 0 || elapsedMs <= 0) return;
+
     const current = ensureOverridePosition();
     if (!current) return;
 
@@ -143,20 +122,11 @@
       current.lng + east / (111320 * Math.max(0.15, Math.cos(current.lat * Math.PI / 180)))
     );
 
-    const profile = profileForSpeed(speedKmh);
-    context.setLocationOverride({
+    body.setLocationOverride({
       lat: next.lat,
       lng: next.lng,
       heading,
       speedMps: speedKmh / 3.6,
-    });
-    window.WanderUI?.setMotion(true, speedKmh / 3.6, heading, {
-      source: 'simulator',
-      motionStatus: 'moving',
-      motionMode: profile.mode,
-      contextStatus: profile.status,
-      contextActivity: profile.activity,
-      confidence: 1,
     });
     window.WanderTracks?.addPoint(next);
 
@@ -187,7 +157,6 @@
     const intensity = maxRadius ? limited / maxRadius : 0;
     speedKmh = intensity * MAX_SPEED_KMH;
     heading = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
-
     startTimer();
 
     const hud = $('#simulation-hud-value');
@@ -202,9 +171,9 @@
     if (hud) hud.textContent = '0.0 km/h · —';
   }
 
-  context.subscribe((key) => {
+  body.subscribe((channel) => {
     if (!enabled || existingOverridePosition()) return;
-    if (key === 'location.real' || key.startsWith('location.real.')) {
+    if (channel === 'location.real') {
       const seeded = seedOverrideFromReal();
       if (seeded) setPanelStatus('Simulación activa · iniciada desde la última ubicación real conocida');
     }
