@@ -1,115 +1,86 @@
 (() => {
-  const STORAGE_KEY = 'wander.engine.state.v1';
-  const listeners = new Set();
+  const context = window.WanderContext;
+  const state = window.WanderEngineState;
+  const inference = window.WanderEngineInference;
+  const decision = window.WanderEngineDecision;
+  if (!context || !state || !inference || !decision) return;
 
-  const DEFAULT_STATE = {
-    schemaVersion: 1,
-    traveler: {
-      name: '',
-      preferredName: '',
-    },
-    profile: {
-      interests: {},
-      patterns: [],
-      tendencies: [],
-    },
-    travel: {
-      currentTrip: null,
-      plans: [],
-      destinations: [],
-      routes: [],
-    },
-    memory: {
-      interactions: [],
-      visitedPlaces: [],
-      acceptedSuggestions: [],
-      rejectedSuggestions: [],
-    },
-  };
+  const evaluationListeners = new Set();
+  let lastEvaluation = null;
 
-  function clone(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
-
-  function loadState() {
-    try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (!stored || stored.schemaVersion !== DEFAULT_STATE.schemaVersion) return clone(DEFAULT_STATE);
-      return {
-        ...clone(DEFAULT_STATE),
-        ...stored,
-        traveler: { ...DEFAULT_STATE.traveler, ...(stored.traveler || {}) },
-        profile: { ...clone(DEFAULT_STATE.profile), ...(stored.profile || {}) },
-        travel: { ...clone(DEFAULT_STATE.travel), ...(stored.travel || {}) },
-        memory: { ...clone(DEFAULT_STATE.memory), ...(stored.memory || {}) },
-      };
-    } catch {
-      return clone(DEFAULT_STATE);
-    }
-  }
-
-  let state = loadState();
-
-  function persist() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-  }
-
-  function snapshot() {
-    return clone(state);
-  }
-
-  function notify(reason = 'update') {
-    const current = snapshot();
-    listeners.forEach((listener) => {
-      try { listener(current, reason); } catch {}
+  function publishEvaluation(evaluation, reason) {
+    lastEvaluation = evaluation;
+    evaluationListeners.forEach((listener) => {
+      try { listener(evaluation, reason); } catch {}
     });
   }
 
-  function subscribe(listener) {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
+  function subscribeEvaluation(listener) {
+    evaluationListeners.add(listener);
+    return () => evaluationListeners.delete(listener);
   }
 
-  function update(mutator, reason = 'update') {
-    const draft = snapshot();
-    const next = mutator(draft) || draft;
-    state = next;
-    persist();
-    notify(reason);
-    return snapshot();
+  function writeSituation(situation) {
+    const motion = situation.motion;
+    const confidence = situation.source === 'simulator' ? 1 : motion.confidence;
+
+    context.set('motion.status', motion.status, { source: 'engine', kind: 'inferred', confidence });
+    context.set('motion.mode', motion.mode, { source: 'engine', kind: 'inferred', confidence });
+
+    if (situation.speedKmh === null) {
+      context.setMotion({ speedKmh: 0, heading: null, source: 'engine' });
+    } else {
+      context.set('motion.speedKmh', situation.speedKmh, { source: 'engine', kind: 'derived', confidence });
+      if (situation.heading === null) context.setMotion({ heading: null, source: 'engine' });
+      else context.set('motion.heading', situation.heading, { source: 'engine', kind: 'derived', confidence });
+    }
+
+    context.setContext({
+      status: motion.label,
+      activity: motion.activity,
+      source: 'engine',
+      confidence,
+    });
   }
 
-  function observe(event = {}) {
-    if (!event || typeof event !== 'object' || !event.type) return false;
-    update((draft) => {
-      draft.memory.interactions.push({
-        ...clone(event),
-        at: event.at || new Date().toISOString(),
-      });
-      return draft;
-    }, 'observe:' + event.type);
-    return true;
-  }
-
-  function answer(questionId, answer) {
-    if (!questionId) return false;
-    return observe({ type: 'answer', questionId, answer });
-  }
-
-  function evaluate(contextSnapshot = null) {
+  function evaluate() {
+    const situation = inference.inferSituation(context);
+    const relevance = decision.evaluateRelevance(situation);
+    const action = decision.decideAction({ situation, relevance });
     return {
-      type: 'wait',
-      reason: 'no_decision_rule',
-      contextAvailable: Boolean(contextSnapshot),
+      ...action,
+      contextAvailable: situation.locationAvailable,
+      situation,
+      relevance,
     };
   }
 
+  function run(reason = 'manual') {
+    const evaluation = evaluate();
+    writeSituation(evaluation.situation);
+    publishEvaluation(evaluation, reason);
+    return evaluation;
+  }
+
+  context.subscribe((key) => {
+    if (key === 'location.effective' || key.startsWith('location.effective.')) {
+      run('context:' + key);
+    }
+  });
+
   window.WanderEngine = {
-    getState: snapshot,
-    subscribe,
-    update,
-    observe,
-    answer,
+    getState: state.getState,
+    subscribe: state.subscribe,
+    update: state.update,
+    observe: state.observe,
+    answer: state.answer,
+    inferMotionProfile: inference.inferMotionProfile,
+    inferSituation: () => inference.inferSituation(context),
     evaluate,
+    run,
+    getLastEvaluation: () => lastEvaluation,
+    subscribeEvaluation,
   };
+
+  run('init');
 })();
