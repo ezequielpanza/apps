@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Adventure Studio</title>
+  <desc id="desc">White AS initials inside a violet circle.</desc>
+  <circle cx="64" cy="64" r="60" fill="#5f2ccf"/>
+  <circle cx="64" cy="64" r="60" fill="url(#glow)" opacity=".34"/>
+  <text x="64" y="79" text-anchor="middle" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="52" font-weight="800" letter-spacing="-4">AS</text>
+  <defs>
+    <radialGradient id="glow" cx="35%" cy="28%" r="78%">
+      <stop offset="0" stop-color="#9a7cff"/>
+      <stop offset="1" stop-color="#32106f"/>
+    </radialGradient>
+  </defs>
+</svg>
