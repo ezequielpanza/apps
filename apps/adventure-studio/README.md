@@ -4,7 +4,7 @@ Editor web modular para crear aventuras gráficas point & click.
 
 ## Versión actual
 
-`v0.10.0`
+`v0.11.0`
 
 ## Tecnología
 
@@ -41,26 +41,60 @@ Dialogues
 Audio
 ```
 
-`Game` es global y fijo. No se elimina, no se renombra y no acepta recursos por drag & drop.
+### Interacción principal
 
-Los proyectos anteriores reciben automáticamente `Game / Settings` al cargarse, sin perder sus recursos existentes.
+El árbol usa click único:
+
+```text
+Click en raíz con hijos
+→ selecciona
+→ expande o contrae
+
+Click en Settings
+→ abre Game Settings Editor
+
+Click en Room
+→ abre Room Editor
+→ expande o contrae sus secciones
+
+Click en Backgrounds
+→ abre Background Editor
+→ expande o contrae la sección
+
+Click en recurso hoja
+→ abre su editor
+```
+
+No se usa doble click para abrir recursos y no existe renombrado retardado por click sobre el nombre.
+
+### Acciones semánticas
+
+```text
++   verde      → crear
+✎   amarillo   → renombrar
+×   rojo       → eliminar
+```
+
+Los mismos recursos que pueden eliminarse muestran también el lápiz para renombrarlos. Las secciones estructurales fijas no se renombran ni se eliminan.
+
+El renombrado inline se activa exclusivamente con el botón `✎`.
 
 ## Game Settings Editor
 
-Doble click sobre:
+Click sobre:
 
 ```text
 Game / Settings
 ```
 
-abre el editor de configuración global.
+abre la configuración global.
 
 Actualmente administra:
 
 - Game Resolution Width
 - Game Resolution Height
 
-La resolución define el viewport lógico y el sistema de coordenadas del juego completo. Ya no aparece como propiedad de una Room.
+La resolución define el viewport lógico del juego completo y ya no aparece como propiedad de una Room.
 
 Separación conceptual:
 
@@ -72,24 +106,17 @@ Camera / Scroll   → futura propiedad de Room
 Room Viewport     → futura configuración de layout
 ```
 
-Valores actuales:
-
-```text
-Proyecto vacío: 1280 × 720
-Monkey Island 2 C: 320 × 200
-```
-
 ## Arquitectura
 
 - Workspace Host central
 - Inspector contextual
-- Estado `activeEditorId` persistente
-- Game Settings Editor especializado
+- estado `activeEditorId` persistente
+- Game Settings Editor
 - Room Editor
 - Background Editor
 - shells para Character, Inventory, Dialogue y Audio
-- Project Tree con subcarpetas y drag & drop tipado
-- recursos separados de la estructura visual del árbol
+- Project Tree con drag & drop tipado
+- recursos separados de la estructura visual
 - bootstrap genérico de proyectos empaquetados
 
 ## Demo privado
@@ -111,8 +138,6 @@ Para remover el demo:
 
 1. borrar `demo-projects/monkey-island-2-c/`;
 2. cambiar `startup-project.js`.
-
-El motor no debe requerir cambios.
 
 ## Rooms
 
@@ -138,8 +163,6 @@ El modelo usa:
 
 - `backgrounds[]`
 - `defaultBackgroundId`
-
-Cada background conserva nombre, asset, dimensiones, tipo, tamaño, zoom y modo de escala.
 
 El Background Editor permite importar, previsualizar, renombrar, marcar el predeterminado y eliminar estados.
 
