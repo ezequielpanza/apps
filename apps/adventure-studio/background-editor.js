@@ -33,7 +33,7 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
     els.backgroundNameInput.value=bg.name;
     els.backgroundDimensions.value=`${bg.width} × ${bg.height}`;
     els.backgroundDefaultCheck.checked=bg.id===resource.defaultBackgroundId;
-    const blob=await assets.get(bg.assetKey);
+    const blob=await assets.get(bg.assetKey,bg.sourceUrl,bg.sourceEncoding,bg.type);
     if(!blob){releasePreview();els.backgroundPreviewImage.removeAttribute('src');return;}
     releasePreview();
     previewUrl=URL.createObjectURL(blob);
@@ -43,7 +43,7 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
   async function addFiles(files){
     const current=context();if(!current||!files?.length)return;
     for(const file of files){
-      const dims=await readDimensions(file),id=uid('background'),assetKey=`${current.room.id}:background:${id}`;
+      const dims=await readDimensions(file),id=uid('background'),assetKey=`${current.room.gameId}:${current.room.id}:background:${id}`;
       await assets.put(assetKey,file);
       current.resource.backgrounds.push({id,name:stripExtension(file.name)||`Background ${current.resource.backgrounds.length+1}`,assetKey,width:dims.width,height:dims.height,type:file.type,size:file.size,zoom:100,scaleMode:'manual'});
       if(!current.resource.defaultBackgroundId)current.resource.defaultBackgroundId=id;
