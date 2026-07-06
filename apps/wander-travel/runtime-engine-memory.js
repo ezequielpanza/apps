@@ -132,6 +132,40 @@
     return record;
   }
 
+  function familiarityFor(record, priorVisitCount = Math.max(0, record.visitCount - 1)) {
+    if (priorVisitCount <= 0) return 'first_visit';
+    if (record.visitCount >= 10 || record.totalDurationMs >= 72000000) return 'frequent';
+    if (record.visitCount >= 3 || record.totalDurationMs >= 14400000) return 'familiar';
+    return 'returning';
+  }
+
+  function latestVisit(record) {
+    return record.recentVisits?.[record.recentVisits.length - 1] || null;
+  }
+
+  function areaEvent(type, at, key, record, extras = {}) {
+    const priorVisitCount = Math.max(0, record.visitCount - 1);
+    return {
+      type,
+      at: iso(at),
+      cellId: key,
+      cellSizeM: CELL_SIZE_M,
+      familiarity: familiarityFor(record, priorVisitCount),
+      visitCount: record.visitCount,
+      priorVisitCount,
+      ...extras,
+    };
+  }
+
+  function pushFamiliarityTransition(events, before, after, at, key, record) {
+    if (before === after) return;
+    if (after === 'familiar') {
+      events.push(areaEvent('area.familiar', at, key, record, { confidence: 0.9 }));
+    } else if (after === 'frequent') {
+      events.push(areaEvent('area.frequent', at, key, record, { confidence: 0.94 }));
+    }
+  }
+
   function activateCell(record, key, point, motion, at, countVisit, enteredAt = at) {
     if (countVisit) {
       record.visitCount += 1;
@@ -150,24 +184,53 @@
   }
 
   function latestVisitStartedAt(record, fallbackAt) {
-    const latest = record.recentVisits?.[record.recentVisits.length - 1];
-    const parsed = Date.parse(latest || '');
+    const parsed = Date.parse(latestVisit(record) || '');
     return Number.isFinite(parsed) ? parsed : fallbackAt;
+  }
+
+  function openNewVisit(record, key, point, motion, at, events) {
+    const previousVisitAt = latestVisit(record);
+    const previousVisitCount = record.visitCount;
+    const beforeFamiliarity = familiarityFor(record, Math.max(0, record.visitCount - 1));
+
+    activateCell(record, key, point, motion, at, true, at);
+
+    if (previousVisitCount === 0) {
+      events.push(areaEvent('area.first_visit', at, key, record, {
+        confidence: 0.96,
+      }));
+    } else {
+      const previousAt = Date.parse(previousVisitAt || '');
+      events.push(areaEvent('area.returned', at, key, record, {
+        previousVisitAt,
+        returnGapMs: Number.isFinite(previousAt) ? Math.max(0, at - previousAt) : null,
+        confidence: 0.92,
+      }));
+    }
+
+    const afterFamiliarity = familiarityFor(record, Math.max(0, record.visitCount - 1));
+    pushFamiliarityTransition(events, beforeFamiliarity, afterFamiliarity, at, key, record);
   }
 
   function updateSpatial(point, motion, at) {
     const key = cellId(point.lat, point.lng);
     const record = cellRecord(key, at);
     const active = memory.active.cell;
+    const events = [];
+    const beforeFamiliarity = familiarityFor(record, Math.max(0, record.visitCount - 1));
 
     if (!active || active.key !== key) {
       const lastSeenAt = Date.parse(record.lastSeenAt || '');
       const sameVisit = record.visitCount > 0 && Number.isFinite(lastSeenAt) && at - lastSeenAt <= REVISIT_GAP_MS;
-      activateCell(record, key, point, motion, at, !sameVisit, sameVisit ? latestVisitStartedAt(record, at) : at);
+      if (sameVisit) {
+        activateCell(record, key, point, motion, at, false, latestVisitStartedAt(record, at));
+      } else {
+        openNewVisit(record, key, point, motion, at, events);
+      }
     } else {
       const gapMs = at - active.lastSampleAt;
       if (gapMs > REVISIT_GAP_MS) {
-        activateCell(record, key, point, motion, at, true, at);
+        openNewVisit(record, key, point, motion, at, events);
       } else {
         const durationMs = Math.max(0, Math.min(gapMs, MAX_SAMPLE_GAP_MS));
         record.totalDurationMs += durationMs;
@@ -178,8 +241,13 @@
 
     record.lastSeenAt = iso(at);
     record.samples += 1;
+
+    const afterFamiliarity = familiarityFor(record, Math.max(0, record.visitCount - 1));
+    const alreadyEmitted = events.some((entry) => entry.type === 'area.' + afterFamiliarity);
+    if (!alreadyEmitted) pushFamiliarityTransition(events, beforeFamiliarity, afterFamiliarity, at, key, record);
+
     schedulePersist();
-    return key;
+    return { key, events };
   }
 
   function thinPath(path) {
@@ -357,13 +425,6 @@
     return null;
   }
 
-  function familiarityFor(record, priorVisitCount) {
-    if (priorVisitCount <= 0) return 'first_visit';
-    if (record.visitCount >= 10 || record.totalDurationMs >= 72000000) return 'frequent';
-    if (record.visitCount >= 3 || record.totalDurationMs >= 14400000) return 'familiar';
-    return 'returning';
-  }
-
   function currentAreaSummary(situation, at = Date.now()) {
     const point = pointFromSituation(situation, at);
     if (!point) return null;
@@ -400,11 +461,11 @@
     const point = pointFromSituation(situation, at);
     if (!point || !situation?.locationAvailable) {
       schedulePersist();
-      return { currentArea: null, closedEpisodes: recoveredEpisodes };
+      return { currentArea: null, closedEpisodes: recoveredEpisodes, areaEvents: [] };
     }
 
     const motion = stableMotion(situation, transitionState);
-    updateSpatial(point, motion, at);
+    const spatialResult = updateSpatial(point, motion, at);
     const beforeMovement = memory.episodes.movement.length;
     const beforeStays = memory.episodes.stays.length;
     syncEpisodes(point, situation, transitionState, at);
@@ -412,6 +473,7 @@
 
     return {
       currentArea: currentAreaSummary(situation, at),
+      areaEvents: spatialResult.events,
       closedEpisodes: [
         ...recoveredEpisodes,
         ...memory.episodes.movement.slice(beforeMovement),
