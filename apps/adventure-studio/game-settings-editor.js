@@ -1,6 +1,7 @@
-export function createGameSettingsEditor({els,getSettings,save,renderWorkspace}){
+export function createGameSettingsEditor({els,getGameResource,save,renderWorkspace}){
   function render(){
-    const settings=getSettings();
+    const game=getGameResource();if(!game)return;
+    const settings=game.settings;
     els.gameSettingsWidthInput.value=settings.width;
     els.gameSettingsHeightInput.value=settings.height;
     els.gameSettingsResolutionPreview.textContent=`${settings.width} × ${settings.height}`;
@@ -9,7 +10,8 @@ export function createGameSettingsEditor({els,getSettings,save,renderWorkspace})
   }
 
   function updateDimension(key,value){
-    const settings=getSettings();
+    const game=getGameResource();if(!game)return;
+    const settings=game.settings;
     const fallback=key==='width'?1280:720;
     const min=key==='width'?160:120;
     const max=key==='width'?7680:4320;
