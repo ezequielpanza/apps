@@ -4,7 +4,7 @@ Editor web para crear aventuras gráficas point & click.
 
 ## Versión actual
 
-`v0.8.1`
+`v0.9.0`
 
 ## Tecnología
 
@@ -14,6 +14,7 @@ Editor web para crear aventuras gráficas point & click.
 - Sin build
 - `localStorage` para estructura, metadatos y configuración
 - IndexedDB para imágenes binarias importadas y cacheadas
+- Web App Manifest para identidad de app y acceso directo
 
 ## Desarrollo local
 
@@ -27,6 +28,27 @@ python -m http.server 8000 --directory apps/adventure-studio
 - Carpeta publicada: `apps/adventure-studio`
 - URL pública esperada: `https://adventure-studio.pages.dev`
 - Workflow: `.github/workflows/deploy-adventure-studio.yml`
+
+## Identidad visual
+
+Adventure Studio usa una marca propia basada en:
+
+- logo circular violeta;
+- iniciales `AS` en blanco;
+- acento violeta unificado en selección, botones, foco, sliders y estados activos.
+
+Assets principales:
+
+```text
+assets/adventure-studio-logo.svg
+app.webmanifest
+```
+
+El mismo logo se usa:
+
+- dentro del header, al lado del título;
+- como favicon del navegador;
+- como icono declarado por el Web App Manifest para accesos directos o instalación como app compatible.
 
 ## Arquitectura actual
 
