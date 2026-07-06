@@ -16,13 +16,9 @@ export async function bootstrapBundledProject(projectUrl,{forceDefault=false}={}
   const isCurrentBundle=currentProjectId===project.id;
 
   if(shouldInitialize){
-    localStorage.setItem(STORAGE_KEYS.tree,JSON.stringify(project.tree));
-    localStorage.setItem(STORAGE_KEYS.resources,JSON.stringify(project.resources));
-    localStorage.setItem(STORAGE_KEYS.settings,JSON.stringify(project.settings));
-    localStorage.setItem(STORAGE_KEYS.selection,project.selectedId||'rooms');
-    if(project.activeEditorId)localStorage.setItem(STORAGE_KEYS.activeEditor,project.activeEditorId);else localStorage.removeItem(STORAGE_KEYS.activeEditor);
-    localStorage.setItem(PROJECT_NAME_KEY,project.name||'Untitled Project');
-    localStorage.setItem(PROJECT_ID_KEY,project.id);
+    initializeProject(project);
+  }else if(isCurrentBundle){
+    reconcileBundledResources(project);
   }
 
   if(shouldInitialize||isCurrentBundle){
@@ -36,6 +32,80 @@ export async function bootstrapBundledProject(projectUrl,{forceDefault=false}={}
 }
 
 export function getCurrentProjectName(){return localStorage.getItem(PROJECT_NAME_KEY)||'Untitled Project';}
+
+function initializeProject(project){
+  localStorage.setItem(STORAGE_KEYS.tree,JSON.stringify(project.tree));
+  localStorage.setItem(STORAGE_KEYS.resources,JSON.stringify(project.resources));
+  localStorage.setItem(STORAGE_KEYS.settings,JSON.stringify(project.settings));
+  localStorage.setItem(STORAGE_KEYS.selection,project.selectedId||'rooms');
+  if(project.activeEditorId)localStorage.setItem(STORAGE_KEYS.activeEditor,project.activeEditorId);else localStorage.removeItem(STORAGE_KEYS.activeEditor);
+  localStorage.setItem(PROJECT_NAME_KEY,project.name||'Untitled Project');
+  localStorage.setItem(PROJECT_ID_KEY,project.id);
+}
+
+function reconcileBundledResources(project){
+  const localResources=parseStoredResources();
+  if(!localResources)return;
+  localResources.rooms??={};
+
+  for(const[roomId,bundledRoom]of Object.entries(project.resources?.rooms||{})){
+    const localRoom=localResources.rooms[roomId];
+    if(!localRoom)continue;
+    localRoom.backgrounds=Array.isArray(localRoom.backgrounds)?localRoom.backgrounds:[];
+
+    for(const bundledBackground of bundledRoom.backgrounds||[]){
+      reconcileBackground(localRoom,bundledBackground);
+    }
+
+    if(!localRoom.defaultBackgroundId||!localRoom.backgrounds.some(bg=>bg.id===localRoom.defaultBackgroundId)){
+      const bundledDefault=(bundledRoom.backgrounds||[]).find(bg=>bg.id===bundledRoom.defaultBackgroundId);
+      const localDefault=bundledDefault?findEquivalentBackground(localRoom.backgrounds,bundledDefault):localRoom.backgrounds[0];
+      localRoom.defaultBackgroundId=localDefault?.id||null;
+    }
+  }
+
+  localStorage.setItem(STORAGE_KEYS.resources,JSON.stringify(localResources));
+}
+
+function reconcileBackground(localRoom,bundledBackground){
+  const matches=localRoom.backgrounds.filter(bg=>backgroundsEquivalent(bg,bundledBackground));
+  let target=matches.find(bg=>bg.id===bundledBackground.id)||matches[0]||null;
+
+  if(!target){
+    target={...bundledBackground};
+    localRoom.backgrounds.push(target);
+  }else{
+    target.assetKey=bundledBackground.assetKey;
+    target.sourceUrl=bundledBackground.sourceUrl;
+    target.sourceEncoding=bundledBackground.sourceEncoding;
+    target.type=bundledBackground.type||target.type;
+    target.width=target.width||bundledBackground.width;
+    target.height=target.height||bundledBackground.height;
+    target.size=bundledBackground.size||target.size;
+    target.zoom=Number(target.zoom)||Number(bundledBackground.zoom)||100;
+    target.scaleMode=target.scaleMode||bundledBackground.scaleMode||'manual';
+  }
+
+  for(const duplicate of matches){
+    if(duplicate===target)continue;
+    if(localRoom.defaultBackgroundId===duplicate.id)localRoom.defaultBackgroundId=target.id;
+    localRoom.backgrounds=localRoom.backgrounds.filter(bg=>bg!==duplicate);
+  }
+}
+
+function findEquivalentBackground(backgrounds,bundledBackground){
+  return backgrounds.find(bg=>backgroundsEquivalent(bg,bundledBackground))||null;
+}
+
+function backgroundsEquivalent(a,b){
+  if(!a||!b)return false;
+  if(a.id&&b.id&&a.id===b.id)return true;
+  return a.name===b.name&&Number(a.width)===Number(b.width)&&Number(a.height)===Number(b.height);
+}
+
+function parseStoredResources(){
+  try{return JSON.parse(localStorage.getItem(STORAGE_KEYS.resources)||'null');}catch{return null;}
+}
 
 async function hydrateBundledAssets(project,projectUrl){
   const assets=[];
