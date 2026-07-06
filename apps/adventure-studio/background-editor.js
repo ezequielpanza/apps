@@ -13,6 +13,7 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
   }
 
   function releasePreview(){if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}}
+  function selectBackground(id){selectedBackgroundId=id||null;}
 
   async function render(){
     const current=context();if(!current)return;
@@ -32,8 +33,8 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
     els.backgroundNameInput.value=bg.name;
     els.backgroundDimensions.value=`${bg.width} × ${bg.height}`;
     els.backgroundDefaultCheck.checked=bg.id===resource.defaultBackgroundId;
-    const blob=await assets.get(bg.assetKey,bg.sourceUrl,bg.sourceEncoding,bg.type);
-    if(!blob){els.backgroundPreviewImage.removeAttribute('src');return;}
+    const blob=await assets.get(bg.assetKey);
+    if(!blob){releasePreview();els.backgroundPreviewImage.removeAttribute('src');return;}
     releasePreview();
     previewUrl=URL.createObjectURL(blob);
     els.backgroundPreviewImage.src=previewUrl;
@@ -75,7 +76,7 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
     window.addEventListener('beforeunload',releasePreview);
   }
 
-  return{bind,render};
+  return{bind,render,selectBackground};
 }
 
 function stripExtension(name){return name.replace(/\.[^.]+$/,'');}
