@@ -63,9 +63,27 @@ function openRoomSectionEditor(id){const found=findNode(tree,id);if(!found||foun
 
 function deleteResourceTree(node){
   const ids=new Set();
-  const visit=current=>{ids.add(current.id);if(current.kind==='item'&&current.itemType==='game'){const game=resources.games?.[current.id];Object.values(game?.rooms||{}).forEach(room=>(room.backgrounds||[]).forEach(bg=>roomBackgroundStore.remove(bg.assetKey).catch(()=>{})));delete resources.games?.[current.id];}
-    else if(current.kind==='item'){const game=ensureGameResource(resources,current.gameId),bucket=bucketFor(current.itemType),resource=game?.[bucket]?.[current.id];if(current.itemType==='room'&&resource?.backgrounds)resource.backgrounds.forEach(bg=>roomBackgroundStore.remove(bg.assetKey).catch(()=>{}));if(game&&bucket)delete game[bucket][current.id];removeReferencesTo(tree,current.id);}if(Array.isArray(current.children))current.children.forEach(visit);};
-  visit(node);if(activeEditorId&&ids.has(activeEditorId))activeEditorId=null;
+  const collect=current=>{ids.add(current.id);if(Array.isArray(current.children))current.children.forEach(collect);};
+  collect(node);
+
+  if(node.kind==='item'&&node.itemType==='game'){
+    const game=resources.games?.[node.id];
+    Object.values(game?.rooms||{}).forEach(room=>(room.backgrounds||[]).forEach(bg=>roomBackgroundStore.remove(bg.assetKey).catch(()=>{})));
+    if(resources.games)delete resources.games[node.id];
+  }else{
+    const remove=current=>{
+      if(current.kind==='item'){
+        const game=ensureGameResource(resources,current.gameId),bucket=bucketFor(current.itemType),resource=bucket?game?.[bucket]?.[current.id]:null;
+        if(current.itemType==='room'&&resource?.backgrounds)resource.backgrounds.forEach(bg=>roomBackgroundStore.remove(bg.assetKey).catch(()=>{}));
+        if(game&&bucket)delete game[bucket][current.id];
+        removeReferencesTo(tree,current.id);
+      }
+      if(Array.isArray(current.children))current.children.forEach(remove);
+    };
+    remove(node);
+  }
+
+  if(activeEditorId&&ids.has(activeEditorId))activeEditorId=null;
 }
 
 function getRoomSectionCount(section){if(section.sectionKey!=='backgrounds')return section.children.length;const room=findNode(tree,section.roomId)?.node;if(!room)return 0;return ensureResource(resources,room).backgrounds.length;}
