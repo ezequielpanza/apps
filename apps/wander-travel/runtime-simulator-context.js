@@ -4,7 +4,7 @@
   if (!base || !context) return;
 
   const $ = (s) => document.querySelector(s);
-  const MAX_SPEED_KMH = 80;
+  const MAX_SPEED_KMH = 40;
   let enabled = false;
   let timer = null;
   let heading = null;
