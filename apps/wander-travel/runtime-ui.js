@@ -13,90 +13,28 @@
     setText('#wander-message', message);
   }
 
-  function syncContextStatus() {
-    const status = window.WanderContext?.value('context.status', 'Preparando contexto');
+  function syncRuntimeMetrics() {
+    const context = window.WanderContext;
+    const status = context?.value('context.status', 'Preparando contexto');
+    const speed = Number(context?.value('motion.speedKmh'));
+    const heading = Number(context?.value('motion.heading'));
+    const moving = context?.value('motion.status') === 'moving';
+
     setText('#metric-status', status || 'Preparando contexto');
-  }
-
-  function setLocationPending() {
-    syncContextStatus();
-    setText('#metric-speed', '—');
-    setText('#metric-heading', '—');
-  }
-
-  function inferMovement(moving, kmh) {
-    if (!moving) {
-      return {
-        status: 'stationary',
-        mode: 'unknown',
-        contextStatus: 'En pausa',
-        activity: 'paused',
-      };
-    }
-    if (kmh < 8) {
-      return {
-        status: 'moving',
-        mode: 'walking',
-        contextStatus: 'Caminando',
-        activity: 'walking',
-      };
-    }
-    if (kmh < 25) {
-      return {
-        status: 'moving',
-        mode: 'cycling',
-        contextStatus: 'Andando en bicicleta',
-        activity: 'cycling',
-      };
-    }
-    return {
-      status: 'moving',
-      mode: 'driving',
-      contextStatus: 'Conduciendo',
-      activity: 'driving',
-    };
-  }
-
-  function setMotion(moving, speedMps, heading, options = {}) {
-    const hasPosition = window.WanderBase?.hasPosition?.() === true;
-    if (!hasPosition && options.allowWithoutPosition !== true) {
-      setLocationPending();
-      return;
-    }
-
-    const kmh = Number(speedMps || 0) * 3.6;
-    const inferred = inferMovement(Boolean(moving), kmh);
-    const source = options.source || 'ui';
-
-    window.WanderContext?.setMotion({
-      status: options.motionStatus || inferred.status,
-      mode: options.motionMode || inferred.mode,
-      speedKmh: kmh,
-      heading: Number.isFinite(heading) ? heading : null,
-      source,
-    });
-
-    if (options.updateContext !== false) {
-      window.WanderContext?.setContext({
-        status: options.contextStatus || inferred.contextStatus,
-        activity: options.contextActivity || inferred.activity,
-        source,
-        confidence: typeof options.confidence === 'number' ? options.confidence : 0.7,
-      });
-    }
-
-    syncContextStatus();
-    setText('#metric-speed', kmh.toFixed(1) + ' km/h');
+    setText('#metric-speed', Number.isFinite(speed) ? speed.toFixed(1) + ' km/h' : '—');
     setText('#metric-heading', moving && Number.isFinite(heading) ? Math.round(heading) + '°' : '—');
   }
 
+  function setLocationPending() {
+    syncRuntimeMetrics();
+  }
+
   function updateClock() {
-    const value = new Date().toLocaleTimeString('es-AR', {
+    const value = window.WanderContext?.value('time.now') || new Date().toLocaleTimeString('es-AR', {
       hour: '2-digit',
       minute: '2-digit',
     });
     setText('#context-time', value);
-    window.WanderContext?.updateTime();
   }
 
   const messages = {
@@ -119,18 +57,17 @@
   });
 
   window.WanderContext?.subscribe((key) => {
-    if (key === 'context.status') syncContextStatus();
+    if (key === 'context.status' || key.startsWith('motion.')) syncRuntimeMetrics();
+    if (key === 'time.now') updateClock();
   });
 
-  setLocationPending();
+  syncRuntimeMetrics();
   updateClock();
-  setInterval(updateClock, 30000);
 
   window.WanderUI = {
     setText,
     showWander,
-    syncContextStatus,
+    syncRuntimeMetrics,
     setLocationPending,
-    setMotion,
   };
 })();
