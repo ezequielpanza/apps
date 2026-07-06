@@ -4,7 +4,7 @@ Editor web para crear aventuras gráficas point & click.
 
 ## Versión actual
 
-`v0.7.0`
+`v0.8.0`
 
 ## Tecnología
 
@@ -13,7 +13,7 @@ Editor web para crear aventuras gráficas point & click.
 - JavaScript modular con ES modules
 - Sin build
 - `localStorage` para estructura, metadatos y configuración
-- IndexedDB para imágenes binarias importadas
+- IndexedDB para imágenes binarias importadas y cacheadas
 
 ## Desarrollo local
 
@@ -41,6 +41,52 @@ python -m http.server 8000 --directory apps/adventure-studio
 - Datos de recursos separados de la estructura visual del árbol.
 - Configuración global del juego separada de las propiedades de Room.
 - Código dividido en módulos de modelo, árbol, assets, Room Editor y Background Editor.
+- Bootstrap genérico de proyectos empaquetados.
+- Proyecto de arranque configurable mediante un único punto de entrada.
+
+## Proyecto de arranque configurable
+
+`startup-project.js` define qué proyecto empaquetado debe abrir Adventure Studio por defecto.
+
+El cargador genérico vive en:
+
+```text
+bundled-project.js
+```
+
+El motor no contiene nombres, IDs ni condiciones específicas del proyecto demo.
+
+Reglas de bootstrap:
+
+- si no existe un proyecto inicializado, carga el proyecto de arranque;
+- si existe un proyecto legado sin identidad de bundle, inicializa el proyecto de arranque una sola vez;
+- después de la primera inicialización, las recargas preservan los cambios locales;
+- el proyecto empaquetado no se vuelve a copiar sobre el trabajo del usuario en cada recarga.
+
+## Demo privado: Monkey Island 2 C
+
+El proyecto demo actual vive aislado en:
+
+```text
+apps/adventure-studio/demo-projects/monkey-island-2-c/
+```
+
+Estado inicial:
+
+- Nombre: `Monkey Island 2 C`
+- Resolución lógica: `320 × 200`
+- Room abierta por defecto: `Room 007`
+- Background inicial: `Default`
+- Background de referencia: `784 × 144`
+
+La Room 007 se abre automáticamente al inicializar el demo por primera vez.
+
+Para remover el demo al finalizar el desarrollo:
+
+1. eliminar `demo-projects/monkey-island-2-c/`;
+2. cambiar `startup-project.js` para que deje de apuntar al demo.
+
+No debe ser necesario modificar el motor, el Project Tree ni los editores.
 
 ## Rooms y referencias
 
@@ -84,10 +130,12 @@ El modelo de Room usa:
 - `backgrounds[]`
 - `defaultBackgroundId`
 
-Cada background conserva:
+Cada background puede conservar:
 
 - nombre;
-- archivo binario en IndexedDB;
+- `assetKey`;
+- origen empaquetado opcional;
+- archivo cacheado en IndexedDB;
 - dimensiones;
 - tipo MIME;
 - tamaño;
@@ -114,7 +162,8 @@ Funciones actuales:
 - renombrar un estado;
 - elegir el background predeterminado;
 - eliminar un estado;
-- persistir archivos como Blob en IndexedDB.
+- persistir archivos como Blob en IndexedDB;
+- cargar assets empaquetados y cachearlos localmente.
 
 Los proyectos anteriores con un único `background` se migran automáticamente al nuevo modelo multi-background.
 
@@ -129,13 +178,17 @@ Los proyectos anteriores con un único `background` se migran automáticamente a
 
 ## Game Settings
 
-La resolución lógica del framework se guarda globalmente.
+La resolución lógica del framework se guarda globalmente por proyecto.
 
-Valor inicial:
+Valor inicial para proyectos vacíos:
 
 `1280 × 720`
 
-Esta resolución representa el viewport lógico del juego. Una Room puede usar imágenes mayores o menores.
+El demo `Monkey Island 2 C` define:
+
+`320 × 200`
+
+Una Room puede usar imágenes mayores o menores que el viewport lógico.
 
 ## Room Editor
 
