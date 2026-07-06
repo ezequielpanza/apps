@@ -5,12 +5,11 @@
     return Number.isFinite(numeric) ? numeric : null;
   }
 
-  function inferMotionProfile(speedKmh) {
+  function inferMotionState(speedKmh) {
     const speed = finiteNumber(speedKmh);
     if (speed === null) {
       return {
         status: 'pending',
-        mode: 'unknown',
         activity: 'pending',
         label: 'Preparando contexto',
         confidence: 0.4,
@@ -20,45 +19,54 @@
     if (speed <= 0.3) {
       return {
         status: 'stationary',
-        mode: 'unknown',
         activity: 'paused',
         label: 'En pausa',
         confidence: 0.95,
       };
     }
 
-    if (speed < 8) {
+    return {
+      status: 'moving',
+      activity: 'moving',
+      label: 'En movimiento',
+      confidence: 0.9,
+    };
+  }
+
+  function inferMobility(context, motion) {
+    const explicitMode = context.value?.('mobility.override.mode', null);
+    if (explicitMode) {
       return {
-        status: 'moving',
-        mode: 'walking',
-        activity: 'walking',
-        label: 'Caminando',
-        confidence: 0.8,
+        mode: String(explicitMode),
+        confidence: 1,
+        source: 'explicit',
+        evidence: ['user_or_provider_override'],
       };
     }
 
-    if (speed < 25) {
+    const providerMode = context.value?.('mobility.provider.mode', null);
+    const providerConfidence = finiteNumber(context.value?.('mobility.provider.confidence', null));
+    if (providerMode && providerConfidence !== null && providerConfidence >= 0.6) {
       return {
-        status: 'moving',
-        mode: 'cycling',
-        activity: 'cycling',
-        label: 'Andando en bicicleta',
-        confidence: 0.7,
+        mode: String(providerMode),
+        confidence: Math.min(1, Math.max(0, providerConfidence)),
+        source: 'provider',
+        evidence: ['provider_signal'],
       };
     }
 
     return {
-      status: 'moving',
-      mode: 'driving',
-      activity: 'driving',
-      label: 'Conduciendo',
-      confidence: 0.75,
+      mode: 'unknown',
+      confidence: motion.status === 'stationary' ? 0.8 : 0.2,
+      source: 'engine',
+      evidence: motion.status === 'stationary' ? ['stationary_no_transport_needed'] : ['insufficient_evidence'],
     };
   }
 
   function inferSituation(context) {
     const effective = context.getEffectiveLocation?.();
     if (!effective) {
+      const motion = inferMotionState(null);
       return {
         locationAvailable: false,
         source: null,
@@ -67,13 +75,15 @@
         accuracy: null,
         speedKmh: null,
         heading: null,
-        motion: inferMotionProfile(null),
+        motion,
+        mobility: inferMobility(context, motion),
       };
     }
 
     const speedMps = finiteNumber(effective.speedMps);
     const speedKmh = speedMps === null ? null : Math.max(0, speedMps * 3.6);
     const heading = finiteNumber(effective.heading);
+    const motion = inferMotionState(speedKmh);
 
     return {
       locationAvailable: true,
@@ -83,12 +93,17 @@
       accuracy: finiteNumber(effective.accuracy),
       speedKmh,
       heading,
-      motion: inferMotionProfile(speedKmh),
+      motion,
+      mobility: inferMobility(context, motion),
     };
   }
 
   window.WanderEngineInference = {
-    inferMotionProfile,
+    inferMotionState,
+    inferMobility: (context) => {
+      const situation = inferSituation(context);
+      return situation.mobility;
+    },
     inferSituation,
   };
 })();
