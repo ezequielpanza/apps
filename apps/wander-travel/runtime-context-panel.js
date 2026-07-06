@@ -19,7 +19,6 @@
     ['motion.heading', 'Rumbo', 'heading'],
     ['place.city', 'Ciudad', 'city'],
     ['place.zone', 'Zona', 'zone'],
-    ['user.intent', 'Intención', 'target'],
   ];
 
   const TECHNICAL = [
@@ -27,7 +26,7 @@
     'location.real.status','location.real.lat','location.real.lng','location.real.accuracy','location.real.altitude','location.real.heading','location.real.speedMps','location.real.updatedAt','location.real.source',
     'location.override.enabled','location.override.status','location.override.lat','location.override.lng','location.override.accuracy','location.override.altitude','location.override.heading','location.override.speedMps','location.override.updatedAt','location.override.source',
     'location.effective.status','location.effective.lat','location.effective.lng','location.effective.accuracy','location.effective.altitude','location.effective.heading','location.effective.speedMps','location.effective.updatedAt','location.effective.source',
-    'motion.status','motion.mode','motion.speedKmh','motion.heading','environment.weatherStatus','place.city','place.zone','user.intent','user.interests',
+    'motion.status','motion.mode','motion.speedKmh','motion.heading','environment.weatherStatus','place.city','place.zone','places.items',
   ];
 
   function readableValue(key, entry) {
@@ -36,7 +35,7 @@
     if (key.endsWith('.speedMps')) return (Number(entry.value) * 3.6).toFixed(1) + ' km/h';
     if (key.endsWith('.heading') || key === 'motion.heading') return Number.isFinite(Number(entry.value)) ? Math.round(Number(entry.value)) + '°' : '—';
     if (key === 'motion.speedKmh') return Number(entry.value || 0).toFixed(1) + ' km/h';
-    if (key === 'user.interests' && Array.isArray(entry.value)) return entry.value.length ? entry.value.join(', ') : 'Pendiente';
+    if (key === 'places.items' && Array.isArray(entry.value)) return entry.value.length + ' lugares';
     return entry.value == null || entry.value === '' ? 'Pendiente' : String(entry.value);
   }
 
@@ -71,10 +70,8 @@
   function syncSummary() {
     const time = context.value('time.now');
     const period = context.value('time.dayPeriod');
-    const next = context.value('user.intent');
     if (time) window.WanderUI?.setText('#context-time', time);
     if (period) window.WanderUI?.setText('#context-period', period);
-    if (next) window.WanderUI?.setText('#context-next', next);
   }
 
   function render() {
