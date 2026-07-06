@@ -1,71 +1,73 @@
 (() => {
-  const TRANSITION_RELEVANCE = {
-    'arrival.confirmed': 0.96,
-    'arrival.possible': 0.82,
-    'location.lost': 0.7,
-    'movement.stopped': 0.45,
-    'movement.started': 0.25,
-    'movement.mode_changed': 0.2,
-    'location.available': 0.15,
-  };
-
-  function selectMostRelevantTransition(transitions = []) {
-    return transitions.reduce((best, transition) => {
-      const score = TRANSITION_RELEVANCE[transition?.type] || 0;
-      if (!best || score > best.score) return { transition, score };
-      return best;
-    }, null);
-  }
-
-  function evaluateRelevance({ situation, transitions = [] } = {}) {
-    const selected = selectMostRelevantTransition(transitions);
-
-    if (selected?.transition?.type === 'movement.stopped' && selected.transition.significant) {
-      return {
-        score: 0.65,
-        reason: 'significant_movement_stopped',
-        transition: selected.transition,
-      };
-    }
-
-    if (selected) {
-      return {
-        score: selected.score,
-        reason: selected.transition.type.replaceAll('.', '_'),
-        transition: selected.transition,
-      };
-    }
-
-    if (!situation?.locationAvailable) {
-      return {
-        score: 0,
-        reason: 'location_unavailable',
-        transition: null,
-      };
-    }
-
-    return {
-      score: 0,
-      reason: 'no_relevant_transition',
-      transition: null,
-    };
-  }
-
   function decideAction({ situation, relevance } = {}) {
-    const transition = relevance?.transition;
+    const signalType = relevance?.signal?.type || 'wait';
+    const familiarity = relevance?.currentArea?.familiarity || relevance?.signal?.familiarity || null;
 
-    if (transition?.type === 'arrival.possible') {
+    if (signalType.endsWith('.possible') && signalType.startsWith('arrival.')) {
       return {
         type: 'observe',
-        reason: 'possible_arrival',
+        reason: signalType,
         followUpAfterMs: 90000,
+        memoryAware: true,
+        areaFamiliarity: familiarity,
       };
     }
 
-    if (transition?.type === 'arrival.confirmed') {
+    if (signalType === 'arrival.new_area.confirmed') {
+      return {
+        type: 'arrival_detected',
+        reason: 'new_area_arrival',
+        memoryAware: true,
+        areaFamiliarity: 'first_visit',
+        discoveryMode: 'explore',
+      };
+    }
+
+    if (signalType === 'arrival.returning_area.confirmed') {
+      return {
+        type: 'arrival_detected',
+        reason: 'returning_area_arrival',
+        memoryAware: true,
+        areaFamiliarity: 'returning',
+        discoveryMode: 'continue',
+      };
+    }
+
+    if (signalType === 'arrival.known_area.confirmed') {
+      return {
+        type: 'arrival_detected',
+        reason: 'known_area_arrival',
+        memoryAware: true,
+        areaFamiliarity: familiarity,
+        discoveryMode: 'avoid_repetition',
+      };
+    }
+
+    if (signalType === 'arrival.unknown_area.confirmed') {
       return {
         type: 'arrival_detected',
         reason: 'stable_stop_after_significant_movement',
+        memoryAware: false,
+        areaFamiliarity: null,
+        discoveryMode: 'neutral',
+      };
+    }
+
+    if (signalType === 'area.returned') {
+      return {
+        type: 'observe',
+        reason: 'area_returned',
+        memoryAware: true,
+        areaFamiliarity: familiarity,
+      };
+    }
+
+    if (signalType === 'area.first_visit' && relevance?.score >= 0.5) {
+      return {
+        type: 'observe',
+        reason: 'area_first_visit',
+        memoryAware: true,
+        areaFamiliarity: 'first_visit',
       };
     }
 
@@ -78,13 +80,13 @@
 
     return {
       type: 'wait',
-      reason: relevance?.reason || 'no_relevant_transition',
+      reason: relevance?.reason || 'no_relevant_signal',
+      memoryAware: Boolean(relevance?.currentArea),
+      areaFamiliarity: familiarity,
     };
   }
 
   window.WanderEngineDecision = {
-    evaluateRelevance,
     decideAction,
-    selectMostRelevantTransition,
   };
 })();
