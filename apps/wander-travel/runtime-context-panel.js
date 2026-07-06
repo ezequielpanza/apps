@@ -27,7 +27,7 @@
     'location.real.status','location.real.lat','location.real.lng','location.real.accuracy','location.real.altitude','location.real.heading','location.real.speedMps','location.real.updatedAt','location.real.source',
     'location.override.enabled','location.override.status','location.override.lat','location.override.lng','location.override.accuracy','location.override.altitude','location.override.heading','location.override.speedMps','location.override.updatedAt','location.override.source',
     'location.effective.status','location.effective.lat','location.effective.lng','location.effective.accuracy','location.effective.altitude','location.effective.heading','location.effective.speedMps','location.effective.updatedAt','location.effective.source',
-    'motion.status','motion.mode','motion.speedKmh','motion.heading','situation.transition','history.currentArea','environment.weatherStatus','place.city','place.zone','places.items',
+    'motion.status','motion.mode','motion.speedKmh','motion.heading','situation.transition','history.currentArea','history.areaEvent','environment.weatherStatus','place.city','place.zone','places.items',
   ];
 
   function relativeVisit(value) {
@@ -64,6 +64,7 @@
     if (key === 'motion.speedKmh') return Number(entry.value || 0).toFixed(1) + ' km/h';
     if (key === 'situation.transition' && entry.value?.type) return entry.value.type;
     if (key === 'history.currentArea') return areaMemoryValue(entry.value);
+    if (key === 'history.areaEvent' && entry.value?.type) return entry.value.type;
     if (key === 'places.items' && Array.isArray(entry.value)) return entry.value.length + ' lugares';
     return entry.value == null || entry.value === '' ? 'Pendiente' : String(entry.value);
   }
