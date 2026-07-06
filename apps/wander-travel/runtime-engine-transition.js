@@ -73,10 +73,6 @@
     };
   }
 
-  function availabilityThreshold() {
-    return POLICY.locationStableMs;
-  }
-
   function motionThreshold(from, to) {
     if (!from) return 0;
     if (from.status === 'stationary' && to.status === 'moving') return POLICY.movingStableMs;
@@ -102,21 +98,24 @@
       return;
     }
 
-    if (at - availabilityCandidate.startedAt < availabilityThreshold()) return;
+    if (at - availabilityCandidate.startedAt < POLICY.locationStableMs) return;
 
     const from = stableAvailability.available;
-    stableAvailability = { available, sinceAt: availabilityCandidate.startedAt };
+    const sinceAt = availabilityCandidate.startedAt;
+    stableAvailability = { available, sinceAt };
     availabilityCandidate = null;
 
     events.push(event(available ? 'location.available' : 'location.lost', at, {
       from,
       to: available,
-      stableForMs: at - stableAvailability.sinceAt,
+      stableForMs: at - sinceAt,
       confidence: 0.9,
     }));
 
     if (!available) {
+      stableMotion = null;
       motionCandidate = null;
+      movementSession = null;
       arrivalCandidate = null;
     }
   }
@@ -133,6 +132,7 @@
   function commitMotionTransition(observation, situation, at, events) {
     const from = stableMotion;
     const startedAt = motionCandidate.startedAt;
+    const startedSituation = motionCandidate.startedSituation;
     const stableForMs = at - startedAt;
     stableMotion = { ...observation, sinceAt: startedAt };
     motionCandidate = null;
@@ -166,8 +166,8 @@
           stoppedAt: startedAt,
           priorMode: from.mode,
           movementDurationMs,
-          anchor: locationPoint(motionCandidate?.startedSituation) || locationPoint(situation),
-          driftLimitM: arrivalDriftLimit(situation),
+          anchor: locationPoint(startedSituation) || locationPoint(situation),
+          driftLimitM: arrivalDriftLimit(startedSituation || situation),
           maxDriftM: 0,
           possibleEmitted: false,
           confirmedEmitted: false,
@@ -285,7 +285,10 @@
           observation: { ...motionCandidate.observation },
           startedAt: motionCandidate.startedAt,
         } : null,
-        arrival: arrivalCandidate ? { ...arrivalCandidate, anchor: arrivalCandidate.anchor ? { ...arrivalCandidate.anchor } : null } : null,
+        arrival: arrivalCandidate ? {
+          ...arrivalCandidate,
+          anchor: arrivalCandidate.anchor ? { ...arrivalCandidate.anchor } : null,
+        } : null,
       },
       lastTransition: lastTransition ? { ...lastTransition } : null,
       nextCheckAt: nextCheckAt(),
