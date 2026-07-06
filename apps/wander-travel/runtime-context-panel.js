@@ -17,6 +17,7 @@
     ['motion.mode', 'Modo de movimiento', 'compass'],
     ['motion.speedKmh', 'Velocidad', 'speed'],
     ['motion.heading', 'Rumbo', 'heading'],
+    ['history.currentArea', 'Memoria de zona', 'brain'],
     ['place.city', 'Ciudad', 'city'],
     ['place.zone', 'Zona', 'zone'],
   ];
@@ -26,8 +27,34 @@
     'location.real.status','location.real.lat','location.real.lng','location.real.accuracy','location.real.altitude','location.real.heading','location.real.speedMps','location.real.updatedAt','location.real.source',
     'location.override.enabled','location.override.status','location.override.lat','location.override.lng','location.override.accuracy','location.override.altitude','location.override.heading','location.override.speedMps','location.override.updatedAt','location.override.source',
     'location.effective.status','location.effective.lat','location.effective.lng','location.effective.accuracy','location.effective.altitude','location.effective.heading','location.effective.speedMps','location.effective.updatedAt','location.effective.source',
-    'motion.status','motion.mode','motion.speedKmh','motion.heading','situation.transition','environment.weatherStatus','place.city','place.zone','places.items',
+    'motion.status','motion.mode','motion.speedKmh','motion.heading','situation.transition','history.currentArea','environment.weatherStatus','place.city','place.zone','places.items',
   ];
+
+  function relativeVisit(value) {
+    const at = Date.parse(value || '');
+    if (!Number.isFinite(at)) return null;
+    const deltaMs = Math.max(0, Date.now() - at);
+    const hours = Math.round(deltaMs / 3600000);
+    if (hours < 1) return 'hace menos de una hora';
+    if (hours < 24) return 'hace ' + hours + ' h';
+    const days = Math.round(hours / 24);
+    if (days < 60) return 'hace ' + days + ' días';
+    const months = Math.round(days / 30);
+    return 'hace ' + months + ' meses';
+  }
+
+  function areaMemoryValue(area) {
+    if (!area) return 'Pendiente';
+    const labels = {
+      first_visit: 'Primera visita a esta zona',
+      returning: 'Ya estuviste en esta zona',
+      familiar: 'Zona familiar',
+      frequent: 'Zona frecuente',
+    };
+    const label = labels[area.familiarity] || area.familiarity || 'Zona conocida';
+    const previous = relativeVisit(area.previousVisitAt);
+    return previous ? label + ' · ' + previous : label;
+  }
 
   function readableValue(key, entry) {
     if (!entry) return 'Pendiente';
@@ -36,6 +63,7 @@
     if (key.endsWith('.heading') || key === 'motion.heading') return Number.isFinite(Number(entry.value)) ? Math.round(Number(entry.value)) + '°' : '—';
     if (key === 'motion.speedKmh') return Number(entry.value || 0).toFixed(1) + ' km/h';
     if (key === 'situation.transition' && entry.value?.type) return entry.value.type;
+    if (key === 'history.currentArea') return areaMemoryValue(entry.value);
     if (key === 'places.items' && Array.isArray(entry.value)) return entry.value.length + ' lugares';
     return entry.value == null || entry.value === '' ? 'Pendiente' : String(entry.value);
   }
