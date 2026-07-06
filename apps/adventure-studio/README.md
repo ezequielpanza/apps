@@ -4,7 +4,7 @@ Editor web modular para crear aventuras gráficas point & click.
 
 ## Versión actual
 
-`v0.11.0`
+`v0.12.0`
 
 ## Tecnología
 
@@ -26,36 +26,108 @@ python -m http.server 8000 --directory apps/adventure-studio
 - Carpeta: `apps/adventure-studio`
 - URL: `https://adventure-studio.pages.dev`
 
-## Project Tree
+## Modelo Project → Games
 
-La estructura raíz fija es:
+Un Project puede contener uno o varios Games.
+
+La estructura base es:
 
 ```text
-Game
-└── Settings
-
-Rooms
-Characters
-Inventory
-Dialogues
-Audio
+Games
+├── Game A
+│   ├── Settings
+│   ├── Rooms
+│   ├── Characters
+│   ├── Inventory
+│   ├── Dialogues
+│   └── Audio
+│
+└── Game B
+    ├── Settings
+    ├── Rooms
+    ├── Characters
+    ├── Inventory
+    ├── Dialogues
+    └── Audio
 ```
 
-### Interacción principal
+`Games` es la única raíz estructural fija del Project.
+
+Cada Game:
+
+- se puede crear con `+`;
+- se puede renombrar con `✎`;
+- se puede eliminar con `×`;
+- tiene configuración propia;
+- tiene sus propios Rooms, Characters, Inventory, Dialogues y Audio.
+
+Los recursos de un Game no pertenecen globalmente al Project.
+
+## Recursos por Game
+
+El modelo de recursos usa:
+
+```text
+resources.games[gameId]
+```
+
+Cada Game contiene:
+
+```text
+settings
+rooms
+characters
+inventory
+dialogues
+audio
+```
+
+Esto evita que dos Games compartan accidentalmente recursos o resolución.
+
+## Game Settings Editor
+
+Click sobre:
+
+```text
+Games / <Game> / Settings
+```
+
+abre la configuración del Game activo.
+
+Actualmente administra:
+
+- Game Resolution Width
+- Game Resolution Height
+
+La resolución es propia de cada Game.
+
+Ejemplo:
+
+```text
+Game A → 320 × 200
+Game B → 1280 × 720
+```
+
+## Project Tree
 
 El árbol usa click único:
 
 ```text
-Click en raíz con hijos
-→ selecciona
+Click en Games
 → expande o contrae
+
+Click en un Game
+→ expande o contrae sus secciones
 
 Click en Settings
 → abre Game Settings Editor
 
+Click en Rooms / Characters / Inventory / Dialogues / Audio
+→ expande o contrae esa sección
+
 Click en Room
 → abre Room Editor
-→ expande o contrae sus secciones
+→ expande o contrae sus subramas
 
 Click en Backgrounds
 → abre Background Editor
@@ -65,9 +137,9 @@ Click en recurso hoja
 → abre su editor
 ```
 
-No se usa doble click para abrir recursos y no existe renombrado retardado por click sobre el nombre.
+No se usa doble click para abrir recursos.
 
-### Acciones semánticas
+## Acciones semánticas
 
 ```text
 +   verde      → crear
@@ -75,53 +147,56 @@ No se usa doble click para abrir recursos y no existe renombrado retardado por c
 ×   rojo       → eliminar
 ```
 
-Los mismos recursos que pueden eliminarse muestran también el lápiz para renombrarlos. Las secciones estructurales fijas no se renombran ni se eliminan.
+Los recursos borrables muestran también el lápiz para renombrarlos.
 
-El renombrado inline se activa exclusivamente con el botón `✎`.
+## Drag & drop
 
-## Game Settings Editor
+Los recursos solo se mueven dentro de:
 
-Click sobre:
+- el mismo Game;
+- la misma sección tipada.
 
-```text
-Game / Settings
-```
+Las referencias de recursos dentro de una Room solo pueden apuntar a recursos del mismo Game.
 
-abre la configuración global.
+## Migración automática
 
-Actualmente administra:
-
-- Game Resolution Width
-- Game Resolution Height
-
-La resolución define el viewport lógico del juego completo y ya no aparece como propiedad de una Room.
-
-Separación conceptual:
+Los proyectos anteriores con estructura global:
 
 ```text
-Game Resolution   → global
-Room Size         → propia de la Room
-Background Size   → propio del Background
-Camera / Scroll   → futura propiedad de Room
-Room Viewport     → futura configuración de layout
+Game
+Rooms
+Characters
+Inventory
+Dialogues
+Audio
 ```
 
-## Arquitectura
+se migran automáticamente a:
 
-- Workspace Host central
-- Inspector contextual
-- estado `activeEditorId` persistente
-- Game Settings Editor
-- Room Editor
-- Background Editor
-- shells para Character, Inventory, Dialogue y Audio
-- Project Tree con drag & drop tipado
-- recursos separados de la estructura visual
-- bootstrap genérico de proyectos empaquetados
+```text
+Games
+└── <Game actual>
+    ├── Settings
+    ├── Rooms
+    ├── Characters
+    ├── Inventory
+    ├── Dialogues
+    └── Audio
+```
+
+La migración conserva:
+
+- Rooms existentes;
+- recursos;
+- referencias;
+- resolución previa;
+- selección activa cuando el ID sigue siendo válido.
+
+No debería ser necesario borrar `localStorage` ni IndexedDB.
 
 ## Demo privado
 
-El proyecto de desarrollo vive aislado en:
+El proyecto de desarrollo vive en:
 
 ```text
 apps/adventure-studio/demo-projects/monkey-island-2-c/
@@ -129,15 +204,11 @@ apps/adventure-studio/demo-projects/monkey-island-2-c/
 
 Estado inicial:
 
-- Proyecto: `Monkey Island 2 C`
+- Project: `Monkey Island 2 C`
+- Game: `Monkey Island 2 C`
 - Game Resolution: `320 × 200`
 - Room: `Room 007`
 - Background de referencia: `784 × 144`
-
-Para remover el demo:
-
-1. borrar `demo-projects/monkey-island-2-c/`;
-2. cambiar `startup-project.js`.
 
 ## Rooms
 
@@ -153,7 +224,7 @@ Cada Room contiene secciones fijas:
 - Walk Areas
 - Entrances
 
-Los recursos maestros pueden referenciarse dentro de una Room sin duplicarse.
+Los recursos maestros pueden referenciarse dentro de una Room sin duplicarse, siempre dentro del mismo Game.
 
 ## Backgrounds
 
