@@ -11,8 +11,11 @@ export async function bootstrapBundledProject(projectUrl,{forceDefault=false}={}
 
   const currentProjectId=localStorage.getItem(PROJECT_ID_KEY);
   const hasProject=Boolean(localStorage.getItem(STORAGE_KEYS.tree));
-  const shouldLoad=forceDefault||!hasProject||currentProjectId===project.id;
-  if(!shouldLoad)return{projectName:localStorage.getItem(PROJECT_NAME_KEY)||'Untitled Project',projectId:currentProjectId};
+  const shouldLoad=forceDefault||!hasProject||!currentProjectId;
+
+  if(!shouldLoad){
+    return{projectName:localStorage.getItem(PROJECT_NAME_KEY)||project.name||'Untitled Project',projectId:currentProjectId};
+  }
 
   localStorage.setItem(STORAGE_KEYS.tree,JSON.stringify(project.tree));
   localStorage.setItem(STORAGE_KEYS.resources,JSON.stringify(project.resources));
