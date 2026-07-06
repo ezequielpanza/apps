@@ -132,33 +132,48 @@
     return record;
   }
 
-  function openCellVisit(record, key, point, motion, at) {
-    record.visitCount += 1;
-    record.recentVisits.push(iso(at));
-    if (record.recentVisits.length > MAX_RECENT_VISITS) record.recentVisits.splice(0, record.recentVisits.length - MAX_RECENT_VISITS);
-    if (motion?.status === 'stationary') record.stayCount += 1;
-    if (motion?.status === 'moving') record.movementCount += 1;
+  function activateCell(record, key, point, motion, at, countVisit, enteredAt = at) {
+    if (countVisit) {
+      record.visitCount += 1;
+      record.recentVisits.push(iso(at));
+      if (record.recentVisits.length > MAX_RECENT_VISITS) record.recentVisits.splice(0, record.recentVisits.length - MAX_RECENT_VISITS);
+      if (motion?.status === 'stationary') record.stayCount += 1;
+      if (motion?.status === 'moving') record.movementCount += 1;
+    }
+
     memory.active.cell = {
       key,
-      enteredAt: at,
+      enteredAt,
       lastSampleAt: at,
       lastPoint: { lat: point.lat, lng: point.lng },
     };
+  }
+
+  function latestVisitStartedAt(record, fallbackAt) {
+    const latest = record.recentVisits?.[record.recentVisits.length - 1];
+    const parsed = Date.parse(latest || '');
+    return Number.isFinite(parsed) ? parsed : fallbackAt;
   }
 
   function updateSpatial(point, motion, at) {
     const key = cellId(point.lat, point.lng);
     const record = cellRecord(key, at);
     const active = memory.active.cell;
-    const gapMs = active ? at - active.lastSampleAt : Infinity;
-    const newVisit = !active || active.key !== key || gapMs > REVISIT_GAP_MS;
 
-    if (newVisit) openCellVisit(record, key, point, motion, at);
-    else {
-      const durationMs = Math.max(0, Math.min(gapMs, MAX_SAMPLE_GAP_MS));
-      record.totalDurationMs += durationMs;
-      active.lastSampleAt = at;
-      active.lastPoint = { lat: point.lat, lng: point.lng };
+    if (!active || active.key !== key) {
+      const lastSeenAt = Date.parse(record.lastSeenAt || '');
+      const sameVisit = record.visitCount > 0 && Number.isFinite(lastSeenAt) && at - lastSeenAt <= REVISIT_GAP_MS;
+      activateCell(record, key, point, motion, at, !sameVisit, sameVisit ? latestVisitStartedAt(record, at) : at);
+    } else {
+      const gapMs = at - active.lastSampleAt;
+      if (gapMs > REVISIT_GAP_MS) {
+        activateCell(record, key, point, motion, at, true, at);
+      } else {
+        const durationMs = Math.max(0, Math.min(gapMs, MAX_SAMPLE_GAP_MS));
+        record.totalDurationMs += durationMs;
+        active.lastSampleAt = at;
+        active.lastPoint = { lat: point.lat, lng: point.lng };
+      }
     }
 
     record.lastSeenAt = iso(at);
@@ -294,10 +309,18 @@
   }
 
   function recoverExpiredActive(at) {
+    const closed = [];
     const movement = memory.active.movement;
-    if (movement && at - movement.lastObservedAt > ACTIVE_RESUME_GAP_MS) closeMovement(movement.lastObservedAt);
+    if (movement && at - movement.lastObservedAt > ACTIVE_RESUME_GAP_MS) {
+      const episode = closeMovement(movement.lastObservedAt);
+      if (episode) closed.push(episode);
+    }
     const stay = memory.active.stay;
-    if (stay && at - stay.lastObservedAt > ACTIVE_RESUME_GAP_MS) closeStay(stay.lastObservedAt);
+    if (stay && at - stay.lastObservedAt > ACTIVE_RESUME_GAP_MS) {
+      const episode = closeStay(stay.lastObservedAt);
+      if (episode) closed.push(episode);
+    }
+    return closed;
   }
 
   function stableMotion(situation, transitionState) {
@@ -373,11 +396,11 @@
   }
 
   function observe({ situation, transitionState } = {}, at = Date.now()) {
-    recoverExpiredActive(at);
+    const recoveredEpisodes = recoverExpiredActive(at);
     const point = pointFromSituation(situation, at);
     if (!point || !situation?.locationAvailable) {
       schedulePersist();
-      return { currentArea: null, closedEpisodes: [] };
+      return { currentArea: null, closedEpisodes: recoveredEpisodes };
     }
 
     const motion = stableMotion(situation, transitionState);
@@ -390,6 +413,7 @@
     return {
       currentArea: currentAreaSummary(situation, at),
       closedEpisodes: [
+        ...recoveredEpisodes,
         ...memory.episodes.movement.slice(beforeMovement),
         ...memory.episodes.stays.slice(beforeStays),
       ],
