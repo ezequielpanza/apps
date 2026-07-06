@@ -12,35 +12,45 @@ export async function bootstrapBundledProject(projectUrl,{forceDefault=false}={}
 
   const currentProjectId=localStorage.getItem(PROJECT_ID_KEY);
   const hasProject=Boolean(localStorage.getItem(STORAGE_KEYS.tree));
-  const shouldLoad=forceDefault||!hasProject||!currentProjectId;
+  const shouldInitialize=forceDefault||!hasProject||!currentProjectId;
+  const isCurrentBundle=currentProjectId===project.id;
 
-  if(!shouldLoad){
-    return{projectName:localStorage.getItem(PROJECT_NAME_KEY)||project.name||'Untitled Project',projectId:currentProjectId};
+  if(shouldInitialize){
+    localStorage.setItem(STORAGE_KEYS.tree,JSON.stringify(project.tree));
+    localStorage.setItem(STORAGE_KEYS.resources,JSON.stringify(project.resources));
+    localStorage.setItem(STORAGE_KEYS.settings,JSON.stringify(project.settings));
+    localStorage.setItem(STORAGE_KEYS.selection,project.selectedId||'rooms');
+    if(project.activeEditorId)localStorage.setItem(STORAGE_KEYS.activeEditor,project.activeEditorId);else localStorage.removeItem(STORAGE_KEYS.activeEditor);
+    localStorage.setItem(PROJECT_NAME_KEY,project.name||'Untitled Project');
+    localStorage.setItem(PROJECT_ID_KEY,project.id);
   }
 
-  localStorage.setItem(STORAGE_KEYS.tree,JSON.stringify(project.tree));
-  localStorage.setItem(STORAGE_KEYS.resources,JSON.stringify(project.resources));
-  localStorage.setItem(STORAGE_KEYS.settings,JSON.stringify(project.settings));
-  localStorage.setItem(STORAGE_KEYS.selection,project.selectedId||'rooms');
-  if(project.activeEditorId)localStorage.setItem(STORAGE_KEYS.activeEditor,project.activeEditorId);else localStorage.removeItem(STORAGE_KEYS.activeEditor);
-  localStorage.setItem(PROJECT_NAME_KEY,project.name||'Untitled Project');
-  localStorage.setItem(PROJECT_ID_KEY,project.id);
+  if(shouldInitialize||isCurrentBundle){
+    await hydrateBundledAssets(project,projectUrl);
+  }
 
-  await loadBundledAssets(project,projectUrl);
-
-  return{projectName:project.name||'Untitled Project',projectId:project.id};
+  return{
+    projectName:localStorage.getItem(PROJECT_NAME_KEY)||project.name||'Untitled Project',
+    projectId:localStorage.getItem(PROJECT_ID_KEY)||project.id
+  };
 }
 
 export function getCurrentProjectName(){return localStorage.getItem(PROJECT_NAME_KEY)||'Untitled Project';}
 
-async function loadBundledAssets(project,projectUrl){
+async function hydrateBundledAssets(project,projectUrl){
   const assets=[];
   if(Array.isArray(project.assets))assets.push(...project.assets);
   Object.values(project.resources?.rooms||{}).forEach(room=>{
     (room.backgrounds||[]).forEach(background=>{
-      if(background.sourceUrl)assets.push({assetKey:background.assetKey,url:background.sourceUrl,encoding:background.sourceEncoding,type:background.type});
+      if(background.sourceUrl)assets.push({
+        assetKey:background.assetKey,
+        url:background.sourceUrl,
+        encoding:background.sourceEncoding,
+        type:background.type
+      });
     });
   });
+
   for(const asset of assets){
     const blob=await fetchAsset(asset,projectUrl);
     if(blob)await roomBackgroundStore.put(asset.assetKey,blob);
@@ -49,12 +59,15 @@ async function loadBundledAssets(project,projectUrl){
 
 async function fetchAsset(asset,projectUrl){
   const url=new URL(asset.url,projectUrl).href;
+  const response=await fetch(url);
+  if(!response.ok)throw new Error(`Unable to load bundled asset: ${url}`);
+
   if(asset.encoding==='base64'){
-    const text=await fetch(url).then(response=>response.text());
+    const text=await response.text();
     return base64ToBlob(text.trim(),asset.type||'application/octet-stream');
   }
-  const response=await fetch(url);
-  return response.ok?response.blob():null;
+
+  return response.blob();
 }
 
 function base64ToBlob(base64,type){
