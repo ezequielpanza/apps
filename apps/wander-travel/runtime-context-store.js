@@ -179,7 +179,7 @@
   }
 
   window.WanderContext = {
-    set, get, value, snapshot, subscribe, updateTime, setContext, setMotion, statusFor,
+    set, remove, get, value, snapshot, subscribe, updateTime, setContext, setMotion, statusFor,
     _write: write, _remove: remove, _notify: notify, _sameValue: sameValue,
   };
 })();
