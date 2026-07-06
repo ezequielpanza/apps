@@ -44,8 +44,7 @@
     'environment.weatherStatus': 1800000,
     'place.city': 3600000,
     'place.zone': 1800000,
-    'user.intent': 600000,
-    'user.interests': Infinity,
+    'places.items': 300000,
   };
 
   const DEFAULT_KIND = {
@@ -59,8 +58,7 @@
     'motion.mode': 'inferred',
     'motion.speedKmh': 'derived',
     'motion.heading': 'derived',
-    'user.intent': 'observed',
-    'user.interests': 'config',
+    'places.items': 'derived',
   };
 
   const now = () => Date.now();
@@ -167,12 +165,12 @@
     set('time.dayPeriod', dayPeriod(date), { source: 'clock', kind: 'derived' });
   }
 
-  function setContext({ status, activity, source = 'engine', confidence = 1 }) {
+  function setContext({ status, activity, source = 'context', confidence = 1 }) {
     if (status != null) set('context.status', status, { source, kind: 'inferred', confidence });
     if (activity != null) set('context.activity', activity, { source, kind: 'inferred', confidence });
   }
 
-  function setMotion({ status, mode, speedKmh, heading, source = 'engine' }) {
+  function setMotion({ status, mode, speedKmh, heading, source = 'context' }) {
     if (status != null) set('motion.status', status, { source, kind: 'inferred' });
     if (mode != null) set('motion.mode', mode, { source, kind: 'inferred' });
     if (speedKmh != null) set('motion.speedKmh', Number(speedKmh), { source, kind: 'derived' });
