@@ -3,7 +3,6 @@
     locationStableMs: 5000,
     movingStableMs: 10000,
     stoppedStableMs: 60000,
-    modeChangeStableMs: 15000,
     significantMovementMs: 300000,
     possibleArrivalMs: 90000,
     confirmedArrivalMs: 180000,
@@ -27,14 +26,16 @@
   function motionObservation(situation) {
     const status = situation?.motion?.status;
     if (status !== 'moving' && status !== 'stationary') return null;
-    return {
-      status,
-      mode: status === 'moving' ? situation.motion.mode || 'unknown' : 'stationary',
-    };
+    return { status };
   }
 
   function sameMotion(a, b) {
-    return Boolean(a && b && a.status === b.status && a.mode === b.mode);
+    return Boolean(a && b && a.status === b.status);
+  }
+
+  function mobilityMode(situation) {
+    const mode = situation?.mobility?.mode;
+    return mode && mode !== 'unknown' ? mode : null;
   }
 
   function distanceMeters(a, b) {
@@ -78,7 +79,7 @@
     if (!from) return 0;
     if (from.status === 'stationary' && to.status === 'moving') return POLICY.movingStableMs;
     if (from.status === 'moving' && to.status === 'stationary') return POLICY.stoppedStableMs;
-    return POLICY.modeChangeStableMs;
+    return 0;
   }
 
   function updateAvailability(situation, at, events) {
@@ -121,13 +122,21 @@
     }
   }
 
-  function beginMovementSession(at, observation) {
+  function beginMovementSession(at, situation) {
+    const mode = mobilityMode(situation);
     movementSession = {
       startedAt: at,
       lastMovingAt: at,
-      mode: observation.mode,
+      mobilityModes: mode ? [mode] : [],
     };
     arrivalCandidate = null;
+  }
+
+  function updateMovementSession(situation, at) {
+    if (!movementSession) return;
+    movementSession.lastMovingAt = at;
+    const mode = mobilityMode(situation);
+    if (mode && !movementSession.mobilityModes.includes(mode)) movementSession.mobilityModes.push(mode);
   }
 
   function commitMotionTransition(observation, situation, at, events) {
@@ -139,12 +148,13 @@
     motionCandidate = null;
 
     if (from.status === 'stationary' && observation.status === 'moving') {
-      beginMovementSession(startedAt, observation);
+      beginMovementSession(startedAt, situation);
       events.push(event('movement.started', at, {
-        from: from.mode,
-        to: observation.mode,
+        from: 'stationary',
+        to: 'moving',
+        mobilityMode: mobilityMode(situation),
         stableForMs,
-        confidence: 0.85,
+        confidence: 0.88,
       }));
       return;
     }
@@ -152,10 +162,12 @@
     if (from.status === 'moving' && observation.status === 'stationary') {
       const movementDurationMs = movementSession ? Math.max(0, startedAt - movementSession.startedAt) : 0;
       const significant = movementDurationMs >= POLICY.significantMovementMs;
+      const mobilityModes = movementSession?.mobilityModes || [];
 
       events.push(event('movement.stopped', at, {
-        from: from.mode,
+        from: 'moving',
         to: 'stationary',
+        mobilityModes,
         stableForMs,
         movementDurationMs,
         significant,
@@ -165,7 +177,7 @@
       if (significant) {
         arrivalCandidate = {
           stoppedAt: startedAt,
-          priorMode: from.mode,
+          mobilityModes,
           movementDurationMs,
           anchor: locationPoint(startedSituation) || locationPoint(situation),
           driftLimitM: arrivalDriftLimit(startedSituation || situation),
@@ -178,17 +190,6 @@
       }
 
       movementSession = null;
-      return;
-    }
-
-    if (from.status === 'moving' && observation.status === 'moving' && from.mode !== observation.mode) {
-      if (movementSession) movementSession.mode = observation.mode;
-      events.push(event('movement.mode_changed', at, {
-        from: from.mode,
-        to: observation.mode,
-        stableForMs,
-        confidence: 0.78,
-      }));
     }
   }
 
@@ -198,16 +199,15 @@
 
     if (!stableMotion) {
       stableMotion = { ...observation, sinceAt: at };
-      if (observation.status === 'moving') beginMovementSession(at, observation);
+      if (observation.status === 'moving') beginMovementSession(at, situation);
       return;
     }
 
     if (sameMotion(stableMotion, observation)) {
       motionCandidate = null;
       if (observation.status === 'moving') {
-        if (!movementSession) beginMovementSession(stableMotion.sinceAt, observation);
-        movementSession.lastMovingAt = at;
-        movementSession.mode = observation.mode;
+        if (!movementSession) beginMovementSession(stableMotion.sinceAt, situation);
+        updateMovementSession(situation, at);
         arrivalCandidate = null;
       }
       return;
@@ -244,9 +244,9 @@
     if (!arrivalCandidate.possibleEmitted && stationaryForMs >= POLICY.possibleArrivalMs) {
       arrivalCandidate.possibleEmitted = true;
       events.push(event('arrival.possible', at, {
-        from: arrivalCandidate.priorMode,
         stationaryForMs,
         priorMovementDurationMs: arrivalCandidate.movementDurationMs,
+        mobilityModes: arrivalCandidate.mobilityModes,
         maxDriftM: Math.round(arrivalCandidate.maxDriftM),
         confidence: 0.82,
       }));
@@ -256,9 +256,9 @@
     if (arrivalCandidate.possibleEmitted && !arrivalCandidate.confirmedEmitted && stationaryForMs >= POLICY.confirmedArrivalMs) {
       arrivalCandidate.confirmedEmitted = true;
       events.push(event('arrival.confirmed', at, {
-        from: arrivalCandidate.priorMode,
         stationaryForMs,
         priorMovementDurationMs: arrivalCandidate.movementDurationMs,
+        mobilityModes: arrivalCandidate.mobilityModes,
         maxDriftM: Math.round(arrivalCandidate.maxDriftM),
         confidence: 0.95,
       }));
@@ -291,6 +291,10 @@
           anchor: arrivalCandidate.anchor ? { ...arrivalCandidate.anchor } : null,
         } : null,
       },
+      movementSession: movementSession ? {
+        ...movementSession,
+        mobilityModes: [...movementSession.mobilityModes],
+      } : null,
       lastTransition: lastTransition ? { ...lastTransition } : null,
       nextCheckAt: nextCheckAt(),
     };
