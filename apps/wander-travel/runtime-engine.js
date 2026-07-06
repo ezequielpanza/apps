@@ -3,12 +3,15 @@
   const state = window.WanderEngineState;
   const inference = window.WanderEngineInference;
   const transition = window.WanderEngineTransition;
+  const memory = window.WanderEngineMemory;
   const decision = window.WanderEngineDecision;
-  if (!context || !state || !inference || !transition || !decision) return;
+  if (!context || !state || !inference || !transition || !memory || !decision) return;
 
   const evaluationListeners = new Set();
   let lastEvaluation = null;
   let transitionTimer = null;
+  let lastMemoryContext = null;
+  let lastMemoryContextWriteAt = 0;
 
   function publishEvaluation(evaluation, reason) {
     lastEvaluation = evaluation;
@@ -39,8 +42,8 @@
     });
 
     if (situation.speedKmh === null) {
-      context.remove?.('motion.speedKmh');
-      context.remove?.('motion.heading');
+      context.remove('motion.speedKmh');
+      context.remove('motion.heading');
     } else {
       context.set('motion.speedKmh', situation.speedKmh, {
         source: 'engine',
@@ -48,7 +51,7 @@
         confidence,
       });
 
-      if (situation.heading === null) context.remove?.('motion.heading');
+      if (situation.heading === null) context.remove('motion.heading');
       else context.set('motion.heading', situation.heading, {
         source: 'engine',
         kind: 'derived',
@@ -75,6 +78,37 @@
     });
   }
 
+  function sameMemoryMeaning(a, b) {
+    if (!a || !b) return a === b;
+    return a.cellId === b.cellId &&
+      a.familiarity === b.familiarity &&
+      a.visitCount === b.visitCount &&
+      a.previousVisitAt === b.previousVisitAt &&
+      a.coverage === b.coverage;
+  }
+
+  function writeMemoryContext(currentArea, at) {
+    if (!currentArea) {
+      if (lastMemoryContext !== null) context.remove('history.currentArea');
+      lastMemoryContext = null;
+      lastMemoryContextWriteAt = at;
+      return;
+    }
+
+    const semanticChange = !sameMemoryMeaning(lastMemoryContext, currentArea);
+    const periodicRefresh = at - lastMemoryContextWriteAt >= 30000;
+    if (!semanticChange && !periodicRefresh) return;
+
+    context.set('history.currentArea', currentArea, {
+      source: 'engine-memory',
+      kind: 'derived',
+      ttlMs: 300000,
+      confidence: 0.9,
+    });
+    lastMemoryContext = currentArea;
+    lastMemoryContextWriteAt = at;
+  }
+
   function scheduleTransitionCheck(nextCheckAt) {
     if (transitionTimer) clearTimeout(transitionTimer);
     transitionTimer = null;
@@ -87,12 +121,13 @@
     }, delay);
   }
 
-  function buildEvaluation(situation, transitionResult) {
+  function buildEvaluation(situation, transitionResult, memoryResult) {
     const relevance = decision.evaluateRelevance({
       situation,
       transitions: transitionResult.events,
+      memory: memoryResult,
     });
-    const action = decision.decideAction({ situation, relevance });
+    const action = decision.decideAction({ situation, relevance, memory: memoryResult });
 
     return {
       ...action,
@@ -105,31 +140,48 @@
         pending: transitionResult.pending,
         nextCheckAt: transitionResult.nextCheckAt,
       },
+      memory: {
+        currentArea: memoryResult.currentArea,
+        closedEpisodes: memoryResult.closedEpisodes,
+      },
       relevance,
     };
   }
 
   function evaluate() {
     const situation = inference.inferSituation(context);
-    const relevance = decision.evaluateRelevance({ situation, transitions: [] });
-    const action = decision.decideAction({ situation, relevance });
+    const currentArea = memory.getCurrentAreaSummary(situation);
+    const relevance = decision.evaluateRelevance({
+      situation,
+      transitions: [],
+      memory: { currentArea, closedEpisodes: [] },
+    });
+    const action = decision.decideAction({ situation, relevance, memory: { currentArea } });
     return {
       ...action,
       contextAvailable: situation.locationAvailable,
       situation,
       transitions: [],
       transitionState: transition.snapshot(),
+      memory: { currentArea, closedEpisodes: [] },
       relevance,
     };
   }
 
   function run(reason = 'manual') {
+    const at = Date.now();
     const situation = inference.inferSituation(context);
-    const transitionResult = transition.update(situation, Date.now());
-    const evaluation = buildEvaluation(situation, transitionResult);
+    const transitionResult = transition.update(situation, at);
+    const memoryResult = memory.observe({
+      situation,
+      transitions: transitionResult.events,
+      transitionState: transitionResult,
+    }, at);
+    const evaluation = buildEvaluation(situation, transitionResult, memoryResult);
 
     writeSituation(situation);
     writeTransition(transitionResult.events, evaluation.relevance);
+    writeMemoryContext(memoryResult.currentArea, at);
     scheduleTransitionCheck(transitionResult.nextCheckAt);
     publishEvaluation(evaluation, reason);
     return evaluation;
@@ -153,6 +205,8 @@
     run,
     getLastEvaluation: () => lastEvaluation,
     getTransitionState: transition.snapshot,
+    getMemory: memory.snapshot,
+    hasVisited: memory.hasVisited,
     subscribeEvaluation,
   };
 
