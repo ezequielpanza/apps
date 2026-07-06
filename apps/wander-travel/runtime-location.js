@@ -1,6 +1,6 @@
 (() => {
-  const context = window.WanderContext;
-  if (!context) return;
+  const body = window.WanderBody;
+  if (!body) return;
 
   let watchId = null;
 
@@ -14,7 +14,7 @@
 
   function onPosition(position) {
     const coords = position.coords;
-    context.setRealLocation({
+    body.setRealLocation({
       lat: coords.latitude,
       lng: coords.longitude,
       accuracy: coords.accuracy,
@@ -23,21 +23,20 @@
       speedMps: coords.speed,
       updatedAt: position.timestamp || Date.now(),
       source: 'gps',
-      confidence: 1,
     });
   }
 
   function onError(error) {
-    context.setRealLocationStatus(mapError(error), { source: 'geolocation' });
+    body.setRealLocationStatus(mapError(error), 'geolocation');
   }
 
   function start() {
     if (!('geolocation' in navigator) || watchId != null) {
-      if (!('geolocation' in navigator)) context.setRealLocationStatus('unsupported', { source: 'geolocation' });
+      if (!('geolocation' in navigator)) body.setRealLocationStatus('unsupported', 'geolocation');
       return false;
     }
 
-    context.setRealLocationStatus('pending', { source: 'geolocation' });
+    body.setRealLocationStatus('pending', 'geolocation');
     watchId = navigator.geolocation.watchPosition(onPosition, onError, {
       enableHighAccuracy: true,
       maximumAge: 5000,
@@ -56,9 +55,9 @@
     if (!navigator.permissions?.query) return;
     try {
       const permission = await navigator.permissions.query({ name: 'geolocation' });
-      if (permission.state === 'denied') context.setRealLocationStatus('denied', { source: 'permissions' });
+      if (permission.state === 'denied') body.setRealLocationStatus('denied', 'permissions');
       permission.addEventListener?.('change', () => {
-        if (permission.state === 'denied') context.setRealLocationStatus('denied', { source: 'permissions' });
+        if (permission.state === 'denied') body.setRealLocationStatus('denied', 'permissions');
         else if (watchId == null) start();
       });
     } catch {}
