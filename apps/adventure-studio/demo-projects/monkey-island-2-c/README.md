@@ -15,7 +15,10 @@ El motor y los editores no deben contener lógica especial para este demo.
 
 ## Estado inicial
 
-- Proyecto: `Monkey Island 2 C`
-- Resolución lógica: `320 × 200`
+- Project: `Monkey Island 2 C`
+- Game: `Monkey Island 2 C`
+- Game Resolution: `320 × 200`
 - Room abierta por defecto: `Room 007`
 - Background inicial: `Default`
+
+El demo usa el mismo modelo multi-Game que cualquier otro Project de Adventure Studio.
