@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wander-travel-v0.70.0';
+const CACHE_NAME = 'wander-travel-v0.72.0';
 const APP_SHELL = [
   './',
   './index.html',
@@ -6,15 +6,24 @@ const APP_SHELL = [
   './wander-icons.svg',
   './wander-app-icon.svg',
   './manifest.webmanifest',
-  './runtime-context.js',
+  './runtime-context-store.js',
+  './runtime-context-location.js',
+  './runtime-context-init.js',
+  './runtime-context-inference.js',
+  './runtime-version.js',
   './app.js',
-  './runtime-location.js',
+  './runtime-map-core.js',
+  './runtime-map-position.js',
+  './runtime-map-controls.js',
+  './runtime-map.js',
+  './runtime-body-location.js',
+  './runtime-engine.js',
   './runtime-ui.js',
   './runtime-panel.js',
   './runtime-context-panel.js',
   './runtime-topbar.js',
   './runtime-tracks.js',
-  './runtime-simulator.js'
+  './runtime-body-simulator.js'
 ];
 
 self.addEventListener('install', (event) => {
