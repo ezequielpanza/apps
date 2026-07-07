@@ -20,7 +20,7 @@
         <button class="icon-button" aria-label="Menú">☰</button>
         <div class="brand-mark"><img src="assets/adventure-studio-logo.svg" alt="" aria-hidden="true" /></div>
         <div class="project-title-wrap">
-          <div class="project-title">Adventure Studio · v0.12.0</div>
+          <div class="project-title">Adventure Studio · v0.13.0</div>
           <div class="project-subtitle" id="projectSubtitle">Untitled Project</div>
         </div>
       </div>
@@ -82,8 +82,8 @@
             <button class="room-tool">✋ Pan</button>
             <div class="toolbar-spacer"></div>
             <button class="room-tool primary" id="importBackgroundButton">＋ Background</button>
-            <button class="room-tool" id="fitRoomButton">Fit</button>
-            <div class="room-zoom-control"><span>Zoom</span><input id="roomZoomRange" type="range" min="10" max="300" step="5" value="100" /><output id="roomZoomOutput">100%</output></div>
+            <button class="room-tool" id="fitRoomButton">Fit Editor View</button>
+            <div class="room-zoom-control"><span>Editor Zoom</span><input id="roomZoomRange" type="range" min="10" max="300" step="5" value="100" /><output id="roomZoomOutput">100%</output></div>
           </div>
           <div class="room-canvas-shell" id="roomCanvasShell">
             <div class="room-canvas-empty" id="roomCanvasEmpty"><span>▧</span><h2>No background</h2><p>Add a state from the Background Editor.</p><button id="emptyImportBackgroundButton">Add Background</button></div>
@@ -116,7 +116,19 @@
         <div class="inspector-resource-card"><span class="inspector-resource-icon" id="inspectorResourceIcon">▧</span><div><strong id="inspectorResourceType">Room</strong><span id="inspectorResourceState">Project resource</span></div></div>
         <div class="property-section" id="resourceSection"><div class="property-heading">Resource</div><label>ID<input id="inspectorResourceId" readonly /></label><label>Type<input id="inspectorResourceKind" readonly /></label></div>
         <div class="property-section" id="gameSettingsInspectorSection" hidden><div class="property-heading">Game Resolution</div><label>Width<input id="gameSettingsInspectorWidth" readonly /></label><label>Height<input id="gameSettingsInspectorHeight" readonly /></label><p class="property-help">Logical viewport for the active game.</p></div>
-        <div class="property-section" id="roomPropertiesSection" hidden><div class="property-heading">Default Background</div><label>Image<input id="roomImageName" readonly /></label><label>Width<input id="roomImageWidth" readonly /></label><label>Height<input id="roomImageHeight" readonly /></label><label>Zoom<input id="roomZoomInput" type="number" min="10" max="300" step="5" /></label><label>Scale mode<select id="roomScaleMode"><option value="manual">Manual</option><option value="fit">Fit viewport</option></select></label><button class="inspector-action" id="replaceBackgroundButton">Replace default</button><button class="inspector-action danger" id="removeBackgroundButton">Remove default</button></div>
+        <div class="property-section" id="roomPropertiesSection" hidden>
+          <div class="property-heading">Default Background</div>
+          <label>Image<input id="roomImageName" readonly /></label>
+          <label>Width<input id="roomImageWidth" readonly /></label>
+          <label>Height<input id="roomImageHeight" readonly /></label>
+          <label>Scale mode<select id="roomScaleMode"><option value="original">Original Size</option><option value="fit-width">Fit to Width</option><option value="fit-height">Fit to Height</option><option value="fit-inside">Fit Inside</option><option value="fill">Fill Viewport</option><option value="custom">Custom</option></select></label>
+          <label>Scale %<input id="roomScaleInput" type="number" min="1" max="1000" step="0.1" /></label>
+          <label>Initial X<input id="roomInitialXInput" type="number" step="1" /></label>
+          <label>Initial Y<input id="roomInitialYInput" type="number" step="1" /></label>
+          <p class="property-help" id="roomTransformHelp">Background transform in game coordinates.</p>
+          <button class="inspector-action" id="replaceBackgroundButton">Replace default</button>
+          <button class="inspector-action danger" id="removeBackgroundButton">Remove default</button>
+        </div>
         <div class="property-section" id="backgroundInspectorSection" hidden><div class="property-heading">Background State</div><label>Name<input id="backgroundNameInput" /></label><label>Size<input id="backgroundDimensions" readonly /></label><label class="background-inspector-check"><input id="backgroundDefaultCheck" type="checkbox" /> Default background</label><button class="inspector-action background-delete" id="deleteBackgroundStateButton">Delete background</button></div>
         <div class="property-section muted-section" id="genericEditorSection"><div class="property-heading">Editor</div><p>Detailed properties will be added with each specialized editor.</p></div>
       </div>
