@@ -305,11 +305,31 @@
     if (currentArea?.interactionState === 'staying') session.evidence.stayed = Math.max(1, session.evidence.stayed);
   }
 
-  function classifySession(session) {
-    if (session.evidence.stayed > 0 || session.stationaryMs >= 14400000) return 'stayed';
-    if (session.evidence.explored > 0) return 'explored';
-    if (session.evidence.visited > 0 || session.stationaryMs >= 1200000) return 'visited';
-    if (session.evidence.stopped > 0 || session.stationaryMs >= 120000) return 'stopped';
+  function classifySession(level, session) {
+    const cells = session.cellIds.length;
+
+    if (level === 'zone') {
+      if (session.evidence.stayed > 0 || session.stationaryMs >= 14400000) return 'stayed';
+      if (session.evidence.explored > 0) return 'explored';
+      if (session.evidence.visited > 0 || session.meaningfulMs >= 1200000) return 'visited';
+      if (session.evidence.stopped > 0 || session.stationaryMs >= 120000) return 'stopped';
+      if (session.evidence.passed_through > 0 || session.movingMs >= 30000) return 'passed_through';
+      return 'encountered';
+    }
+
+    if (level === 'city') {
+      if ((session.evidence.stayed > 0 && (cells >= 2 || session.stationaryMs >= 28800000)) || session.stationaryMs >= 43200000) return 'stayed';
+      if (session.evidence.explored > 0 && cells >= 2) return 'explored';
+      if (session.evidence.visited >= 2 || (session.evidence.visited >= 1 && cells >= 2) || (session.meaningfulMs >= 3600000 && cells >= 2)) return 'visited';
+      if (session.evidence.stopped > 0 || session.evidence.visited > 0 || session.stationaryMs >= 120000) return 'stopped';
+      if (session.evidence.passed_through > 0 || session.movingMs >= 30000) return 'passed_through';
+      return 'encountered';
+    }
+
+    if ((session.evidence.stayed > 0 && (cells >= 3 || session.stationaryMs >= 43200000)) || session.stationaryMs >= 64800000) return 'stayed';
+    if (session.evidence.explored >= 2 && cells >= 3) return 'explored';
+    if (session.evidence.visited >= 3 || (session.meaningfulMs >= 7200000 && cells >= 3)) return 'visited';
+    if (session.evidence.stopped > 0 || session.evidence.visited > 0 || session.stationaryMs >= 120000) return 'stopped';
     if (session.evidence.passed_through > 0 || session.movingMs >= 30000) return 'passed_through';
     return 'encountered';
   }
@@ -326,7 +346,7 @@
   }
 
   function maybeEmitPromotion(level, session, record, at, events) {
-    const type = classifySession(session);
+    const type = classifySession(level, session);
     if (type === 'encountered' || type === 'passed_through') return;
     if (interactionRank(type) <= interactionRank(session.emittedInteraction)) return;
 
@@ -336,7 +356,7 @@
       placeId: session.placeId,
       name: session.name,
       sessionId: session.id,
-      firstMeaningfulVisit: record.visitCount === 0,
+      firstMeaningfulVisit: record.visitCount === 0 && ['visited', 'explored', 'stayed'].includes(type),
       familiarity: before,
       routeFamiliarity: routeFamiliarity(record),
       confidence: type === 'stopped' ? 0.86 : 0.93,
@@ -389,7 +409,7 @@
     const record = data.records[level][session.placeId];
     if (!record) return null;
 
-    const finalType = classifySession(session);
+    const finalType = classifySession(level, session);
     const before = familiarity(level, record);
     const routeBefore = routeFamiliarity(record);
 
@@ -556,7 +576,7 @@
         id: activeSession.id,
         enteredAt: iso(activeSession.enteredAt),
         durationMs: Math.max(0, Date.now() - activeSession.enteredAt),
-        interaction: classifySession(activeSession),
+        interaction: classifySession(level, activeSession),
         journeyIds: [...activeSession.journeyIds],
         cellCount: activeSession.cellIds.length,
       } : null,
