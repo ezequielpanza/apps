@@ -39,6 +39,53 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
     els.roomInitialYInput.value=trimNumber(bg.initialY);
     els.roomTransformHelp.textContent=`Game viewport ${view.width} × ${view.height}. Rendered size ${Math.round(bg.width*scale)} × ${Math.round(bg.height*scale)}.`;
   }
+  function setGuideVisibility(){
+    const showViewport=els.showViewportToggle.checked;
+    const showImageBounds=els.showImageBoundsToggle.checked;
+    els.roomViewportFrame.hidden=!showViewport;
+    els.roomViewportMask.hidden=!showViewport;
+    els.roomOriginMarker.hidden=!showViewport;
+    els.roomBackgroundBounds.classList.toggle('hide-bounds',!showImageBounds);
+  }
+  function layoutScene(bg,game){
+    const view=viewport(game),scale=resolveScale(bg,game),factor=editorZoom/100;
+    const viewportWidth=view.width*factor,viewportHeight=view.height*factor;
+    const imageWidth=bg.width*scale*factor,imageHeight=bg.height*scale*factor;
+    const imageX=bg.initialX*factor,imageY=bg.initialY*factor;
+    const minX=Math.min(0,imageX),minY=Math.min(0,imageY);
+    const maxX=Math.max(viewportWidth,imageX+imageWidth),maxY=Math.max(viewportHeight,imageY+imageHeight);
+    const pad=56;
+    const sceneWidth=maxX-minX+pad*2,sceneHeight=maxY-minY+pad*2;
+    const originX=pad-minX,originY=pad-minY;
+
+    els.roomScene.style.width=`${sceneWidth}px`;
+    els.roomScene.style.height=`${sceneHeight}px`;
+    els.roomViewportFrame.style.left=`${originX}px`;
+    els.roomViewportFrame.style.top=`${originY}px`;
+    els.roomViewportFrame.style.width=`${viewportWidth}px`;
+    els.roomViewportFrame.style.height=`${viewportHeight}px`;
+    els.roomViewportLabel.textContent=`Viewport ${view.width} × ${view.height}`;
+
+    els.roomViewportMask.style.left=`${originX}px`;
+    els.roomViewportMask.style.top=`${originY}px`;
+    els.roomViewportMask.style.width=`${viewportWidth}px`;
+    els.roomViewportMask.style.height=`${viewportHeight}px`;
+    els.roomViewportMask.style.boxShadow=`0 0 0 99999px rgba(3,5,8,.58)`;
+
+    els.roomOriginMarker.style.left=`${originX}px`;
+    els.roomOriginMarker.style.top=`${originY}px`;
+
+    els.roomBackgroundBounds.style.left=`${originX+imageX}px`;
+    els.roomBackgroundBounds.style.top=`${originY+imageY}px`;
+    els.roomBackgroundBounds.style.width=`${imageWidth}px`;
+    els.roomBackgroundBounds.style.height=`${imageHeight}px`;
+    els.roomBackgroundBoundsLabel.textContent=`Background ${bg.width} × ${bg.height}`;
+
+    els.roomBackgroundImage.style.width='100%';
+    els.roomBackgroundImage.style.height='100%';
+    els.roomBackgroundImage.style.transform='none';
+    setGuideVisibility();
+  }
 
   async function render(room){
     const current=activeRoomContext(),bg=defaultBackground(room),game=current?.game;
@@ -54,11 +101,8 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
     if(!blob){release();els.roomCanvasEmpty.hidden=false;els.roomCanvasStage.hidden=true;return;}
     release();
     imageUrl=URL.createObjectURL(blob);
-    const scale=resolveScale(bg,game),editorFactor=editorZoom/100;
     els.roomBackgroundImage.src=imageUrl;
-    els.roomBackgroundImage.style.width=`${bg.width*scale*editorFactor}px`;
-    els.roomBackgroundImage.style.transform=`translate(${bg.initialX*editorFactor}px,${bg.initialY*editorFactor}px)`;
-    els.roomBackgroundImage.style.transformOrigin='top left';
+    layoutScene(bg,game);
     els.roomCanvasEmpty.hidden=true;
     els.roomCanvasStage.hidden=false;
   }
@@ -85,7 +129,7 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
   }
 
   function setEditorZoom(value){editorZoom=Math.max(10,Math.min(300,Number(value)||100));const current=activeRoomContext();if(current)render(current.resource);}
-  function fitEditorView(){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;const scale=resolveScale(bg,current.game),box=els.roomCanvasShell.getBoundingClientRect(),renderWidth=bg.width*scale,renderHeight=bg.height*scale;const value=Math.min((box.width-80)/Math.max(1,renderWidth),(box.height-80)/Math.max(1,renderHeight))*100;editorZoom=Math.max(10,Math.min(300,Math.round(value/5)*5));render(current.resource);}
+  function fitEditorView(){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;const view=viewport(current.game),scale=resolveScale(bg,current.game),box=els.roomCanvasShell.getBoundingClientRect();const minX=Math.min(0,bg.initialX),minY=Math.min(0,bg.initialY),maxX=Math.max(view.width,bg.initialX+bg.width*scale),maxY=Math.max(view.height,bg.initialY+bg.height*scale);const sceneWidth=maxX-minX,sceneHeight=maxY-minY;const value=Math.min((box.width-112)/Math.max(1,sceneWidth),(box.height-112)/Math.max(1,sceneHeight))*100;editorZoom=Math.max(10,Math.min(300,Math.floor(value/5)*5));render(current.resource);}
   function setScaleMode(mode){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg||!SCALE_MODES.has(mode))return;normalizeTransform(bg);bg.scaleMode=mode;resolveScale(bg,current.game);save();render(current.resource);}
   function setCustomScale(value){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;normalizeTransform(bg);bg.scaleMode='custom';bg.scale=Math.max(.01,Math.min(10,(Number(value)||100)/100));save();render(current.resource);}
   function setInitialPosition(axis,value){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;normalizeTransform(bg);bg[axis]=Number(value)||0;save();render(current.resource);}
@@ -102,6 +146,8 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
     els.roomScaleInput.addEventListener('change',()=>setCustomScale(els.roomScaleInput.value));
     els.roomInitialXInput.addEventListener('change',()=>setInitialPosition('initialX',els.roomInitialXInput.value));
     els.roomInitialYInput.addEventListener('change',()=>setInitialPosition('initialY',els.roomInitialYInput.value));
+    els.showViewportToggle.addEventListener('change',setGuideVisibility);
+    els.showImageBoundsToggle.addEventListener('change',setGuideVisibility);
     els.removeBackgroundButton.addEventListener('click',removeDefault);
     window.addEventListener('beforeunload',release);
   }
