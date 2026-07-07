@@ -21,6 +21,7 @@
     ['place.country', 'País', 'pin'],
     ['place.city', 'Ciudad', 'city'],
     ['place.zone', 'Zona', 'zone'],
+    ['history.currentPlace', 'Memoria semántica', 'brain'],
     ['history.currentArea', 'Memoria de zona', 'brain'],
   ];
 
@@ -31,11 +32,11 @@
     'location.effective.status','location.effective.lat','location.effective.lng','location.effective.accuracy','location.effective.altitude','location.effective.heading','location.effective.speedMps','location.effective.updatedAt','location.effective.source',
     'motion.status','motion.speedKmh','motion.heading',
     'mobility.mode','mobility.evidence','mobility.override.mode','mobility.provider.mode','mobility.provider.confidence',
-    'journey.current','journey.event','situation.transition',
+    'journey.current','journey.event','situation.transition','situation.placeEvent',
     'place.status','place.current','place.country','place.countryCode','place.countryId','place.region','place.regionId',
     'place.city','place.cityId','place.district','place.districtId','place.neighborhood','place.neighborhoodId',
     'place.zone','place.zoneId','place.type','place.displayName','place.source','place.sourceRef','place.resolvedLat','place.resolvedLng','place.updatedAt','place.attribution',
-    'history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
+    'history.currentPlace','history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
   ];
 
   function areaMemoryValue(area) {
@@ -56,6 +57,32 @@
     const place = placeLabels[area.placeFamiliarity] || area.placeFamiliarity || 'Lugar desconocido';
     const route = routeLabels[area.routeFamiliarity] || area.routeFamiliarity;
     return route ? place + ' · ' + route : place;
+  }
+
+  function semanticPlaceValue(place) {
+    if (!place) return 'Pendiente';
+    const current = place.zone || place.city || place.country;
+    if (!current) return 'Sin sesión semántica';
+
+    const labels = {
+      unexplored: 'no recorrido',
+      first_visit: 'primera visita',
+      returning: 'visitado antes',
+      familiar: 'familiar',
+      frequent: 'frecuente',
+    };
+    const interactionLabels = {
+      encountered: 'presencia',
+      passed_through: 'en tránsito',
+      stopped: 'parada',
+      visited: 'visita',
+      explored: 'explorando',
+      stayed: 'estadía',
+    };
+
+    const familiarity = labels[current.familiarity] || current.familiarity || 'sin historial';
+    const interaction = interactionLabels[current.session?.interaction] || current.session?.interaction;
+    return current.name + ' · ' + familiarity + (interaction ? ' · ' + interaction : '');
   }
 
   function journeyValue(journey) {
@@ -90,7 +117,8 @@
     if (key === 'mobility.evidence' && Array.isArray(entry.value)) return entry.value.join(', ') || 'Sin evidencia';
     if (key === 'journey.current') return journeyValue(entry.value);
     if (key === 'place.status') return placeStatusValue(entry.value);
-    if ((key === 'journey.event' || key === 'situation.transition' || key === 'history.areaEvent') && entry.value?.type) return entry.value.type;
+    if ((key === 'journey.event' || key === 'situation.transition' || key === 'situation.placeEvent' || key === 'history.areaEvent') && entry.value?.type) return entry.value.type;
+    if (key === 'history.currentPlace') return semanticPlaceValue(entry.value);
     if (key === 'history.currentArea') return areaMemoryValue(entry.value);
     if (key === 'places.items' && Array.isArray(entry.value)) return entry.value.length + ' lugares';
     if (entry.value && typeof entry.value === 'object') {
