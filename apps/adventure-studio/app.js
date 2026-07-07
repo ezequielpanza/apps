@@ -22,7 +22,7 @@ const getActiveNode=()=>findNode(tree,activeEditorId)?.node||null;
 const getActiveGameResource=()=>{const node=getActiveNode();return node?.gameId?ensureGameResource(resources,node.gameId):null;};
 
 const roomEditor=createRoomEditor({els,getActiveNode,getActiveGameResource,getResources:()=>resources,save,renderWorkspace:()=>renderWorkspace(),assets:roomBackgroundStore});
-const backgroundEditor=createBackgroundEditor({els,getTree:()=>tree,getActiveSection:()=>{const node=getActiveNode();return node?.kind==='room-section'?node:null;},getResources:()=>resources,save,assets:roomBackgroundStore,renderWorkspace:()=>renderWorkspace()});
+const backgroundEditor=createBackgroundEditor({els,getTree:()=>tree,getActiveSection:()=>{const node=getActiveNode();return node?.kind==='room-section'?node:null;},getResources:()=>resources,save,assets:roomBackgroundStore,renderWorkspace:()=>renderWorkspace(),renderTree:()=>treeController.render()});
 const gameSettingsEditor=createGameSettingsEditor({els,getGameResource:getActiveGameResource,save,renderWorkspace:()=>renderWorkspace()});
 
 function hideAllEditors(){els.placeholder.hidden=true;els.gameSettingsEditor.hidden=true;els.roomEditor.hidden=true;els.backgroundEditor.hidden=true;}
@@ -60,36 +60,25 @@ async function renderWorkspace(){
 function openEditor(id){const found=findNode(tree,id);if(!found||found.node.kind!=='item'||found.node.itemType==='game')return;ensureResource(resources,found.node);activeEditorId=id;selectedId=id;save();treeController.render();renderWorkspace();}
 function openGameSectionEditor(id){const found=findNode(tree,id);if(!found||found.node.kind!=='game-section')return;activeEditorId=id;selectedId=id;save();treeController.render();renderWorkspace();}
 function openRoomSectionEditor(id){const found=findNode(tree,id);if(!found||found.node.kind!=='room-section')return;activeEditorId=id;selectedId=id;save();treeController.render();renderWorkspace();}
+function openBackground(sectionId,backgroundId){const found=findNode(tree,sectionId);if(!found||found.node.kind!=='room-section'||found.node.sectionKey!=='backgrounds')return;backgroundEditor.selectBackground(backgroundId);activeEditorId=sectionId;selectedId=`background:${backgroundId}`;save();treeController.render();renderWorkspace();}
 
 function deleteResourceTree(node){
   const ids=new Set();
   const collect=current=>{ids.add(current.id);if(Array.isArray(current.children))current.children.forEach(collect);};
   collect(node);
-
   if(node.kind==='item'&&node.itemType==='game'){
-    const game=resources.games?.[node.id];
-    Object.values(game?.rooms||{}).forEach(room=>(room.backgrounds||[]).forEach(bg=>roomBackgroundStore.remove(bg.assetKey).catch(()=>{})));
-    if(resources.games)delete resources.games[node.id];
+    const game=resources.games?.[node.id];Object.values(game?.rooms||{}).forEach(room=>(room.backgrounds||[]).forEach(bg=>roomBackgroundStore.remove(bg.assetKey).catch(()=>{})));if(resources.games)delete resources.games[node.id];
   }else{
-    const remove=current=>{
-      if(current.kind==='item'){
-        const game=ensureGameResource(resources,current.gameId),bucket=bucketFor(current.itemType),resource=bucket?game?.[bucket]?.[current.id]:null;
-        if(current.itemType==='room'&&resource?.backgrounds)resource.backgrounds.forEach(bg=>roomBackgroundStore.remove(bg.assetKey).catch(()=>{}));
-        if(game&&bucket)delete game[bucket][current.id];
-        removeReferencesTo(tree,current.id);
-      }
-      if(Array.isArray(current.children))current.children.forEach(remove);
-    };
-    remove(node);
+    const remove=current=>{if(current.kind==='item'){const game=ensureGameResource(resources,current.gameId),bucket=bucketFor(current.itemType),resource=bucket?game?.[bucket]?.[current.id]:null;if(current.itemType==='room'&&resource?.backgrounds)resource.backgrounds.forEach(bg=>roomBackgroundStore.remove(bg.assetKey).catch(()=>{}));if(game&&bucket)delete game[bucket][current.id];removeReferencesTo(tree,current.id);}if(Array.isArray(current.children))current.children.forEach(remove);};remove(node);
   }
-
   if(activeEditorId&&ids.has(activeEditorId))activeEditorId=null;
 }
 
 function getRoomSectionCount(section){if(section.sectionKey!=='backgrounds')return section.children.length;const room=findNode(tree,section.roomId)?.node;if(!room)return 0;return ensureResource(resources,room).backgrounds.length;}
+function getRoomBackgrounds(section){if(section.sectionKey!=='backgrounds')return[];const room=findNode(tree,section.roomId)?.node;if(!room)return[];return ensureResource(resources,room).backgrounds;}
 function createResource(node){ensureResource(resources,node);}
 
-const treeController=createProjectTreeController({treeElement:els.tree,menuElement:els.menu,getTree:()=>tree,getSelectedId:()=>selectedId,setSelectedId:id=>{selectedId=id;},save:()=>{save();renderWorkspace();},openEditor,openGameSectionEditor,openRoomSectionEditor,onCreateResource:createResource,onDeleteResource:deleteResourceTree,getRoomSectionCount});
+const treeController=createProjectTreeController({treeElement:els.tree,menuElement:els.menu,getTree:()=>tree,getSelectedId:()=>selectedId,setSelectedId:id=>{selectedId=id;},save:()=>{save();renderWorkspace();},openEditor,openGameSectionEditor,openRoomSectionEditor,onCreateResource:createResource,onDeleteResource:deleteResourceTree,getRoomSectionCount,getRoomBackgrounds,onOpenBackground:openBackground});
 
 const panelLimits={project:{min:170,max:420,key:STORAGE_KEYS.projectWidth,css:'--project-width'},inspector:{min:220,max:480,key:STORAGE_KEYS.inspectorWidth,css:'--inspector-width'}};
 function clamp(value,min,max){return Math.min(Math.max(value,min),max);}
