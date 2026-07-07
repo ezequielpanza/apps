@@ -10,9 +10,17 @@
     'time.now': 70000,
     'time.dayPeriod': 300000,
     'motion.status': 15000,
-    'motion.mode': 15000,
     'motion.speedKmh': 15000,
     'motion.heading': 15000,
+    'mobility.mode': 15000,
+    'mobility.evidence': 15000,
+    'mobility.override.mode': Infinity,
+    'mobility.provider.mode': 60000,
+    'mobility.provider.confidence': 60000,
+    'journey.current': 300000,
+    'journey.event': 120000,
+    'history.currentArea': 300000,
+    'history.areaEvent': 120000,
     'location.real.status': 30000,
     'location.real.lat': 30000,
     'location.real.lng': 30000,
@@ -55,9 +63,17 @@
     'time.now': 'observed',
     'time.dayPeriod': 'derived',
     'motion.status': 'inferred',
-    'motion.mode': 'inferred',
     'motion.speedKmh': 'derived',
     'motion.heading': 'derived',
+    'mobility.mode': 'inferred',
+    'mobility.evidence': 'inferred',
+    'mobility.override.mode': 'config',
+    'mobility.provider.mode': 'observed',
+    'mobility.provider.confidence': 'observed',
+    'journey.current': 'inferred',
+    'journey.event': 'inferred',
+    'history.currentArea': 'derived',
+    'history.areaEvent': 'inferred',
     'places.items': 'derived',
   };
 
@@ -170,16 +186,20 @@
     if (activity != null) set('context.activity', activity, { source, kind: 'inferred', confidence });
   }
 
-  function setMotion({ status, mode, speedKmh, heading, source = 'context' }) {
-    if (status != null) set('motion.status', status, { source, kind: 'inferred' });
-    if (mode != null) set('motion.mode', mode, { source, kind: 'inferred' });
-    if (speedKmh != null) set('motion.speedKmh', Number(speedKmh), { source, kind: 'derived' });
+  function setMotion({ status, speedKmh, heading, source = 'context', confidence = 1 }) {
+    if (status != null) set('motion.status', status, { source, kind: 'inferred', confidence });
+    if (speedKmh != null) set('motion.speedKmh', Number(speedKmh), { source, kind: 'derived', confidence });
     if (heading === null) remove('motion.heading');
-    else if (heading != null) set('motion.heading', Number(heading), { source, kind: 'derived' });
+    else if (heading != null) set('motion.heading', Number(heading), { source, kind: 'derived', confidence });
+  }
+
+  function setMobility({ mode, evidence, source = 'context', confidence = 1 }) {
+    if (mode != null) set('mobility.mode', mode, { source, kind: 'inferred', confidence });
+    if (evidence != null) set('mobility.evidence', evidence, { source, kind: 'inferred', confidence });
   }
 
   window.WanderContext = {
-    set, remove, get, value, snapshot, subscribe, updateTime, setContext, setMotion, statusFor,
+    set, remove, get, value, snapshot, subscribe, updateTime, setContext, setMotion, setMobility, statusFor,
     _write: write, _remove: remove, _notify: notify, _sameValue: sameValue,
   };
 })();
