@@ -34,7 +34,7 @@ const project={
     [gameId]:{
       id:gameId,
       type:'game',
-      settings:{width:320,height:200},
+      settings:{width:1920,height:1080},
       rooms:{
         [roomId]:{
           id:roomId,
@@ -49,8 +49,10 @@ const project={
             height:144,
             type:'image/webp',
             size:22182,
-            zoom:100,
-            scaleMode:'manual'
+            scaleMode:'original',
+            scale:1,
+            initialX:0,
+            initialY:0
           }],
           defaultBackgroundId:'mi2c-room-007-bg-default'
         }
