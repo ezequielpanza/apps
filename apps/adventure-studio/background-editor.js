@@ -45,7 +45,7 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
     for(const file of files){
       const dims=await readDimensions(file),id=uid('background'),assetKey=`${current.room.gameId}:${current.room.id}:background:${id}`;
       await assets.put(assetKey,file);
-      current.resource.backgrounds.push({id,name:stripExtension(file.name)||`Background ${current.resource.backgrounds.length+1}`,assetKey,width:dims.width,height:dims.height,type:file.type,size:file.size,zoom:100,scaleMode:'manual'});
+      current.resource.backgrounds.push({id,name:stripExtension(file.name)||`Background ${current.resource.backgrounds.length+1}`,assetKey,width:dims.width,height:dims.height,type:file.type,size:file.size,scaleMode:'original',scale:1,initialX:0,initialY:0});
       if(!current.resource.defaultBackgroundId)current.resource.defaultBackgroundId=id;
       selectedBackgroundId=id;
     }
