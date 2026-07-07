@@ -14,9 +14,10 @@
     ['location.effective.source', 'Fuente de ubicación', 'target'],
     ['location.effective.accuracy', 'Precisión', 'target'],
     ['motion.status', 'Movimiento físico', 'route'],
-    ['motion.mode', 'Modo de movimiento', 'compass'],
+    ['mobility.mode', 'Modo de movilidad', 'compass'],
     ['motion.speedKmh', 'Velocidad', 'speed'],
     ['motion.heading', 'Rumbo', 'heading'],
+    ['journey.current', 'Journey', 'route'],
     ['history.currentArea', 'Memoria de zona', 'brain'],
     ['place.city', 'Ciudad', 'city'],
     ['place.zone', 'Zona', 'zone'],
@@ -27,33 +28,42 @@
     'location.real.status','location.real.lat','location.real.lng','location.real.accuracy','location.real.altitude','location.real.heading','location.real.speedMps','location.real.updatedAt','location.real.source',
     'location.override.enabled','location.override.status','location.override.lat','location.override.lng','location.override.accuracy','location.override.altitude','location.override.heading','location.override.speedMps','location.override.updatedAt','location.override.source',
     'location.effective.status','location.effective.lat','location.effective.lng','location.effective.accuracy','location.effective.altitude','location.effective.heading','location.effective.speedMps','location.effective.updatedAt','location.effective.source',
-    'motion.status','motion.mode','motion.speedKmh','motion.heading','situation.transition','history.currentArea','history.areaEvent','environment.weatherStatus','place.city','place.zone','places.items',
+    'motion.status','motion.speedKmh','motion.heading',
+    'mobility.mode','mobility.evidence','mobility.override.mode','mobility.provider.mode','mobility.provider.confidence',
+    'journey.current','journey.event','situation.transition','history.currentArea','history.areaEvent',
+    'environment.weatherStatus','place.city','place.zone','places.items',
   ];
-
-  function relativeVisit(value) {
-    const at = Date.parse(value || '');
-    if (!Number.isFinite(at)) return null;
-    const deltaMs = Math.max(0, Date.now() - at);
-    const hours = Math.round(deltaMs / 3600000);
-    if (hours < 1) return 'hace menos de una hora';
-    if (hours < 24) return 'hace ' + hours + ' h';
-    const days = Math.round(hours / 24);
-    if (days < 60) return 'hace ' + days + ' días';
-    const months = Math.round(days / 30);
-    return 'hace ' + months + ' meses';
-  }
 
   function areaMemoryValue(area) {
     if (!area) return 'Pendiente';
-    const labels = {
-      first_visit: 'Primera visita a esta zona',
-      returning: 'Ya estuviste en esta zona',
-      familiar: 'Zona familiar',
-      frequent: 'Zona frecuente',
+    const placeLabels = {
+      unexplored: 'Lugar no recorrido',
+      first_visit: 'Primera visita real',
+      returning: 'Lugar visitado antes',
+      familiar: 'Lugar familiar',
+      frequent: 'Lugar frecuente',
     };
-    const label = labels[area.familiarity] || area.familiarity || 'Zona conocida';
-    const previous = relativeVisit(area.previousVisitAt);
-    return previous ? label + ' · ' + previous : label;
+    const routeLabels = {
+      route_new: 'ruta nueva',
+      route_returning: 'ruta ya transitada',
+      route_familiar: 'ruta familiar',
+      route_frequent: 'ruta frecuente',
+    };
+    const place = placeLabels[area.placeFamiliarity] || area.placeFamiliarity || 'Lugar desconocido';
+    const route = routeLabels[area.routeFamiliarity] || area.routeFamiliarity;
+    return route ? place + ' · ' + route : place;
+  }
+
+  function journeyValue(journey) {
+    if (!journey) return 'Sin Journey activo';
+    const state = journey.state === 'paused' ? 'Pausado' : 'Activo';
+    const distanceKm = Number(journey.distanceM || 0) / 1000;
+    return state + ' · ' + distanceKm.toFixed(distanceKm >= 10 ? 0 : 1) + ' km';
+  }
+
+  function mobilityValue(value) {
+    if (!value || value === 'unknown') return 'Desconocido';
+    return String(value);
   }
 
   function readableValue(key, entry) {
@@ -62,10 +72,15 @@
     if (key.endsWith('.speedMps')) return (Number(entry.value) * 3.6).toFixed(1) + ' km/h';
     if (key.endsWith('.heading') || key === 'motion.heading') return Number.isFinite(Number(entry.value)) ? Math.round(Number(entry.value)) + '°' : '—';
     if (key === 'motion.speedKmh') return Number(entry.value || 0).toFixed(1) + ' km/h';
-    if (key === 'situation.transition' && entry.value?.type) return entry.value.type;
+    if (key === 'mobility.mode') return mobilityValue(entry.value);
+    if (key === 'mobility.evidence' && Array.isArray(entry.value)) return entry.value.join(', ') || 'Sin evidencia';
+    if (key === 'journey.current') return journeyValue(entry.value);
+    if ((key === 'journey.event' || key === 'situation.transition' || key === 'history.areaEvent') && entry.value?.type) return entry.value.type;
     if (key === 'history.currentArea') return areaMemoryValue(entry.value);
-    if (key === 'history.areaEvent' && entry.value?.type) return entry.value.type;
     if (key === 'places.items' && Array.isArray(entry.value)) return entry.value.length + ' lugares';
+    if (entry.value && typeof entry.value === 'object') {
+      try { return JSON.stringify(entry.value); } catch { return '[objeto]'; }
+    }
     return entry.value == null || entry.value === '' ? 'Pendiente' : String(entry.value);
   }
 
