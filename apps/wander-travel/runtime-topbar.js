@@ -5,6 +5,19 @@
     return ($('#wander-query-input')?.value || '').trim();
   }
 
+  function rememberUserMessage(message, intent) {
+    window.WanderContext?.set('user.intent', intent, {
+      source: 'topbar',
+      ttlMs: 600000,
+      confidence: 0.95,
+    });
+    window.WanderContext?.set('user.lastQuestion', message, {
+      source: 'topbar',
+      ttlMs: 600000,
+      confidence: 1,
+    });
+  }
+
   function askWander() {
     const input = $('#wander-query-input');
     const question = currentQuestion();
@@ -23,17 +36,15 @@
       return;
     }
 
-    window.WanderContext?.set('user.intent', 'Preguntar a Wander', {
-      source: 'topbar',
-      ttlMs: 600000,
-      confidence: 0.9,
-    });
-    window.WanderContext?.set('user.lastQuestion', question, {
-      source: 'topbar',
-      ttlMs: 600000,
-      confidence: 1,
-    });
+    const learned = window.WanderEngine?.handleUserMessage?.(question);
+    if (learned?.handled) {
+      rememberUserMessage(question, 'Corregir memoria de Wander');
+      window.WanderUI?.showWander('Entendido', learned.message);
+      if (input) input.value = '';
+      return;
+    }
 
+    rememberUserMessage(question, 'Preguntar a Wander');
     window.WanderUI?.showWander(
       'Pregunta recibida',
       question + ' — La entrada ya funciona. El próximo paso es conectar esta pregunta con la IA contextual de Wander.'
