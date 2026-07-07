@@ -121,9 +121,9 @@
     }
   }
 
-  function writeMemoryEvent(areaEvents, relevance) {
+  function writeMemoryEvent(areaEvents) {
     if (!areaEvents.length) return;
-    const selected = relevance?.areaEvent || areaEvents[areaEvents.length - 1];
+    const selected = areaEvents[areaEvents.length - 1];
     context.set('history.areaEvent', selected, {
       source: 'engine-memory',
       kind: 'inferred',
@@ -159,7 +159,7 @@
       source: 'engine-memory',
       kind: 'derived',
       ttlMs: 300000,
-      confidence: 0.9,
+      confidence: 0.75,
     });
     lastMemoryContext = currentArea;
     lastMemoryContextWriteAt = at;
@@ -167,17 +167,16 @@
 
   function samePlaceMeaning(a, b) {
     if (!a || !b) return a === b;
-    const levels = ['country', 'city', 'zone'];
-    return levels.every((level) => {
+    return ['country', 'city', 'zone'].every((level) => {
       const left = a[level];
       const right = b[level];
       if (!left || !right) return left === right;
       return left.placeId === right.placeId &&
-        left.familiarity === right.familiarity &&
-        left.routeFamiliarity === right.routeFamiliarity &&
-        left.visitCount === right.visitCount &&
-        left.passThroughCount === right.passThroughCount &&
-        left.session?.interaction === right.session?.interaction;
+        left.presenceStatus === right.presenceStatus &&
+        left.knownByUser === right.knownByUser &&
+        left.seenCount === right.seenCount &&
+        left.seenDaysCount === right.seenDaysCount &&
+        left.seenYesterday === right.seenYesterday;
     });
   }
 
@@ -195,7 +194,7 @@
           source: 'engine-place',
           kind: 'derived',
           ttlMs: 300000,
-          confidence: 0.92,
+          confidence: 0.95,
         });
         lastPlaceContext = current;
         lastPlaceContextWriteAt = at;
@@ -210,6 +209,17 @@
         ttlMs: 120000,
         confidence: selected.confidence ?? 0.88,
       });
+    }
+
+    if (placeResult.pendingClarification) {
+      context.set('conversation.pendingClarification', placeResult.pendingClarification, {
+        source: 'engine-place',
+        kind: 'inferred',
+        ttlMs: Math.max(1000, placeResult.pendingClarification.expiresAt - at),
+        confidence: 1,
+      });
+    } else {
+      context.remove('conversation.pendingClarification');
     }
   }
 
@@ -261,7 +271,7 @@
       place: {
         current: placeResult.current,
         events: placeResult.events,
-        closedSessions: placeResult.closedSessions,
+        pendingClarification: placeResult.pendingClarification,
         nextCheckAt: placeResult.nextCheckAt,
       },
       relevance,
@@ -276,7 +286,7 @@
     const placeSnapshot = {
       current: placeEngine.getCurrentSummary(),
       events: [],
-      closedSessions: [],
+      pendingClarification: context.value('conversation.pendingClarification'),
       nextCheckAt: null,
     };
     const relevance = relevanceEngine.evaluate({
@@ -319,22 +329,40 @@
     const placeResult = placeEngine.update({
       place: context.value('place.current'),
       placeStatus: context.value('place.status'),
-      situation,
-      transitionState: transitionResult,
-      journeyState: journeyResult,
-      memoryResult,
     }, at);
     const evaluation = buildEvaluation(situation, transitionResult, journeyResult, memoryResult, placeResult);
 
     writeSituation(situation);
     writeTransition(transitionResult.events, evaluation.relevance);
     writeJourney(journeyResult);
-    writeMemoryEvent(memoryResult.areaEvents, evaluation.relevance);
+    writeMemoryEvent(memoryResult.areaEvents);
     writeMemoryContext(memoryResult.currentArea, at);
     writePlaceContext(placeResult, evaluation.relevance, at);
     scheduleReevaluation(transitionResult.nextCheckAt, journeyResult.nextCheckAt, placeResult.nextCheckAt);
     publishEvaluation(evaluation, reason);
     return evaluation;
+  }
+
+  function handleUserMessage(text) {
+    const result = placeEngine.handleUserMessage(text);
+    if (result?.handled) run('user:place-memory');
+    return result;
+  }
+
+  function setPlaceFamiliarity(input) {
+    const result = placeEngine.setPlaceFamiliarity(input);
+    if (result) run('user:place-familiarity');
+    return result;
+  }
+
+  function requestPlaceClarification(input) {
+    const result = placeEngine.requestClarification(input);
+    if (result) run('engine:clarification');
+    return result;
+  }
+
+  function rememberContent(input) {
+    return placeEngine.rememberContent(input);
   }
 
   context.subscribe((key) => {
@@ -366,6 +394,13 @@
     getMemory: memory.snapshot,
     getPlaceMemory: placeEngine.snapshot,
     getPlaceRecord: placeEngine.getRecord,
+    setPlaceFamiliarity,
+    requestPlaceClarification,
+    handleUserMessage,
+    rememberContent,
+    updateContentFeedback: placeEngine.updateContentFeedback,
+    hasToldContent: placeEngine.hasToldContent,
+    getContentRecord: placeEngine.getContentRecord,
     hasSeen: memory.hasSeen,
     hasVisited: memory.hasVisited,
     subscribeEvaluation,
