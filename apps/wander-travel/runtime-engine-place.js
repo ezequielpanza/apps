@@ -79,12 +79,6 @@
     return new Date(at).toISOString();
   }
 
-  function finiteNumber(value) {
-    if (value === null || value === undefined || value === '') return null;
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : null;
-  }
-
   function makeId(prefix, at) {
     return prefix + '_' + at.toString(36) + '_' + Math.random().toString(36).slice(2, 7);
   }
@@ -350,6 +344,13 @@
     session.emittedInteraction = type;
   }
 
+  function meaningfulDuration(session, type) {
+    if (session.meaningfulMs > 0) return session.meaningfulMs;
+    if (type === 'explored') return Math.max(0, session.movingMs);
+    if (type === 'visited' || type === 'stayed') return Math.max(0, session.stationaryMs);
+    return 0;
+  }
+
   function countFinalInteraction(record, type, session, at) {
     record.totalObservedMs += Math.max(0, session.observedMs);
     record.lastSeenAt = iso(at);
@@ -364,16 +365,16 @@
     } else if (type === 'explored') {
       record.exploreCount += 1;
       record.visitCount += 1;
-      record.totalVisitedMs += Math.max(session.observedMs, session.meaningfulMs);
+      record.totalVisitedMs += meaningfulDuration(session, type);
       record.lastVisitAt = iso(at);
     } else if (type === 'visited') {
       record.visitCount += 1;
-      record.totalVisitedMs += Math.max(session.observedMs, session.meaningfulMs);
+      record.totalVisitedMs += meaningfulDuration(session, type);
       record.lastVisitAt = iso(at);
     } else if (type === 'stayed') {
       record.stayCount += 1;
       record.visitCount += 1;
-      record.totalVisitedMs += Math.max(session.observedMs, session.meaningfulMs);
+      record.totalVisitedMs += meaningfulDuration(session, type);
       record.lastVisitAt = iso(at);
       record.lastStayAt = iso(at);
     }
