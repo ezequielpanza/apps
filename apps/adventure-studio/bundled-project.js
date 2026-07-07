@@ -3,6 +3,7 @@ import{roomBackgroundStore}from'./asset-store.js';
 
 const PROJECT_NAME_KEY='adventureStudioProjectNameV1';
 const PROJECT_ID_KEY='adventureStudioBundledProjectIdV1';
+const PROJECT_REVISION_KEY='adventureStudioBundledProjectRevisionV1';
 
 export async function bootstrapBundledProject(projectUrl,{forceDefault=false}={}){
   if(!projectUrl)return null;
@@ -10,13 +11,20 @@ export async function bootstrapBundledProject(projectUrl,{forceDefault=false}={}
   const project=module.default;
   if(!project?.id||!Array.isArray(project.tree)||!project.resources?.games)return null;
 
+  const bundledRevision=Math.max(1,Number(project.revision)||1);
   const currentProjectId=localStorage.getItem(PROJECT_ID_KEY);
+  const currentRevision=Math.max(1,Number(localStorage.getItem(PROJECT_REVISION_KEY))||1);
   const hasProject=Boolean(localStorage.getItem(STORAGE_KEYS.tree));
   const shouldInitialize=forceDefault||!hasProject||!currentProjectId;
   const isCurrentBundle=currentProjectId===project.id;
+  const shouldUpgrade=isCurrentBundle&&bundledRevision>currentRevision;
 
-  if(shouldInitialize)initializeProject(project);
-  else if(isCurrentBundle)reconcileBundledResources(project);
+  if(shouldInitialize){
+    initializeProject(project,bundledRevision);
+  }else if(isCurrentBundle){
+    reconcileBundledResources(project,{updateSettings:shouldUpgrade});
+    if(shouldUpgrade)localStorage.setItem(PROJECT_REVISION_KEY,String(bundledRevision));
+  }
 
   if(shouldInitialize||isCurrentBundle)await hydrateBundledAssets(project,projectUrl);
 
@@ -25,7 +33,7 @@ export async function bootstrapBundledProject(projectUrl,{forceDefault=false}={}
 
 export function getCurrentProjectName(){return localStorage.getItem(PROJECT_NAME_KEY)||'Untitled Project';}
 
-function initializeProject(project){
+function initializeProject(project,revision){
   localStorage.setItem(STORAGE_KEYS.tree,JSON.stringify(project.tree));
   localStorage.setItem(STORAGE_KEYS.resources,JSON.stringify(project.resources));
   localStorage.removeItem(STORAGE_KEYS.settings);
@@ -33,9 +41,10 @@ function initializeProject(project){
   if(project.activeEditorId)localStorage.setItem(STORAGE_KEYS.activeEditor,project.activeEditorId);else localStorage.removeItem(STORAGE_KEYS.activeEditor);
   localStorage.setItem(PROJECT_NAME_KEY,project.name||'Untitled Project');
   localStorage.setItem(PROJECT_ID_KEY,project.id);
+  localStorage.setItem(PROJECT_REVISION_KEY,String(revision));
 }
 
-function reconcileBundledResources(project){
+function reconcileBundledResources(project,{updateSettings=false}={}){
   let localResources=parseStoredResources();if(!localResources)return;
   if(!localResources.games)localResources=migrateLegacyResources(localResources,project);
   localResources.games??={};
@@ -43,6 +52,7 @@ function reconcileBundledResources(project){
   for(const[gameId,bundledGame]of Object.entries(project.resources.games||{})){
     const localGame=localResources.games[gameId];if(!localGame)continue;
     localGame.settings=localGame.settings||bundledGame.settings||{width:1280,height:720};
+    if(updateSettings&&bundledGame.settings)localGame.settings={...localGame.settings,...bundledGame.settings};
     for(const bucket of['rooms','characters','inventory','dialogues','audio'])localGame[bucket]=localGame[bucket]&&typeof localGame[bucket]==='object'?localGame[bucket]:{};
 
     for(const[roomId,bundledRoom]of Object.entries(bundledGame.rooms||{})){
