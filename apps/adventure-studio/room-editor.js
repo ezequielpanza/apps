@@ -25,21 +25,44 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
   function automaticScale(bg,game){
     const view=viewport(game),width=Math.max(1,Number(bg.width)||1),height=Math.max(1,Number(bg.height)||1);
     if(bg.scaleMode==='original')return 1;
-    if(bg.scaleMode==='fit-width')return view.width/width;
-    if(bg.scaleMode==='fit-height')return view.height/height;
+    if(bg.scaleMode==='fit-width')return Math.max(view.width/width,view.height/height);
+    if(bg.scaleMode==='fit-height')return Math.max(view.height/height,view.width/width);
     if(bg.scaleMode==='fit-inside')return Math.min(view.width/width,view.height/height);
     if(bg.scaleMode==='fill')return Math.max(view.width/width,view.height/height);
     return Math.max(.01,Number(bg.scale)||1);
   }
   function resolveScale(bg,game){normalizeTransform(bg);const scale=automaticScale(bg,game);if(bg.scaleMode!=='custom')bg.scale=scale;return scale;}
+  function dragAxes(mode){
+    if(mode==='fit-height')return{x:true,y:false};
+    if(mode==='fit-width')return{x:false,y:true};
+    return{x:true,y:true};
+  }
+  function constrainPosition(bg,game,x,y){
+    const view=viewport(game),scale=resolveScale(bg,game);
+    const imageWidth=Math.max(0,Number(bg.width)||0)*scale;
+    const imageHeight=Math.max(0,Number(bg.height)||0)*scale;
+    const minX=Math.min(0,view.width-imageWidth),maxX=0;
+    const minY=Math.min(0,view.height-imageHeight),maxY=0;
+    const axes=dragAxes(bg.scaleMode);
+    let nextX=axes.x?clamp(Number(x)||0,minX,maxX):0;
+    let nextY=axes.y?clamp(Number(y)||0,minY,maxY):0;
+    if(imageWidth<=view.width)nextX=0;
+    if(imageHeight<=view.height)nextY=0;
+    return{x:trimNumber(nextX),y:trimNumber(nextY)};
+  }
+  function enforceTransform(bg,game){const position=constrainPosition(bg,game,bg.initialX,bg.initialY);bg.initialX=position.x;bg.initialY=position.y;return position;}
   function syncInspector(bg,game){
-    const scale=resolveScale(bg,game),view=viewport(game);
+    const scale=resolveScale(bg,game),view=viewport(game),axes=dragAxes(bg.scaleMode);
+    enforceTransform(bg,game);
     els.roomScaleMode.value=bg.scaleMode;
     els.roomScaleInput.value=trimNumber(scale*100);
     els.roomScaleInput.disabled=bg.scaleMode!=='custom';
     els.roomInitialXInput.value=trimNumber(bg.initialX);
     els.roomInitialYInput.value=trimNumber(bg.initialY);
-    els.roomTransformHelp.textContent=`Game viewport ${view.width} × ${view.height}. Rendered size ${Math.round(bg.width*scale)} × ${Math.round(bg.height*scale)}.`;
+    els.roomInitialXInput.disabled=!axes.x;
+    els.roomInitialYInput.disabled=!axes.y;
+    const lockText=bg.scaleMode==='fit-height'?' Horizontal drag only.':bg.scaleMode==='fit-width'?' Vertical drag only.':'';
+    els.roomTransformHelp.textContent=`Game viewport ${view.width} × ${view.height}. Rendered size ${Math.round(bg.width*scale)} × ${Math.round(bg.height*scale)}.${lockText}`;
   }
   function setGuideVisibility(){
     const showViewport=els.showViewportToggle.checked;
@@ -50,6 +73,7 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
     els.roomBackgroundBounds.classList.toggle('hide-bounds',!showImageBounds);
   }
   function layoutScene(bg,game){
+    enforceTransform(bg,game);
     const view=viewport(game),scale=resolveScale(bg,game),factor=editorZoom/100;
     const viewportWidth=view.width*factor,viewportHeight=view.height*factor;
     const imageWidth=bg.width*scale*factor,imageHeight=bg.height*scale*factor;
@@ -105,7 +129,7 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
     els.roomImageWidth.value=bg?.width||'—';
     els.roomImageHeight.value=bg?.height||'—';
     if(!bg){release();els.roomCanvasEmpty.hidden=false;els.roomCanvasStage.hidden=true;els.roomScaleMode.disabled=true;els.roomScaleInput.disabled=true;els.roomInitialXInput.disabled=true;els.roomInitialYInput.disabled=true;els.roomTransformHelp.textContent='Background transform in game coordinates.';return;}
-    els.roomScaleMode.disabled=false;els.roomInitialXInput.disabled=false;els.roomInitialYInput.disabled=false;
+    els.roomScaleMode.disabled=false;
     normalizeTransform(bg);syncInspector(bg,game);
     const blob=await assets.get(bg.assetKey,bg.sourceUrl,bg.sourceEncoding,bg.type);
     if(!blob){release();els.roomCanvasEmpty.hidden=false;els.roomCanvasStage.hidden=true;return;}
@@ -125,6 +149,7 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
     const bg={id,name:stripExtension(file.name)||'Background',assetKey,width:dims.width,height:dims.height,type:file.type,size:file.size,scaleMode:'original',scale:1,initialX:0,initialY:0};
     current.resource.backgrounds.push(bg);
     if(!current.resource.defaultBackgroundId)current.resource.defaultBackgroundId=id;
+    enforceTransform(bg,current.game);
     centerViewportPending=true;
     save();await renderWorkspace();
   }
@@ -136,41 +161,48 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
     bg.name=stripExtension(file.name)||bg.name;
     bg.width=dims.width;bg.height=dims.height;bg.type=file.type;bg.size=file.size;
     delete bg.sourceUrl;delete bg.sourceEncoding;
-    normalizeTransform(bg);resolveScale(bg,current.game);
+    normalizeTransform(bg);resolveScale(bg,current.game);enforceTransform(bg,current.game);
     centerViewportPending=true;
     save();await renderWorkspace();
   }
 
   function setEditorZoom(value){editorZoom=Math.max(10,Math.min(300,Number(value)||100));const current=activeRoomContext();if(current)render(current.resource);}
-  function fitEditorView(){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;const view=viewport(current.game),scale=resolveScale(bg,current.game),box=els.roomCanvasShell.getBoundingClientRect();const minX=Math.min(0,bg.initialX),minY=Math.min(0,bg.initialY),maxX=Math.max(view.width,bg.initialX+bg.width*scale),maxY=Math.max(view.height,bg.initialY+bg.height*scale);const sceneWidth=maxX-minX,sceneHeight=maxY-minY;const value=Math.min((box.width-112)/Math.max(1,sceneWidth),(box.height-112)/Math.max(1,sceneHeight))*100;editorZoom=Math.max(10,Math.min(300,Math.floor(value/5)*5));centerViewportPending=true;render(current.resource);}
-  function setScaleMode(mode){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg||!SCALE_MODES.has(mode))return;normalizeTransform(bg);bg.scaleMode=mode;resolveScale(bg,current.game);save();render(current.resource);}
-  function setCustomScale(value){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;normalizeTransform(bg);bg.scaleMode='custom';bg.scale=Math.max(.01,Math.min(10,(Number(value)||100)/100));save();render(current.resource);}
-  function setInitialPosition(axis,value){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;normalizeTransform(bg);bg[axis]=Number(value)||0;save();render(current.resource);}
+  function fitEditorView(){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;enforceTransform(bg,current.game);const view=viewport(current.game),scale=resolveScale(bg,current.game),box=els.roomCanvasShell.getBoundingClientRect();const minX=Math.min(0,bg.initialX),minY=Math.min(0,bg.initialY),maxX=Math.max(view.width,bg.initialX+bg.width*scale),maxY=Math.max(view.height,bg.initialY+bg.height*scale);const sceneWidth=maxX-minX,sceneHeight=maxY-minY;const value=Math.min((box.width-112)/Math.max(1,sceneWidth),(box.height-112)/Math.max(1,sceneHeight))*100;editorZoom=Math.max(10,Math.min(300,Math.floor(value/5)*5));centerViewportPending=true;render(current.resource);}
+  function setScaleMode(mode){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg||!SCALE_MODES.has(mode))return;normalizeTransform(bg);bg.scaleMode=mode;resolveScale(bg,current.game);enforceTransform(bg,current.game);save();render(current.resource);}
+  function setCustomScale(value){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;normalizeTransform(bg);bg.scaleMode='custom';bg.scale=Math.max(.01,Math.min(10,(Number(value)||100)/100));enforceTransform(bg,current.game);save();render(current.resource);}
+  function setInitialPosition(axis,value){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;normalizeTransform(bg);const axes=dragAxes(bg.scaleMode);if(axis==='initialX'&&!axes.x||axis==='initialY'&&!axes.y){syncInspector(bg,current.game);return;}const position=constrainPosition(bg,current.game,axis==='initialX'?value:bg.initialX,axis==='initialY'?value:bg.initialY);bg.initialX=position.x;bg.initialY=position.y;save();render(current.resource);}
   async function removeDefault(){const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;await assets.remove(bg.assetKey);current.resource.backgrounds=current.resource.backgrounds.filter(item=>item.id!==bg.id);current.resource.defaultBackgroundId=current.resource.backgrounds[0]?.id||null;centerViewportPending=true;save();renderWorkspace();}
 
   function beginBackgroundDrag(event){
     if(event.button!==0)return;
     const current=activeRoomContext(),bg=defaultBackground(current?.resource);if(!current||!bg)return;
     event.preventDefault();
-    const factor=editorZoom/100;
-    dragState={pointerId:event.pointerId,current,bg,factor,startClientX:event.clientX,startClientY:event.clientY,startInitialX:Number(bg.initialX)||0,startInitialY:Number(bg.initialY)||0,startLeft:parseFloat(els.roomBackgroundBounds.style.left)||0,startTop:parseFloat(els.roomBackgroundBounds.style.top)||0};
+    enforceTransform(bg,current.game);
+    const factor=editorZoom/100,axes=dragAxes(bg.scaleMode);
+    dragState={pointerId:event.pointerId,current,bg,factor,axes,startClientX:event.clientX,startClientY:event.clientY,startInitialX:Number(bg.initialX)||0,startInitialY:Number(bg.initialY)||0};
     els.roomBackgroundBounds.classList.add('dragging');
     els.roomBackgroundBounds.setPointerCapture?.(event.pointerId);
   }
   function moveBackgroundDrag(event){
     if(!dragState||event.pointerId!==dragState.pointerId)return;
-    const dx=event.clientX-dragState.startClientX,dy=event.clientY-dragState.startClientY;
-    els.roomBackgroundBounds.style.left=`${dragState.startLeft+dx}px`;
-    els.roomBackgroundBounds.style.top=`${dragState.startTop+dy}px`;
-    els.roomInitialXInput.value=trimNumber(dragState.startInitialX+dx/dragState.factor);
-    els.roomInitialYInput.value=trimNumber(dragState.startInitialY+dy/dragState.factor);
+    const dx=dragState.axes.x?(event.clientX-dragState.startClientX)/dragState.factor:0;
+    const dy=dragState.axes.y?(event.clientY-dragState.startClientY)/dragState.factor:0;
+    const position=constrainPosition(dragState.bg,dragState.current.game,dragState.startInitialX+dx,dragState.startInitialY+dy);
+    dragState.preview=position;
+    const factor=dragState.factor;
+    const viewLeft=parseFloat(els.roomViewportFrame.style.left)||0;
+    const viewTop=parseFloat(els.roomViewportFrame.style.top)||0;
+    els.roomBackgroundBounds.style.left=`${viewLeft+position.x*factor}px`;
+    els.roomBackgroundBounds.style.top=`${viewTop+position.y*factor}px`;
+    els.roomInitialXInput.value=position.x;
+    els.roomInitialYInput.value=position.y;
   }
   function endBackgroundDrag(event){
     if(!dragState||event.pointerId!==dragState.pointerId)return;
-    const state=dragState,dx=event.clientX-state.startClientX,dy=event.clientY-state.startClientY;
+    const state=dragState,position=state.preview||constrainPosition(state.bg,state.current.game,state.startInitialX,state.startInitialY);
     dragState=null;
-    state.bg.initialX=trimNumber(state.startInitialX+dx/state.factor);
-    state.bg.initialY=trimNumber(state.startInitialY+dy/state.factor);
+    state.bg.initialX=position.x;
+    state.bg.initialY=position.y;
     els.roomBackgroundBounds.classList.remove('dragging');
     try{els.roomBackgroundBounds.releasePointerCapture?.(event.pointerId);}catch{}
     centerViewportPending=true;
@@ -203,6 +235,7 @@ export function createRoomEditor({els,getActiveNode,getActiveGameResource,getRes
   return{bind,render};
 }
 
+function clamp(value,min,max){return Math.min(Math.max(value,min),max);}
 function trimNumber(value){return Number(Number(value).toFixed(3));}
 function stripExtension(name){return name.replace(/\.[^.]+$/,'');}
 function readDimensions(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{resolve({width:img.naturalWidth,height:img.naturalHeight});URL.revokeObjectURL(url);};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Invalid image'));};img.src=url;});}
