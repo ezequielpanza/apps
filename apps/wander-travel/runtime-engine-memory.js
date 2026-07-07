@@ -153,7 +153,7 @@
   }
 
   function placeFamiliarity(record) {
-    const meaningfulCount = record.exploreCount + record.visitCount + record.stayCount;
+    const meaningfulCount = record.visitCount;
     if (meaningfulCount <= 0) return 'unexplored';
     if (meaningfulCount >= 10 || record.placeDurationMs >= 72000000) return 'frequent';
     if (meaningfulCount >= 3 || record.placeDurationMs >= 14400000) return 'familiar';
