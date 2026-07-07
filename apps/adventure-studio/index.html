@@ -20,7 +20,7 @@
         <button class="icon-button" aria-label="Menú">☰</button>
         <div class="brand-mark"><img src="assets/adventure-studio-logo.svg" alt="" aria-hidden="true" /></div>
         <div class="project-title-wrap">
-          <div class="project-title">Adventure Studio · v0.13.0</div>
+          <div class="project-title">Adventure Studio · v0.14.0</div>
           <div class="project-subtitle" id="projectSubtitle">Untitled Project</div>
         </div>
       </div>
@@ -80,6 +80,10 @@
           <div class="room-toolbar">
             <button class="room-tool active">↖ Select</button>
             <button class="room-tool">✋ Pan</button>
+            <div class="room-guide-toggles">
+              <label class="room-guide-toggle"><input id="showViewportToggle" type="checkbox" checked /> Viewport</label>
+              <label class="room-guide-toggle"><input id="showImageBoundsToggle" type="checkbox" checked /> Image Bounds</label>
+            </div>
             <div class="toolbar-spacer"></div>
             <button class="room-tool primary" id="importBackgroundButton">＋ Background</button>
             <button class="room-tool" id="fitRoomButton">Fit Editor View</button>
@@ -87,7 +91,19 @@
           </div>
           <div class="room-canvas-shell" id="roomCanvasShell">
             <div class="room-canvas-empty" id="roomCanvasEmpty"><span>▧</span><h2>No background</h2><p>Add a state from the Background Editor.</p><button id="emptyImportBackgroundButton">Add Background</button></div>
-            <div class="room-canvas-stage" id="roomCanvasStage" hidden><img id="roomBackgroundImage" alt="Room background" /></div>
+            <div class="room-canvas-stage" id="roomCanvasStage" hidden>
+              <div class="room-scene" id="roomScene">
+                <div class="room-background-bounds" id="roomBackgroundBounds">
+                  <span class="room-guide-label image-label" id="roomBackgroundBoundsLabel">Background</span>
+                  <img id="roomBackgroundImage" alt="Room background" />
+                </div>
+                <div class="room-viewport-frame" id="roomViewportFrame">
+                  <span class="room-guide-label viewport-label" id="roomViewportLabel">Viewport</span>
+                  <span class="room-origin-marker" id="roomOriginMarker"><i></i><b>0,0</b></span>
+                </div>
+                <div class="room-viewport-mask" id="roomViewportMask" aria-hidden="true"></div>
+              </div>
+            </div>
           </div>
         </div>
 
