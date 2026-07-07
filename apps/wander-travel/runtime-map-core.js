@@ -8,6 +8,7 @@
   }).setView([20, 0], 2);
 
   L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map);
+  map.attributionControl.addAttribution('Place data &copy; OpenStreetMap contributors');
 
   const baseLayers = {
     streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
