@@ -21,8 +21,7 @@
     ['place.country', 'País', 'pin'],
     ['place.city', 'Ciudad', 'city'],
     ['place.zone', 'Zona', 'zone'],
-    ['history.currentPlace', 'Memoria semántica', 'brain'],
-    ['history.currentArea', 'Memoria de zona', 'brain'],
+    ['history.currentPlace', 'Memoria del lugar', 'brain'],
   ];
 
   const TECHNICAL = [
@@ -36,53 +35,24 @@
     'place.status','place.current','place.country','place.countryCode','place.countryId','place.region','place.regionId',
     'place.city','place.cityId','place.district','place.districtId','place.neighborhood','place.neighborhoodId',
     'place.zone','place.zoneId','place.type','place.displayName','place.source','place.sourceRef','place.resolvedLat','place.resolvedLng','place.updatedAt','place.attribution',
-    'history.currentPlace','history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
+    'history.currentPlace','conversation.pendingClarification',
+    'history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
   ];
 
-  function areaMemoryValue(area) {
-    if (!area) return 'Pendiente';
-    const placeLabels = {
-      unexplored: 'Lugar no recorrido',
-      first_visit: 'Primera visita real',
-      returning: 'Lugar visitado antes',
-      familiar: 'Lugar familiar',
-      frequent: 'Lugar frecuente',
-    };
-    const routeLabels = {
-      route_new: 'ruta nueva',
-      route_returning: 'ruta ya transitada',
-      route_familiar: 'ruta familiar',
-      route_frequent: 'ruta frecuente',
-    };
-    const place = placeLabels[area.placeFamiliarity] || area.placeFamiliarity || 'Lugar desconocido';
-    const route = routeLabels[area.routeFamiliarity] || area.routeFamiliarity;
-    return route ? place + ' · ' + route : place;
-  }
-
-  function semanticPlaceValue(place) {
+  function placeMemoryValue(place) {
     if (!place) return 'Pendiente';
-    const current = place.zone || place.city || place.country;
-    if (!current) return 'Sin sesión semántica';
+    const current = place.city || place.zone || place.country;
+    if (!current) return 'Sin memoria';
 
     const labels = {
-      unexplored: 'no recorrido',
-      first_visit: 'primera visita',
-      returning: 'visitado antes',
-      familiar: 'familiar',
-      frequent: 'frecuente',
+      assumed_new: 'asumido nuevo',
+      new_confirmed: 'nuevo confirmado',
+      recent_presence: 'presencia reciente',
+      known: 'conocido por vos',
     };
-    const interactionLabels = {
-      encountered: 'presencia',
-      passed_through: 'en tránsito',
-      stopped: 'parada',
-      visited: 'visita',
-      explored: 'explorando',
-      stayed: 'estadía',
-    };
-
-    const familiarity = labels[current.familiarity] || current.familiarity || 'sin historial';
-    const interaction = interactionLabels[current.session?.interaction] || current.session?.interaction;
-    return current.name + ' · ' + familiarity + (interaction ? ' · ' + interaction : '');
+    const status = labels[current.presenceStatus] || current.presenceStatus || 'sin historial';
+    const yesterday = current.seenYesterday ? ' · estuvo ayer' : '';
+    return (current.name || 'Lugar actual') + ' · ' + status + yesterday;
   }
 
   function journeyValue(journey) {
@@ -118,8 +88,8 @@
     if (key === 'journey.current') return journeyValue(entry.value);
     if (key === 'place.status') return placeStatusValue(entry.value);
     if ((key === 'journey.event' || key === 'situation.transition' || key === 'situation.placeEvent' || key === 'history.areaEvent') && entry.value?.type) return entry.value.type;
-    if (key === 'history.currentPlace') return semanticPlaceValue(entry.value);
-    if (key === 'history.currentArea') return areaMemoryValue(entry.value);
+    if (key === 'history.currentPlace') return placeMemoryValue(entry.value);
+    if (key === 'conversation.pendingClarification') return entry.value?.question || 'Aclaración pendiente';
     if (key === 'places.items' && Array.isArray(entry.value)) return entry.value.length + ' lugares';
     if (entry.value && typeof entry.value === 'object') {
       try { return JSON.stringify(entry.value); } catch { return '[objeto]'; }
