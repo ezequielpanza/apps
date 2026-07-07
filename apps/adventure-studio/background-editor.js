@@ -1,6 +1,6 @@
 import{ensureResource,findNode,uid}from'./project-model.js';
 
-export function createBackgroundEditor({els,getTree,getActiveSection,getResources,save,assets,renderWorkspace}){
+export function createBackgroundEditor({els,getTree,getActiveSection,getResources,save,assets,renderWorkspace,renderTree}){
   let selectedBackgroundId=null;
   let previewUrl=null;
 
@@ -19,7 +19,6 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
     const current=context();if(!current)return;
     const{resource}=current;
     if(!selectedBackgroundId||!resource.backgrounds.some(bg=>bg.id===selectedBackgroundId))selectedBackgroundId=resource.defaultBackgroundId||resource.backgrounds[0]?.id||null;
-    els.backgroundList.innerHTML=resource.backgrounds.length?resource.backgrounds.map(bg=>`<button class="background-list-item${bg.id===selectedBackgroundId?' selected':''}" data-background-id="${bg.id}"><span class="background-state-dot"></span><span><strong>${escapeHtml(bg.name)}</strong><small>${bg.width} × ${bg.height}${bg.id===resource.defaultBackgroundId?' · Default':''}</small></span></button>`).join(''):'<div class="background-list-empty">No backgrounds yet</div>';
     els.backgroundCount.textContent=`${resource.backgrounds.length} background${resource.backgrounds.length===1?'':'s'}`;
     await renderSelected(resource);
   }
@@ -49,7 +48,7 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
       if(!current.resource.defaultBackgroundId)current.resource.defaultBackgroundId=id;
       selectedBackgroundId=id;
     }
-    save();await renderWorkspace();
+    save();renderTree?.();await renderWorkspace();
   }
 
   async function removeSelected(){
@@ -59,17 +58,16 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
     await assets.remove(removed.assetKey);
     if(current.resource.defaultBackgroundId===removed.id)current.resource.defaultBackgroundId=current.resource.backgrounds[0]?.id||null;
     selectedBackgroundId=current.resource.backgrounds[index]?.id||current.resource.backgrounds[index-1]?.id||null;
-    save();await renderWorkspace();
+    save();renderTree?.();await renderWorkspace();
   }
 
-  function renameSelected(value){const current=context(),bg=current?.resource.backgrounds.find(item=>item.id===selectedBackgroundId),name=value.trim();if(!bg||!name)return;bg.name=name;save();render();}
-  function setDefault(checked){const current=context();if(!current||!selectedBackgroundId||!checked)return;current.resource.defaultBackgroundId=selectedBackgroundId;save();render();}
+  function renameSelected(value){const current=context(),bg=current?.resource.backgrounds.find(item=>item.id===selectedBackgroundId),name=value.trim();if(!bg||!name)return;bg.name=name;save();renderTree?.();render();}
+  function setDefault(checked){const current=context();if(!current||!selectedBackgroundId||!checked)return;current.resource.defaultBackgroundId=selectedBackgroundId;save();renderTree?.();render();}
 
   function bind(){
     els.addBackgroundStateButton.addEventListener('click',()=>els.backgroundStateFileInput.click());
     els.backgroundEditorImportButton.addEventListener('click',()=>els.backgroundStateFileInput.click());
     els.backgroundStateFileInput.addEventListener('change',async()=>{const files=[...(els.backgroundStateFileInput.files||[])];els.backgroundStateFileInput.value='';if(files.length)await addFiles(files);});
-    els.backgroundList.addEventListener('click',event=>{const button=event.target.closest('[data-background-id]');if(!button)return;selectedBackgroundId=button.dataset.backgroundId;render();});
     els.backgroundNameInput.addEventListener('change',()=>renameSelected(els.backgroundNameInput.value));
     els.backgroundDefaultCheck.addEventListener('change',()=>setDefault(els.backgroundDefaultCheck.checked));
     els.deleteBackgroundStateButton.addEventListener('click',removeSelected);
@@ -80,5 +78,4 @@ export function createBackgroundEditor({els,getTree,getActiveSection,getResource
 }
 
 function stripExtension(name){return name.replace(/\.[^.]+$/,'');}
-function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 function readDimensions(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{resolve({width:img.naturalWidth,height:img.naturalHeight});URL.revokeObjectURL(url);};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Invalid image'));};img.src=url;});}
