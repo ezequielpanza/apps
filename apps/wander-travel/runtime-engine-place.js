@@ -2,21 +2,9 @@
   const STORAGE_KEY = 'wander.engine.place.v2';
   const LEVELS = ['country', 'city', 'zone'];
   const POLICY = Object.freeze({
-    changeStableMs: {
-      country: 60000,
-      city: 30000,
-      zone: 20000,
-    },
-    resumeGapMs: {
-      country: 172800000,
-      city: 86400000,
-      zone: 21600000,
-    },
-    maxRecords: {
-      country: 200,
-      city: 1500,
-      zone: 4000,
-    },
+    changeStableMs: { country: 60000, city: 30000, zone: 20000 },
+    resumeGapMs: { country: 172800000, city: 86400000, zone: 21600000 },
+    maxRecords: { country: 200, city: 1500, zone: 4000 },
     maxSeenDays: 60,
     maxContentItems: 5000,
     clarificationTtlMs: 900000,
@@ -86,10 +74,9 @@
 
   function localDayKey(at) {
     const date = new Date(at);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return year + '-' + month + '-' + day;
+    return date.getFullYear() + '-' +
+      String(date.getMonth() + 1).padStart(2, '0') + '-' +
+      String(date.getDate()).padStart(2, '0');
   }
 
   function previousLocalDayKey(at) {
@@ -109,11 +96,7 @@
   function descriptorFor(level, place) {
     if (!place) return null;
     if (level === 'country') {
-      return place.countryId ? {
-        id: place.countryId,
-        name: place.country || null,
-        parentId: null,
-      } : null;
+      return place.countryId ? { id: place.countryId, name: place.country || null, parentId: null } : null;
     }
     if (level === 'city') {
       return place.cityId ? {
@@ -170,7 +153,7 @@
     return placeId ? data.userPlaces[placeId] || null : null;
   }
 
-  function presenceStatus(level, record, at, seenTodayBefore, seenYesterday) {
+  function presenceStatus(record, seenTodayBefore, seenYesterday) {
     const explicit = userPlace(record.id);
     if (explicit?.known === true) return 'known';
     if (explicit?.known === false) return 'new_confirmed';
@@ -184,9 +167,8 @@
     const yesterday = previousLocalDayKey(at);
     const seenTodayBefore = record.seenDays.includes(today);
     const seenYesterday = record.seenDays.includes(yesterday);
-    const previousSeenAt = record.lastSeenAt;
 
-    record.previousSeenAt = record.seenCount > 0 ? previousSeenAt : null;
+    record.previousSeenAt = record.seenCount > 0 ? record.lastSeenAt : null;
     record.lastSeenAt = iso(at);
     record.seenCount += 1;
     if (!record.seenDays.includes(today)) record.seenDays.push(today);
@@ -196,8 +178,7 @@
 
     return {
       record,
-      status: presenceStatus(level, record, at, seenTodayBefore, seenYesterday),
-      seenTodayBefore,
+      status: presenceStatus(record, seenTodayBefore, seenYesterday),
       seenYesterday,
     };
   }
@@ -238,8 +219,6 @@
       knownByUser: userPlace(descriptor.id)?.known ?? null,
       confidence: touched.status === 'known' || touched.status === 'new_confirmed' ? 1 : 0.85,
     }));
-
-    return session;
   }
 
   function closeSession(level, at, reason, events) {
@@ -260,8 +239,7 @@
   function recoverExpired(at, events) {
     LEVELS.forEach((level) => {
       const session = data.active[level];
-      if (!session) return;
-      if (at - session.lastSeenAt > POLICY.resumeGapMs[level]) {
+      if (session && at - session.lastSeenAt > POLICY.resumeGapMs[level]) {
         closeSession(level, session.lastSeenAt, 'observation_gap', events);
       }
     });
@@ -315,9 +293,7 @@
       name: record.name,
       parentId: record.parentId,
       presenceStatus: session?.presenceStatus || presenceStatus(
-        level,
         record,
-        at,
         record.seenDays.includes(localDayKey(at)),
         record.seenDays.includes(previousLocalDayKey(at)),
       ),
@@ -362,9 +338,7 @@
     recoverExpired(at, events);
 
     const placeAvailable = placeStatus === 'available' && Boolean(place);
-    LEVELS.forEach((level) => {
-      reconcileLevel(level, descriptorFor(level, place), placeAvailable, at, events);
-    });
+    LEVELS.forEach((level) => reconcileLevel(level, descriptorFor(level, place), placeAvailable, at, events));
 
     if (data.pendingClarification && at > data.pendingClarification.expiresAt) {
       data.pendingClarification = null;
@@ -394,9 +368,7 @@
 
     LEVELS.forEach((candidateLevel) => {
       const session = data.active[candidateLevel];
-      if (session?.placeId === placeId) {
-        session.presenceStatus = known ? 'known' : 'new_confirmed';
-      }
+      if (session?.placeId === placeId) session.presenceStatus = known ? 'known' : 'new_confirmed';
     });
 
     if (data.pendingClarification?.placeId === placeId) data.pendingClarification = null;
@@ -404,14 +376,13 @@
     return clone(data.userPlaces[placeId]);
   }
 
-  function mostSpecificCurrent() {
+  function currentConversationTarget() {
     const current = currentSummary();
     return current?.city || current?.zone || current?.country || null;
   }
 
   function requestClarification({ level = null, placeId = null, name = null, question = null } = {}, at = Date.now()) {
-    const current = mostSpecificCurrent();
-    const target = placeId ? { level, placeId, name } : current;
+    const target = placeId ? { level, placeId, name } : currentConversationTarget();
     if (!target?.placeId) return null;
 
     data.pendingClarification = {
@@ -419,7 +390,7 @@
       level: target.level,
       placeId: target.placeId,
       name: target.name,
-      question: question || ('¿Ya conocías ' + (target.name || 'este lugar') + '?'),
+      question: question || ('Ya conocías ' + (target.name || 'este lugar') + '?'),
       askedAt: iso(at),
       expiresAt: at + POLICY.clarificationTtlMs,
     };
@@ -439,15 +410,6 @@
     const normalized = normalizeText(text);
     if (!normalized) return null;
 
-    const knownPatterns = [
-      /\bya lo conozco\b/,
-      /\bya conozco\b/,
-      /\bconozco (bien )?(este|esta|el|la)?\s*(lugar|ciudad|zona)?\b/,
-      /\bestuve (aca|aqui) antes\b/,
-      /\bvine antes\b/,
-      /\bya estuve\b/,
-      /\bvivi (aca|aqui)\b/,
-    ];
     const newPatterns = [
       /\bnunca estuve\b/,
       /\bes mi primera vez\b/,
@@ -456,9 +418,21 @@
       /\bno conozco (este|esta|el|la)?\s*(lugar|ciudad|zona)?\b/,
       /\bes nuevo para mi\b/,
     ];
+    const knownPatterns = [
+      /\bya lo conozco\b/,
+      /\bya conozco\b/,
+      /\bconozco bien\b/,
+      /\bconozco este lugar\b/,
+      /\bconozco esta ciudad\b/,
+      /\bconozco esta zona\b/,
+      /\bestuve (aca|aqui) antes\b/,
+      /\bvine antes\b/,
+      /\bya estuve\b/,
+      /\bvivi (aca|aqui)\b/,
+    ];
 
-    if (knownPatterns.some((pattern) => pattern.test(normalized))) return true;
     if (newPatterns.some((pattern) => pattern.test(normalized))) return false;
+    if (knownPatterns.some((pattern) => pattern.test(normalized))) return true;
     return null;
   }
 
@@ -466,9 +440,7 @@
     const known = classifyFamiliarityMessage(text);
     if (known === null) return { handled: false };
 
-    const pending = data.pendingClarification;
-    const current = mostSpecificCurrent();
-    const target = pending || current;
+    const target = data.pendingClarification || currentConversationTarget();
     if (!target?.placeId) return { handled: false };
 
     const record = setPlaceFamiliarity({
@@ -544,10 +516,7 @@
   function getRecord(level, placeId) {
     const record = data.presence?.[level]?.[placeId];
     if (!record) return null;
-    return {
-      ...clone(record),
-      user: userPlace(placeId) ? clone(userPlace(placeId)) : null,
-    };
+    return { ...clone(record), user: userPlace(placeId) ? clone(userPlace(placeId)) : null };
   }
 
   function getContentRecord(contentId) {
