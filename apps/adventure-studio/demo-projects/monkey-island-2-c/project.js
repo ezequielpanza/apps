@@ -17,6 +17,7 @@ const roomNode={id:roomId,kind:'item',label:'Room 007',rootId:'games',gameId,sec
 
 const project={
   id:'monkey-island-2-c',
+  revision:2,
   name:'Monkey Island 2 C',
   selectedId:roomId,
   activeEditorId:roomId,
