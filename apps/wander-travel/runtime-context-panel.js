@@ -18,9 +18,10 @@
     ['motion.speedKmh', 'Velocidad', 'speed'],
     ['motion.heading', 'Rumbo', 'heading'],
     ['journey.current', 'Journey', 'route'],
-    ['history.currentArea', 'Memoria de zona', 'brain'],
+    ['place.country', 'País', 'pin'],
     ['place.city', 'Ciudad', 'city'],
     ['place.zone', 'Zona', 'zone'],
+    ['history.currentArea', 'Memoria de zona', 'brain'],
   ];
 
   const TECHNICAL = [
@@ -30,8 +31,11 @@
     'location.effective.status','location.effective.lat','location.effective.lng','location.effective.accuracy','location.effective.altitude','location.effective.heading','location.effective.speedMps','location.effective.updatedAt','location.effective.source',
     'motion.status','motion.speedKmh','motion.heading',
     'mobility.mode','mobility.evidence','mobility.override.mode','mobility.provider.mode','mobility.provider.confidence',
-    'journey.current','journey.event','situation.transition','history.currentArea','history.areaEvent',
-    'environment.weatherStatus','place.city','place.zone','places.items',
+    'journey.current','journey.event','situation.transition',
+    'place.status','place.current','place.country','place.countryCode','place.countryId','place.region','place.regionId',
+    'place.city','place.cityId','place.district','place.districtId','place.neighborhood','place.neighborhoodId',
+    'place.zone','place.zoneId','place.type','place.displayName','place.source','place.sourceRef','place.resolvedLat','place.resolvedLng','place.updatedAt','place.attribution',
+    'history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
   ];
 
   function areaMemoryValue(area) {
@@ -66,6 +70,16 @@
     return String(value);
   }
 
+  function placeStatusValue(value) {
+    const labels = {
+      pending: 'Pendiente',
+      resolving: 'Resolviendo',
+      available: 'Disponible',
+      unavailable: 'No disponible',
+    };
+    return labels[value] || String(value || 'Pendiente');
+  }
+
   function readableValue(key, entry) {
     if (!entry) return 'Pendiente';
     if (key.endsWith('.accuracy')) return Number(entry.value).toFixed(0) + ' m';
@@ -75,6 +89,7 @@
     if (key === 'mobility.mode') return mobilityValue(entry.value);
     if (key === 'mobility.evidence' && Array.isArray(entry.value)) return entry.value.join(', ') || 'Sin evidencia';
     if (key === 'journey.current') return journeyValue(entry.value);
+    if (key === 'place.status') return placeStatusValue(entry.value);
     if ((key === 'journey.event' || key === 'situation.transition' || key === 'history.areaEvent') && entry.value?.type) return entry.value.type;
     if (key === 'history.currentArea') return areaMemoryValue(entry.value);
     if (key === 'places.items' && Array.isArray(entry.value)) return entry.value.length + ' lugares';
@@ -127,6 +142,7 @@
 
   $('#refresh-context-button')?.addEventListener('click', () => {
     context.updateTime();
+    window.WanderProviders?.place?.refresh?.(true);
     render();
   });
 
