@@ -1,5 +1,5 @@
 (() => {
-  const MAP_RUNTIME_VERSION = '20260706-05';
+  const MAP_RUNTIME_VERSION = '20260707-02';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
   document.write('<script src="runtime-map-position.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
