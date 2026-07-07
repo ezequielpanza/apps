@@ -30,7 +30,13 @@
   }, false);
 
   context.recomputeEffectiveLocation();
-  context.setMotion({ status: 'pending', mode: 'unknown', source: 'init' });
+  context.setMotion({ status: 'pending', source: 'init' });
+  context.setMobility({ mode: 'unknown', evidence: ['initializing'], source: 'init', confidence: 0 });
+  context.set('place.status', 'pending', {
+    source: 'init',
+    kind: 'derived',
+    confidence: 0,
+  });
   context.set('places.items', [], {
     source: 'init',
     kind: 'derived',
