@@ -1,8 +1,7 @@
 (() => {
-  const STORAGE_KEY = 'wander.engine.place.v1';
+  const STORAGE_KEY = 'wander.engine.place.v2';
   const LEVELS = ['country', 'city', 'zone'];
   const POLICY = Object.freeze({
-    maxSampleGapMs: 120000,
     changeStableMs: {
       country: 60000,
       city: 30000,
@@ -18,15 +17,19 @@
       city: 1500,
       zone: 4000,
     },
-    maxCompletedSessions: 1500,
+    maxSeenDays: 60,
+    maxContentItems: 5000,
+    clarificationTtlMs: 900000,
   });
 
   const EMPTY = {
-    schemaVersion: 1,
-    records: { country: {}, city: {}, zone: {} },
+    schemaVersion: 2,
+    presence: { country: {}, city: {}, zone: {} },
+    userPlaces: {},
+    content: {},
     active: { country: null, city: null, zone: null },
     candidates: { country: null, city: null, zone: null },
-    completedSessions: [],
+    pendingClarification: null,
   };
 
   let data = load();
@@ -39,14 +42,16 @@
   function load() {
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (stored?.schemaVersion === 1) {
+      if (stored?.schemaVersion === 2) {
         return {
-          schemaVersion: 1,
-          records: {
-            country: stored.records?.country || {},
-            city: stored.records?.city || {},
-            zone: stored.records?.zone || {},
+          schemaVersion: 2,
+          presence: {
+            country: stored.presence?.country || {},
+            city: stored.presence?.city || {},
+            zone: stored.presence?.zone || {},
           },
+          userPlaces: stored.userPlaces || {},
+          content: stored.content || {},
           active: {
             country: stored.active?.country || null,
             city: stored.active?.city || null,
@@ -57,7 +62,7 @@
             city: stored.candidates?.city || null,
             zone: stored.candidates?.zone || null,
           },
-          completedSessions: Array.isArray(stored.completedSessions) ? stored.completedSessions : [],
+          pendingClarification: stored.pendingClarification || null,
         };
       }
     } catch {}
@@ -66,7 +71,7 @@
 
   function schedulePersist() {
     if (persistTimer) return;
-    persistTimer = setTimeout(flush, 1500);
+    persistTimer = setTimeout(flush, 1200);
   }
 
   function flush() {
@@ -77,6 +82,20 @@
 
   function iso(at) {
     return new Date(at).toISOString();
+  }
+
+  function localDayKey(at) {
+    const date = new Date(at);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+  }
+
+  function previousLocalDayKey(at) {
+    const date = new Date(at);
+    date.setDate(date.getDate() - 1);
+    return localDayKey(date.getTime());
   }
 
   function makeId(prefix, at) {
@@ -110,7 +129,7 @@
     } : null;
   }
 
-  function baseRecord(level, descriptor, at) {
+  function basePresence(level, descriptor, at) {
     return {
       id: descriptor.id,
       level,
@@ -118,24 +137,14 @@
       parentId: descriptor.parentId,
       firstSeenAt: iso(at),
       lastSeenAt: iso(at),
-      encounterCount: 0,
-      passThroughCount: 0,
-      stopCount: 0,
-      exploreCount: 0,
-      visitCount: 0,
-      stayCount: 0,
-      totalObservedMs: 0,
-      totalVisitedMs: 0,
-      lastInteraction: null,
-      lastInteractionAt: null,
-      lastPassThroughAt: null,
-      lastVisitAt: null,
-      lastStayAt: null,
+      previousSeenAt: null,
+      seenCount: 0,
+      seenDays: [],
     };
   }
 
-  function pruneRecords(level) {
-    const records = data.records[level];
+  function prunePresence(level) {
+    const records = data.presence[level];
     const keys = Object.keys(records);
     const limit = POLICY.maxRecords[level];
     if (keys.length <= limit) return;
@@ -145,11 +154,11 @@
       .forEach((key) => delete records[key]);
   }
 
-  function ensureRecord(level, descriptor, at) {
-    let record = data.records[level][descriptor.id];
+  function ensurePresence(level, descriptor, at) {
+    let record = data.presence[level][descriptor.id];
     if (!record) {
-      record = data.records[level][descriptor.id] = baseRecord(level, descriptor, at);
-      pruneRecords(level);
+      record = data.presence[level][descriptor.id] = basePresence(level, descriptor, at);
+      prunePresence(level);
     } else {
       record.name = descriptor.name || record.name;
       record.parentId = descriptor.parentId || record.parentId;
@@ -157,59 +166,44 @@
     return record;
   }
 
-  function routeFamiliarity(record) {
-    if (!record || record.passThroughCount <= 0) return 'route_new';
-    if (record.passThroughCount >= 10) return 'route_frequent';
-    if (record.passThroughCount >= 3) return 'route_familiar';
-    return 'route_returning';
+  function userPlace(placeId) {
+    return placeId ? data.userPlaces[placeId] || null : null;
   }
 
-  function familiarity(level, record) {
-    if (!record || record.visitCount <= 0) return 'unexplored';
-
-    const thresholds = {
-      country: { familiarCount: 3, familiarMs: 604800000, frequentCount: 10, frequentMs: 2592000000 },
-      city: { familiarCount: 3, familiarMs: 86400000, frequentCount: 10, frequentMs: 604800000 },
-      zone: { familiarCount: 3, familiarMs: 28800000, frequentCount: 10, frequentMs: 172800000 },
-    }[level];
-
-    if (record.visitCount >= thresholds.frequentCount || record.totalVisitedMs >= thresholds.frequentMs) return 'frequent';
-    if (record.visitCount >= thresholds.familiarCount || record.totalVisitedMs >= thresholds.familiarMs) return 'familiar';
-    if (record.visitCount === 1) return 'first_visit';
-    return 'returning';
+  function presenceStatus(level, record, at, seenTodayBefore, seenYesterday) {
+    const explicit = userPlace(record.id);
+    if (explicit?.known === true) return 'known';
+    if (explicit?.known === false) return 'new_confirmed';
+    if (seenTodayBefore || seenYesterday) return 'recent_presence';
+    return 'assumed_new';
   }
 
-  function stableMotion(situation, transitionState) {
-    const stable = transitionState?.stableMotion;
-    if (stable?.status === 'moving' || stable?.status === 'stationary') return stable;
-    const current = situation?.motion;
-    if (current?.status === 'moving' || current?.status === 'stationary') return current;
-    return null;
-  }
+  function touchPresence(level, descriptor, at) {
+    const record = ensurePresence(level, descriptor, at);
+    const today = localDayKey(at);
+    const yesterday = previousLocalDayKey(at);
+    const seenTodayBefore = record.seenDays.includes(today);
+    const seenYesterday = record.seenDays.includes(yesterday);
+    const previousSeenAt = record.lastSeenAt;
 
-  function activeJourneyId(journeyState) {
-    return journeyState?.active?.id || null;
-  }
+    record.previousSeenAt = record.seenCount > 0 ? previousSeenAt : null;
+    record.lastSeenAt = iso(at);
+    record.seenCount += 1;
+    if (!record.seenDays.includes(today)) record.seenDays.push(today);
+    if (record.seenDays.length > POLICY.maxSeenDays) {
+      record.seenDays.splice(0, record.seenDays.length - POLICY.maxSeenDays);
+    }
 
-  function baseEvidence() {
     return {
-      encountered: 0,
-      passed_through: 0,
-      stopped: 0,
-      explored: 0,
-      visited: 0,
-      stayed: 0,
+      record,
+      status: presenceStatus(level, record, at, seenTodayBefore, seenYesterday),
+      seenTodayBefore,
+      seenYesterday,
     };
   }
 
-  function openSession(level, descriptor, at, journeyState, events) {
-    const record = ensureRecord(level, descriptor, at);
-    const priorFamiliarity = familiarity(level, record);
-    const priorVisitAt = record.lastVisitAt || record.lastStayAt;
-
-    record.encounterCount += 1;
-    record.lastSeenAt = iso(at);
-
+  function openSession(level, descriptor, at, events) {
+    const touched = touchPresence(level, descriptor, at);
     const session = {
       id: makeId(level, at),
       level,
@@ -218,19 +212,9 @@
       parentId: descriptor.parentId,
       enteredAt: at,
       lastSeenAt: at,
-      lastSampleAt: at,
-      observedMs: 0,
-      movingMs: 0,
-      stationaryMs: 0,
-      meaningfulMs: 0,
-      journeyIds: [],
-      cellIds: [],
-      evidence: baseEvidence(),
-      emittedInteraction: null,
+      presenceStatus: touched.status,
     };
 
-    const journeyId = activeJourneyId(journeyState);
-    if (journeyId) session.journeyIds.push(journeyId);
     data.active[level] = session;
     data.candidates[level] = null;
 
@@ -239,262 +223,46 @@
       placeId: descriptor.id,
       name: descriptor.name,
       parentId: descriptor.parentId,
-      firstSeen: record.encounterCount === 1,
-      familiarity: priorFamiliarity,
-      routeFamiliarity: routeFamiliarity(record),
-      confidence: 0.9,
+      presenceStatus: touched.status,
+      seenCount: touched.record.seenCount,
+      confidence: 0.92,
     }));
 
-    if (record.visitCount > 0 && priorVisitAt) {
-      const previousAt = Date.parse(priorVisitAt);
-      events.push(makeEvent(level + '.returned', at, {
-        level,
-        placeId: descriptor.id,
-        name: descriptor.name,
-        previousVisitAt: priorVisitAt,
-        returnGapMs: Number.isFinite(previousAt) ? Math.max(0, at - previousAt) : null,
-        familiarity: priorFamiliarity,
-        confidence: 0.94,
-      }));
-    }
+    events.push(makeEvent(level + '.' + touched.status, at, {
+      level,
+      placeId: descriptor.id,
+      name: descriptor.name,
+      presenceStatus: touched.status,
+      previousSeenAt: touched.record.previousSeenAt,
+      seenYesterday: touched.seenYesterday,
+      knownByUser: userPlace(descriptor.id)?.known ?? null,
+      confidence: touched.status === 'known' || touched.status === 'new_confirmed' ? 1 : 0.85,
+    }));
 
     return session;
   }
 
-  function pushUnique(list, value, max = 100) {
-    if (!value || list.includes(value)) return;
-    list.push(value);
-    if (list.length > max) list.splice(0, list.length - max);
-  }
-
-  function consumeInteraction(session, interaction) {
-    if (!interaction?.type) return;
-    const endedAt = Date.parse(interaction.endedAt || interaction.startedAt || '');
-    if (Number.isFinite(endedAt) && endedAt < session.enteredAt) return;
-
-    if (Object.prototype.hasOwnProperty.call(session.evidence, interaction.type)) {
-      session.evidence[interaction.type] += 1;
-    }
-    if (interaction.type === 'explored' || interaction.type === 'visited' || interaction.type === 'stayed') {
-      session.meaningfulMs += Math.max(0, Number(interaction.durationMs) || 0);
-    }
-    pushUnique(session.cellIds, interaction.cellId, 250);
-    pushUnique(session.journeyIds, interaction.journeyId, 50);
-  }
-
-  function updateSession(session, situation, transitionState, journeyState, memoryResult, at) {
-    const deltaMs = Math.max(0, Math.min(at - session.lastSampleAt, POLICY.maxSampleGapMs));
-    const motion = stableMotion(situation, transitionState);
-
-    session.observedMs += deltaMs;
-    if (motion?.status === 'moving') session.movingMs += deltaMs;
-    else if (motion?.status === 'stationary') session.stationaryMs += deltaMs;
-
-    session.lastSampleAt = at;
-    session.lastSeenAt = at;
-
-    const journeyId = activeJourneyId(journeyState);
-    if (journeyId) pushUnique(session.journeyIds, journeyId, 50);
-
-    (memoryResult?.closedInteractions || []).forEach((interaction) => consumeInteraction(session, interaction));
-    const currentArea = memoryResult?.currentArea;
-    if (currentArea?.cellId) pushUnique(session.cellIds, currentArea.cellId, 250);
-
-    if (currentArea?.interactionState === 'stopped') session.evidence.stopped = Math.max(1, session.evidence.stopped);
-    if (currentArea?.interactionState === 'visiting') session.evidence.visited = Math.max(1, session.evidence.visited);
-    if (currentArea?.interactionState === 'staying') session.evidence.stayed = Math.max(1, session.evidence.stayed);
-  }
-
-  function classifySession(level, session) {
-    const cells = session.cellIds.length;
-
-    if (level === 'zone') {
-      if (session.evidence.stayed > 0 || session.stationaryMs >= 14400000) return 'stayed';
-      if (session.evidence.explored > 0) return 'explored';
-      if (session.evidence.visited > 0 || session.meaningfulMs >= 1200000) return 'visited';
-      if (session.evidence.stopped > 0 || session.stationaryMs >= 120000) return 'stopped';
-      if (session.evidence.passed_through > 0 || session.movingMs >= 30000) return 'passed_through';
-      return 'encountered';
-    }
-
-    if (level === 'city') {
-      if ((session.evidence.stayed > 0 && (cells >= 2 || session.stationaryMs >= 28800000)) || session.stationaryMs >= 43200000) return 'stayed';
-      if (session.evidence.explored > 0 && cells >= 2) return 'explored';
-      if (session.evidence.visited >= 2 || (session.evidence.visited >= 1 && cells >= 2) || (session.meaningfulMs >= 3600000 && cells >= 2)) return 'visited';
-      if (session.evidence.stopped > 0 || session.evidence.visited > 0 || session.stationaryMs >= 120000) return 'stopped';
-      if (session.evidence.passed_through > 0 || session.movingMs >= 30000) return 'passed_through';
-      return 'encountered';
-    }
-
-    if ((session.evidence.stayed > 0 && (cells >= 3 || session.stationaryMs >= 43200000)) || session.stationaryMs >= 64800000) return 'stayed';
-    if (session.evidence.explored >= 2 && cells >= 3) return 'explored';
-    if (session.evidence.visited >= 3 || (session.meaningfulMs >= 7200000 && cells >= 3)) return 'visited';
-    if (session.evidence.stopped > 0 || session.evidence.visited > 0 || session.stationaryMs >= 120000) return 'stopped';
-    if (session.evidence.passed_through > 0 || session.movingMs >= 30000) return 'passed_through';
-    return 'encountered';
-  }
-
-  function interactionRank(type) {
-    return {
-      encountered: 0,
-      passed_through: 1,
-      stopped: 2,
-      visited: 3,
-      explored: 4,
-      stayed: 5,
-    }[type] ?? 0;
-  }
-
-  function maybeEmitPromotion(level, session, record, at, events) {
-    const type = classifySession(level, session);
-    if (type === 'encountered' || type === 'passed_through') return;
-    if (interactionRank(type) <= interactionRank(session.emittedInteraction)) return;
-
-    const before = familiarity(level, record);
-    events.push(makeEvent(level + '.' + type, at, {
-      level,
-      placeId: session.placeId,
-      name: session.name,
-      sessionId: session.id,
-      firstMeaningfulVisit: record.visitCount === 0 && ['visited', 'explored', 'stayed'].includes(type),
-      familiarity: before,
-      routeFamiliarity: routeFamiliarity(record),
-      confidence: type === 'stopped' ? 0.86 : 0.93,
-    }));
-    session.emittedInteraction = type;
-  }
-
-  function meaningfulDuration(session, type) {
-    if (session.meaningfulMs > 0) return session.meaningfulMs;
-    if (type === 'explored') return Math.max(0, session.movingMs);
-    if (type === 'visited' || type === 'stayed') return Math.max(0, session.stationaryMs);
-    return 0;
-  }
-
-  function countFinalInteraction(record, type, session, at) {
-    record.totalObservedMs += Math.max(0, session.observedMs);
-    record.lastSeenAt = iso(at);
-    record.lastInteraction = type;
-    record.lastInteractionAt = iso(at);
-
-    if (type === 'passed_through') {
-      record.passThroughCount += 1;
-      record.lastPassThroughAt = iso(at);
-    } else if (type === 'stopped') {
-      record.stopCount += 1;
-    } else if (type === 'explored') {
-      record.exploreCount += 1;
-      record.visitCount += 1;
-      record.totalVisitedMs += meaningfulDuration(session, type);
-      record.lastVisitAt = iso(at);
-    } else if (type === 'visited') {
-      record.visitCount += 1;
-      record.totalVisitedMs += meaningfulDuration(session, type);
-      record.lastVisitAt = iso(at);
-    } else if (type === 'stayed') {
-      record.stayCount += 1;
-      record.visitCount += 1;
-      record.totalVisitedMs += meaningfulDuration(session, type);
-      record.lastVisitAt = iso(at);
-      record.lastStayAt = iso(at);
-    }
-  }
-
-  function closeSession(level, at, reason, events, closedSessions) {
+  function closeSession(level, at, reason, events) {
     const session = data.active[level];
-    if (!session) return null;
+    if (!session) return;
     data.active[level] = null;
     data.candidates[level] = null;
-
-    const record = data.records[level][session.placeId];
-    if (!record) return null;
-
-    const finalType = classifySession(level, session);
-    const before = familiarity(level, record);
-    const routeBefore = routeFamiliarity(record);
-
-    if (interactionRank(finalType) > interactionRank(session.emittedInteraction)) {
-      events.push(makeEvent(level + '.' + finalType, at, {
-        level,
-        placeId: session.placeId,
-        name: session.name,
-        sessionId: session.id,
-        firstMeaningfulVisit: record.visitCount === 0 && ['visited', 'explored', 'stayed'].includes(finalType),
-        familiarity: before,
-        routeFamiliarity: routeBefore,
-        confidence: finalType === 'encountered' ? 0.72 : 0.92,
-      }));
-    }
-
-    countFinalInteraction(record, finalType, session, at);
-    const after = familiarity(level, record);
-    const routeAfter = routeFamiliarity(record);
-
-    const completed = {
-      id: session.id,
-      level,
-      placeId: session.placeId,
-      name: session.name,
-      parentId: session.parentId,
-      enteredAt: iso(session.enteredAt),
-      exitedAt: iso(at),
-      durationMs: Math.max(0, at - session.enteredAt),
-      observedMs: Math.round(session.observedMs),
-      movingMs: Math.round(session.movingMs),
-      stationaryMs: Math.round(session.stationaryMs),
-      interaction: finalType,
-      journeyIds: [...session.journeyIds],
-      cellCount: session.cellIds.length,
-      reason,
-    };
-
-    data.completedSessions.push(completed);
-    if (data.completedSessions.length > POLICY.maxCompletedSessions) {
-      data.completedSessions.splice(0, data.completedSessions.length - POLICY.maxCompletedSessions);
-    }
-    closedSessions.push(completed);
-
     events.push(makeEvent(level + '.exited', at, {
       level,
       placeId: session.placeId,
       name: session.name,
-      sessionId: session.id,
-      interaction: finalType,
-      durationMs: completed.durationMs,
-      familiarity: after,
-      routeFamiliarity: routeAfter,
-      confidence: 0.92,
+      durationMs: Math.max(0, at - session.enteredAt),
+      reason,
+      confidence: 0.9,
     }));
-
-    if (before !== after && (after === 'familiar' || after === 'frequent')) {
-      events.push(makeEvent(level + '.' + after, at, {
-        level,
-        placeId: session.placeId,
-        name: session.name,
-        familiarity: after,
-        confidence: 0.95,
-      }));
-    }
-
-    if (routeBefore !== routeAfter && (routeAfter === 'route_familiar' || routeAfter === 'route_frequent')) {
-      events.push(makeEvent(level + '.' + routeAfter, at, {
-        level,
-        placeId: session.placeId,
-        name: session.name,
-        routeFamiliarity: routeAfter,
-        confidence: 0.9,
-      }));
-    }
-
-    return completed;
   }
 
-  function recoverExpired(at, events, closedSessions) {
+  function recoverExpired(at, events) {
     LEVELS.forEach((level) => {
       const session = data.active[level];
       if (!session) return;
       if (at - session.lastSeenAt > POLICY.resumeGapMs[level]) {
-        closeSession(level, session.lastSeenAt, 'observation_gap', events, closedSessions);
+        closeSession(level, session.lastSeenAt, 'observation_gap', events);
       }
     });
   }
@@ -503,16 +271,12 @@
     return Boolean(candidate && candidate.placeId === (descriptor?.id || null));
   }
 
-  function reconcileLevel(level, descriptor, placeAvailable, situation, transitionState, journeyState, memoryResult, at, events, closedSessions) {
+  function reconcileLevel(level, descriptor, placeAvailable, at, events) {
     const active = data.active[level];
 
     if (!active) {
       data.candidates[level] = null;
-      if (placeAvailable && descriptor) {
-        const session = openSession(level, descriptor, at, journeyState, events);
-        updateSession(session, situation, transitionState, journeyState, memoryResult, at);
-        maybeEmitPromotion(level, session, data.records[level][session.placeId], at, events);
-      }
+      if (placeAvailable && descriptor) openSession(level, descriptor, at, events);
       return;
     }
 
@@ -520,12 +284,9 @@
 
     if (descriptor?.id === active.placeId) {
       data.candidates[level] = null;
-      updateSession(active, situation, transitionState, journeyState, memoryResult, at);
-      const record = data.records[level][active.placeId];
-      if (record) {
-        record.lastSeenAt = iso(at);
-        maybeEmitPromotion(level, active, record, at, events);
-      }
+      active.lastSeenAt = at;
+      const record = data.presence[level][active.placeId];
+      if (record) record.lastSeenAt = iso(at);
       return;
     }
 
@@ -541,55 +302,48 @@
 
     if (at - candidate.startedAt < POLICY.changeStableMs[level]) return;
 
-    closeSession(level, at, descriptor ? 'place_changed' : 'place_unavailable', events, closedSessions);
-    if (descriptor) {
-      const session = openSession(level, descriptor, at, journeyState, events);
-      updateSession(session, situation, transitionState, journeyState, memoryResult, at);
-      maybeEmitPromotion(level, session, data.records[level][session.placeId], at, events);
-    }
+    closeSession(level, at, descriptor ? 'place_changed' : 'place_unavailable', events);
+    if (descriptor) openSession(level, descriptor, at, events);
   }
 
-  function recordSummary(level, record, activeSession = null) {
+  function recordSummary(level, record, session, at = Date.now()) {
     if (!record) return null;
+    const explicit = userPlace(record.id);
     return {
       level,
       placeId: record.id,
       name: record.name,
       parentId: record.parentId,
-      familiarity: familiarity(level, record),
-      routeFamiliarity: routeFamiliarity(record),
-      encounterCount: record.encounterCount,
-      passThroughCount: record.passThroughCount,
-      stopCount: record.stopCount,
-      exploreCount: record.exploreCount,
-      visitCount: record.visitCount,
-      stayCount: record.stayCount,
-      totalObservedMs: Math.round(record.totalObservedMs),
-      totalVisitedMs: Math.round(record.totalVisitedMs),
+      presenceStatus: session?.presenceStatus || presenceStatus(
+        level,
+        record,
+        at,
+        record.seenDays.includes(localDayKey(at)),
+        record.seenDays.includes(previousLocalDayKey(at)),
+      ),
+      knownByUser: explicit?.known ?? null,
+      userNote: explicit?.note || null,
       firstSeenAt: record.firstSeenAt,
       lastSeenAt: record.lastSeenAt,
-      lastInteraction: record.lastInteraction,
-      lastInteractionAt: record.lastInteractionAt,
-      lastVisitAt: record.lastVisitAt,
-      lastStayAt: record.lastStayAt,
-      session: activeSession ? {
-        id: activeSession.id,
-        enteredAt: iso(activeSession.enteredAt),
-        durationMs: Math.max(0, Date.now() - activeSession.enteredAt),
-        interaction: classifySession(level, activeSession),
-        journeyIds: [...activeSession.journeyIds],
-        cellCount: activeSession.cellIds.length,
+      previousSeenAt: record.previousSeenAt,
+      seenCount: record.seenCount,
+      seenDaysCount: record.seenDays.length,
+      seenYesterday: record.seenDays.includes(previousLocalDayKey(at)),
+      session: session ? {
+        id: session.id,
+        enteredAt: iso(session.enteredAt),
+        durationMs: Math.max(0, at - session.enteredAt),
       } : null,
     };
   }
 
-  function currentSummary() {
+  function currentSummary(at = Date.now()) {
     const out = {};
     LEVELS.forEach((level) => {
       const session = data.active[level];
       if (!session) return;
-      const record = data.records[level][session.placeId];
-      if (record) out[level] = recordSummary(level, record, session);
+      const record = data.presence[level][session.placeId];
+      if (record) out[level] = recordSummary(level, record, session, at);
     });
     return Object.keys(out).length ? out : null;
   }
@@ -603,34 +357,180 @@
     return checks.length ? Math.min(...checks) : null;
   }
 
-  function update({ place, placeStatus, situation, transitionState, journeyState, memoryResult } = {}, at = Date.now()) {
+  function update({ place, placeStatus } = {}, at = Date.now()) {
     const events = [];
-    const closedSessions = [];
-    recoverExpired(at, events, closedSessions);
+    recoverExpired(at, events);
 
     const placeAvailable = placeStatus === 'available' && Boolean(place);
     LEVELS.forEach((level) => {
-      reconcileLevel(
-        level,
-        descriptorFor(level, place),
-        placeAvailable,
-        situation,
-        transitionState,
-        journeyState,
-        memoryResult,
-        at,
-        events,
-        closedSessions,
-      );
+      reconcileLevel(level, descriptorFor(level, place), placeAvailable, at, events);
     });
+
+    if (data.pendingClarification && at > data.pendingClarification.expiresAt) {
+      data.pendingClarification = null;
+    }
 
     schedulePersist();
     return {
       events,
-      closedSessions,
-      current: currentSummary(),
+      current: currentSummary(at),
+      pendingClarification: data.pendingClarification ? clone(data.pendingClarification) : null,
       nextCheckAt: nextCheckAt(),
     };
+  }
+
+  function setPlaceFamiliarity({ placeId, level = null, name = null, known, note = null } = {}, at = Date.now()) {
+    if (!placeId || typeof known !== 'boolean') return null;
+    data.userPlaces[placeId] = {
+      placeId,
+      level,
+      name,
+      known,
+      note: note || null,
+      source: 'user',
+      updatedAt: iso(at),
+      confidence: 1,
+    };
+
+    LEVELS.forEach((candidateLevel) => {
+      const session = data.active[candidateLevel];
+      if (session?.placeId === placeId) {
+        session.presenceStatus = known ? 'known' : 'new_confirmed';
+      }
+    });
+
+    if (data.pendingClarification?.placeId === placeId) data.pendingClarification = null;
+    schedulePersist();
+    return clone(data.userPlaces[placeId]);
+  }
+
+  function mostSpecificCurrent() {
+    const current = currentSummary();
+    return current?.city || current?.zone || current?.country || null;
+  }
+
+  function requestClarification({ level = null, placeId = null, name = null, question = null } = {}, at = Date.now()) {
+    const current = mostSpecificCurrent();
+    const target = placeId ? { level, placeId, name } : current;
+    if (!target?.placeId) return null;
+
+    data.pendingClarification = {
+      type: 'place_familiarity',
+      level: target.level,
+      placeId: target.placeId,
+      name: target.name,
+      question: question || ('¿Ya conocías ' + (target.name || 'este lugar') + '?'),
+      askedAt: iso(at),
+      expiresAt: at + POLICY.clarificationTtlMs,
+    };
+    schedulePersist();
+    return clone(data.pendingClarification);
+  }
+
+  function normalizeText(text) {
+    return String(text || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  function classifyFamiliarityMessage(text) {
+    const normalized = normalizeText(text);
+    if (!normalized) return null;
+
+    const knownPatterns = [
+      /\bya lo conozco\b/,
+      /\bya conozco\b/,
+      /\bconozco (bien )?(este|esta|el|la)?\s*(lugar|ciudad|zona)?\b/,
+      /\bestuve (aca|aqui) antes\b/,
+      /\bvine antes\b/,
+      /\bya estuve\b/,
+      /\bvivi (aca|aqui)\b/,
+    ];
+    const newPatterns = [
+      /\bnunca estuve\b/,
+      /\bes mi primera vez\b/,
+      /\bprimera vez (aca|aqui)\b/,
+      /\bno lo conozco\b/,
+      /\bno conozco (este|esta|el|la)?\s*(lugar|ciudad|zona)?\b/,
+      /\bes nuevo para mi\b/,
+    ];
+
+    if (knownPatterns.some((pattern) => pattern.test(normalized))) return true;
+    if (newPatterns.some((pattern) => pattern.test(normalized))) return false;
+    return null;
+  }
+
+  function handleUserMessage(text, at = Date.now()) {
+    const known = classifyFamiliarityMessage(text);
+    if (known === null) return { handled: false };
+
+    const pending = data.pendingClarification;
+    const current = mostSpecificCurrent();
+    const target = pending || current;
+    if (!target?.placeId) return { handled: false };
+
+    const record = setPlaceFamiliarity({
+      placeId: target.placeId,
+      level: target.level,
+      name: target.name,
+      known,
+      note: String(text || '').trim(),
+    }, at);
+
+    return {
+      handled: true,
+      type: 'place_familiarity',
+      known,
+      placeId: target.placeId,
+      level: target.level,
+      name: target.name,
+      record,
+      message: known
+        ? 'Entendido. Voy a tratar ' + (target.name || 'este lugar') + ' como conocido, sin dejar de contarte cosas nuevas.'
+        : 'Entendido. Voy a tratar ' + (target.name || 'este lugar') + ' como nuevo para vos.',
+    };
+  }
+
+  function pruneContent() {
+    const entries = Object.entries(data.content);
+    if (entries.length <= POLICY.maxContentItems) return;
+    entries
+      .sort((a, b) => Date.parse(a[1]?.lastToldAt || a[1]?.firstToldAt || 0) - Date.parse(b[1]?.lastToldAt || b[1]?.firstToldAt || 0))
+      .slice(0, entries.length - POLICY.maxContentItems)
+      .forEach(([key]) => delete data.content[key]);
+  }
+
+  function rememberContent({ contentId, placeId = null, topic = null, userKnewIt = null, interest = null } = {}, at = Date.now()) {
+    if (!contentId) return null;
+    const previous = data.content[contentId];
+    data.content[contentId] = {
+      contentId,
+      placeId: placeId ?? previous?.placeId ?? null,
+      topic: topic ?? previous?.topic ?? null,
+      firstToldAt: previous?.firstToldAt || iso(at),
+      lastToldAt: iso(at),
+      tellCount: (previous?.tellCount || 0) + 1,
+      userKnewIt: userKnewIt ?? previous?.userKnewIt ?? null,
+      interest: interest ?? previous?.interest ?? null,
+    };
+    pruneContent();
+    schedulePersist();
+    return clone(data.content[contentId]);
+  }
+
+  function updateContentFeedback(contentId, { userKnewIt = undefined, interest = undefined } = {}) {
+    const record = data.content[contentId];
+    if (!record) return null;
+    if (userKnewIt !== undefined) record.userKnewIt = userKnewIt;
+    if (interest !== undefined) record.interest = interest;
+    schedulePersist();
+    return clone(record);
+  }
+
+  function hasToldContent(contentId) {
+    return Boolean(contentId && data.content[contentId]);
   }
 
   function snapshot() {
@@ -642,7 +542,16 @@
   }
 
   function getRecord(level, placeId) {
-    const record = data.records?.[level]?.[placeId];
+    const record = data.presence?.[level]?.[placeId];
+    if (!record) return null;
+    return {
+      ...clone(record),
+      user: userPlace(placeId) ? clone(userPlace(placeId)) : null,
+    };
+  }
+
+  function getContentRecord(contentId) {
+    const record = data.content[contentId];
     return record ? clone(record) : null;
   }
 
@@ -658,6 +567,13 @@
     snapshot,
     getCurrentSummary,
     getRecord,
+    setPlaceFamiliarity,
+    requestClarification,
+    handleUserMessage,
+    rememberContent,
+    updateContentFeedback,
+    hasToldContent,
+    getContentRecord,
     reset,
     flush,
   };
