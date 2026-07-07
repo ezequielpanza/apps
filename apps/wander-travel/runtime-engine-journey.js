@@ -42,7 +42,13 @@
   function point(situation, at) {
     const lat = finiteNumber(situation?.lat);
     const lng = finiteNumber(situation?.lng);
-    return lat === null || lng === null ? null : { lat, lng, at };
+    if (lat === null || lng === null) return null;
+    return {
+      lat,
+      lng,
+      accuracy: finiteNumber(situation?.accuracy),
+      at,
+    };
   }
 
   function distanceMeters(a, b) {
@@ -54,6 +60,15 @@
     const dLng = (b.lng - a.lng) * Math.PI / 180;
     const h = Math.sin(dLat / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dLng / 2) ** 2;
     return r * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  }
+
+  function acceptedStepMeters(previous, current, elapsedMs) {
+    if (!previous || !current) return 0;
+    const stepM = distanceMeters(previous, current);
+    const accuracy = Math.max(previous.accuracy || 0, current.accuracy || 0, 10);
+    const noiseFloorM = Math.max(3, Math.min(35, accuracy * 0.5));
+    const plausibleMaxM = Math.max(300, elapsedMs / 1000 * 120);
+    return stepM >= noiseFloorM && stepM <= plausibleMaxM ? stepM : 0;
   }
 
   function stableMotion(situation, transitionState) {
@@ -154,7 +169,7 @@
 
       const deltaMs = Math.max(0, Math.min(at - active.lastSampleAt, POLICY.maxSampleGapMs));
       active.movingDurationMs += deltaMs;
-      if (location && active.lastPoint) active.distanceM += distanceMeters(active.lastPoint, location);
+      active.distanceM += acceptedStepMeters(active.lastPoint, location, deltaMs);
       active.lastPoint = location || active.lastPoint;
       active.lastSampleAt = at;
       active.lastObservedAt = at;
