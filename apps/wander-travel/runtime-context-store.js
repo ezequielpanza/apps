@@ -21,6 +21,8 @@
     'journey.event': 120000,
     'history.currentArea': 300000,
     'history.areaEvent': 120000,
+    'history.currentPlace': 300000,
+    'situation.placeEvent': 120000,
     'location.real.status': 30000,
     'location.real.lat': 30000,
     'location.real.lng': 30000,
@@ -74,6 +76,8 @@
     'journey.event': 'inferred',
     'history.currentArea': 'derived',
     'history.areaEvent': 'inferred',
+    'history.currentPlace': 'derived',
+    'situation.placeEvent': 'inferred',
     'places.items': 'derived',
   };
 
