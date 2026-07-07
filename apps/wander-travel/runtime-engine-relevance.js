@@ -24,6 +24,50 @@
     'area.place_frequent': 0.45,
   };
 
+  const PLACE_EVENT_SCORES = {
+    'country.entered': 0.25,
+    'country.exited': 0.12,
+    'country.returned': 0.86,
+    'country.encountered': 0.08,
+    'country.passed_through': 0.12,
+    'country.stopped': 0.4,
+    'country.explored': 0.82,
+    'country.visited': 0.9,
+    'country.stayed': 0.94,
+    'country.familiar': 0.58,
+    'country.frequent': 0.48,
+    'country.route_familiar': 0.2,
+    'country.route_frequent': 0.15,
+
+    'city.entered': 0.18,
+    'city.exited': 0.1,
+    'city.returned': 0.78,
+    'city.encountered': 0.06,
+    'city.passed_through': 0.1,
+    'city.stopped': 0.42,
+    'city.explored': 0.82,
+    'city.visited': 0.88,
+    'city.stayed': 0.92,
+    'city.familiar': 0.55,
+    'city.frequent': 0.45,
+    'city.route_familiar': 0.18,
+    'city.route_frequent': 0.12,
+
+    'zone.entered': 0.12,
+    'zone.exited': 0.08,
+    'zone.returned': 0.68,
+    'zone.encountered': 0.05,
+    'zone.passed_through': 0.08,
+    'zone.stopped': 0.36,
+    'zone.explored': 0.75,
+    'zone.visited': 0.82,
+    'zone.stayed': 0.86,
+    'zone.familiar': 0.5,
+    'zone.frequent': 0.4,
+    'zone.route_familiar': 0.15,
+    'zone.route_frequent': 0.1,
+  };
+
   const CONFIRMED_ARRIVAL = {
     unexplored: 0.99,
     first_visit: 0.94,
@@ -77,7 +121,9 @@
       },
       transition,
       areaEvent: null,
+      placeEvent: null,
       currentArea: currentArea || null,
+      currentPlace: null,
     };
   }
 
@@ -95,7 +141,9 @@
           signal: { type: entry?.type || 'unknown', score },
           transition: entry,
           areaEvent: null,
+          placeEvent: null,
           currentArea: null,
+          currentPlace: null,
         };
       }
     });
@@ -123,20 +171,65 @@
           },
           transition: null,
           areaEvent: entry,
+          placeEvent: null,
           currentArea: currentArea || null,
+          currentPlace: null,
         };
       }
     });
     return best;
   }
 
-  function evaluate({ situation, transitions = [], memory = {} } = {}) {
+  function placeCandidate(placeEvents, currentPlace, situation) {
+    let best = null;
+    placeEvents.forEach((entry) => {
+      let score = PLACE_EVENT_SCORES[entry?.type] || 0;
+      if (entry?.firstMeaningfulVisit && /\.(visited|explored|stayed)$/.test(entry.type || '')) {
+        if (entry.level === 'country') score = Math.max(score, 0.98);
+        else if (entry.level === 'city') score = Math.max(score, 0.96);
+        else if (entry.level === 'zone') score = Math.max(score, 0.9);
+      }
+
+      if (situation?.motion?.status === 'moving') {
+        if (/\.entered$/.test(entry?.type || '')) score = Math.min(score, 0.1);
+        if (/\.passed_through$/.test(entry?.type || '')) score = Math.min(score, 0.08);
+      }
+
+      if (!best || score > best.score) {
+        best = {
+          score,
+          reason: String(entry?.type || 'unknown').replaceAll('.', '_'),
+          signal: {
+            type: entry?.type || 'unknown',
+            score,
+            placeLevel: entry?.level || null,
+            placeId: entry?.placeId || null,
+            placeName: entry?.name || null,
+            placeFamiliarity: entry?.familiarity || null,
+            routeFamiliarity: entry?.routeFamiliarity || null,
+            firstMeaningfulVisit: Boolean(entry?.firstMeaningfulVisit),
+          },
+          transition: null,
+          areaEvent: null,
+          placeEvent: entry,
+          currentArea: null,
+          currentPlace: currentPlace || null,
+        };
+      }
+    });
+    return best;
+  }
+
+  function evaluate({ situation, transitions = [], memory = {}, place = {} } = {}) {
     const currentArea = memory?.currentArea || null;
     const areaEvents = Array.isArray(memory?.areaEvents) ? memory.areaEvents : [];
+    const currentPlace = place?.current || null;
+    const placeEvents = Array.isArray(place?.events) ? place.events : [];
     const candidates = [
       arrivalCandidate(transitions, currentArea),
       transitionCandidate(transitions),
       areaCandidate(areaEvents, currentArea, situation),
+      placeCandidate(placeEvents, currentPlace, situation),
     ].filter(Boolean);
 
     const best = candidates.reduce((selected, candidate) => {
@@ -153,7 +246,9 @@
         signal: { type: 'wait', score: 0 },
         transition: null,
         areaEvent: null,
+        placeEvent: null,
         currentArea,
+        currentPlace,
       };
     }
 
@@ -163,7 +258,9 @@
       signal: { type: 'wait', score: 0 },
       transition: null,
       areaEvent: null,
+      placeEvent: null,
       currentArea,
+      currentPlace,
     };
   }
 
