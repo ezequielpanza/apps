@@ -1,0 +1,29 @@
+name: Wander Travel scenarios
+
+on:
+  push:
+    paths:
+      - 'apps/wander-travel/**'
+      - '.github/workflows/wander-travel-scenarios.yml'
+  pull_request:
+    paths:
+      - 'apps/wander-travel/**'
+      - '.github/workflows/wander-travel-scenarios.yml'
+  workflow_dispatch:
+
+jobs:
+  scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Wander scenarios
+        run: node apps/wander-travel/tests/wander-scenarios.mjs
