@@ -27,3 +27,6 @@ jobs:
 
       - name: Run Wander scenarios
         run: node apps/wander-travel/tests/wander-scenarios.mjs
+
+      - name: Run POI source foundation tests
+        run: node apps/wander-travel/tests/poi-source-foundation.mjs
