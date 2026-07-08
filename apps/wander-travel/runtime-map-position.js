@@ -4,6 +4,9 @@
   if (!core || !context) return;
 
   const map = core.map;
+  const mapContainer = map.getContainer();
+  const LONG_PRESS_MS = 550;
+  const LONG_PRESS_MOVE_TOLERANCE_PX = 12;
   const userIcon = L.divIcon({
     className: '',
     html: '<div class="wander-user-dot"></div>',
@@ -15,6 +18,7 @@
   let markerDragActive = false;
   let initialRealLocationCentered = false;
   let followMode = false;
+  let longPress = null;
 
   function finiteCoordinate(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -55,7 +59,7 @@
       const next = nextMarker.getLatLng();
       markerDragActive = false;
       if (!simulationEnabled()) return syncEffectiveMarker();
-      context.setLocationOverride({ lat: next.lat, lng: next.lng, speedMps: 0 });
+      window.WanderProviders?.simulator?.setPosition?.(next.lat, next.lng, { source: 'marker-drag' });
     });
   }
 
@@ -106,10 +110,67 @@
     return followMode;
   }
 
+  function interactiveTarget(target) {
+    return Boolean(target?.closest?.(
+      '.leaflet-marker-icon, .leaflet-control, .wander-top-controls, .simulation-map-controls'
+    ));
+  }
+
+  function cancelLongPress(pointerId = null) {
+    if (!longPress) return;
+    if (pointerId !== null && longPress.pointerId !== pointerId) return;
+    if (longPress.timer) clearTimeout(longPress.timer);
+    longPress = null;
+  }
+
+  function placeSimulatorPin(clientX, clientY) {
+    const simulator = window.WanderProviders?.simulator;
+    if (!simulationEnabled() || !simulator?.isEnabled?.()) return false;
+    const rect = mapContainer.getBoundingClientRect();
+    const point = L.point(clientX - rect.left, clientY - rect.top);
+    const latLng = map.containerPointToLatLng(point);
+    return simulator.setPosition?.(latLng.lat, latLng.lng, { source: 'map-long-press' }) === true;
+  }
+
+  function beginLongPress(event) {
+    if (!simulationEnabled() || event.isPrimary === false || event.button > 0 || interactiveTarget(event.target)) return;
+    cancelLongPress();
+
+    const state = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      timer: null,
+    };
+
+    state.timer = setTimeout(() => {
+      if (longPress !== state || !simulationEnabled()) return;
+      placeSimulatorPin(state.startX, state.startY);
+      longPress = null;
+    }, LONG_PRESS_MS);
+
+    longPress = state;
+  }
+
+  function moveLongPress(event) {
+    if (!longPress || event.pointerId !== longPress.pointerId) return;
+    const moved = Math.hypot(event.clientX - longPress.startX, event.clientY - longPress.startY);
+    if (moved > LONG_PRESS_MOVE_TOLERANCE_PX) cancelLongPress(event.pointerId);
+  }
+
+  mapContainer.addEventListener('pointerdown', beginLongPress);
+  mapContainer.addEventListener('pointermove', moveLongPress);
+  window.addEventListener('pointerup', (event) => cancelLongPress(event.pointerId));
+  window.addEventListener('pointercancel', (event) => cancelLongPress(event.pointerId));
+  mapContainer.addEventListener('contextmenu', (event) => {
+    if (simulationEnabled()) event.preventDefault();
+  });
+
   context.subscribe((key) => {
     if (key === 'location.effective' || key.startsWith('location.effective.')) syncEffectiveMarker();
     if (key === 'location.real' || key.startsWith('location.real.')) centerOnFirstRealLocation();
     if (key === 'simulation.status') {
+      if (!simulationEnabled()) cancelLongPress();
       syncMarkerDraggable();
       syncEffectiveMarker();
     }
