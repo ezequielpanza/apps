@@ -61,6 +61,9 @@ jobs:
       - name: Run deterministic Wander scenarios
         run: node apps/wander-travel/tests/wander-scenarios.mjs
 
+      - name: Run POI source foundation tests
+        run: node apps/wander-travel/tests/poi-source-foundation.mjs
+
       - name: Publish to Cloudflare Pages
         working-directory: apps/wander-travel
         env:
