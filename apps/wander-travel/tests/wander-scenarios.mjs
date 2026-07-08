@@ -294,7 +294,7 @@ scenario('Journey multimodal conserva una sola sesión', () => {
   assert.equal(second.active.id, journeyId);
   assert.equal(third.active.id, journeyId);
   assert.deepEqual(
-    third.active.mobilitySegments.map((segment) => segment.mode),
+    Array.from(third.active.mobilitySegments, (segment) => segment.mode),
     ['car', 'boat', 'bicycle'],
   );
 });
