@@ -7,6 +7,7 @@
   const mapContainer = map.getContainer();
   const LONG_PRESS_MS = 550;
   const LONG_PRESS_MOVE_TOLERANCE_PX = 12;
+  const PLACEMENT_DEDUP_MS = 800;
   const userIcon = L.divIcon({
     className: '',
     html: '<div class="wander-user-dot"></div>',
@@ -19,6 +20,7 @@
   let initialRealLocationCentered = false;
   let followMode = false;
   let longPress = null;
+  let lastPlacementAt = 0;
 
   function finiteCoordinate(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -123,13 +125,22 @@
     longPress = null;
   }
 
-  function placeSimulatorPin(clientX, clientY) {
+  function placeSimulatorLatLng(latLng, source = 'map-long-press') {
     const simulator = window.WanderProviders?.simulator;
-    if (!simulationEnabled() || !simulator?.isEnabled?.()) return false;
+    if (!simulationEnabled() || !simulator?.isEnabled?.() || !latLng) return false;
+
+    const now = Date.now();
+    if (now - lastPlacementAt < PLACEMENT_DEDUP_MS) return false;
+
+    const placed = simulator.setPosition?.(latLng.lat, latLng.lng, { source }) === true;
+    if (placed) lastPlacementAt = now;
+    return placed;
+  }
+
+  function placeSimulatorPin(clientX, clientY) {
     const rect = mapContainer.getBoundingClientRect();
     const point = L.point(clientX - rect.left, clientY - rect.top);
-    const latLng = map.containerPointToLatLng(point);
-    return simulator.setPosition?.(latLng.lat, latLng.lng, { source: 'map-long-press' }) === true;
+    return placeSimulatorLatLng(map.containerPointToLatLng(point));
   }
 
   function beginLongPress(event) {
@@ -162,6 +173,14 @@
   mapContainer.addEventListener('pointermove', moveLongPress);
   window.addEventListener('pointerup', (event) => cancelLongPress(event.pointerId));
   window.addEventListener('pointercancel', (event) => cancelLongPress(event.pointerId));
+
+  map.on('contextmenu', (event) => {
+    if (!simulationEnabled()) return;
+    event.originalEvent?.preventDefault?.();
+    cancelLongPress();
+    placeSimulatorLatLng(event.latlng, 'map-long-press');
+  });
+
   mapContainer.addEventListener('contextmenu', (event) => {
     if (simulationEnabled()) event.preventDefault();
   });
