@@ -13,11 +13,17 @@
   let pointerId = null;
   let lastTickAt = null;
 
+  function finiteCoordinate(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
   function overridePosition() {
     if (context.value('location.override.enabled', false) !== true) return null;
-    const lat = Number(context.value('location.override.lat'));
-    const lng = Number(context.value('location.override.lng'));
-    return Number.isFinite(lat) && Number.isFinite(lng) ? L.latLng(lat, lng) : null;
+    const lat = finiteCoordinate(context.value('location.override.lat'));
+    const lng = finiteCoordinate(context.value('location.override.lng'));
+    return lat === null || lng === null ? null : L.latLng(lat, lng);
   }
 
   function seedFromReal() {
@@ -46,6 +52,11 @@
     if (node) node.textContent = text;
   }
 
+  function resetHud() {
+    const hud = $('#simulation-hud-value');
+    if (hud) hud.textContent = '0.0 km/h · —';
+  }
+
   function stopTimer() {
     if (timer) clearInterval(timer);
     timer = null;
@@ -60,6 +71,25 @@
     if (knob) knob.style.transform = 'translate(0px, 0px)';
     const current = enabled ? currentPosition() : null;
     if (current) context.setLocationOverride({ lat: current.lat, lng: current.lng, speedMps: 0 });
+    resetHud();
+  }
+
+  function setPosition(lat, lng, { center = false, source = 'manual' } = {}) {
+    if (!enabled) return false;
+    const nextLat = finiteCoordinate(lat);
+    const nextLng = finiteCoordinate(lng);
+    if (nextLat === null || nextLng === null || nextLat < -90 || nextLat > 90 || nextLng < -180 || nextLng > 180) return false;
+
+    stopMotion();
+    const written = context.setLocationOverride({ lat: nextLat, lng: nextLng, speedMps: 0 });
+    if (!written) return false;
+
+    const next = L.latLng(nextLat, nextLng);
+    if (center) base.map.setView(next, Math.max(base.map.getZoom(), 15));
+    panelStatus(source === 'map-long-press'
+      ? 'Simulación activa · posición ubicada manualmente en el mapa'
+      : 'Simulación activa · posición simulada actualizada');
+    return true;
   }
 
   function setEnabled(next) {
@@ -71,7 +101,9 @@
     if (enabled) {
       const seed = seedFromReal();
       context.set('simulation.status', 'active', { source: 'simulator', kind: 'observed', ttlMs: Infinity, confidence: 1 });
-      panelStatus(seed ? 'Simulación activa · iniciada desde la última ubicación real conocida' : 'Simulación activa · esperando una ubicación real para inicializar');
+      panelStatus(seed
+        ? 'Simulación activa · iniciada desde la última ubicación real conocida'
+        : 'Simulación activa · mantené pulsado el mapa para ubicar el pin');
     } else {
       context.clearLocationOverride();
       context.set('simulation.status', 'inactive', { source: 'simulator', kind: 'observed', ttlMs: Infinity, confidence: 1 });
@@ -124,8 +156,6 @@
     if (pointerId != null && event?.pointerId != null && event.pointerId !== pointerId) return;
     pointerId = null;
     stopMotion();
-    const hud = $('#simulation-hud-value');
-    if (hud) hud.textContent = '0.0 km/h · —';
   }
 
   context.subscribe((key) => {
@@ -144,6 +174,7 @@
     enable: () => setEnabled(true),
     disable: () => setEnabled(false),
     setEnabled,
+    setPosition,
     isEnabled: () => enabled,
     stop: stopMotion,
   };
