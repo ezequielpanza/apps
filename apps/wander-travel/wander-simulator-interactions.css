@@ -1,0 +1,15 @@
+body.simulation-enabled #wander-map,
+body.simulation-enabled #wander-map .leaflet-container,
+body.simulation-enabled #wander-map .leaflet-pane,
+body.simulation-enabled #wander-map .leaflet-tile,
+body.simulation-enabled #wander-map .leaflet-overlay-pane {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body.simulation-enabled #wander-map img,
+body.simulation-enabled #wander-map svg {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
