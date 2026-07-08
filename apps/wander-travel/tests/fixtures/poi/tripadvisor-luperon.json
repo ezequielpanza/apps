@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "tripadvisor-luperon-destination-listing-v1",
+  "purpose": "Research corpus for the experimental Tripadvisor POI source connector. This is not canonical POI data and is not a live scrape.",
+  "source": {
+    "connector": "tripadvisor",
+    "pageType": "destination-tourism",
+    "sourceUrl": "https://www.tripadvisor.com.ar/Tourism-g644386-Luperon_Puerto_Plata_Province_Dominican_Republic-Vacations.html",
+    "strategy": "destination-listing",
+    "sectionHint": "destination highlights / imprescindibles",
+    "discoveryMethod": [
+      "Open the public Tripadvisor destination tourism page for Luperon.",
+      "Inspect the highlighted place cards exposed on the destination page.",
+      "Capture each visible place name as an unresolved POI candidate.",
+      "Capture a detail-page link when one is available.",
+      "Do not treat listing presence as proof of exact location."
+    ]
+  },
+  "destination": {
+    "id": "country:do/region:puerto-plata/city:luperon",
+    "name": "Luperón",
+    "countryCode": "do"
+  },
+  "listing": {
+    "section": "destination highlights / imprescindibles",
+    "items": [
+      {
+        "position": 1,
+        "name": "Puerto Blanco Marina",
+        "typeHint": "marina"
+      },
+      {
+        "position": 2,
+        "name": "The Patio",
+        "typeHint": "restaurant"
+      },
+      {
+        "position": 3,
+        "name": "La Yola",
+        "typeHint": "restaurant"
+      },
+      {
+        "position": 4,
+        "name": "Las Velas Restaurant",
+        "typeHint": "restaurant"
+      },
+      {
+        "position": 5,
+        "name": "FricoLandia - El Nunca Jamás",
+        "typeHint": "restaurant",
+        "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d25030633-Reviews-FricoLandia_El_Nunca_Jamas-Luperon_Puerto_Plata_Province_Dominican_Republic.html"
+      }
+    ]
+  },
+  "researchNotes": [
+    "The five names are preserved as observed candidates from the destination-page listing research.",
+    "Candidate type hints are provisional and may be corrected by later evidence.",
+    "The connector must preserve provenance and must not invent coordinates for unresolved candidates.",
+    "Future research should inspect each detail page for visible address, map links, JSON-LD, and embedded location state."
+  ]
+}
