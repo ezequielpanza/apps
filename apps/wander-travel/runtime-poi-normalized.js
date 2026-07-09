@@ -110,9 +110,13 @@
   }
 
   function makeId({ name, source, location }) {
-    const ref = source.ref || source.url || '';
     const coordinate = location ? `${location.lat},${location.lng}` : '';
-    return `normalized-poi:${source.id}:${hash([ref, normalizeText(name), coordinate].join('|'))}`;
+    const identity = source.ref
+      ? `ref:${source.ref}`
+      : source.url
+        ? `url:${source.url}`
+        : `fallback:${normalizeText(name)}|${coordinate}`;
+    return `normalized-poi:${source.id}:${hash(identity)}`;
   }
 
   function create(input, at = Date.now()) {
