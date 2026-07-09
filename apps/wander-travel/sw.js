@@ -18,7 +18,6 @@ const APP_SHELL = [
   './runtime-poi-connectors.js',
   './runtime-external-source-tripadvisor.js',
   './runtime-external-source-google-maps.js',
-  './runtime-web-acquisition.js',
   './runtime-poi-connector-wikidata.js',
   './runtime-map-core.js',
   './runtime-map-position.js',
