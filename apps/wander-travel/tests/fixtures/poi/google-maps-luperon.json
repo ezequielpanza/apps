@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 1,
-  "fixtureId": "google-maps-luperon-query-research-v1",
-  "purpose": "Research corpus for the experimental Google Maps POI source connector. It records observed query behavior and URL evidence; it is not consolidated POI data and is not a live scrape.",
+  "schemaVersion": 2,
+  "fixtureId": "google-maps-luperon-query-research-v2",
+  "purpose": "Research corpus for the experimental Google Maps POI source connector. It records observed query behavior, URL evidence, and live-access research outcomes; it is not consolidated POI data and is not a live scrape.",
   "observedAt": "2026-07-09T00:00:00Z",
   "source": {
     "connector": "google-maps",
@@ -73,9 +73,35 @@
       "observedCategory": "atms"
     }
   ],
+  "liveResearchAttempt": {
+    "attemptedAt": "2026-07-09T00:00:00Z",
+    "goal": "Observe real result cards for all six semantic query profiles directly from public Google Maps search pages.",
+    "status": "not_observed",
+    "resultCandidatesCaptured": 0,
+    "attempts": [
+      {
+        "method": "dynamic-page-fetch",
+        "target": "user-supplied Luperón que hacer Google Maps URL",
+        "status": "cache_miss"
+      },
+      {
+        "method": "direct-http-fetch",
+        "target": "www.google.com/maps",
+        "status": "network_name_resolution_unavailable"
+      },
+      {
+        "method": "public-web-index-search",
+        "target": "Google Maps result pages and place pages for the six profiles",
+        "status": "no_direct_google_maps_result_lists_observed"
+      }
+    ],
+    "interpretation": "The research environment could not observe the dynamic result lists. This does not mean the six Google Maps searches return no places.",
+    "nextResearchRequirement": "Use a browser-capable capture path that can render the public Google Maps result list, or collect result-card URLs from a user-visible session, while preserving exact query provenance."
+  },
   "researchNotes": [
     "The six profiles are intentionally limited to categories already observed by the user.",
     "No search-result POIs are asserted in this fixture yet.",
+    "A not_observed live-access result is not equivalent to an empty Google Maps result set.",
     "The connector must preserve the exact query and result provenance for every future candidate.",
     "Viewport coordinates are never promoted to exact POI coordinates without corroborating evidence."
   ]
