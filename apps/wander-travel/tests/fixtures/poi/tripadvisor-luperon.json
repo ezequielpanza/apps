@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "fixtureId": "tripadvisor-luperon-destination-listing-v1",
-  "purpose": "Research corpus for the experimental Tripadvisor POI source connector. This is not canonical POI data and is not a live scrape.",
+  "purpose": "Research corpus for the experimental Tripadvisor POI source connector. This is not consolidated POI data and is not a live scrape.",
   "source": {
     "connector": "tripadvisor",
     "pageType": "destination-tourism",
