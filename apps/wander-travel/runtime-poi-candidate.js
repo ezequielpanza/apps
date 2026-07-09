@@ -1,4 +1,5 @@
 (() => {
+  const SCHEMA_VERSION = 2;
   const STATUSES = new Set(['unresolved', 'partially_resolved', 'resolved', 'rejected']);
 
   function clone(value) {
@@ -31,11 +32,23 @@
     return date.toISOString();
   }
 
+  function normalizeSource(source = {}) {
+    if (!source.id) throw new Error('POI candidate source.id is required');
+    if (!source.version) throw new Error('POI candidate source.version is required');
+    return {
+      id: String(source.id),
+      version: String(source.version),
+      url: source.url || null,
+      ref: source.ref || null,
+      strategy: source.strategy || null,
+    };
+  }
+
   function makeId({ name, source, destination }) {
-    const connector = source?.connector || 'unknown';
-    const sourceRef = source?.sourceRef || source?.sourceUrl || '';
+    const sourceId = source?.id || 'unknown';
+    const sourceRef = source?.ref || source?.url || '';
     const destinationRef = destination?.id || destination?.name || '';
-    return `candidate:${connector}:${hash([normalizeText(name), sourceRef, destinationRef].join('|'))}`;
+    return `candidate:${sourceId}:${hash([normalizeText(name), sourceRef, destinationRef].join('|'))}`;
   }
 
   function create(input, at = Date.now()) {
@@ -43,10 +56,7 @@
     const name = String(input.name || '').trim();
     if (!name) throw new Error('POI candidate name is required');
 
-    const source = input.source || {};
-    if (!source.connector) throw new Error('POI candidate source.connector is required');
-    if (!source.connectorVersion) throw new Error('POI candidate source.connectorVersion is required');
-
+    const source = normalizeSource(input.source);
     const status = input.status || 'unresolved';
     if (!STATUSES.has(status)) throw new Error(`Invalid POI candidate status: ${status}`);
 
@@ -57,22 +67,14 @@
       countryCode: input.destination.countryCode || null,
     } : null;
 
-    const normalizedSource = {
-      connector: String(source.connector),
-      connectorVersion: String(source.connectorVersion),
-      sourceUrl: source.sourceUrl || null,
-      sourceRef: source.sourceRef || null,
-      strategy: source.strategy || null,
-    };
-
     return {
-      schemaVersion: 1,
-      id: input.id || makeId({ name, source: normalizedSource, destination }),
+      schemaVersion: SCHEMA_VERSION,
+      id: input.id || makeId({ name, source, destination }),
       name,
       normalizedName: normalizeText(name),
       typeHint: input.typeHint || null,
       destination,
-      source: normalizedSource,
+      source,
       discoveredAt,
       lastObservedAt: iso(input.lastObservedAt || discoveredAt),
       status,
@@ -83,16 +85,17 @@
   function isCandidate(value) {
     return Boolean(
       value &&
-      value.schemaVersion === 1 &&
+      value.schemaVersion === SCHEMA_VERSION &&
       typeof value.id === 'string' &&
       typeof value.name === 'string' &&
-      value.source?.connector &&
-      value.source?.connectorVersion &&
+      value.source?.id &&
+      value.source?.version &&
       STATUSES.has(value.status),
     );
   }
 
   window.WanderPOICandidate = Object.freeze({
+    schemaVersion: SCHEMA_VERSION,
     create,
     isCandidate,
     normalizeText,
