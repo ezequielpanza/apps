@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'apps/wander-travel/**'
+      - 'services/wander-web-acquisition/**'
       - '.github/workflows/wander-travel-scenarios.yml'
   pull_request:
     paths:
       - 'apps/wander-travel/**'
+      - 'services/wander-web-acquisition/**'
       - '.github/workflows/wander-travel-scenarios.yml'
   workflow_dispatch:
 
@@ -31,5 +33,8 @@ jobs:
       - name: Run POI source foundation tests
         run: node apps/wander-travel/tests/poi-source-foundation.mjs
 
-      - name: Run Google Maps connector tests
-        run: node apps/wander-travel/tests/google-maps-connector.mjs
+      - name: Run Wikidata connector tests
+        run: node apps/wander-travel/tests/wikidata-connector.mjs
+
+      - name: Check Browser Run worker syntax
+        run: node --check services/wander-web-acquisition/src/index.js
