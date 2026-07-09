@@ -30,11 +30,14 @@ jobs:
       - name: Run Wander scenarios
         run: node apps/wander-travel/tests/wander-scenarios.mjs
 
-      - name: Run POI source foundation tests
+      - name: Run unified POI engine tests
         run: node apps/wander-travel/tests/poi-source-foundation.mjs
 
       - name: Run Wikidata connector tests
         run: node apps/wander-travel/tests/wikidata-connector.mjs
+
+      - name: Run OpenStreetMap connector tests
+        run: node apps/wander-travel/tests/openstreetmap-connector.mjs
 
       - name: Check Browser Run worker syntax
         run: node --check services/wander-web-acquisition/src/index.js
