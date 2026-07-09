@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wander-travel-v0.82.1';
+const CACHE_NAME = 'wander-travel-v0.83.0';
 const APP_SHELL = [
   './index.html',
   './wander-ui.css',
@@ -12,13 +12,13 @@ const APP_SHELL = [
   './runtime-version.js',
   './app.js',
   './runtime-source-policy.js',
-  './runtime-poi-candidate.js',
-  './runtime-poi-evidence.js',
+  './runtime-poi-normalized.js',
   './runtime-poi-store.js',
-  './runtime-poi-connectors.js',
+  './runtime-poi-engine.js',
   './runtime-external-source-tripadvisor.js',
   './runtime-external-source-google-maps.js',
   './runtime-poi-connector-wikidata.js',
+  './runtime-poi-connector-openstreetmap.js',
   './runtime-map-core.js',
   './runtime-map-position.js',
   './runtime-map-controls.js',
@@ -60,48 +60,19 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-async function networkFirst(request, fallback = null) {
-  try {
-    const response = await fetch(request, { cache: 'no-store' });
-    if (response.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch {
-    return (await caches.match(request)) || (fallback ? await caches.match(fallback) : Response.error());
-  }
-}
-
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-
-  const requestUrl = new URL(event.request.url);
-  if (requestUrl.origin !== self.location.origin) return;
-
-  if (event.request.mode === 'navigate') {
-    event.respondWith(networkFirst(event.request, './index.html'));
-    return;
-  }
-
-  const pathname = requestUrl.pathname;
-  const runtimeAsset =
-    pathname.endsWith('.js') ||
-    pathname.endsWith('.css') ||
-    pathname.endsWith('.webmanifest');
-
-  if (runtimeAsset) {
-    event.respondWith(networkFirst(event.request));
-    return;
-  }
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-      if (response.ok) {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-      }
-      return response;
-    }))
+    fetch(event.request, { cache: 'no-store' })
+      .then((response) => {
+        if (response.ok) {
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
   );
 });
