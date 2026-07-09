@@ -18,7 +18,7 @@
       'locality-hint',
     ]),
     notes: Object.freeze([
-      'Discovery output is a POI candidate, not a canonical POI.',
+      'Discovery output is a POI candidate, not a consolidated POI.',
       'Keep every extracted value as evidence with source URL, strategy, connector version, and confidence.',
       'Do not treat a map viewport center as exact POI coordinates.',
       'Do not merge candidates only because their names look similar.',
