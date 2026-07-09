@@ -44,7 +44,6 @@ function createRuntime(storage = new MemoryStorage()) {
     localStorage: storage,
     setTimeout: () => ++timerId,
     clearTimeout: () => {},
-    fetch: async () => { throw new Error('unexpected fetch'); },
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
@@ -58,7 +57,6 @@ function createRuntime(storage = new MemoryStorage()) {
     'runtime-poi-connectors.js',
     'runtime-external-source-google-maps.js',
     'runtime-external-source-tripadvisor.js',
-    'runtime-web-acquisition.js',
   ].forEach((filename) => loadRuntimeFile(context, filename));
 
   return {
@@ -70,7 +68,6 @@ function createRuntime(storage = new MemoryStorage()) {
     connectors: context.WanderPOIConnectors,
     googleMaps: context.WanderExternalSourceGoogleMaps,
     tripadvisor: context.WanderExternalSourceTripadvisor,
-    acquisition: context.WanderWebAcquisition,
   };
 }
 
@@ -137,6 +134,23 @@ test('Unknown sources are denied by default', () => {
   assert.equal(runtime.policy.canStoreCandidates('unreviewed-source'), false);
 });
 
+test('Restricted source cannot register a POI connector even when it exposes discover()', () => {
+  const runtime = createRuntime();
+
+  assert.throws(
+    () => runtime.connectors.register({
+      id: 'tripadvisor',
+      version: 'test',
+      async discover() {
+        return { candidates: [], evidence: [] };
+      },
+    }),
+    (error) => error?.code === 'SOURCE_POLICY_BLOCKED',
+  );
+
+  assert.equal(runtime.connectors.get('tripadvisor'), null);
+});
+
 test('Explicitly reviewed store-allowed source can register, discover, and persist', async () => {
   const shared = new Map();
   const runtime = createRuntime(new MemoryStorage(shared));
@@ -201,17 +215,25 @@ test('Explicitly reviewed store-allowed source can register, discover, and persi
   assert.equal(reopened.store.listCandidates().length, 1);
 });
 
-test('Policy-gated acquisition blocks restricted sources before any network call', async () => {
-  const runtime = createRuntime();
-  runtime.acquisition.configure({ endpoint: 'https://example.invalid/capture' });
+test('Legacy POI Store v1 data is not migrated into policy-enforced Store v2', () => {
+  const shared = new Map();
+  shared.set('wander.poi.store.v1', JSON.stringify({
+    schemaVersion: 1,
+    candidates: {
+      legacy: {
+        id: 'legacy',
+        name: 'Legacy restricted data',
+        source: { connector: 'google-maps' },
+      },
+    },
+    evidence: {},
+    consolidated: {},
+  }));
 
-  await assert.rejects(
-    () => runtime.acquisition.acquire({
-      sourceId: 'tripadvisor',
-      url: 'https://www.tripadvisor.com/',
-    }),
-    (error) => error?.code === 'SOURCE_POLICY_BLOCKED',
-  );
+  const runtime = createRuntime(new MemoryStorage(shared));
+  assert.equal(runtime.store.storageKey, 'wander.poi.store.v2');
+  assert.equal(runtime.store.listCandidates().length, 0);
+  assert.equal(runtime.store.listEvidence().length, 0);
 });
 
 let passed = 0;
