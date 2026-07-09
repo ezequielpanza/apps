@@ -1,6 +1,6 @@
 (() => {
   const ID = 'wikidata';
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
   const DEFAULT_ENDPOINT = 'https://query.wikidata.org/sparql';
 
   function finiteNumber(value, label) {
@@ -78,16 +78,6 @@
     return { lat, lng };
   }
 
-  function connectorSource({ sourceUrl, sourceRef, strategy }) {
-    return {
-      connector: ID,
-      connectorVersion: VERSION,
-      sourceUrl: sourceUrl || null,
-      sourceRef: sourceRef || null,
-      strategy: strategy || null,
-    };
-  }
-
   function aggregateBindings(bindings = []) {
     const entities = new Map();
 
@@ -125,16 +115,80 @@
     }));
   }
 
-  async function discover(input = {}) {
-    window.WanderSourcePolicy?.assertCapability(ID, 'automatedAcquisition');
+  function normalizeEntity(entity, context) {
+    const itemUrl = `https://www.wikidata.org/wiki/${entity.qid}`;
+    const source = {
+      id: ID,
+      version: VERSION,
+      ref: entity.qid,
+      url: itemUrl,
+      strategy: 'wdqs-nearby-p625',
+    };
 
+    return window.WanderNormalizedPOI.create({
+      name: entity.label || entity.qid,
+      categories: entity.instances.map((instance) => ({
+        id: `wikidata:${instance.qid}`,
+        label: instance.label,
+        sourceRef: instance.qid,
+      })),
+      location: {
+        ...entity.location,
+        method: 'wikidata_p625',
+        geometryType: 'point',
+      },
+      source,
+      confidence: 0.97,
+      observedAt: context.observedAt,
+      destination: context.destination,
+      tags: {
+        wikidata: entity.qid,
+      },
+      attributes: {
+        qid: entity.qid,
+        instances: entity.instances,
+      },
+      evidence: [
+        {
+          type: 'source_entity_id',
+          value: entity.qid,
+          confidence: 1,
+        },
+        {
+          type: 'entity_coordinates',
+          value: { property: 'P625', qid: entity.qid },
+          location: {
+            ...entity.location,
+            method: 'wikidata_p625',
+            geometryType: 'point',
+          },
+          confidence: 0.97,
+        },
+        ...entity.instances.map((instance) => ({
+          type: 'source_instance_of',
+          value: {
+            property: 'P31',
+            qid: instance.qid,
+            label: instance.label,
+          },
+          confidence: 0.95,
+        })),
+      ],
+      metadata: {
+        queryCenter: context.center,
+        radiusKm: context.radiusKm,
+      },
+    }, context.observedAt);
+  }
+
+  async function search(input = {}) {
     const center = validateCenter(input);
     const radiusKm = clampRadiusKm(input.radiusKm);
     const limit = clampLimit(input.limit);
     const language = escapeLanguage(input.language);
     const endpoint = String(input.endpoint || DEFAULT_ENDPOINT);
     const observedAt = input.observedAt || Date.now();
-    const queryUrl = buildQueryUrl({ center, ...center, radiusKm, limit, language, endpoint });
+    const queryUrl = buildQueryUrl({ ...center, radiusKm, limit, language, endpoint });
 
     const response = await fetch(queryUrl, {
       headers: {
@@ -150,89 +204,25 @@
     }
 
     const payload = await response.json();
-    const entities = aggregateBindings(payload?.results?.bindings || []);
-    const candidates = [];
-    const evidence = [];
-
-    for (const entity of entities) {
-      const itemUrl = `https://www.wikidata.org/wiki/${entity.qid}`;
-      const source = connectorSource({
-        sourceUrl: endpoint,
-        sourceRef: entity.qid,
-        strategy: 'wdqs-nearby-p625',
-      });
-
-      const candidate = window.WanderPOICandidate.create({
-        name: entity.label || entity.qid,
-        typeHint: entity.instances[0]?.label || entity.instances[0]?.qid || null,
-        destination: input.destination || null,
-        source,
-        discoveredAt: observedAt,
-        lastObservedAt: observedAt,
-        status: 'unresolved',
-        metadata: {
-          qid: entity.qid,
-          itemUrl,
-          center,
-          radiusKm,
-        },
-      }, observedAt);
-
-      candidates.push(candidate);
-
-      evidence.push(window.WanderPOIEvidence.create({
-        candidateId: candidate.id,
-        type: 'source_entity_id',
-        value: entity.qid,
-        source,
-        confidence: 1,
-        observedAt,
-      }, observedAt));
-
-      evidence.push(window.WanderPOIEvidence.create({
-        candidateId: candidate.id,
-        type: 'entity_coordinates',
-        location: {
-          ...entity.location,
-          method: 'wikidata_p625',
-        },
-        value: {
-          property: 'P625',
-          qid: entity.qid,
-        },
-        source,
-        confidence: 0.97,
-        observedAt,
-      }, observedAt));
-
-      for (const instance of entity.instances) {
-        evidence.push(window.WanderPOIEvidence.create({
-          candidateId: candidate.id,
-          type: 'source_instance_of',
-          value: {
-            property: 'P31',
-            qid: instance.qid,
-            label: instance.label,
-          },
-          source,
-          confidence: 0.95,
-          observedAt,
-        }, observedAt));
-      }
-    }
+    const bindings = Array.isArray(payload?.results?.bindings) ? payload.results.bindings : [];
+    const entities = aggregateBindings(bindings);
+    const context = {
+      center,
+      radiusKm,
+      observedAt,
+      destination: input.destination || null,
+    };
 
     return {
-      candidates,
-      evidence,
+      pois: entities.map((entity) => normalizeEntity(entity, context)),
       diagnostics: {
-        sourceId: ID,
         endpoint,
         queryUrl,
         center,
         radiusKm,
         requestedLimit: limit,
-        rawBindingCount: Array.isArray(payload?.results?.bindings) ? payload.results.bindings.length : 0,
-        candidateCount: candidates.length,
+        rawBindingCount: bindings.length,
+        poiCount: entities.length,
       },
     };
   }
@@ -240,12 +230,11 @@
   const connector = Object.freeze({
     id: ID,
     version: VERSION,
-    experimental: true,
     capabilities: Object.freeze([
-      'nearby-entity-discovery',
-      'qid-evidence',
-      'p625-coordinate-evidence',
-      'p31-type-evidence',
+      'nearby-search',
+      'qid',
+      'p625-location',
+      'p31-categories',
     ]),
     endpoint: DEFAULT_ENDPOINT,
     buildNearbyQuery,
@@ -253,9 +242,9 @@
     extractQid,
     parseWktPoint,
     aggregateBindings,
-    discover,
+    search,
   });
 
   window.WanderPOIConnectorWikidata = connector;
-  window.WanderPOIConnectors?.register(connector);
+  window.WanderPOIEngine?.register(connector);
 })();
