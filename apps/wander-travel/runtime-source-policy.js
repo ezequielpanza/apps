@@ -25,8 +25,7 @@
       id,
       mode,
       automatedAcquisition: Boolean(input.automatedAcquisition),
-      storeCandidates: Boolean(input.storeCandidates),
-      storeEvidence: Boolean(input.storeEvidence),
+      storePOIs: Boolean(input.storePOIs),
       externalDiscovery: Boolean(input.externalDiscovery),
       reviewedAt: input.reviewedAt || null,
       termsUrl: input.termsUrl || null,
@@ -36,9 +35,9 @@
   }
 
   function register(input) {
-    const policy = normalizePolicy(input);
-    policies.set(policy.id, policy);
-    return policy;
+    const sourcePolicy = normalizePolicy(input);
+    policies.set(sourcePolicy.id, sourcePolicy);
+    return sourcePolicy;
   }
 
   function get(sourceId) {
@@ -52,8 +51,7 @@
       id: String(sourceId || 'unknown'),
       mode: POLICY_MODES.DENY_BY_DEFAULT,
       automatedAcquisition: false,
-      storeCandidates: false,
-      storeEvidence: false,
+      storePOIs: false,
       externalDiscovery: false,
       reviewedAt: null,
       termsUrl: null,
@@ -70,12 +68,8 @@
     return getOrDefault(sourceId).automatedAcquisition === true;
   }
 
-  function canStoreCandidates(sourceId) {
-    return getOrDefault(sourceId).storeCandidates === true;
-  }
-
-  function canStoreEvidence(sourceId) {
-    return getOrDefault(sourceId).storeEvidence === true;
+  function canStorePOIs(sourceId) {
+    return getOrDefault(sourceId).storePOIs === true;
   }
 
   function canUseExternally(sourceId) {
@@ -83,37 +77,35 @@
   }
 
   function assertCapability(sourceId, capability) {
-    const policy = getOrDefault(sourceId);
+    const sourcePolicy = getOrDefault(sourceId);
     const allowed = {
-      automatedAcquisition: policy.automatedAcquisition,
-      storeCandidates: policy.storeCandidates,
-      storeEvidence: policy.storeEvidence,
-      externalDiscovery: policy.externalDiscovery,
+      automatedAcquisition: sourcePolicy.automatedAcquisition,
+      storePOIs: sourcePolicy.storePOIs,
+      externalDiscovery: sourcePolicy.externalDiscovery,
     }[capability];
 
     if (allowed !== true) {
-      const error = new Error(`Source policy blocks ${capability} for ${policy.id}`);
+      const error = new Error(`Source policy blocks ${capability} for ${sourcePolicy.id}`);
       error.code = 'SOURCE_POLICY_BLOCKED';
-      error.sourceId = policy.id;
+      error.sourceId = sourcePolicy.id;
       error.capability = capability;
       throw error;
     }
-    return policy;
+    return sourcePolicy;
   }
 
   register({
     id: 'google-maps',
     mode: POLICY_MODES.EXTERNAL_ONLY,
     automatedAcquisition: false,
-    storeCandidates: false,
-    storeEvidence: false,
+    storePOIs: false,
     externalDiscovery: true,
     reviewedAt: '2026-07-09',
     termsUrl: 'https://maps.google.com/help/terms_maps/',
-    reason: 'Google Maps content is external-only for Wander; do not build or augment the POI store from Maps content.',
+    reason: 'Google Maps remains external-only until Wander has a permitted acquisition path that can return normalized POIs.',
     notes: [
-      'Use only to open an external Google Maps search or navigation experience.',
-      'Do not ingest result cards, business names, addresses, reviews, coordinates, or identifiers into the POI Store.',
+      'The POI Engine does not ingest Google Maps results through automated scraping.',
+      'A future permitted connector must still return the common NormalizedPOI contract.',
     ],
   });
 
@@ -121,14 +113,14 @@
     id: 'tripadvisor',
     mode: POLICY_MODES.EXTERNAL_ONLY,
     automatedAcquisition: false,
-    storeCandidates: false,
-    storeEvidence: false,
+    storePOIs: false,
     externalDiscovery: true,
     reviewedAt: '2026-07-09',
     termsUrl: 'https://tripadvisor.mediaroom.com/us-terms-of-use',
-    reason: 'Tripadvisor content is external-only for Wander unless explicit permission is obtained.',
+    reason: 'Tripadvisor remains external-only until Wander has a permitted acquisition path that can return normalized POIs.',
     notes: [
-      'Do not automate access, scrape, aggregate, or index Tripadvisor content into the POI Store.',
+      'The POI Engine does not automate or ingest Tripadvisor content.',
+      'A future permitted connector must still return the common NormalizedPOI contract.',
     ],
   });
 
@@ -136,16 +128,15 @@
     id: 'wikidata',
     mode: POLICY_MODES.STORE_ALLOWED,
     automatedAcquisition: true,
-    storeCandidates: true,
-    storeEvidence: true,
+    storePOIs: true,
     externalDiscovery: true,
     reviewedAt: '2026-07-09',
     termsUrl: 'https://www.wikidata.org/wiki/Wikidata:Licensing',
-    reason: 'Wikidata structured data is available under CC0 and can feed the POI knowledge pipeline with provenance.',
+    reason: 'Wikidata structured data can feed the normalized POI pipeline with source provenance.',
     notes: [
-      'Use the official Wikidata Query Service for structured entity discovery.',
-      'Preserve QIDs, query provenance, coordinates, and declared types as source evidence.',
-      'Do not treat Wikidata presence as proof that an entity is tourist-relevant.',
+      'The connector owns SPARQL search strategy and QID/P625/P31 normalization.',
+      'The POI Engine receives only NormalizedPOI objects.',
+      'Wikidata presence is not equivalent to tourist relevance.',
     ],
   });
 
@@ -153,10 +144,9 @@
     id: 'generic-web',
     mode: POLICY_MODES.DENY_BY_DEFAULT,
     automatedAcquisition: false,
-    storeCandidates: false,
-    storeEvidence: false,
+    storePOIs: false,
     externalDiscovery: false,
-    reason: 'Automated acquisition requires an explicit per-source policy review.',
+    reason: 'Automated acquisition requires an explicit per-source policy review and a connector that returns normalized POIs.',
   });
 
   window.WanderSourcePolicy = Object.freeze({
@@ -166,8 +156,7 @@
     getOrDefault,
     list,
     canAutomate,
-    canStoreCandidates,
-    canStoreEvidence,
+    canStorePOIs,
     canUseExternally,
     assertCapability,
   });
