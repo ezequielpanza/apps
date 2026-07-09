@@ -7,7 +7,7 @@
     schemaVersion: SCHEMA_VERSION,
     candidates: {},
     evidence: {},
-    canonical: {},
+    consolidated: {},
   };
 
   let data = load();
@@ -25,7 +25,7 @@
           schemaVersion: SCHEMA_VERSION,
           candidates: stored.candidates || {},
           evidence: stored.evidence || {},
-          canonical: stored.canonical || {},
+          consolidated: stored.consolidated || {},
         };
       }
     } catch {}
