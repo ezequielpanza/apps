@@ -1,19 +1,21 @@
 {
-  "schemaVersion": 1,
-  "fixtureId": "tripadvisor-luperon-destination-listing-v1",
+  "schemaVersion": 2,
+  "fixtureId": "tripadvisor-luperon-source-research-v2",
   "purpose": "Research corpus for the experimental Tripadvisor POI source connector. This is not consolidated POI data and is not a live scrape.",
+  "observedAt": "2026-07-08T00:00:00Z",
   "source": {
     "connector": "tripadvisor",
     "pageType": "destination-tourism",
     "sourceUrl": "https://www.tripadvisor.com.ar/Tourism-g644386-Luperon_Puerto_Plata_Province_Dominican_Republic-Vacations.html",
     "strategy": "destination-listing",
-    "sectionHint": "destination highlights / imprescindibles",
+    "sectionHint": "Imprescindibles / Comida y bebida",
     "discoveryMethod": [
       "Open the public Tripadvisor destination tourism page for Luperon.",
       "Inspect the highlighted place cards exposed on the destination page.",
       "Capture each visible place name as an unresolved POI candidate.",
-      "Capture a detail-page link when one is available.",
-      "Do not treat listing presence as proof of exact location."
+      "Capture detail-page URL and visible listing metadata when available.",
+      "Inspect each detail page for visible address and map-location links.",
+      "Do not treat listing presence or a map viewport center as proof of exact location."
     ]
   },
   "destination": {
@@ -22,40 +24,100 @@
     "countryCode": "do"
   },
   "listing": {
-    "section": "destination highlights / imprescindibles",
+    "section": "Imprescindibles / Comida y bebida",
     "items": [
       {
         "position": 1,
         "name": "Puerto Blanco Marina",
-        "typeHint": "marina"
+        "typeHint": "marina",
+        "rating": 4.3,
+        "reviewCount": 23,
+        "priceHint": "$$ - $$$",
+        "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d7706934-Reviews-Puerto_Blanco_Marina-Luperon_Puerto_Plata_Province_Dominican_Republic.html"
       },
       {
         "position": 2,
         "name": "The Patio",
-        "typeHint": "restaurant"
+        "typeHint": "restaurant",
+        "rating": 4.3,
+        "reviewCount": 3,
+        "priceHint": "$",
+        "categoryHints": ["Estadounidense", "Bar", "Pub"],
+        "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d19243920-Reviews-The_Patio-Luperon_Puerto_Plata_Province_Dominican_Republic.html"
       },
       {
         "position": 3,
         "name": "La Yola",
-        "typeHint": "restaurant"
+        "typeHint": "restaurant",
+        "rating": 5.0,
+        "reviewCount": 1,
+        "priceHint": "$$$$",
+        "categoryHints": ["Cajún y criolla"],
+        "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d8838632-Reviews-La_Yola-Luperon_Puerto_Plata_Province_Dominican_Republic.html"
       },
       {
         "position": 4,
         "name": "Las Velas Restaurant",
-        "typeHint": "restaurant"
+        "typeHint": "restaurant",
+        "rating": 3.5,
+        "reviewCount": 2,
+        "categoryHints": ["Caribeña", "Mariscos"],
+        "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d25331044-Reviews-Las_Velas_Restaurant-Luperon_Puerto_Plata_Province_Dominican_Republic.html"
       },
       {
         "position": 5,
         "name": "FricoLandia - El Nunca Jamás",
         "typeHint": "restaurant",
+        "rating": 3.1,
+        "reviewCount": 13,
         "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d25030633-Reviews-FricoLandia_El_Nunca_Jamas-Luperon_Puerto_Plata_Province_Dominican_Republic.html"
       }
     ]
   },
+  "detailResearch": [
+    {
+      "name": "Puerto Blanco Marina",
+      "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d7706934-Reviews-Puerto_Blanco_Marina-Luperon_Puerto_Plata_Province_Dominican_Republic.html",
+      "fetchStatus": "not_observed",
+      "researchNote": "The detail URL was obtained from the destination listing, but the research fetcher returned a cache-miss error. No address or coordinates are asserted."
+    },
+    {
+      "name": "The Patio",
+      "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d19243920-Reviews-The_Patio-Luperon_Puerto_Plata_Province_Dominican_Republic.html",
+      "fetchStatus": "not_observed",
+      "researchNote": "The detail URL was obtained from the destination listing, but the research fetcher returned a cache-miss error. No address or coordinates are asserted."
+    },
+    {
+      "name": "La Yola",
+      "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d8838632-Reviews-La_Yola-Luperon_Puerto_Plata_Province_Dominican_Republic.html",
+      "fetchStatus": "not_observed",
+      "researchNote": "The detail URL was obtained from the destination listing, but the research fetcher could not load the page. No address or coordinates are asserted."
+    },
+    {
+      "name": "Las Velas Restaurant",
+      "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d25331044-Reviews-Las_Velas_Restaurant-Luperon_Puerto_Plata_Province_Dominican_Republic.html",
+      "fetchStatus": "not_observed",
+      "researchNote": "The detail URL was obtained from the destination listing, but the research fetcher could not load the page. No address or coordinates are asserted."
+    },
+    {
+      "name": "FricoLandia - El Nunca Jamás",
+      "detailUrl": "https://www.tripadvisor.com.ar/Restaurant_Review-g644386-d25030633-Reviews-FricoLandia_El_Nunca_Jamas-Luperon_Puerto_Plata_Province_Dominican_Republic.html",
+      "fetchStatus": "observed",
+      "visibleAddress": "Luperon 57000 República Dominicana",
+      "mapUrl": "https://maps.google.com/maps?daddr=Luperon+57000+Rep%C3%BAblica+Dominicana%4019.916283%2C-71.06353&saddr=",
+      "mapLinkLocation": {
+        "lat": 19.916283,
+        "lng": -71.06353,
+        "method": "tripadvisor_map_link_daddr_coordinates"
+      },
+      "researchNote": "The public detail page exposed the visible address and an Ubicación link to Google Maps. The coordinates are embedded in that map-link URL."
+    }
+  ],
   "researchNotes": [
     "The five names are preserved as observed candidates from the destination-page listing research.",
     "Candidate type hints are provisional and may be corrected by later evidence.",
+    "A detail-page fetch failure means not observed in this research run; it does not mean the source lacks the data.",
     "The connector must preserve provenance and must not invent coordinates for unresolved candidates.",
-    "Future research should inspect each detail page for visible address, map links, JSON-LD, and embedded location state."
+    "Future research should continue with JSON-LD and embedded application-state inspection when public detail pages are observable."
   ]
 }
