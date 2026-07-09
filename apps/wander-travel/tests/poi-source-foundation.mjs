@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(TEST_DIR, '..');
-const FIXTURE_PATH = path.join(TEST_DIR, 'fixtures', 'poi', 'tripadvisor-luperon.json');
 
 class MemoryStorage {
   constructor(shared = new Map()) {
@@ -41,180 +40,178 @@ function createRuntime(storage = new MemoryStorage()) {
     console,
     Date,
     Math,
+    URL,
     localStorage: storage,
     setTimeout: () => ++timerId,
     clearTimeout: () => {},
+    fetch: async () => { throw new Error('unexpected fetch'); },
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
 
   const context = vm.createContext(sandbox);
   [
+    'runtime-source-policy.js',
     'runtime-poi-candidate.js',
     'runtime-poi-evidence.js',
     'runtime-poi-store.js',
     'runtime-poi-connectors.js',
-    'runtime-poi-connector-tripadvisor.js',
+    'runtime-external-source-google-maps.js',
+    'runtime-external-source-tripadvisor.js',
+    'runtime-web-acquisition.js',
   ].forEach((filename) => loadRuntimeFile(context, filename));
 
   return {
     storage,
+    policy: context.WanderSourcePolicy,
     candidate: context.WanderPOICandidate,
     evidence: context.WanderPOIEvidence,
     store: context.WanderPOIStore,
     connectors: context.WanderPOIConnectors,
-    tripadvisor: context.WanderPOIConnectorTripadvisor,
+    googleMaps: context.WanderExternalSourceGoogleMaps,
+    tripadvisor: context.WanderExternalSourceTripadvisor,
+    acquisition: context.WanderWebAcquisition,
   };
 }
 
-const fixture = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8'));
-const observedAt = '2026-07-08T12:00:00.000Z';
-
+const observedAt = '2026-07-09T12:00:00.000Z';
 const tests = [];
 function test(name, run) {
   tests.push({ name, run });
 }
 
-test('Tripadvisor fixture discovers exactly five unresolved Luperon candidates', async () => {
+test('Google Maps and Tripadvisor are external-only and cannot enter the POI registry', () => {
   const runtime = createRuntime();
-  const result = await runtime.connectors.discoverAndStore('tripadvisor', {
-    sourceUrl: fixture.source.sourceUrl,
-    destination: fixture.destination,
-    section: fixture.listing.section,
-    items: fixture.listing.items,
-    observedAt,
-  });
 
-  assert.equal(result.candidates.length, 5);
-  assert.deepEqual(
-    Array.from(result.candidates, (candidate) => candidate.name),
-    fixture.listing.items.map((item) => item.name),
-  );
-  assert.equal(result.candidates.every((candidate) => candidate.status === 'unresolved'), true);
-  assert.equal(runtime.store.listCandidates({ connector: 'tripadvisor' }).length, 5);
-  assert.equal(runtime.store.listEvidence().filter((item) => item.type === 'source_listing_presence').length, 5);
+  for (const sourceId of ['google-maps', 'tripadvisor']) {
+    const policy = runtime.policy.get(sourceId);
+    assert.equal(policy.mode, 'external_only');
+    assert.equal(policy.externalDiscovery, true);
+    assert.equal(policy.automatedAcquisition, false);
+    assert.equal(policy.storeCandidates, false);
+    assert.equal(policy.storeEvidence, false);
+  }
+
+  assert.deepEqual(runtime.connectors.list(), []);
 });
 
-test('Tripadvisor discovery keeps listing metadata, provenance, and detail links', async () => {
+test('External source helpers create outbound intents but expose no POI discovery method', () => {
   const runtime = createRuntime();
-  const result = await runtime.connectors.discover('tripadvisor', {
-    sourceUrl: fixture.source.sourceUrl,
-    destination: fixture.destination,
-    section: fixture.listing.section,
-    items: fixture.listing.items,
-    observedAt,
-  });
 
-  const fricolandia = result.candidates.find((candidate) => candidate.name.startsWith('FricoLandia'));
-  assert.ok(fricolandia);
-  assert.equal(fricolandia.source.connector, 'tripadvisor');
-  assert.equal(fricolandia.source.connectorVersion, '0.2.0');
-  assert.equal(fricolandia.source.strategy, 'destination-listing');
-  assert.equal(fricolandia.source.sourceUrl, fixture.source.sourceUrl);
+  const mapsIntent = runtime.googleMaps.buildExternalIntent('attractions', 'Luperón');
+  assert.equal(mapsIntent.query, 'Luperón que hacer');
+  assert.equal(mapsIntent.mode, 'external_only');
+  assert.equal(mapsIntent.storeAllowed, false);
+  assert.equal(typeof runtime.googleMaps.discover, 'undefined');
 
-  const detailEvidence = result.evidence.find(
-    (item) => item.candidateId === fricolandia.id && item.type === 'source_detail_url',
-  );
-  assert.ok(detailEvidence);
-  assert.equal(detailEvidence.confidence, 1);
-
-  const thePatio = result.candidates.find((candidate) => candidate.name === 'The Patio');
-  const listingEvidence = result.evidence.find(
-    (item) => item.candidateId === thePatio.id && item.type === 'source_listing_presence',
-  );
-  assert.equal(listingEvidence.value.rating, 4.3);
-  assert.equal(listingEvidence.value.reviewCount, 3);
-  assert.equal(listingEvidence.value.priceHint, '$');
-  assert.deepEqual(Array.from(listingEvidence.value.categoryHints), ['Estadounidense', 'Bar', 'Pub']);
+  const taIntent = runtime.tripadvisor.buildExternalIntent('Luperón');
+  assert.equal(taIntent.mode, 'external_only');
+  assert.equal(taIntent.storeAllowed, false);
+  assert.equal(typeof runtime.tripadvisor.discover, 'undefined');
 });
 
-test('POI store persists candidates and evidence across reopen', async () => {
+test('POI Store v2 blocks direct candidate insertion from restricted sources', () => {
+  const runtime = createRuntime();
+  const candidate = runtime.candidate.create({
+    name: 'Restricted candidate',
+    source: {
+      connector: 'google-maps',
+      connectorVersion: '0.2.0',
+      strategy: 'external-search',
+    },
+    discoveredAt: observedAt,
+  }, observedAt);
+
+  assert.throws(
+    () => runtime.store.upsertCandidate(candidate),
+    (error) => error?.code === 'SOURCE_POLICY_BLOCKED',
+  );
+  assert.equal(runtime.store.listCandidates().length, 0);
+});
+
+test('Unknown sources are denied by default', () => {
+  const runtime = createRuntime();
+  const policy = runtime.policy.getOrDefault('unreviewed-source');
+  assert.equal(policy.mode, 'deny_by_default');
+  assert.equal(runtime.policy.canAutomate('unreviewed-source'), false);
+  assert.equal(runtime.policy.canStoreCandidates('unreviewed-source'), false);
+});
+
+test('Explicitly reviewed store-allowed source can register, discover, and persist', async () => {
   const shared = new Map();
-  const first = createRuntime(new MemoryStorage(shared));
-  await first.connectors.discoverAndStore('tripadvisor', {
-    sourceUrl: fixture.source.sourceUrl,
-    destination: fixture.destination,
-    section: fixture.listing.section,
-    items: fixture.listing.items,
-    observedAt,
+  const runtime = createRuntime(new MemoryStorage(shared));
+
+  runtime.policy.register({
+    id: 'test-permitted-source',
+    mode: 'store_allowed',
+    automatedAcquisition: true,
+    storeCandidates: true,
+    storeEvidence: true,
+    reviewedAt: '2026-07-09',
   });
-  first.store.flush();
+
+  runtime.connectors.register({
+    id: 'test-permitted-source',
+    version: '1.0.0',
+    async discover() {
+      const candidate = runtime.candidate.create({
+        name: 'Permitted candidate',
+        source: {
+          connector: 'test-permitted-source',
+          connectorVersion: '1.0.0',
+          strategy: 'test',
+        },
+        discoveredAt: observedAt,
+      }, observedAt);
+
+      const evidence = runtime.evidence.create({
+        candidateId: candidate.id,
+        type: 'test_evidence',
+        value: 'observed',
+        source: {
+          connector: 'test-permitted-source',
+          connectorVersion: '1.0.0',
+          strategy: 'test',
+        },
+        confidence: 1,
+        observedAt,
+      }, observedAt);
+
+      return { candidates: [candidate], evidence: [evidence] };
+    },
+  });
+
+  await runtime.connectors.discoverAndStore('test-permitted-source', {});
+  runtime.store.flush();
+
+  assert.equal(runtime.store.storageKey, 'wander.poi.store.v2');
+  assert.equal(runtime.store.listCandidates().length, 1);
+  assert.equal(runtime.store.listEvidence().length, 1);
+  assert.deepEqual(Object.keys(runtime.store.snapshot().consolidated), []);
+  assert.equal('canonical' in runtime.store.snapshot(), false);
 
   const reopened = createRuntime(new MemoryStorage(shared));
-  assert.equal(reopened.store.listCandidates().length, 5);
-  assert.equal(reopened.store.listEvidence().length, 10);
-  assert.deepEqual(Object.keys(reopened.store.snapshot().consolidated), []);
-  assert.equal('canonical' in reopened.store.snapshot(), false);
-});
-
-test('Google Maps URL parser separates entity coordinates from viewport center', () => {
-  const runtime = createRuntime();
-  const parsed = runtime.tripadvisor.parseGoogleMapsUrl(
-    'https://www.google.com/maps/place/Example/@19.8924784,-70.9618092,16z/data=!3m1!4b1!8m2!3d19.8935957!4d-70.9613064',
-  );
-
-  assert.deepEqual(
-    { ...parsed.entityLocation },
-    { lat: 19.8935957, lng: -70.9613064 },
-  );
-  assert.equal(parsed.destinationLocation, null);
-  assert.deepEqual(
-    { ...parsed.viewport },
-    { lat: 19.8924784, lng: -70.9618092, zoom: 16 },
-  );
-});
-
-test('Tripadvisor daddr map link resolves destination coordinates, not viewport', () => {
-  const runtime = createRuntime();
-  const detail = fixture.detailResearch.find((item) => item.name.startsWith('FricoLandia'));
-  const parsed = runtime.tripadvisor.parseGoogleMapsUrl(detail.mapUrl);
-
-  assert.equal(parsed.entityLocation, null);
-  assert.deepEqual(
-    { ...parsed.destinationLocation },
-    { lat: 19.916283, lng: -71.06353 },
-  );
-  assert.equal(parsed.viewport, null);
-});
-
-test('Location extraction preserves address and emits high-confidence daddr destination evidence', async () => {
-  const runtime = createRuntime();
-  const discovery = await runtime.connectors.discoverAndStore('tripadvisor', {
-    sourceUrl: fixture.source.sourceUrl,
-    destination: fixture.destination,
-    section: fixture.listing.section,
-    items: fixture.listing.items,
-    observedAt,
+  reopened.policy.register({
+    id: 'test-permitted-source',
+    mode: 'store_allowed',
+    automatedAcquisition: true,
+    storeCandidates: true,
+    storeEvidence: true,
   });
-  const candidate = discovery.candidates.find((item) => item.name.startsWith('FricoLandia'));
-  const detail = fixture.detailResearch.find((item) => item.name.startsWith('FricoLandia'));
-
-  const extracted = runtime.tripadvisor.extractLocationEvidence({
-    candidateId: candidate.id,
-    sourceUrl: detail.detailUrl,
-    address: detail.visibleAddress,
-    mapUrl: detail.mapUrl,
-    observedAt,
-  });
-
-  assert.deepEqual(
-    Array.from(extracted, (item) => item.type),
-    ['visible_address', 'map_link_destination_coordinates'],
-  );
-  const coordinateEvidence = extracted[1];
-  assert.equal(coordinateEvidence.location.lat, 19.916283);
-  assert.equal(coordinateEvidence.location.lng, -71.06353);
-  assert.equal(coordinateEvidence.confidence, 0.96);
+  assert.equal(reopened.store.listCandidates().length, 1);
 });
 
-test('Connector exposes source-specific research instructions without making them consolidated truth', () => {
+test('Policy-gated acquisition blocks restricted sources before any network call', async () => {
   const runtime = createRuntime();
-  assert.equal(runtime.tripadvisor.experimental, true);
-  assert.equal(runtime.tripadvisor.research.observedCandidateCount, 5);
-  assert.equal(runtime.tripadvisor.research.observedDetailCount, 1);
-  assert.equal(runtime.tripadvisor.research.fixturePath, 'tests/fixtures/poi/tripadvisor-luperon.json');
-  assert.equal(runtime.tripadvisor.sourceInstructions.discovery[0].strategy, 'destination-listing');
-  assert.equal(runtime.tripadvisor.sourceInstructions.notes.includes('Discovery output is a POI candidate, not a consolidated POI.'), true);
+  runtime.acquisition.configure({ endpoint: 'https://example.invalid/capture' });
+
+  await assert.rejects(
+    () => runtime.acquisition.acquire({
+      sourceId: 'tripadvisor',
+      url: 'https://www.tripadvisor.com/',
+    }),
+    (error) => error?.code === 'SOURCE_POLICY_BLOCKED',
+  );
 });
 
 let passed = 0;
