@@ -1,16 +1,17 @@
 (() => {
   const ID = 'tripadvisor';
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
 
   const SOURCE_INSTRUCTIONS = Object.freeze({
     discovery: Object.freeze([
       {
         strategy: 'destination-listing',
-        description: 'Open a public Tripadvisor destination tourism page, inspect highlighted place cards, and capture each place name plus any visible detail URL, position, category, rating, and review count.',
+        description: 'Open a public Tripadvisor destination tourism page, inspect highlighted place cards, and capture each place name plus any visible detail URL, position, category, rating, review count, and price hint.',
       },
     ]),
     detailResolutionPriority: Object.freeze([
       'map-link-entity-coordinates',
+      'map-link-destination-coordinates',
       'json-ld-geo',
       'embedded-state-geo',
       'map-link-viewport-coordinates',
@@ -21,6 +22,7 @@
       'Discovery output is a POI candidate, not a consolidated POI.',
       'Keep every extracted value as evidence with source URL, strategy, connector version, and confidence.',
       'Do not treat a map viewport center as exact POI coordinates.',
+      'Coordinates embedded in a Google Maps daddr destination are location evidence, distinct from viewport coordinates.',
       'Do not merge candidates only because their names look similar.',
     ]),
   });
@@ -30,6 +32,7 @@
     fixturePath: 'tests/fixtures/poi/tripadvisor-luperon.json',
     discoveryStrategy: 'destination-listing',
     observedCandidateCount: 5,
+    observedDetailCount: 1,
   });
 
   function connectorSource({ sourceUrl, sourceRef, strategy }) {
@@ -89,6 +92,8 @@
           section,
           position,
           categoryHint: item.categoryHint || item.typeHint || null,
+          categoryHints: Array.isArray(item.categoryHints) ? [...item.categoryHints] : [],
+          priceHint: item.priceHint || null,
           rating: Number.isFinite(Number(item.rating)) ? Number(item.rating) : null,
           reviewCount: Number.isFinite(Number(item.reviewCount)) ? Number(item.reviewCount) : null,
         },
@@ -127,7 +132,7 @@
   }
 
   function parseGoogleMapsUrl(url) {
-    if (!url) return { entityLocation: null, viewport: null };
+    if (!url) return { entityLocation: null, destinationLocation: null, viewport: null };
     let text;
     try {
       text = decodeURIComponent(String(url));
@@ -136,11 +141,18 @@
     }
 
     const entityMatch = text.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
+    const destinationMatch = text.match(/(?:[?&]|^)daddr=[^&]*@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/i)
+      || text.match(/(?:[?&]|^)daddr=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/i);
     const viewportMatch = text.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(\d+(?:\.\d+)?)z/);
 
     const entityLocation = entityMatch ? {
       lat: Number(entityMatch[1]),
       lng: Number(entityMatch[2]),
+    } : null;
+
+    const destinationLocation = destinationMatch ? {
+      lat: Number(destinationMatch[1]),
+      lng: Number(destinationMatch[2]),
     } : null;
 
     const viewport = viewportMatch ? {
@@ -149,7 +161,7 @@
       zoom: Number(viewportMatch[3]),
     } : null;
 
-    return { entityLocation, viewport };
+    return { entityLocation, destinationLocation, viewport };
   }
 
   function extractLocationEvidence(input = {}) {
@@ -189,6 +201,23 @@
           strategy: 'map-link-entity-coordinates',
         }),
         confidence: 0.98,
+        observedAt,
+      }, observedAt));
+    } else if (parsed.destinationLocation) {
+      result.push(window.WanderPOIEvidence.create({
+        candidateId: input.candidateId,
+        type: 'map_link_destination_coordinates',
+        location: {
+          ...parsed.destinationLocation,
+          method: 'map_link_destination_coordinates',
+        },
+        value: { mapUrl: input.mapUrl },
+        source: connectorSource({
+          sourceUrl,
+          sourceRef: input.mapUrl,
+          strategy: 'map-link-destination-coordinates',
+        }),
+        confidence: 0.96,
         observedAt,
       }, observedAt));
     } else if (parsed.viewport) {
