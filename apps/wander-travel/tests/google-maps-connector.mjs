@@ -172,6 +172,19 @@ test('A semantic query with no observed result cards creates no candidates', asy
   assert.equal(result.diagnostics.query, 'Luperón museos');
 });
 
+test('Live research not_observed status never means an empty Google Maps result set', () => {
+  assert.equal(fixture.liveResearchAttempt.status, 'not_observed');
+  assert.equal(fixture.liveResearchAttempt.resultCandidatesCaptured, 0);
+  assert.match(
+    fixture.liveResearchAttempt.interpretation,
+    /does not mean the six Google Maps searches return no places/i,
+  );
+  assert.equal(
+    fixture.researchNotes.includes('A not_observed live-access result is not equivalent to an empty Google Maps result set.'),
+    true,
+  );
+});
+
 let passed = 0;
 const failures = [];
 
