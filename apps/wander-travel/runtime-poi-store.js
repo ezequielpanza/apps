@@ -1,6 +1,6 @@
 (() => {
-  const STORAGE_KEY = 'wander.poi.store.v1';
-  const SCHEMA_VERSION = 1;
+  const STORAGE_KEY = 'wander.poi.store.v2';
+  const SCHEMA_VERSION = 2;
   const VALID_STATUSES = new Set(['unresolved', 'partially_resolved', 'resolved', 'rejected']);
 
   const EMPTY = {
@@ -15,6 +15,11 @@
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
+  }
+
+  function sourcePolicy() {
+    if (!window.WanderSourcePolicy) throw new Error('WanderSourcePolicy is unavailable');
+    return window.WanderSourcePolicy;
   }
 
   function load() {
@@ -48,6 +53,8 @@
       throw new Error('Invalid POI candidate');
     }
 
+    sourcePolicy().assertCapability(candidate.source?.connector, 'storeCandidates');
+
     const existing = data.candidates[candidate.id];
     const merged = existing ? {
       ...existing,
@@ -69,6 +76,9 @@
     if (!window.WanderPOIEvidence?.isEvidence(evidence)) {
       throw new Error('Invalid POI evidence');
     }
+
+    sourcePolicy().assertCapability(evidence.source?.connector, 'storeEvidence');
+
     if (!data.candidates[evidence.candidateId]) {
       throw new Error(`Unknown POI candidate: ${evidence.candidateId}`);
     }
@@ -126,6 +136,7 @@
     if (!VALID_STATUSES.has(status)) throw new Error(`Invalid POI candidate status: ${status}`);
     const candidate = data.candidates[candidateId];
     if (!candidate) throw new Error(`Unknown POI candidate: ${candidateId}`);
+    sourcePolicy().assertCapability(candidate.source?.connector, 'storeCandidates');
     candidate.status = status;
     schedulePersist();
     return clone(candidate);
