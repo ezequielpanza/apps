@@ -1,0 +1,42 @@
+name: Wander Web Acquisition
+
+on:
+  push:
+    paths:
+      - 'services/wander-web-acquisition/**'
+      - '.github/workflows/wander-web-acquisition.yml'
+  pull_request:
+    paths:
+      - 'services/wander-web-acquisition/**'
+      - '.github/workflows/wander-web-acquisition.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: services/wander-web-acquisition
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Check worker syntax
+        run: npm run check
+
+      - name: Bundle worker without deploy
+        run: npx wrangler deploy --dry-run
