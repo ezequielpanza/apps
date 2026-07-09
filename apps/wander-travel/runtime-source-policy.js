@@ -125,6 +125,23 @@
   });
 
   register({
+    id: 'openstreetmap',
+    mode: POLICY_MODES.STORE_ALLOWED,
+    automatedAcquisition: true,
+    storePOIs: true,
+    externalDiscovery: true,
+    reviewedAt: '2026-07-09',
+    termsUrl: 'https://www.openstreetmap.org/copyright',
+    reason: 'OpenStreetMap geographic data can feed the normalized POI pipeline with source provenance and attribution.',
+    notes: [
+      'The connector owns Overpass query profiles, node/way/relation handling, tag interpretation, and geometry normalization.',
+      'Preserve OSM object type, object id, original tags, source URL, and location method.',
+      'OpenStreetMap attribution and ODbL obligations must be preserved in products that use the data.',
+      'The POI Engine receives only NormalizedPOI objects.',
+    ],
+  });
+
+  register({
     id: 'wikidata',
     mode: POLICY_MODES.STORE_ALLOWED,
     automatedAcquisition: true,
