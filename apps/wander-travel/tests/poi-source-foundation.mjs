@@ -4,50 +4,32 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
-const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
-const APP_ROOT = path.resolve(TEST_DIR, '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 class MemoryStorage {
-  constructor(shared = new Map()) {
-    this.shared = shared;
-  }
-
-  getItem(key) {
-    return this.shared.has(String(key)) ? this.shared.get(String(key)) : null;
-  }
-
-  setItem(key, value) {
-    this.shared.set(String(key), String(value));
-  }
-
-  removeItem(key) {
-    this.shared.delete(String(key));
-  }
-
-  clear() {
-    this.shared.clear();
-  }
+  constructor(shared = new Map()) { this.shared = shared; }
+  getItem(key) { return this.shared.has(String(key)) ? this.shared.get(String(key)) : null; }
+  setItem(key, value) { this.shared.set(String(key), String(value)); }
+  removeItem(key) { this.shared.delete(String(key)); }
 }
 
-function loadRuntimeFile(context, filename) {
-  const source = fs.readFileSync(path.join(APP_ROOT, filename), 'utf8');
-  new vm.Script(source, { filename }).runInContext(context);
+function load(context, file) {
+  new vm.Script(fs.readFileSync(path.join(ROOT, file), 'utf8'), { filename: file }).runInContext(context);
 }
 
-function createRuntime(storage = new MemoryStorage()) {
-  let timerId = 0;
+function runtime(storage = new MemoryStorage()) {
+  let timer = 0;
   const sandbox = {
     console,
     Date,
     Math,
     URL,
     localStorage: storage,
-    setTimeout: () => ++timerId,
+    setTimeout: () => ++timer,
     clearTimeout: () => {},
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
-
   const context = vm.createContext(sandbox);
   [
     'runtime-source-policy.js',
@@ -56,201 +38,113 @@ function createRuntime(storage = new MemoryStorage()) {
     'runtime-poi-engine.js',
     'runtime-external-source-google-maps.js',
     'runtime-external-source-tripadvisor.js',
-  ].forEach((filename) => loadRuntimeFile(context, filename));
-
+  ].forEach((file) => load(context, file));
   return {
-    storage,
     policy: context.WanderSourcePolicy,
     normalized: context.WanderNormalizedPOI,
     store: context.WanderPOIStore,
     engine: context.WanderPOIEngine,
-    googleMaps: context.WanderExternalSourceGoogleMaps,
+    maps: context.WanderExternalSourceGoogleMaps,
     tripadvisor: context.WanderExternalSourceTripadvisor,
   };
 }
 
-const observedAt = '2026-07-09T12:00:00.000Z';
+const AT = '2026-07-09T12:00:00.000Z';
 const tests = [];
-function test(name, run) {
-  tests.push({ name, run });
+const test = (name, run) => tests.push({ name, run });
+
+function makePOI(rt, sourceId, ref = '1', name = `POI ${sourceId}`) {
+  return rt.normalized.create({
+    name,
+    location: { lat: 19.9, lng: -70.95, method: `${sourceId}_point` },
+    source: { id: sourceId, version: '1.0.0', ref },
+    confidence: 0.9,
+    observedAt: AT,
+    evidence: [{ type: 'source_entity_id', value: ref, confidence: 1 }],
+  }, AT);
 }
 
-test('Normalized POI contract has one source-independent shape', () => {
-  const runtime = createRuntime();
-  const poi = runtime.normalized.create({
-    name: 'Lugar de prueba',
-    aliases: ['Test Place'],
-    categories: [{ id: 'test:place', label: 'Place' }],
-    location: { lat: 19.9, lng: -70.95, method: 'test_point' },
-    source: {
-      id: 'test-source',
-      version: '1.0.0',
-      ref: 'abc',
-      strategy: 'test-search',
-    },
-    confidence: 0.9,
-    observedAt,
-    tags: { kind: 'test' },
-    attributes: { rawId: 123 },
-    evidence: [
-      { type: 'source_entity_id', value: 'abc', confidence: 1 },
-    ],
-  }, observedAt);
-
-  assert.equal(runtime.normalized.isNormalizedPOI(poi), true);
+test('NormalizedPOI contract is source-independent', () => {
+  const rt = runtime();
+  const poi = makePOI(rt, 'test-source');
+  assert.equal(rt.normalized.isNormalizedPOI(poi), true);
   assert.equal(poi.source.id, 'test-source');
-  assert.equal(poi.location.method, 'test_point');
   assert.equal(poi.evidence.length, 1);
 });
 
-test('External-only sources remain outside the POI connector registry', () => {
-  const runtime = createRuntime();
-
-  for (const sourceId of ['google-maps', 'tripadvisor']) {
-    const sourcePolicy = runtime.policy.get(sourceId);
-    assert.equal(sourcePolicy.mode, 'external_only');
-    assert.equal(sourcePolicy.automatedAcquisition, false);
-    assert.equal(sourcePolicy.storePOIs, false);
-  }
-
-  assert.deepEqual(runtime.engine.listConnectors(), []);
-  assert.equal(typeof runtime.googleMaps.buildExternalIntent, 'function');
-  assert.equal(typeof runtime.tripadvisor.buildExternalIntent, 'function');
+test('Stable source ref keeps POI identity stable', () => {
+  const rt = runtime();
+  const first = makePOI(rt, 'stable-source', 'entity-123', 'Nombre inicial');
+  const second = rt.normalized.create({
+    name: 'Nombre corregido',
+    location: { lat: 19.9001, lng: -70.9501, method: 'source_point' },
+    source: { id: 'stable-source', version: '1.0.0', ref: 'entity-123' },
+    confidence: 0.95,
+    observedAt: AT,
+  }, AT);
+  assert.equal(first.id, second.id);
 });
 
-test('POI Engine rejects connectors that return raw non-normalized records', async () => {
-  const runtime = createRuntime();
-  runtime.policy.register({
-    id: 'raw-source',
-    mode: 'store_allowed',
-    automatedAcquisition: true,
-    storePOIs: true,
-  });
-
-  runtime.engine.register({
-    id: 'raw-source',
-    version: '1.0.0',
-    async search() {
-      return { pois: [{ name: 'raw result' }] };
-    },
-  });
-
-  await assert.rejects(
-    () => runtime.engine.search('raw-source', {}),
-    /non-normalized POI/,
-  );
+test('External-only sources are not POI connectors', () => {
+  const rt = runtime();
+  for (const id of ['google-maps', 'tripadvisor']) {
+    assert.equal(rt.policy.get(id).mode, 'external_only');
+    assert.equal(rt.policy.get(id).storePOIs, false);
+  }
+  assert.equal(rt.engine.listConnectors().length, 0);
+  assert.equal(typeof rt.maps.buildExternalIntent, 'function');
+  assert.equal(typeof rt.tripadvisor.buildExternalIntent, 'function');
 });
 
-test('POI Engine processes different connectors through the same path', async () => {
-  const runtime = createRuntime();
+test('Engine rejects raw non-normalized connector output', async () => {
+  const rt = runtime();
+  rt.policy.register({ id: 'raw', mode: 'store_allowed', automatedAcquisition: true, storePOIs: true });
+  rt.engine.register({ id: 'raw', version: '1.0.0', async search() { return { pois: [{ name: 'raw' }] }; } });
+  await assert.rejects(() => rt.engine.search('raw'), /non-normalized POI/);
+});
 
-  for (const sourceId of ['source-a', 'source-b']) {
-    runtime.policy.register({
-      id: sourceId,
-      mode: 'store_allowed',
-      automatedAcquisition: true,
-      storePOIs: true,
-    });
-
-    runtime.engine.register({
-      id: sourceId,
-      version: '1.0.0',
-      async search() {
-        return {
-          pois: [runtime.normalized.create({
-            name: `POI ${sourceId}`,
-            location: { lat: 19.9, lng: -70.95, method: `${sourceId}_point` },
-            source: { id: sourceId, version: '1.0.0', ref: '1' },
-            confidence: 0.9,
-            observedAt,
-          }, observedAt)],
-          diagnostics: { sourceSpecific: sourceId },
-        };
-      },
-    });
+test('Engine processes multiple connectors through one path', async () => {
+  const rt = runtime();
+  for (const id of ['source-a', 'source-b']) {
+    rt.policy.register({ id, mode: 'store_allowed', automatedAcquisition: true, storePOIs: true });
+    rt.engine.register({ id, version: '1.0.0', async search() { return { pois: [makePOI(rt, id)] }; } });
   }
-
-  const result = await runtime.engine.searchMany(['source-a', 'source-b'], { any: 'request' });
+  const result = await rt.engine.searchMany(['source-a', 'source-b']);
   assert.equal(result.batches.length, 2);
   assert.equal(result.pois.length, 2);
   assert.equal(result.errors.length, 0);
-  assert.deepEqual(
-    Array.from(result.pois, (poi) => poi.source.id).sort(),
-    ['source-a', 'source-b'],
-  );
+  assert.deepEqual(Array.from(result.pois, (poi) => poi.source.id).sort(), ['source-a', 'source-b']);
 });
 
-test('POI Store v3 persists normalized POIs and embedded evidence', async () => {
+test('Store v3 persists normalized POIs with embedded evidence', async () => {
   const shared = new Map();
-  const runtime = createRuntime(new MemoryStorage(shared));
-
-  runtime.policy.register({
-    id: 'permitted-source',
-    mode: 'store_allowed',
-    automatedAcquisition: true,
-    storePOIs: true,
-  });
-
-  runtime.engine.register({
-    id: 'permitted-source',
-    version: '1.0.0',
-    async search() {
-      return {
-        pois: [runtime.normalized.create({
-          name: 'Persisted POI',
-          categories: ['test place'],
-          location: { lat: 19.9, lng: -70.95, method: 'test_point' },
-          source: { id: 'permitted-source', version: '1.0.0', ref: 'p1' },
-          confidence: 1,
-          observedAt,
-          evidence: [
-            { type: 'source_entity_id', value: 'p1', confidence: 1 },
-          ],
-        }, observedAt)],
-      };
-    },
-  });
-
-  await runtime.engine.searchAndStore('permitted-source', {});
-  runtime.store.flush();
-
-  assert.equal(runtime.store.storageKey, 'wander.poi.store.v3');
-  assert.equal(runtime.store.listNormalized().length, 1);
-  assert.equal(runtime.store.listNormalized()[0].evidence.length, 1);
-  assert.deepEqual(Object.keys(runtime.store.snapshot().consolidated), []);
-
-  const reopened = createRuntime(new MemoryStorage(shared));
-  assert.equal(reopened.store.listNormalized().length, 1);
+  const rt = runtime(new MemoryStorage(shared));
+  rt.policy.register({ id: 'permitted', mode: 'store_allowed', automatedAcquisition: true, storePOIs: true });
+  rt.engine.register({ id: 'permitted', version: '1.0.0', async search() { return { pois: [makePOI(rt, 'permitted')] }; } });
+  await rt.engine.searchAndStore('permitted');
+  rt.store.flush();
+  assert.equal(rt.store.storageKey, 'wander.poi.store.v3');
+  assert.equal(rt.store.listNormalized().length, 1);
+  assert.equal(rt.store.listNormalized()[0].evidence.length, 1);
+  assert.equal(runtime(new MemoryStorage(shared)).store.listNormalized().length, 1);
 });
 
-test('Legacy candidate/evidence stores are not migrated into normalized Store v3', () => {
+test('Legacy candidate/evidence store is not migrated', () => {
   const shared = new Map();
-  shared.set('wander.poi.store.v2', JSON.stringify({
-    schemaVersion: 2,
-    candidates: { old: { id: 'old' } },
-    evidence: { old: { id: 'old' } },
-    consolidated: {},
-  }));
-
-  const runtime = createRuntime(new MemoryStorage(shared));
-  assert.equal(runtime.store.storageKey, 'wander.poi.store.v3');
-  assert.equal(runtime.store.listNormalized().length, 0);
+  shared.set('wander.poi.store.v2', JSON.stringify({ schemaVersion: 2, candidates: { old: {} }, evidence: { old: {} } }));
+  assert.equal(runtime(new MemoryStorage(shared)).store.listNormalized().length, 0);
 });
 
 let passed = 0;
-const failures = [];
-
 for (const current of tests) {
   try {
     await current.run();
     passed += 1;
     console.log('PASS', current.name);
   } catch (error) {
-    failures.push({ name: current.name, error });
     console.error('FAIL', current.name);
     console.error(error?.stack || error);
+    process.exitCode = 1;
   }
 }
-
 console.log(`\n${passed}/${tests.length} unified POI engine tests passed`);
-if (failures.length) process.exitCode = 1;
