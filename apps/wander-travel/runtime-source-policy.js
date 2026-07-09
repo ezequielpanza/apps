@@ -129,7 +129,23 @@
     reason: 'Tripadvisor content is external-only for Wander unless explicit permission is obtained.',
     notes: [
       'Do not automate access, scrape, aggregate, or index Tripadvisor content into the POI Store.',
-      'Existing research fixtures remain historical research records and are not production POI data.',
+    ],
+  });
+
+  register({
+    id: 'wikidata',
+    mode: POLICY_MODES.STORE_ALLOWED,
+    automatedAcquisition: true,
+    storeCandidates: true,
+    storeEvidence: true,
+    externalDiscovery: true,
+    reviewedAt: '2026-07-09',
+    termsUrl: 'https://www.wikidata.org/wiki/Wikidata:Licensing',
+    reason: 'Wikidata structured data is available under CC0 and can feed the POI knowledge pipeline with provenance.',
+    notes: [
+      'Use the official Wikidata Query Service for structured entity discovery.',
+      'Preserve QIDs, query provenance, coordinates, and declared types as source evidence.',
+      'Do not treat Wikidata presence as proof that an entity is tourist-relevant.',
     ],
   });
 
