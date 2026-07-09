@@ -26,11 +26,12 @@ The runners have no external dependencies. They load the real production runtime
 `poi-source-foundation.mjs` covers:
 
 1. Tripadvisor Luperón research fixture discovers exactly five unresolved candidates
-2. Candidate provenance and detail-link evidence are preserved
-3. Candidate/evidence store persists across reopen
+2. Listing metadata, candidate provenance, and detail-link evidence are preserved
+3. Candidate/evidence store persists across reopen and uses `consolidated`, never `canonical`
 4. Google Maps URL parsing separates entity coordinates from viewport center
-5. Detail-page location extraction keeps address evidence separate from coordinate evidence
-6. Tripadvisor connector exposes source-specific research instructions without promoting candidates to canonical truth
+5. Tripadvisor Google Maps `daddr` links resolve destination coordinates separately from viewport coordinates
+6. Detail-page location extraction keeps visible address evidence separate from coordinate evidence
+7. Tripadvisor connector exposes source-specific research instructions without promoting candidates to consolidated truth
 
 The Tripadvisor fixture lives at:
 
@@ -38,6 +39,13 @@ The Tripadvisor fixture lives at:
 apps/wander-travel/tests/fixtures/poi/tripadvisor-luperon.json
 ```
 
-It is a research corpus, not production POI data and not a live scrape.
+It is a research corpus, not production POI data and not a live scrape. Its current research observations include:
+
+- five candidates discovered from the public Luperón destination page
+- listing rating/review metadata and detail URLs
+- one observed detail page (`FricoLandia - El Nunca Jamás`)
+- visible-address evidence for that observed detail page
+- Google Maps `daddr` destination coordinates extracted from its public location link
+- four detail pages explicitly marked `not_observed` when the research fetcher could not load them, without assuming the data is absent
 
 A failing assertion exits with a non-zero status so both runners can execute in CI and before Cloudflare Pages deployment.
