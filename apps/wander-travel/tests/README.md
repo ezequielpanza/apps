@@ -5,6 +5,7 @@ Run from the repository root:
 ```bash
 node apps/wander-travel/tests/wander-scenarios.mjs
 node apps/wander-travel/tests/poi-source-foundation.mjs
+node apps/wander-travel/tests/google-maps-connector.mjs
 ```
 
 The runners have no external dependencies. They load the real production runtime modules in isolated Node `vm` contexts with controlled storage and no network access.
@@ -48,4 +49,25 @@ It is a research corpus, not production POI data and not a live scrape. Its curr
 - Google Maps `daddr` destination coordinates extracted from its public location link
 - four detail pages explicitly marked `not_observed` when the research fetcher could not load them, without assuming the data is absent
 
-A failing assertion exits with a non-zero status so both runners can execute in CI and before Cloudflare Pages deployment.
+## Google Maps connector
+
+`google-maps-connector.mjs` covers:
+
+1. Exactly six query profiles observed by the user: attractions, restaurants, hotels, museums, pharmacies, and ATMs
+2. Deterministic semantic-query generation for Luperón
+3. Search URL generation without inventing result POIs
+4. Destination URL parsing that separates entity coordinates from viewport coordinates
+5. Preservation of source entity identifiers without assigning undocumented semantics
+6. Search URL parsing that keeps semantic query text separate from viewport context
+7. Discovery provenance, visible-address evidence, place-link evidence, source IDs, and entity-coordinate evidence
+8. Empty observed result sets produce no candidates
+
+The Google Maps fixture lives at:
+
+```text
+apps/wander-travel/tests/fixtures/poi/google-maps-luperon.json
+```
+
+It records the two URLs supplied by the user, the six observed query profiles, and expected URL evidence. It intentionally contains no asserted search-result POIs yet.
+
+A failing assertion exits with a non-zero status so all runners can execute in CI and before Cloudflare Pages deployment.
