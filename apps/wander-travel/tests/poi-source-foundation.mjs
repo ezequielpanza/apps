@@ -134,6 +134,8 @@ test('POI store persists candidates and evidence across reopen', async () => {
   const reopened = createRuntime(new MemoryStorage(shared));
   assert.equal(reopened.store.listCandidates().length, 5);
   assert.equal(reopened.store.listEvidence().length, 6);
+  assert.deepEqual(Object.keys(reopened.store.snapshot().consolidated), []);
+  assert.equal('canonical' in reopened.store.snapshot(), false);
 });
 
 test('Google Maps URL parser separates entity coordinates from viewport center', () => {
@@ -181,13 +183,13 @@ test('Location extraction prefers entity coordinates and preserves visible addre
   assert.equal(coordinateEvidence.confidence, 0.98);
 });
 
-test('Connector exposes source-specific research instructions without making them canonical truth', () => {
+test('Connector exposes source-specific research instructions without making them consolidated truth', () => {
   const runtime = createRuntime();
   assert.equal(runtime.tripadvisor.experimental, true);
   assert.equal(runtime.tripadvisor.research.observedCandidateCount, 5);
   assert.equal(runtime.tripadvisor.research.fixturePath, 'tests/fixtures/poi/tripadvisor-luperon.json');
   assert.equal(runtime.tripadvisor.sourceInstructions.discovery[0].strategy, 'destination-listing');
-  assert.equal(runtime.tripadvisor.sourceInstructions.notes.includes('Discovery output is a POI candidate, not a canonical POI.'), true);
+  assert.equal(runtime.tripadvisor.sourceInstructions.notes.includes('Discovery output is a POI candidate, not a consolidated POI.'), true);
 });
 
 let passed = 0;
