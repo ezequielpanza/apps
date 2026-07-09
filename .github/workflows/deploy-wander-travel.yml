@@ -64,8 +64,8 @@ jobs:
       - name: Run POI source foundation tests
         run: node apps/wander-travel/tests/poi-source-foundation.mjs
 
-      - name: Run Google Maps connector tests
-        run: node apps/wander-travel/tests/google-maps-connector.mjs
+      - name: Run Wikidata connector tests
+        run: node apps/wander-travel/tests/wikidata-connector.mjs
 
       - name: Publish to Cloudflare Pages
         working-directory: apps/wander-travel
