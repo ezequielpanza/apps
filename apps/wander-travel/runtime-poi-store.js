@@ -1,12 +1,10 @@
 (() => {
-  const STORAGE_KEY = 'wander.poi.store.v2';
-  const SCHEMA_VERSION = 2;
-  const VALID_STATUSES = new Set(['unresolved', 'partially_resolved', 'resolved', 'rejected']);
+  const STORAGE_KEY = 'wander.poi.store.v3';
+  const SCHEMA_VERSION = 3;
 
   const EMPTY = {
     schemaVersion: SCHEMA_VERSION,
-    candidates: {},
-    evidence: {},
+    normalized: {},
     consolidated: {},
   };
 
@@ -22,14 +20,18 @@
     return window.WanderSourcePolicy;
   }
 
+  function normalizedPOI() {
+    if (!window.WanderNormalizedPOI) throw new Error('WanderNormalizedPOI is unavailable');
+    return window.WanderNormalizedPOI;
+  }
+
   function load() {
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
       if (stored?.schemaVersion === SCHEMA_VERSION) {
         return {
           schemaVersion: SCHEMA_VERSION,
-          candidates: stored.candidates || {},
-          evidence: stored.evidence || {},
+          normalized: stored.normalized || {},
           consolidated: stored.consolidated || {},
         };
       }
@@ -48,98 +50,77 @@
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
   }
 
-  function upsertCandidate(candidate) {
-    if (!window.WanderPOICandidate?.isCandidate(candidate)) {
-      throw new Error('Invalid POI candidate');
-    }
+  function upsertNormalized(poi) {
+    if (!normalizedPOI().isNormalizedPOI(poi)) throw new Error('Invalid normalized POI');
+    sourcePolicy().assertCapability(poi.source?.id, 'storePOIs');
 
-    sourcePolicy().assertCapability(candidate.source?.connector, 'storeCandidates');
-
-    const existing = data.candidates[candidate.id];
+    const existing = data.normalized[poi.id];
     const merged = existing ? {
       ...existing,
-      ...clone(candidate),
-      discoveredAt: existing.discoveredAt || candidate.discoveredAt,
-      lastObservedAt: candidate.lastObservedAt || candidate.discoveredAt || existing.lastObservedAt,
+      ...clone(poi),
+      observedAt: poi.observedAt || existing.observedAt,
+      aliases: Array.from(new Set([...(existing.aliases || []), ...(poi.aliases || [])])),
+      categories: mergeCategories(existing.categories, poi.categories),
+      tags: {
+        ...(existing.tags || {}),
+        ...(poi.tags || {}),
+      },
+      attributes: {
+        ...(existing.attributes || {}),
+        ...(poi.attributes || {}),
+      },
       metadata: {
         ...(existing.metadata || {}),
-        ...(candidate.metadata || {}),
+        ...(poi.metadata || {}),
       },
-    } : clone(candidate);
+      evidence: mergeEvidence(existing.evidence, poi.evidence),
+    } : clone(poi);
 
-    data.candidates[candidate.id] = merged;
+    data.normalized[poi.id] = merged;
     schedulePersist();
     return clone(merged);
   }
 
-  function addEvidence(evidence) {
-    if (!window.WanderPOIEvidence?.isEvidence(evidence)) {
-      throw new Error('Invalid POI evidence');
-    }
-
-    sourcePolicy().assertCapability(evidence.source?.connector, 'storeEvidence');
-
-    if (!data.candidates[evidence.candidateId]) {
-      throw new Error(`Unknown POI candidate: ${evidence.candidateId}`);
-    }
-
-    const existing = data.evidence[evidence.id];
-    data.evidence[evidence.id] = existing ? {
-      ...existing,
-      ...clone(evidence),
-      observedAt: evidence.observedAt || existing.observedAt,
-      metadata: {
-        ...(existing.metadata || {}),
-        ...(evidence.metadata || {}),
-      },
-    } : clone(evidence);
-
-    schedulePersist();
-    return clone(data.evidence[evidence.id]);
+  function mergeCategories(left = [], right = []) {
+    const byId = new Map();
+    [...left, ...right].forEach((category) => {
+      if (category?.id) byId.set(category.id, clone(category));
+    });
+    return Array.from(byId.values());
   }
 
-  function ingestDiscovery(result) {
-    const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
-    const evidence = Array.isArray(result?.evidence) ? result.evidence : [];
-
-    const storedCandidates = candidates.map(upsertCandidate);
-    const storedEvidence = evidence.map(addEvidence);
-
-    return {
-      candidates: storedCandidates,
-      evidence: storedEvidence,
-    };
+  function evidenceKey(item) {
+    return JSON.stringify([
+      item?.type || '',
+      item?.source?.id || '',
+      item?.source?.ref || item?.source?.url || '',
+      item?.value == null ? null : item.value,
+      item?.location || null,
+    ]);
   }
 
-  function getCandidate(candidateId) {
-    const value = data.candidates[candidateId];
+  function mergeEvidence(left = [], right = []) {
+    const byKey = new Map();
+    [...left, ...right].forEach((item) => byKey.set(evidenceKey(item), clone(item)));
+    return Array.from(byKey.values());
+  }
+
+  function ingestNormalized(pois = []) {
+    return (Array.isArray(pois) ? pois : []).map(upsertNormalized);
+  }
+
+  function getNormalized(poiId) {
+    const value = data.normalized[poiId];
     return value ? clone(value) : null;
   }
 
-  function listCandidates(filters = {}) {
-    return Object.values(data.candidates)
-      .filter((candidate) => !filters.connector || candidate.source?.connector === filters.connector)
-      .filter((candidate) => !filters.status || candidate.status === filters.status)
-      .filter((candidate) => !filters.destinationId || candidate.destination?.id === filters.destinationId)
-      .sort((a, b) => String(a.discoveredAt).localeCompare(String(b.discoveredAt)))
-      .map(clone);
-  }
-
-  function listEvidence(candidateId = null) {
-    return Object.values(data.evidence)
-      .filter((item) => !candidateId || item.candidateId === candidateId)
+  function listNormalized(filters = {}) {
+    return Object.values(data.normalized)
+      .filter((poi) => !filters.sourceId || poi.source?.id === filters.sourceId)
+      .filter((poi) => !filters.destinationId || poi.destination?.id === filters.destinationId)
+      .filter((poi) => !filters.categoryId || poi.categories?.some((category) => category.id === filters.categoryId))
       .sort((a, b) => String(a.observedAt).localeCompare(String(b.observedAt)))
       .map(clone);
-  }
-
-  function setCandidateStatus(candidateId, status) {
-    if (!VALID_STATUSES.has(status)) throw new Error(`Invalid POI candidate status: ${status}`);
-    const candidate = data.candidates[candidateId];
-    if (!candidate) throw new Error(`Unknown POI candidate: ${candidateId}`);
-    sourcePolicy().assertCapability(candidate.source?.connector, 'storeCandidates');
-    candidate.status = status;
-    schedulePersist();
-    return clone(candidate);
   }
 
   function snapshot() {
@@ -154,13 +135,10 @@
   window.WanderPOIStore = Object.freeze({
     storageKey: STORAGE_KEY,
     schemaVersion: SCHEMA_VERSION,
-    upsertCandidate,
-    addEvidence,
-    ingestDiscovery,
-    getCandidate,
-    listCandidates,
-    listEvidence,
-    setCandidateStatus,
+    upsertNormalized,
+    ingestNormalized,
+    getNormalized,
+    listNormalized,
     snapshot,
     flush,
     clear,
