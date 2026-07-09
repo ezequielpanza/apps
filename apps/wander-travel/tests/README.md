@@ -5,10 +5,10 @@ Run from the repository root:
 ```bash
 node apps/wander-travel/tests/wander-scenarios.mjs
 node apps/wander-travel/tests/poi-source-foundation.mjs
-node apps/wander-travel/tests/google-maps-connector.mjs
+node apps/wander-travel/tests/wikidata-connector.mjs
 ```
 
-The runners have no external dependencies. They load the real production runtime modules in isolated Node `vm` contexts with controlled storage and no network access.
+The runners have no external dependencies. They load the real production runtime modules in isolated Node `vm` contexts with controlled storage and no live network access.
 
 ## Engine scenarios
 
@@ -26,48 +26,35 @@ The runners have no external dependencies. They load the real production runtime
 
 `poi-source-foundation.mjs` covers:
 
-1. Tripadvisor Luperón research fixture discovers exactly five unresolved candidates
-2. Listing metadata, candidate provenance, and detail-link evidence are preserved
-3. Candidate/evidence store persists across reopen and uses `consolidated`, never `canonical`
-4. Google Maps URL parsing separates entity coordinates from viewport center
-5. Tripadvisor Google Maps `daddr` links resolve destination coordinates separately from viewport coordinates
-6. Detail-page location extraction keeps visible address evidence separate from coordinate evidence
-7. Tripadvisor connector exposes source-specific research instructions without promoting candidates to consolidated truth
+1. Google Maps and Tripadvisor are `external_only`
+2. External helpers create outbound intents but expose no POI `discover()` method
+3. POI Store v2 blocks direct insertion from restricted sources
+4. Unknown sources are denied by default
+5. An explicitly reviewed `store_allowed` source can register, discover, store, and persist
+6. The store uses `consolidated`, never `canonical`
+7. Policy-gated web acquisition blocks restricted sources before any network call
 
-The Tripadvisor fixture lives at:
-
-```text
-apps/wander-travel/tests/fixtures/poi/tripadvisor-luperon.json
-```
-
-It is a research corpus, not production POI data and not a live scrape. Its current research observations include:
-
-- five candidates discovered from the public Luperón destination page
-- listing rating/review metadata and detail URLs
-- one observed detail page (`FricoLandia - El Nunca Jamás`)
-- visible-address evidence for that observed detail page
-- Google Maps `daddr` destination coordinates extracted from its public location link
-- four detail pages explicitly marked `not_observed` when the research fetcher could not load them, without assuming the data is absent
-
-## Google Maps connector
-
-`google-maps-connector.mjs` covers:
-
-1. Exactly six query profiles observed by the user: attractions, restaurants, hotels, museums, pharmacies, and ATMs
-2. Deterministic semantic-query generation for Luperón
-3. Search URL generation without inventing result POIs
-4. Destination URL parsing that separates entity coordinates from viewport coordinates
-5. Preservation of source entity identifiers without assigning undocumented semantics
-6. Search URL parsing that keeps semantic query text separate from viewport context
-7. Discovery provenance, visible-address evidence, place-link evidence, source IDs, and entity-coordinate evidence
-8. Empty observed result sets produce no candidates
-
-The Google Maps fixture lives at:
+The production store key is:
 
 ```text
-apps/wander-travel/tests/fixtures/poi/google-maps-luperon.json
+wander.poi.store.v2
 ```
 
-It records the two URLs supplied by the user, the six observed query profiles, and expected URL evidence. It intentionally contains no asserted search-result POIs yet.
+No legacy Tripadvisor or Google Maps POI research fixtures are retained in the repository.
+
+## Wikidata connector
+
+`wikidata-connector.mjs` covers:
+
+1. Wikidata is explicitly `store_allowed`
+2. Nearby SPARQL query generation preserves center, radius, language, and bounded limit
+3. QID aggregation deduplicates repeated rows while preserving multiple P31 types
+4. Discovery creates unresolved candidates with provenance
+5. QID (`source_entity_id`) evidence is retained
+6. P625 coordinate evidence is retained with `wikidata_p625` method
+7. P31 type evidence is retained separately
+8. The official Wikidata Query Service endpoint and JSON result format are used
+
+The tests use simulated SPARQL bindings so CI remains deterministic.
 
 A failing assertion exits with a non-zero status so all runners can execute in CI and before Cloudflare Pages deployment.
