@@ -1,6 +1,6 @@
 (() => {
-  const STORAGE_KEY = 'wander.poi.store.v3';
-  const SCHEMA_VERSION = 3;
+  const STORAGE_KEY = 'wander.poi.store.v4';
+  const SCHEMA_VERSION = 4;
 
   const EMPTY = {
     schemaVersion: SCHEMA_VERSION,
@@ -23,6 +23,11 @@
   function normalizedPOI() {
     if (!window.WanderNormalizedPOI) throw new Error('WanderNormalizedPOI is unavailable');
     return window.WanderNormalizedPOI;
+  }
+
+  function consolidatedPOI() {
+    if (!window.WanderConsolidatedPOI) throw new Error('WanderConsolidatedPOI is unavailable');
+    return window.WanderConsolidatedPOI;
   }
 
   function load() {
@@ -50,37 +55,6 @@
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
   }
 
-  function upsertNormalized(poi) {
-    if (!normalizedPOI().isNormalizedPOI(poi)) throw new Error('Invalid normalized POI');
-    sourcePolicy().assertCapability(poi.source?.id, 'storePOIs');
-
-    const existing = data.normalized[poi.id];
-    const merged = existing ? {
-      ...existing,
-      ...clone(poi),
-      observedAt: poi.observedAt || existing.observedAt,
-      aliases: Array.from(new Set([...(existing.aliases || []), ...(poi.aliases || [])])),
-      categories: mergeCategories(existing.categories, poi.categories),
-      tags: {
-        ...(existing.tags || {}),
-        ...(poi.tags || {}),
-      },
-      attributes: {
-        ...(existing.attributes || {}),
-        ...(poi.attributes || {}),
-      },
-      metadata: {
-        ...(existing.metadata || {}),
-        ...(poi.metadata || {}),
-      },
-      evidence: mergeEvidence(existing.evidence, poi.evidence),
-    } : clone(poi);
-
-    data.normalized[poi.id] = merged;
-    schedulePersist();
-    return clone(merged);
-  }
-
   function mergeCategories(left = [], right = []) {
     const byId = new Map();
     [...left, ...right].forEach((category) => {
@@ -105,6 +79,28 @@
     return Array.from(byKey.values());
   }
 
+  function upsertNormalized(poi) {
+    if (!normalizedPOI().isNormalizedPOI(poi)) throw new Error('Invalid normalized POI');
+    sourcePolicy().assertCapability(poi.source?.id, 'storePOIs');
+
+    const existing = data.normalized[poi.id];
+    const merged = existing ? {
+      ...existing,
+      ...clone(poi),
+      observedAt: poi.observedAt || existing.observedAt,
+      aliases: Array.from(new Set([...(existing.aliases || []), ...(poi.aliases || [])])),
+      categories: mergeCategories(existing.categories, poi.categories),
+      tags: { ...(existing.tags || {}), ...(poi.tags || {}) },
+      attributes: { ...(existing.attributes || {}), ...(poi.attributes || {}) },
+      metadata: { ...(existing.metadata || {}), ...(poi.metadata || {}) },
+      evidence: mergeEvidence(existing.evidence, poi.evidence),
+    } : clone(poi);
+
+    data.normalized[poi.id] = merged;
+    schedulePersist();
+    return clone(merged);
+  }
+
   function ingestNormalized(pois = []) {
     return (Array.isArray(pois) ? pois : []).map(upsertNormalized);
   }
@@ -120,6 +116,38 @@
       .filter((poi) => !filters.destinationId || poi.destination?.id === filters.destinationId)
       .filter((poi) => !filters.categoryId || poi.categories?.some((category) => category.id === filters.categoryId))
       .sort((a, b) => String(a.observedAt).localeCompare(String(b.observedAt)))
+      .map(clone);
+  }
+
+  function upsertConsolidated(poi) {
+    if (!consolidatedPOI().isConsolidatedPOI(poi)) throw new Error('Invalid consolidated POI');
+    data.consolidated[poi.id] = clone(poi);
+    schedulePersist();
+    return clone(data.consolidated[poi.id]);
+  }
+
+  function replaceConsolidated(pois = []) {
+    const next = {};
+    for (const poi of Array.isArray(pois) ? pois : []) {
+      if (!consolidatedPOI().isConsolidatedPOI(poi)) throw new Error('Invalid consolidated POI');
+      next[poi.id] = clone(poi);
+    }
+    data.consolidated = next;
+    schedulePersist();
+    return listConsolidated();
+  }
+
+  function getConsolidated(poiId) {
+    const value = data.consolidated[poiId];
+    return value ? clone(value) : null;
+  }
+
+  function listConsolidated(filters = {}) {
+    return Object.values(data.consolidated)
+      .filter((poi) => !filters.sourceId || poi.sources?.some((source) => source.id === filters.sourceId))
+      .filter((poi) => !filters.memberId || poi.memberIds?.includes(filters.memberId))
+      .filter((poi) => !filters.categoryId || poi.categories?.some((category) => category.id === filters.categoryId))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
       .map(clone);
   }
 
@@ -139,6 +167,10 @@
     ingestNormalized,
     getNormalized,
     listNormalized,
+    upsertConsolidated,
+    replaceConsolidated,
+    getConsolidated,
+    listConsolidated,
     snapshot,
     flush,
     clear,
