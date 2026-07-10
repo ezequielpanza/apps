@@ -151,10 +151,37 @@ test('presentation can use relative direction and consolidated notes', () => {
     notes: [{ text: 'Fue construida para proteger la entrada de la bahía.', confidence: 0.9 }],
   });
 
-  const presentation = rt.api.formatSuggestion(fort, current([fort]));
+  const presentation = rt.api.formatSuggestion(fort);
   assert.match(presentation.message, /a tu derecha/i);
   assert.match(presentation.message, /proteger la entrada de la bahía/i);
   assert.match(presentation.message, /Varias fuentes/i);
+});
+
+test('missing heading never invents a relative direction', () => {
+  const rt = createRuntime();
+  rt.api.clearMemory();
+  const viewpoint = item({
+    id: 'viewpoint',
+    name: 'Mirador',
+    category: 'tourism=viewpoint',
+    distanceM: 220,
+    bearingDeg: 90,
+  });
+
+  const presentation = rt.api.formatSuggestion(viewpoint);
+  assert.doesNotMatch(presentation.message, /a tu derecha|a tu izquierda|adelante tuyo|detrás tuyo/i);
+});
+
+test('a new nearby result clears a candidate that is no longer justified', () => {
+  const rt = createRuntime();
+  rt.api.clearMemory();
+  const fort = item({ id: 'fort-stale', name: 'Fortaleza', category: 'historic=fort', distanceM: 180 });
+  const pharmacy = item({ id: 'pharmacy-new', name: 'Farmacia', category: 'amenity=pharmacy', distanceM: 40, score: 0.95 });
+
+  assert.ok(rt.api.consider(current([fort])));
+  assert.equal(rt.context.value('fieldGuide.candidate').poiId, 'fort-stale');
+  assert.equal(rt.api.consider(current([pharmacy])), null);
+  assert.equal(rt.context.value('fieldGuide.candidate'), null);
 });
 
 let passed = 0;
