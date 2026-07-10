@@ -37,10 +37,38 @@
     setText('#context-time', value);
   }
 
+  function categoryText(item) {
+    return (item?.categories || [])
+      .map((category) => `${category.id || ''} ${category.label || ''}`.toLowerCase())
+      .join(' ');
+  }
+
+  function distanceLabel(distanceM) {
+    const distance = Math.max(0, Number(distanceM) || 0);
+    if (distance < 1000) return `${Math.max(10, Math.round(distance / 10) * 10)} m`;
+    return `${(distance / 1000).toFixed(distance < 3000 ? 1 : 0)} km`;
+  }
+
+  function showNearbyFood() {
+    const current = window.WanderContext?.value('nearby.current');
+    const food = (current?.items || [])
+      .filter((item) => /restaurant|cafe|fast_food|bar|pub|food_court|ice_cream/.test(categoryText(item)))
+      .sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity))[0];
+
+    if (!food) {
+      window.WanderProviders?.nearby?.refresh?.(true);
+      showWander('Comer', 'Todavía no tengo un lugar gastronómico confiable cerca. Estoy actualizando la búsqueda alrededor tuyo.');
+      return;
+    }
+
+    const sourceCount = food.sources?.length || 1;
+    const sourceText = sourceCount > 1 ? ` Coincide en ${sourceCount} fuentes.` : '';
+    showWander(food.name, `Está a unos ${distanceLabel(food.distanceM)} de tu ubicación.${sourceText}`);
+  }
+
   const messages = {
     details: ['Wander', 'Soy tu compañero de viaje. El estado principal resume qué está pasando ahora en la sesión y puede combinar movimiento, actividad, lugar e intención.'],
     route: ['Ruta', 'La ruta viva vuelve después de consolidar ubicación y contexto. Primero necesito saber dónde estás y qué está pasando alrededor.'],
-    food: ['Comer', 'La recomendación gastronómica usará el contexto: hora, ubicación, clima, actividad e intereses. Todavía no está conectada a lugares reales.'],
     ask: ['Preguntar', 'La IA contextual será la próxima capa. Va a leer WanderContext en vez de datos sueltos de la pantalla.'],
   };
 
@@ -51,6 +79,10 @@
 
   document.querySelectorAll('[data-message]').forEach((button) => {
     button.addEventListener('click', () => {
+      if (button.dataset.message === 'food') {
+        showNearbyFood();
+        return;
+      }
       const payload = messages[button.dataset.message] || ['Wander', 'Función preparada para la siguiente etapa.'];
       showWander(payload[0], payload[1]);
     });
@@ -67,6 +99,7 @@
   window.WanderUI = {
     setText,
     showWander,
+    showNearbyFood,
     syncRuntimeMetrics,
     setLocationPending,
   };
