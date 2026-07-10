@@ -70,6 +70,9 @@ jobs:
       - name: Run OpenStreetMap connector tests
         run: node apps/wander-travel/tests/openstreetmap-connector.mjs
 
+      - name: Run POI consolidation tests
+        run: node apps/wander-travel/tests/poi-consolidation.mjs
+
       - name: Publish to Cloudflare Pages
         working-directory: apps/wander-travel
         env:
