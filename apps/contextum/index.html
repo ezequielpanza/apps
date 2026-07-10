@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0a0f14">
   <meta name="description" content="Contextum: capa personal de contexto para ampliar las capacidades de ChatGPT.">
-  <title>Contextum v0.1.1</title>
+  <title>Contextum v0.2.0</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon.svg">
-  <link rel="stylesheet" href="styles.css?v=0.1.1">
+  <link rel="stylesheet" href="styles.css?v=0.2.0">
 </head>
 <body>
   <main class="app-shell">
@@ -18,7 +18,7 @@
         <div class="brand-mark" aria-hidden="true">C</div>
         <div>
           <h1>Contextum</h1>
-          <p>Context layer · v0.1.1</p>
+          <p>Context layer · v0.2.0</p>
         </div>
       </div>
       <span id="onlinePill" class="pill"><span class="dot"></span><span>Online</span></span>
@@ -46,7 +46,7 @@
       </div>
 
       <button id="gpsButton" class="primary-button" type="button">Activar GPS</button>
-      <p id="gpsMessage" class="helper">La ubicación permanece en este dispositivo en esta versión.</p>
+      <p id="gpsMessage" class="helper">La ubicación se guarda localmente y, cuando la nube está disponible, se sincroniza con un token privado del dispositivo.</p>
     </section>
 
     <section class="card companion-card" aria-labelledby="companionTitle">
@@ -56,6 +56,25 @@
         <p>Interfaz mínima + pantalla activa.</p>
       </div>
       <button id="companionButton" class="secondary-button" type="button">Activar</button>
+    </section>
+
+    <section class="card sync-card" aria-labelledby="syncTitle">
+      <div class="sync-main">
+        <div>
+          <span class="eyebrow">Puente</span>
+          <h2 id="syncTitle">Contexto en nube</h2>
+        </div>
+        <span id="syncState" class="status-badge idle">Preparando</span>
+      </div>
+      <div class="sync-actions">
+        <span id="lastSync">Todavía sin sincronizar</span>
+        <button id="pairButton" class="secondary-button" type="button">Código de prueba</button>
+      </div>
+      <div id="pairBox" class="pair-box" hidden>
+        <span>Código temporal</span>
+        <strong id="pairCode">—</strong>
+        <small id="pairExpiry">Vence en 10 min</small>
+      </div>
     </section>
 
     <section class="card" aria-labelledby="runtimeTitle">
@@ -73,8 +92,8 @@
 
     <section class="card" aria-labelledby="contextTitle">
       <div class="section-heading compact">
-        <div><span class="eyebrow">Contexto local</span><h2 id="contextTitle">Nota activa</h2></div>
-        <span class="status-badge local">Local</span>
+        <div><span class="eyebrow">Contexto</span><h2 id="contextTitle">Nota activa</h2></div>
+        <span class="status-badge local">Local + nube</span>
       </div>
       <textarea id="contextNote" rows="2" maxlength="500" placeholder="Ej.: Estoy con Chilu, viajando en auto hacia Santo Domingo."></textarea>
       <div class="note-actions">
@@ -84,10 +103,10 @@
     </section>
 
     <footer>
-      <span>Persistencia local activa</span>
+      <span>Token privado generado en este dispositivo</span>
       <span id="installHint">Abrí el menú del navegador para instalar la app.</span>
     </footer>
   </main>
-  <script src="app.js?v=0.1.1" defer></script>
+  <script src="app.js?v=0.2.0" defer></script>
 </body>
 </html>
