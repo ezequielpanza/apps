@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wander-travel-v0.85.2';
+const CACHE_NAME = 'wander-travel-v0.85.3';
 const APP_SHELL = [
   './index.html',
   './wander-ui.css',
