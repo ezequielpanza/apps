@@ -1,6 +1,6 @@
 (() => {
   const ID = 'openstreetmap';
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
   const QUERY_PROFILES = Object.freeze({
@@ -11,29 +11,14 @@
       '["natural"]',
       '["amenity"~"^(restaurant|cafe|fast_food|bar|pub|pharmacy|atm|bank|hospital|clinic|fuel|ferry_terminal|drinking_water|toilets)$"]',
     ]),
-    food: Object.freeze([
-      '["amenity"~"^(restaurant|cafe|fast_food|bar|pub|ice_cream|food_court)$"]',
-    ]),
-    lodging: Object.freeze([
-      '["tourism"~"^(hotel|hostel|guest_house|motel|apartment|camp_site|caravan_site|chalet)$"]',
-    ]),
-    museums: Object.freeze([
-      '["tourism"~"^(museum|gallery)$"]',
-    ]),
-    pharmacies: Object.freeze([
-      '["amenity"="pharmacy"]',
-    ]),
-    atms: Object.freeze([
-      '["amenity"="atm"]',
-      '["amenity"="bank"]["atm"="yes"]',
-    ]),
+    food: Object.freeze(['["amenity"~"^(restaurant|cafe|fast_food|bar|pub|ice_cream|food_court)$"]']),
+    lodging: Object.freeze(['["tourism"~"^(hotel|hostel|guest_house|motel|apartment|camp_site|caravan_site|chalet)$"]']),
+    museums: Object.freeze(['["tourism"~"^(museum|gallery)$"]']),
+    pharmacies: Object.freeze(['["amenity"="pharmacy"]']),
+    atms: Object.freeze(['["amenity"="atm"]', '["amenity"="bank"]["atm"="yes"]']),
     nautical: Object.freeze([
-      '["leisure"="marina"]',
-      '["amenity"="ferry_terminal"]',
-      '["amenity"="fuel"]',
-      '["harbour"]',
-      '["seamark:type"]',
-      '["mooring"]',
+      '["leisure"="marina"]', '["amenity"="ferry_terminal"]', '["amenity"="fuel"]',
+      '["harbour"]', '["seamark:type"]', '["mooring"]',
     ]),
   });
 
@@ -43,21 +28,11 @@
   ]);
 
   const FALLBACK_LABELS = Object.freeze({
-    'amenity=atm': 'ATM',
-    'amenity=pharmacy': 'Pharmacy',
-    'amenity=restaurant': 'Restaurant',
-    'amenity=cafe': 'Cafe',
-    'amenity=fast_food': 'Fast food',
-    'amenity=bar': 'Bar',
-    'amenity=pub': 'Pub',
-    'tourism=hotel': 'Hotel',
-    'tourism=hostel': 'Hostel',
-    'tourism=guest_house': 'Guest house',
-    'tourism=museum': 'Museum',
-    'tourism=gallery': 'Gallery',
-    'leisure=marina': 'Marina',
-    'amenity=ferry_terminal': 'Ferry terminal',
-    'amenity=fuel': 'Fuel',
+    'amenity=atm': 'ATM', 'amenity=pharmacy': 'Pharmacy', 'amenity=restaurant': 'Restaurant',
+    'amenity=cafe': 'Cafe', 'amenity=fast_food': 'Fast food', 'amenity=bar': 'Bar',
+    'amenity=pub': 'Pub', 'tourism=hotel': 'Hotel', 'tourism=hostel': 'Hostel',
+    'tourism=guest_house': 'Guest house', 'tourism=museum': 'Museum', 'tourism=gallery': 'Gallery',
+    'leisure=marina': 'Marina', 'amenity=ferry_terminal': 'Ferry terminal', 'amenity=fuel': 'Fuel',
   });
 
   function validateCenter(input = {}) {
@@ -84,31 +59,20 @@
     const center = validateCenter(input);
     const radiusM = clampRadiusM(input.radiusM);
     const profileKey = input.profile || 'discovery';
-    const selectors = profileSelectors(profileKey);
-    const statements = selectors.map((selector) => `  nwr(around:${radiusM},${center.lat},${center.lng})${selector};`);
+    const statements = profileSelectors(profileKey)
+      .map((selector) => `  nwr(around:${radiusM},${center.lat},${center.lng})${selector};`);
     return ['[out:json][timeout:25];', '(', ...statements, ');', 'out center tags;'].join('\n');
   }
 
-  function objectRef(element) {
-    return `${element.type}/${element.id}`;
-  }
-
-  function objectUrl(element) {
-    return `https://www.openstreetmap.org/${element.type}/${element.id}`;
-  }
+  function objectRef(element) { return `${element.type}/${element.id}`; }
+  function objectUrl(element) { return `https://www.openstreetmap.org/${element.type}/${element.id}`; }
 
   function elementLocation(element) {
     if (element?.type === 'node' && Number.isFinite(Number(element.lat)) && Number.isFinite(Number(element.lon))) {
-      return {
-        lat: Number(element.lat), lng: Number(element.lon), method: 'osm_node',
-        accuracyRadiusM: null, geometryType: 'point', confidence: 0.99,
-      };
+      return { lat: Number(element.lat), lng: Number(element.lon), method: 'osm_node', accuracyRadiusM: null, geometryType: 'point', confidence: 0.99 };
     }
     if (Number.isFinite(Number(element?.center?.lat)) && Number.isFinite(Number(element?.center?.lon))) {
-      return {
-        lat: Number(element.center.lat), lng: Number(element.center.lon), method: 'osm_geometry_center',
-        accuracyRadiusM: null, geometryType: element.type || 'geometry', confidence: 0.88,
-      };
+      return { lat: Number(element.center.lat), lng: Number(element.center.lon), method: 'osm_geometry_center', accuracyRadiusM: null, geometryType: element.type || 'geometry', confidence: 0.88 };
     }
     return null;
   }
@@ -144,20 +108,18 @@
     return identifiers;
   }
 
-  function contentFromTags(tags = {}) {
-    const descriptions = [];
+  function notesFromTags(tags = {}) {
     const notes = [];
-    if (tags.description) descriptions.push({ text: String(tags.description), kind: 'description', confidence: 0.9 });
+    if (tags.description) notes.push({ text: String(tags.description), kind: 'description', confidence: 0.9 });
     if (tags.inscription) notes.push({ text: String(tags.inscription), kind: 'inscription', confidence: 0.95 });
-    return { descriptions, ratings: [], reviewSummaries: [], notes };
+    return notes;
   }
 
   function fallbackName(tags = {}, element) {
     for (const key of PRIMARY_CATEGORY_KEYS) {
       if (!tags[key]) continue;
       const pair = `${key}=${tags[key]}`;
-      if (FALLBACK_LABELS[pair]) return FALLBACK_LABELS[pair];
-      return String(tags[key]).replace(/_/g, ' ');
+      return FALLBACK_LABELS[pair] || String(tags[key]).replace(/_/g, ' ');
     }
     return `OSM ${element.type} ${element.id}`;
   }
@@ -178,12 +140,9 @@
   function normalizeElement(element, context) {
     const location = elementLocation(element);
     if (!location) return null;
-
     const tags = element.tags && typeof element.tags === 'object' ? element.tags : {};
     const ref = objectRef(element);
-    const source = {
-      id: ID, version: VERSION, ref, url: objectUrl(element), strategy: `overpass:${context.profile}`,
-    };
+    const source = { id: ID, version: VERSION, ref, url: objectUrl(element), strategy: `overpass:${context.profile}` };
     const name = String(tags.name || tags['name:es'] || tags.brand || tags.operator || fallbackName(tags, element)).trim();
 
     return window.WanderNormalizedPOI.create({
@@ -191,16 +150,13 @@
       aliases: localizedNames(tags),
       categories: categoryPairs(tags),
       identifiers: identifiersFromTags(tags, ref),
-      location: {
-        lat: location.lat, lng: location.lng, method: location.method,
-        accuracyRadiusM: location.accuracyRadiusM, geometryType: location.geometryType,
-      },
+      location: { lat: location.lat, lng: location.lng, method: location.method, accuracyRadiusM: location.accuracyRadiusM, geometryType: location.geometryType },
       address: addressFromTags(tags),
       source,
       confidence: location.confidence,
       observedAt: context.observedAt,
       destination: context.destination,
-      content: contentFromTags(tags),
+      notes: notesFromTags(tags),
       tags,
       attributes: { osmType: element.type, osmId: element.id, profile: context.profile },
       evidence: [
@@ -209,9 +165,7 @@
         {
           type: 'entity_coordinates',
           value: { objectType: element.type, objectId: element.id, locationMethod: location.method },
-          location: {
-            lat: location.lat, lng: location.lng, method: location.method, geometryType: location.geometryType,
-          },
+          location: { lat: location.lat, lng: location.lng, method: location.method, geometryType: location.geometryType },
           confidence: location.confidence,
         },
       ],
@@ -227,7 +181,6 @@
     const endpoint = String(input.endpoint || DEFAULT_ENDPOINT);
     const observedAt = input.observedAt || Date.now();
     const query = buildQuery({ ...center, radiusM, profile });
-
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8' },
@@ -239,17 +192,11 @@
       error.status = response.status;
       throw error;
     }
-
     const payload = await response.json();
     const elements = Array.isArray(payload?.elements) ? payload.elements : [];
-    const context = {
-      center, radiusM, profile, observedAt, destination: input.destination || null,
-    };
+    const context = { center, radiusM, profile, observedAt, destination: input.destination || null };
     const pois = elements.map((element) => normalizeElement(element, context)).filter(Boolean);
-    return {
-      pois,
-      diagnostics: { endpoint, profile, center, radiusM, rawElementCount: elements.length, poiCount: pois.length },
-    };
+    return { pois, diagnostics: { endpoint, profile, center, radiusM, rawElementCount: elements.length, poiCount: pois.length } };
   }
 
   const connector = Object.freeze({
@@ -257,14 +204,14 @@
     version: VERSION,
     capabilities: Object.freeze([
       'nearby-search', 'query-profiles', 'node-way-relation', 'tag-normalization',
-      'geometry-center', 'cross-source-identifiers', 'descriptive-content',
+      'geometry-center', 'cross-source-identifiers', 'generic-notes',
     ]),
     endpoint: DEFAULT_ENDPOINT,
     queryProfiles: QUERY_PROFILES,
     buildQuery,
     elementLocation,
     identifiersFromTags,
-    contentFromTags,
+    notesFromTags,
     normalizeElement,
     search,
   });
