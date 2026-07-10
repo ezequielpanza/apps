@@ -8,6 +8,9 @@ node apps/wander-travel/tests/poi-source-foundation.mjs
 node apps/wander-travel/tests/wikidata-connector.mjs
 node apps/wander-travel/tests/openstreetmap-connector.mjs
 node apps/wander-travel/tests/poi-consolidation.mjs
+node apps/wander-travel/tests/nearby-provider.mjs
+node apps/wander-travel/tests/field-guide.mjs
+node apps/wander-travel/tests/field-test-logger.mjs
 ```
 
 The runners have no external dependencies. They load the real production runtime modules in isolated Node `vm` contexts with controlled storage and simulated source responses.
@@ -92,6 +95,7 @@ The tests use simulated SPARQL bindings so CI remains deterministic.
 10. Address tags become the common address structure
 11. The common POI Engine stores OSM output without OSM-specific storage logic
 12. The connector posts Overpass QL to its configured endpoint
+13. The field `discovery` profile is bounded to travel-relevant tag subsets and a 10 km maximum radius
 
 The tests use simulated Overpass elements so CI remains deterministic.
 
@@ -107,5 +111,39 @@ The tests use simulated Overpass elements so CI remains deterministic.
 6. Formal `ConsolidatedPOI` objects persist in Store v4
 
 The matcher is deterministic and does not require AI. AI can be added later for interpretation, summarization, or user interaction without becoming a dependency of POI discovery or basic consolidation.
+
+## NearbyProvider field pipeline
+
+`nearby-provider.mjs` covers:
+
+1. Adaptive search radii and movement thresholds by mobility
+2. Effective-location search through multiple connectors
+3. Normalized result consolidation
+4. Distance and bearing calculation
+5. Deterministic relevance ranking
+6. `WanderContext.nearby` writes
+7. Partial-source degradation when one connector fails
+8. Skipping insignificant movement until threshold or age
+
+## Minimal field guide
+
+`field-guide.mjs` covers:
+
+1. Nearby historic/cultural/natural POIs can trigger the existing Wander card
+2. Utility POIs such as pharmacies do not interrupt spontaneously
+3. Per-POI 24-hour repetition cooldown
+4. Global interruption cooldown
+5. Mobility-dependent interruption distance
+
+## Field test logger
+
+`field-test-logger.mjs` covers:
+
+1. Field session creation and app metadata
+2. Nearby-result summaries limited to the top ten items
+3. Field-guide suggestions becoming diagnostic events
+4. Clearing the log creates a new session
+
+The production logger samples location rather than storing every GPS callback, records context transitions and nearby diagnostics, and exposes JSON export controls inside the Simulator screen.
 
 A failing assertion exits with a non-zero status so all runners can execute in CI and before Cloudflare Pages deployment.
