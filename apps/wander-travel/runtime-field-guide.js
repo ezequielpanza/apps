@@ -102,9 +102,14 @@
   }
 
   function relativeDirectionLabel(item) {
-    const heading = Number(context.value('motion.heading'));
-    const bearing = Number(item?.bearingDeg);
+    const headingRaw = context.value('motion.heading', null);
+    const bearingRaw = item?.bearingDeg;
+    if (headingRaw === null || headingRaw === undefined || bearingRaw === null || bearingRaw === undefined) return null;
+
+    const heading = Number(headingRaw);
+    const bearing = Number(bearingRaw);
     if (!Number.isFinite(heading) || !Number.isFinite(bearing)) return null;
+
     const delta = ((bearing - heading + 540) % 360) - 180;
     const absolute = Math.abs(delta);
     if (absolute <= 30) return 'adelante tuyo';
@@ -122,7 +127,7 @@
     return text.length <= 180 ? text : `${text.slice(0, 177).trimEnd()}...`;
   }
 
-  function formatSuggestion(item, current = context.value('nearby.current')) {
+  function formatSuggestion(item) {
     const direction = relativeDirectionLabel(item);
     const directionText = direction ? `, ${direction},` : '';
     const note = noteExcerpt(item);
@@ -153,7 +158,7 @@
       createdAt: new Date(at).toISOString(),
       expiresAt: at + CANDIDATE_TTL_MS,
       item: clone(item),
-      presentation: formatSuggestion(item, current),
+      presentation: formatSuggestion(item),
       context: {
         nearbyUpdatedAt: current?.updatedAt || null,
         mobility: clone(current?.mobility || null),
@@ -182,8 +187,7 @@
   function consider(current = context.value('nearby.current'), at = Date.now()) {
     const item = selectCandidate(current, at);
     if (!item) {
-      const existing = context.value('fieldGuide.candidate');
-      if (existing && Number(existing.expiresAt) <= at) clearCandidate(existing.contentId);
+      clearCandidate();
       return null;
     }
 
