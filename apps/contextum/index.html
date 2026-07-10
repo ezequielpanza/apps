@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0a0f14">
+  <meta name="description" content="Contextum: capa personal de contexto para ampliar las capacidades de ChatGPT.">
+  <title>Contextum</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">C</div>
+        <div>
+          <h1>Contextum</h1>
+          <p>Context layer · v0.1.0</p>
+        </div>
+      </div>
+      <span id="onlinePill" class="pill"><span class="dot"></span><span>Online</span></span>
+    </header>
+
+    <section class="hero-card" aria-labelledby="gpsTitle">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Percepción</span>
+          <h2 id="gpsTitle">GPS en vivo</h2>
+        </div>
+        <span id="gpsState" class="status-badge idle">Inactivo</span>
+      </div>
+
+      <div class="coordinates">
+        <div>
+          <span>Latitud</span>
+          <strong id="latitude">—</strong>
+        </div>
+        <div>
+          <span>Longitud</span>
+          <strong id="longitude">—</strong>
+        </div>
+      </div>
+
+      <div class="metrics-grid">
+        <article class="metric"><span>Precisión</span><strong id="accuracy">—</strong></article>
+        <article class="metric"><span>Velocidad</span><strong id="speed">—</strong></article>
+        <article class="metric"><span>Rumbo</span><strong id="heading">—</strong></article>
+        <article class="metric"><span>Altitud</span><strong id="altitude">—</strong></article>
+      </div>
+
+      <button id="gpsButton" class="primary-button" type="button">Activar GPS</button>
+      <p id="gpsMessage" class="helper">La ubicación permanece en este dispositivo en esta versión.</p>
+    </section>
+
+    <section class="card" aria-labelledby="runtimeTitle">
+      <div class="section-heading compact">
+        <div><span class="eyebrow">Laboratorio</span><h2 id="runtimeTitle">Estado de ejecución</h2></div>
+      </div>
+      <div class="runtime-list">
+        <div><span>Documento visible</span><strong id="visibilityState">—</strong></div>
+        <div><span>Ventana con foco</span><strong id="focusState">—</strong></div>
+        <div><span>GPS watch</span><strong id="watchState">Inactivo</strong></div>
+        <div><span>Último GPS</span><strong id="lastGps">Nunca</strong></div>
+        <div><span>Wake Lock</span><strong id="wakeState">Inactivo</strong></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="contextTitle">
+      <div class="section-heading compact">
+        <div><span class="eyebrow">Contexto local</span><h2 id="contextTitle">Nota activa</h2></div>
+        <span class="status-badge local">Local</span>
+      </div>
+      <textarea id="contextNote" rows="3" maxlength="500" placeholder="Ej.: Estoy con Chilu, viajando en auto hacia Santo Domingo."></textarea>
+      <div class="note-actions">
+        <span id="noteSaved">Sin cambios</span>
+        <button id="saveNoteButton" class="secondary-button" type="button">Guardar</button>
+      </div>
+    </section>
+
+    <section class="card companion-card" aria-labelledby="companionTitle">
+      <div>
+        <span class="eyebrow">Split screen</span>
+        <h2 id="companionTitle">Companion Mode</h2>
+        <p>Mantiene la pantalla activa y reduce la interfaz para probar Contextum junto a ChatGPT.</p>
+      </div>
+      <button id="companionButton" class="secondary-button" type="button">Activar</button>
+    </section>
+
+    <footer>
+      <span>Persistencia local activa</span>
+      <span id="installHint">Abrí el menú del navegador para instalar la app.</span>
+    </footer>
+  </main>
+  <script src="app.js" defer></script>
+</body>
+</html>
