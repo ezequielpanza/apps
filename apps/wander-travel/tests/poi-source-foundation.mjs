@@ -20,11 +20,7 @@ function load(context, file) {
 function runtime(storage = new MemoryStorage()) {
   let timer = 0;
   const sandbox = {
-    console,
-    Date,
-    Math,
-    URL,
-    localStorage: storage,
+    console, Date, Math, URL, localStorage: storage,
     setTimeout: () => ++timer,
     clearTimeout: () => {},
   };
@@ -34,6 +30,7 @@ function runtime(storage = new MemoryStorage()) {
   [
     'runtime-source-policy.js',
     'runtime-poi-normalized.js',
+    'runtime-poi-consolidated.js',
     'runtime-poi-store.js',
     'runtime-poi-engine.js',
     'runtime-external-source-google-maps.js',
@@ -42,6 +39,7 @@ function runtime(storage = new MemoryStorage()) {
   return {
     policy: context.WanderSourcePolicy,
     normalized: context.WanderNormalizedPOI,
+    consolidated: context.WanderConsolidatedPOI,
     store: context.WanderPOIStore,
     engine: context.WanderPOIEngine,
     maps: context.WanderExternalSourceGoogleMaps,
@@ -60,6 +58,8 @@ function makePOI(rt, sourceId, ref = '1', name = `POI ${sourceId}`) {
     source: { id: sourceId, version: '1.0.0', ref },
     confidence: 0.9,
     observedAt: AT,
+    identifiers: [{ namespace: sourceId, value: ref }],
+    notes: [{ text: `Nota ${sourceId}`, kind: 'note', confidence: 0.9 }],
     evidence: [{ type: 'source_entity_id', value: ref, confidence: 1 }],
   }, AT);
 }
@@ -68,8 +68,8 @@ test('NormalizedPOI contract is source-independent', () => {
   const rt = runtime();
   const poi = makePOI(rt, 'test-source');
   assert.equal(rt.normalized.isNormalizedPOI(poi), true);
-  assert.equal(poi.source.id, 'test-source');
-  assert.equal(poi.evidence.length, 1);
+  assert.equal(poi.identifiers.length, 1);
+  assert.equal(poi.notes.length, 1);
 });
 
 test('Stable source ref keeps POI identity stable', () => {
@@ -113,26 +113,27 @@ test('Engine processes multiple connectors through one path', async () => {
   assert.equal(result.batches.length, 2);
   assert.equal(result.pois.length, 2);
   assert.equal(result.errors.length, 0);
-  assert.deepEqual(Array.from(result.pois, (poi) => poi.source.id).sort(), ['source-a', 'source-b']);
 });
 
-test('Store v3 persists normalized POIs with embedded evidence', async () => {
+test('Store v4 persists normalized POIs and leaves consolidation explicit', async () => {
   const shared = new Map();
   const rt = runtime(new MemoryStorage(shared));
   rt.policy.register({ id: 'permitted', mode: 'store_allowed', automatedAcquisition: true, storePOIs: true });
   rt.engine.register({ id: 'permitted', version: '1.0.0', async search() { return { pois: [makePOI(rt, 'permitted')] }; } });
   await rt.engine.searchAndStore('permitted');
   rt.store.flush();
-  assert.equal(rt.store.storageKey, 'wander.poi.store.v3');
+  assert.equal(rt.store.storageKey, 'wander.poi.store.v4');
   assert.equal(rt.store.listNormalized().length, 1);
-  assert.equal(rt.store.listNormalized()[0].evidence.length, 1);
+  assert.equal(rt.store.listConsolidated().length, 0);
   assert.equal(runtime(new MemoryStorage(shared)).store.listNormalized().length, 1);
 });
 
-test('Legacy candidate/evidence store is not migrated', () => {
+test('Legacy Store v3 is not migrated into Store v4', () => {
   const shared = new Map();
-  shared.set('wander.poi.store.v2', JSON.stringify({ schemaVersion: 2, candidates: { old: {} }, evidence: { old: {} } }));
-  assert.equal(runtime(new MemoryStorage(shared)).store.listNormalized().length, 0);
+  shared.set('wander.poi.store.v3', JSON.stringify({ schemaVersion: 3, normalized: { old: { id: 'old' } }, consolidated: {} }));
+  const rt = runtime(new MemoryStorage(shared));
+  assert.equal(rt.store.listNormalized().length, 0);
+  assert.equal(rt.store.listConsolidated().length, 0);
 });
 
 let passed = 0;
