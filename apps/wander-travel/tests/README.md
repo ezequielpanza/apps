@@ -7,6 +7,7 @@ node apps/wander-travel/tests/wander-scenarios.mjs
 node apps/wander-travel/tests/poi-source-foundation.mjs
 node apps/wander-travel/tests/wikidata-connector.mjs
 node apps/wander-travel/tests/openstreetmap-connector.mjs
+node apps/wander-travel/tests/poi-consolidation.mjs
 ```
 
 The runners have no external dependencies. They load the real production runtime modules in isolated Node `vm` contexts with controlled storage and simulated source responses.
@@ -28,20 +29,22 @@ The runners have no external dependencies. They load the real production runtime
 `poi-source-foundation.mjs` covers:
 
 1. One source-independent `NormalizedPOI` contract
-2. External-only sources remain outside the POI connector registry
-3. Connectors returning raw non-normalized records are rejected
-4. Different connectors are processed through the same `POIEngine` path
-5. `searchMany()` combines normalized POIs without source-specific branches
-6. `POIStore v3` persists normalized POIs with embedded evidence
-7. Legacy candidate/evidence stores are not migrated into Store v3
+2. Stable identity when a source provides `source.ref`
+3. Generic source-attributed `notes[]`
+4. External-only sources remain outside the POI connector registry
+5. Connectors returning raw non-normalized records are rejected
+6. Different connectors are processed through the same `POIEngine` path
+7. `POIStore v4` persists normalized POIs
+8. Consolidation remains explicit
+9. Legacy Store v3 data is not migrated into Store v4
 
 The production store key is:
 
 ```text
-wander.poi.store.v3
+wander.poi.store.v4
 ```
 
-The production contract is:
+The production flow is:
 
 ```text
 connector.search(request)
@@ -50,9 +53,11 @@ connector.search(request)
         ↓
 WanderPOIEngine
         ↓
-WanderPOIStore
+WanderPOIStore.normalized
         ↓
-consolidated
+POIEngine.consolidate()
+        ↓
+WanderPOIStore.consolidated
 ```
 
 ## Wikidata connector
@@ -63,7 +68,7 @@ consolidated
 2. Nearby SPARQL query generation preserves center, radius, language, and bounded limit
 3. QID aggregation deduplicates repeated rows while preserving multiple P31 types
 4. `search()` returns only `NormalizedPOI` objects
-5. QID is retained as source identity and evidence
+5. QID is retained as a normalized `wikidata` identifier
 6. P625 becomes normalized location with `wikidata_p625`
 7. P31 becomes normalized categories plus evidence
 8. The common POI Engine stores Wikidata output without Wikidata-specific storage logic
@@ -81,11 +86,26 @@ The tests use simulated SPARQL bindings so CI remains deterministic.
 4. `way` and `relation` centers normalize as `osm_geometry_center`
 5. Original OSM tags are retained
 6. OSM object type/id and source URLs are retained
-7. OSM tag pairs become normalized categories
-8. Address tags become the common address structure
-9. The common POI Engine stores OSM output without OSM-specific storage logic
-10. The connector posts Overpass QL to its configured endpoint
+7. OSM and cross-source identifiers are normalized
+8. OSM `description` and `inscription` can become generic notes
+9. OSM tag pairs become normalized categories
+10. Address tags become the common address structure
+11. The common POI Engine stores OSM output without OSM-specific storage logic
+12. The connector posts Overpass QL to its configured endpoint
 
 The tests use simulated Overpass elements so CI remains deterministic.
+
+## POI consolidation
+
+`poi-consolidation.mjs` covers:
+
+1. Shared cross-source identifiers produce a strong match
+2. Exact names plus nearby coordinates can match without a shared identifier
+3. Same names far apart do not merge
+4. Partial signals remain ambiguous rather than forcing a merge
+5. Generic `notes[]` from multiple sources are preserved in the consolidated POI
+6. Formal `ConsolidatedPOI` objects persist in Store v4
+
+The matcher is deterministic and does not require AI. AI can be added later for interpretation, summarization, or user interaction without becoming a dependency of POI discovery or basic consolidation.
 
 A failing assertion exits with a non-zero status so all runners can execute in CI and before Cloudflare Pages deployment.
