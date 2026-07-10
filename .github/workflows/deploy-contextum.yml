@@ -10,7 +10,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: deploy-contextum
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -43,3 +47,36 @@ jobs:
         run: |
           npx --yes wrangler@latest pages deploy apps/contextum \
             --project-name=contextum
+
+      - name: Verify public URL
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum"; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Public URL verification failed"
+          exit 1
+
+      - name: Record verified deployment
+        run: |
+          mkdir -p deploy-status
+          VERIFIED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          cat > deploy-status/contextum.json <<EOF
+          {
+            "app": "contextum",
+            "version": "0.1.0",
+            "url": "https://contextum.pages.dev",
+            "verified": true,
+            "verified_at": "${VERIFIED_AT}"
+          }
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy-status/contextum.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore(contextum): record verified deployment"
+          git push
