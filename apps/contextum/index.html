@@ -46,7 +46,7 @@
       </div>
 
       <button id="gpsButton" class="primary-button" type="button">Activar GPS</button>
-      <p id="gpsMessage" class="helper">La ubicación se guarda localmente y, cuando la nube está disponible, se sincroniza con un token privado del dispositivo.</p>
+      <p id="gpsMessage" class="helper">La ubicación se guarda localmente. La nube se activa por separado y de forma voluntaria.</p>
     </section>
 
     <section class="card companion-card" aria-labelledby="companionTitle">
@@ -64,11 +64,14 @@
           <span class="eyebrow">Puente</span>
           <h2 id="syncTitle">Contexto en nube</h2>
         </div>
-        <span id="syncState" class="status-badge idle">Preparando</span>
+        <span id="syncState" class="status-badge idle">Desactivado</span>
       </div>
       <div class="sync-actions">
-        <span id="lastSync">Todavía sin sincronizar</span>
-        <button id="pairButton" class="secondary-button" type="button">Código de prueba</button>
+        <span id="lastSync">Los datos no salen del teléfono</span>
+        <div class="sync-buttons">
+          <button id="syncToggleButton" class="secondary-button" type="button">Activar nube</button>
+          <button id="pairButton" class="secondary-button" type="button" disabled>Código de prueba</button>
+        </div>
       </div>
       <div id="pairBox" class="pair-box" hidden>
         <span>Código temporal</span>
@@ -93,7 +96,7 @@
     <section class="card" aria-labelledby="contextTitle">
       <div class="section-heading compact">
         <div><span class="eyebrow">Contexto</span><h2 id="contextTitle">Nota activa</h2></div>
-        <span class="status-badge local">Local + nube</span>
+        <span class="status-badge local">Local</span>
       </div>
       <textarea id="contextNote" rows="2" maxlength="500" placeholder="Ej.: Estoy con Chilu, viajando en auto hacia Santo Domingo."></textarea>
       <div class="note-actions">
@@ -103,10 +106,11 @@
     </section>
 
     <footer>
-      <span>Token privado generado en este dispositivo</span>
+      <span>La nube requiere activación explícita</span>
       <span id="installHint">Abrí el menú del navegador para instalar la app.</span>
     </footer>
   </main>
-  <script src="app.js?v=0.2.0" defer></script>
+  <script src="app.js?v=0.1.1" defer></script>
+  <script src="cloud-sync.js?v=0.2.0" defer></script>
 </body>
 </html>
