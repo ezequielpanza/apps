@@ -28,9 +28,13 @@ jobs:
           test -f apps/contextum/index.html
           test -f apps/contextum/styles.css
           test -f apps/contextum/app.js
+          test -f apps/contextum/cloud-sync.js
           test -f apps/contextum/manifest.webmanifest
           test -f apps/contextum/service-worker.js
           test -f apps/contextum/icons/icon.svg
+          test -f apps/contextum/functions/api/context.js
+          test -f apps/contextum/functions/api/pair.js
+          test -f 'apps/contextum/functions/api/pair/[code].js'
 
       - name: Create Cloudflare Pages project
         env:
@@ -40,43 +44,122 @@ jobs:
           npx --yes wrangler@latest pages project create contextum \
             --production-branch=main || true
 
-      - name: Deploy to Cloudflare Pages
+      - name: Prepare KV binding
+        id: kv
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          npx --yes wrangler@latest pages deploy apps/contextum \
+          API="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/storage/kv/namespaces"
+          LIST_RESPONSE="$(curl --silent --show-error \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            --header "Content-Type: application/json" \
+            "${API}" || true)"
+
+          KV_ID="$(printf '%s' "${LIST_RESPONSE}" | node -e '
+            let s=""; process.stdin.on("data",d=>s+=d); process.stdin.on("end",()=>{
+              try { const j=JSON.parse(s); const n=(j.result||[]).find(x=>x.title==="contextum-context"); process.stdout.write(n?.id||""); } catch {}
+            });
+          ')"
+
+          if [ -z "${KV_ID}" ]; then
+            CREATE_RESPONSE="$(curl --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data '{"title":"contextum-context"}' \
+              "${API}" || true)"
+            KV_ID="$(printf '%s' "${CREATE_RESPONSE}" | node -e '
+              let s=""; process.stdin.on("data",d=>s+=d); process.stdin.on("end",()=>{
+                try { const j=JSON.parse(s); process.stdout.write(j.result?.id||""); } catch {}
+              });
+            ')"
+          fi
+
+          if [ -z "${KV_ID}" ]; then
+            echo "ready=false" >> "${GITHUB_OUTPUT}"
+            echo "KV namespace unavailable with current Cloudflare token permissions."
+            exit 0
+          fi
+
+          echo "ready=true" >> "${GITHUB_OUTPUT}"
+          cat > apps/contextum/wrangler.toml <<EOF
+          name = "contextum"
+          pages_build_output_dir = "."
+          compatibility_date = "2026-07-10"
+
+          [[kv_namespaces]]
+          binding = "CONTEXTUM_KV"
+          id = "${KV_ID}"
+          EOF
+
+      - name: Deploy to Cloudflare Pages
+        if: steps.kv.outputs.ready == 'true'
+        working-directory: apps/contextum
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@latest pages deploy . \
             --project-name=contextum
 
-      - name: Verify public URL
+      - name: Verify public app and bridge
+        id: verify
+        if: steps.kv.outputs.ready == 'true'
         run: |
+          APP_OK=false
+          API_OK=false
           for attempt in {1..20}; do
-            if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum v0.1.1"; then
+            if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum v0.2.0"; then
+              APP_OK=true
+            fi
+            API_BODY="$(curl --silent --show-error https://contextum.pages.dev/api/pair/ABCDEFGH || true)"
+            if printf '%s' "${API_BODY}" | grep -q "expired_or_unknown"; then
+              API_OK=true
+            fi
+            if [ "${APP_OK}" = true ] && [ "${API_OK}" = true ]; then
+              echo "verified=true" >> "${GITHUB_OUTPUT}"
               exit 0
             fi
             sleep 3
           done
-          echo "Public URL verification failed"
-          exit 1
+          echo "verified=false" >> "${GITHUB_OUTPUT}"
 
-      - name: Record verified deployment
+      - name: Record deployment result
+        if: always()
+        env:
+          KV_READY: ${{ steps.kv.outputs.ready }}
+          BRIDGE_VERIFIED: ${{ steps.verify.outputs.verified }}
         run: |
           mkdir -p deploy-status
           VERIFIED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          if [ "${KV_READY}" = "true" ] && [ "${BRIDGE_VERIFIED}" = "true" ]; then
+            VERIFIED=true
+            STATUS="ready"
+          else
+            VERIFIED=false
+            STATUS="kv-permission-or-deploy-error"
+          fi
           cat > deploy-status/contextum.json <<EOF
           {
             "app": "contextum",
-            "version": "0.1.1",
+            "version": "0.2.0",
             "url": "https://contextum.pages.dev",
-            "verified": true,
+            "verified": ${VERIFIED},
+            "bridge": "${STATUS}",
             "verified_at": "${VERIFIED_AT}"
           }
           EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deploy-status/contextum.json
-          if git diff --cached --quiet; then
-            exit 0
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(contextum): record v0.2.0 deployment result"
+            git push
           fi
-          git commit -m "chore(contextum): record verified deployment"
-          git push
+
+      - name: Fail when bridge is unavailable
+        if: steps.kv.outputs.ready != 'true' || steps.verify.outputs.verified != 'true'
+        run: |
+          echo "Contextum v0.2.0 bridge was not verified."
+          exit 1
