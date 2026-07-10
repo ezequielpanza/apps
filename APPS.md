@@ -4,3 +4,4 @@
 |---|---|---|---|---|
 | Cronolife | apps/cronolife | cronolife-workflow-test | Pendiente de deploy | HTML/CSS/JS |
 | Wander Travel | apps/wander-travel | wander-travel | https://wander-travel.pages.dev | HTML/CSS/JS + Leaflet |
+| Contextum | apps/contextum | contextum | https://contextum.pages.dev | PWA HTML/CSS/JS |
