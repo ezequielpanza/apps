@@ -1,10 +1,10 @@
 {
   "app": "contextum",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "url": "https://contextum.pages.dev",
   "mcp_url": "https://contextum.pages.dev/mcp",
   "verified": true,
   "bridge": "ready",
   "mcp": "ready",
-  "verified_at": "2026-07-10T13:15:51Z"
+  "verified_at": "2026-07-10T14:19:45Z"
 }
