@@ -23,15 +23,15 @@
   pairBox.appendChild(linkButton);
 
   const currentCode = () => pairCode.textContent.trim();
-  const validCode = () => {
+  const hasValidCode = () => {
     const code = currentCode();
-    return code && code !== "—";
+    return Boolean(code && code !== "—");
   };
 
-  const refresh = () => {
-    const visible = Boolean(validCode()) && !pairBox.hidden;
-    copyButton.hidden = !visible;
-    linkButton.hidden = !visible;
+  const refreshVisibility = () => {
+    const shouldHide = !hasValidCode() || pairBox.hidden;
+    if (copyButton.hidden !== shouldHide) copyButton.hidden = shouldHide;
+    if (linkButton.hidden !== shouldHide) linkButton.hidden = shouldHide;
   };
 
   async function writeText(text, button, successText) {
@@ -49,13 +49,14 @@
 
   copyButton.addEventListener("click", async () => {
     const code = currentCode();
-    if (!validCode()) return;
+    if (!hasValidCode()) return;
     const copied = await writeText(code, copyButton, "Copiado");
     if (copied) return;
 
     const range = document.createRange();
     range.selectNodeContents(pairCode);
     const selection = window.getSelection();
+    if (!selection) return;
     selection.removeAllRanges();
     selection.addRange(range);
     copyButton.textContent = "Seleccionado";
@@ -64,17 +65,23 @@
 
   linkButton.addEventListener("click", async () => {
     const code = currentCode();
-    if (!validCode()) return;
+    if (!hasValidCode()) return;
     const url = `${window.location.origin}/api/pair/${encodeURIComponent(code)}`;
     await writeText(url, linkButton, "Enlace copiado");
   });
 
-  new MutationObserver(refresh).observe(pairBox, {
+  const boxObserver = new MutationObserver(refreshVisibility);
+  boxObserver.observe(pairBox, {
     attributes: true,
+    attributeFilter: ["hidden"]
+  });
+
+  const codeObserver = new MutationObserver(refreshVisibility);
+  codeObserver.observe(pairCode, {
     childList: true,
     subtree: true,
     characterData: true
   });
 
-  refresh();
+  refreshVisibility();
 })();
