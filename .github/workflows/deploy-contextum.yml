@@ -51,7 +51,7 @@ jobs:
       - name: Verify public URL
         run: |
           for attempt in {1..20}; do
-            if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum"; then
+            if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum v0.1.1"; then
               exit 0
             fi
             sleep 3
@@ -66,7 +66,7 @@ jobs:
           cat > deploy-status/contextum.json <<EOF
           {
             "app": "contextum",
-            "version": "0.1.0",
+            "version": "0.1.1",
             "url": "https://contextum.pages.dev",
             "verified": true,
             "verified_at": "${VERIFIED_AT}"
