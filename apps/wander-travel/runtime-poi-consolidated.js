@@ -1,5 +1,5 @@
 (() => {
-  const SCHEMA_VERSION = 1;
+  const SCHEMA_VERSION = 2;
 
   function clone(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -25,6 +25,40 @@
     return Array.from(new Set((Array.isArray(values) ? values : [])
       .map((value) => String(value || '').trim())
       .filter(Boolean)));
+  }
+
+  function normalizeIdentifiers(identifiers = []) {
+    const seen = new Set();
+    const result = [];
+    for (const item of Array.isArray(identifiers) ? identifiers : []) {
+      const namespace = String(item?.namespace || '').trim().toLowerCase();
+      const value = String(item?.value || '').trim();
+      if (!namespace || !value) continue;
+      const key = `${namespace}:${value}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({ namespace, value });
+    }
+    return result;
+  }
+
+  function normalizeNotes(notes = []) {
+    return (Array.isArray(notes) ? notes : []).map((note) => {
+      const text = String(note?.text || '').trim();
+      if (!text) return null;
+      const confidence = Number(note.confidence == null ? 1 : note.confidence);
+      if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+        throw new Error('Consolidated POI note confidence must be between 0 and 1');
+      }
+      return {
+        text,
+        kind: note.kind || 'note',
+        language: note.language || null,
+        confidence,
+        source: note.source ? clone(note.source) : null,
+        metadata: clone(note.metadata || {}),
+      };
+    }).filter(Boolean);
   }
 
   function makeId(memberIds = []) {
@@ -60,11 +94,13 @@
       normalizedName: input.normalizedName || null,
       aliases: uniqueStrings(input.aliases),
       categories: clone(Array.isArray(input.categories) ? input.categories : []),
+      identifiers: normalizeIdentifiers(input.identifiers),
       location: clone(input.location || null),
       address: clone(input.address || null),
       confidence,
       sources,
       memberIds,
+      notes: normalizeNotes(input.notes),
       evidence: clone(Array.isArray(input.evidence) ? input.evidence : []),
       tagsBySource: clone(input.tagsBySource || {}),
       attributesBySource: clone(input.attributesBySource || {}),
@@ -84,6 +120,8 @@
       Array.isArray(value.memberIds) &&
       value.memberIds.length > 0 &&
       Array.isArray(value.sources) &&
+      Array.isArray(value.identifiers) &&
+      Array.isArray(value.notes) &&
       Array.isArray(value.evidence) &&
       Number.isFinite(value.confidence) &&
       value.confidence >= 0 &&
