@@ -23,8 +23,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Read version
+        id: version
+        run: |
+          APP_VERSION="$(tr -d '[:space:]' < apps/contextum/VERSION)"
+          test -n "${APP_VERSION}"
+          echo "value=${APP_VERSION}" >> "${GITHUB_OUTPUT}"
+
       - name: Verify source
         run: |
+          test -f apps/contextum/VERSION
           test -f apps/contextum/index.html
           test -f apps/contextum/styles.css
           test -f apps/contextum/app.js
@@ -36,6 +44,7 @@ jobs:
           test -f apps/contextum/functions/api/context.js
           test -f apps/contextum/functions/api/pair.js
           test -f 'apps/contextum/functions/api/pair/[code].js'
+          test -f apps/contextum/functions/mcp.js
 
       - name: Create Cloudflare Pages project
         env:
@@ -104,50 +113,95 @@ jobs:
           npx --yes wrangler@latest pages deploy . \
             --project-name=contextum
 
-      - name: Verify public app and bridge
+      - name: Verify public app, bridge and MCP
         id: verify
         if: steps.kv.outputs.ready == 'true'
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
         run: |
           APP_OK=false
           API_OK=false
-          for attempt in {1..20}; do
-            if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum v0.2.1"; then
+          MCP_INIT_OK=false
+          MCP_TOOLS_OK=false
+          MCP_CALL_OK=false
+
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum v${APP_VERSION}"; then
               APP_OK=true
             fi
+
             API_BODY="$(curl --silent --show-error https://contextum.pages.dev/api/pair/ABCDEFGH || true)"
             if printf '%s' "${API_BODY}" | grep -q "expired_or_unknown"; then
               API_OK=true
             fi
-            if [ "${APP_OK}" = true ] && [ "${API_OK}" = true ]; then
+
+            MCP_INIT="$(curl --silent --show-error \
+              --request POST \
+              --header 'Content-Type: application/json' \
+              --header 'Accept: application/json, text/event-stream' \
+              --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"contextum-ci","version":"1.0.0"}}}' \
+              https://contextum.pages.dev/mcp || true)"
+            if printf '%s' "${MCP_INIT}" | grep -q '"name":"contextum"'; then
+              MCP_INIT_OK=true
+            fi
+
+            MCP_TOOLS="$(curl --silent --show-error \
+              --request POST \
+              --header 'Content-Type: application/json' \
+              --header 'Accept: application/json, text/event-stream' \
+              --data '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+              https://contextum.pages.dev/mcp || true)"
+            if printf '%s' "${MCP_TOOLS}" | grep -q '"name":"get_context"'; then
+              MCP_TOOLS_OK=true
+            fi
+
+            MCP_CALL="$(curl --silent --show-error \
+              --request POST \
+              --header 'Content-Type: application/json' \
+              --header 'Accept: application/json, text/event-stream' \
+              --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_context","arguments":{"code":"ABCDEFGH"}}}' \
+              https://contextum.pages.dev/mcp || true)"
+            if printf '%s' "${MCP_CALL}" | grep -q 'expired_or_unknown'; then
+              MCP_CALL_OK=true
+            fi
+
+            if [ "${APP_OK}" = true ] && [ "${API_OK}" = true ] && [ "${MCP_INIT_OK}" = true ] && [ "${MCP_TOOLS_OK}" = true ] && [ "${MCP_CALL_OK}" = true ]; then
               echo "verified=true" >> "${GITHUB_OUTPUT}"
               exit 0
             fi
             sleep 3
           done
+
           echo "verified=false" >> "${GITHUB_OUTPUT}"
+          echo "APP_OK=${APP_OK} API_OK=${API_OK} MCP_INIT_OK=${MCP_INIT_OK} MCP_TOOLS_OK=${MCP_TOOLS_OK} MCP_CALL_OK=${MCP_CALL_OK}"
 
       - name: Record deployment result
         if: always()
         env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
           KV_READY: ${{ steps.kv.outputs.ready }}
-          BRIDGE_VERIFIED: ${{ steps.verify.outputs.verified }}
+          DEPLOY_VERIFIED: ${{ steps.verify.outputs.verified }}
         run: |
           mkdir -p deploy-status
           VERIFIED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          if [ "${KV_READY}" = "true" ] && [ "${BRIDGE_VERIFIED}" = "true" ]; then
+          if [ "${KV_READY}" = "true" ] && [ "${DEPLOY_VERIFIED}" = "true" ]; then
             VERIFIED=true
-            STATUS="ready"
+            BRIDGE_STATUS="ready"
+            MCP_STATUS="ready"
           else
             VERIFIED=false
-            STATUS="kv-permission-or-deploy-error"
+            BRIDGE_STATUS="deploy-or-verification-error"
+            MCP_STATUS="deploy-or-verification-error"
           fi
           cat > deploy-status/contextum.json <<EOF
           {
             "app": "contextum",
-            "version": "0.2.1",
+            "version": "${APP_VERSION}",
             "url": "https://contextum.pages.dev",
+            "mcp_url": "https://contextum.pages.dev/mcp",
             "verified": ${VERIFIED},
-            "bridge": "${STATUS}",
+            "bridge": "${BRIDGE_STATUS}",
+            "mcp": "${MCP_STATUS}",
             "verified_at": "${VERIFIED_AT}"
           }
           EOF
@@ -155,12 +209,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deploy-status/contextum.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore(contextum): record v0.2.1 deployment result"
+            git commit -m "chore(contextum): record v${APP_VERSION} deployment result"
             git push
           fi
 
-      - name: Fail when bridge is unavailable
+      - name: Fail when deployment is unavailable
         if: steps.kv.outputs.ready != 'true' || steps.verify.outputs.verified != 'true'
         run: |
-          echo "Contextum v0.2.1 bridge was not verified."
+          echo "Contextum deployment or MCP verification failed."
           exit 1
