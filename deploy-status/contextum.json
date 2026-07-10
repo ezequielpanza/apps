@@ -1,7 +1,8 @@
 {
   "app": "contextum",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "url": "https://contextum.pages.dev",
   "verified": true,
-  "verified_at": "2026-07-10T11:43:37Z"
+  "bridge": "ready",
+  "verified_at": "2026-07-10T11:48:43Z"
 }
