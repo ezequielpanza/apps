@@ -10,6 +10,7 @@ node apps/wander-travel/tests/openstreetmap-connector.mjs
 node apps/wander-travel/tests/poi-consolidation.mjs
 node apps/wander-travel/tests/nearby-provider.mjs
 node apps/wander-travel/tests/field-guide.mjs
+node apps/wander-travel/tests/field-guide-engine-flow.mjs
 node apps/wander-travel/tests/field-test-logger.mjs
 ```
 
@@ -125,15 +126,48 @@ The matcher is deterministic and does not require AI. AI can be added later for 
 7. Partial-source degradation when one connector fails
 8. Skipping insignificant movement until threshold or age
 
-## Minimal field guide
+## Engine-driven field guide
 
 `field-guide.mjs` covers:
 
-1. Nearby historic/cultural/natural POIs can trigger the existing Wander card
-2. Utility POIs such as pharmacies do not interrupt spontaneously
-3. Per-POI 24-hour repetition cooldown
-4. Global interruption cooldown
+1. Nearby historic/cultural/natural POIs become `fieldGuide.candidate` context signals rather than direct UI calls
+2. Utility POIs such as pharmacies do not create spontaneous candidates
+3. Per-POI and global cooldowns begin only after an actual presentation
+4. Existing Content Memory suppresses already-told proximity content
 5. Mobility-dependent interruption distance
+6. Relative direction can use current heading plus POI bearing
+7. Consolidated notes and multi-source corroboration can enrich the presentation text
+
+`field-guide-engine-flow.mjs` covers:
+
+1. `fieldGuide.candidate` becomes a formal `field_guide.poi_nearby` relevance signal
+2. `WanderEngineDecision` produces `field_guide_suggestion`
+3. New-city events outrank nearby POI interruptions
+4. Expired candidates are ignored
+5. `WanderEnginePresenter` presents a formal engine decision exactly once
+6. Content Memory and cooldowns are updated only after presentation
+
+The production spontaneous-guide flow is:
+
+```text
+NearbyProvider
+      ↓
+FieldGuide candidate
+      ↓
+WanderContext.fieldGuide.candidate
+      ↓
+WanderEngineRelevance
+      ↓
+WanderEngineDecision
+      ↓
+WanderEnginePresenter
+      ↓
+WanderUI
+      ↓
+Content Memory + cooldown
+```
+
+`runtime-field-guide.js` no longer calls `WanderUI` directly.
 
 ## Field test logger
 
