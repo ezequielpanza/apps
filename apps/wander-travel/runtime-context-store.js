@@ -60,6 +60,7 @@
     'nearby.items': 900000,
     'nearby.updatedAt': 900000,
     'nearby.diagnostics': 1800000,
+    'fieldGuide.lastSuggestion': 86400000,
   };
 
   const DEFAULT_KIND = {
@@ -89,6 +90,7 @@
     'nearby.items': 'derived',
     'nearby.updatedAt': 'derived',
     'nearby.diagnostics': 'derived',
+    'fieldGuide.lastSuggestion': 'derived',
   };
 
   const now = () => Date.now();
