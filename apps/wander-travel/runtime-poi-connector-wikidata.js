@@ -1,6 +1,6 @@
 (() => {
   const ID = 'wikidata';
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const DEFAULT_ENDPOINT = 'https://query.wikidata.org/sparql';
 
   function finiteNumber(value, label) {
@@ -40,7 +40,6 @@
     const radiusKm = clampRadiusKm(input.radiusKm);
     const limit = clampLimit(input.limit);
     const language = escapeLanguage(input.language);
-
     return [
       'SELECT ?item ?itemLabel ?location ?instance ?instanceLabel WHERE {',
       '  SERVICE wikibase:around {',
@@ -80,12 +79,10 @@
 
   function aggregateBindings(bindings = []) {
     const entities = new Map();
-
     for (const row of bindings) {
       const qid = extractQid(row?.item?.value);
       const location = parseWktPoint(row?.location?.value);
       if (!qid || !location) continue;
-
       if (!entities.has(qid)) {
         entities.set(qid, {
           qid,
@@ -94,12 +91,8 @@
           instances: new Map(),
         });
       }
-
       const entity = entities.get(qid);
-      if ((!entity.label || entity.label === qid) && row?.itemLabel?.value) {
-        entity.label = row.itemLabel.value;
-      }
-
+      if ((!entity.label || entity.label === qid) && row?.itemLabel?.value) entity.label = row.itemLabel.value;
       const instanceQid = extractQid(row?.instance?.value);
       if (instanceQid) {
         entity.instances.set(instanceQid, {
@@ -108,7 +101,6 @@
         });
       }
     }
-
     return Array.from(entities.values(), (entity) => ({
       ...entity,
       instances: Array.from(entity.instances.values()),
@@ -132,6 +124,7 @@
         label: instance.label,
         sourceRef: instance.qid,
       })),
+      identifiers: [{ namespace: 'wikidata', value: entity.qid }],
       location: {
         ...entity.location,
         method: 'wikidata_p625',
@@ -141,43 +134,24 @@
       confidence: 0.97,
       observedAt: context.observedAt,
       destination: context.destination,
-      tags: {
-        wikidata: entity.qid,
-      },
-      attributes: {
-        qid: entity.qid,
-        instances: entity.instances,
-      },
+      notes: [],
+      tags: { wikidata: entity.qid },
+      attributes: { qid: entity.qid, instances: entity.instances },
       evidence: [
-        {
-          type: 'source_entity_id',
-          value: entity.qid,
-          confidence: 1,
-        },
+        { type: 'source_entity_id', value: entity.qid, confidence: 1 },
         {
           type: 'entity_coordinates',
           value: { property: 'P625', qid: entity.qid },
-          location: {
-            ...entity.location,
-            method: 'wikidata_p625',
-            geometryType: 'point',
-          },
+          location: { ...entity.location, method: 'wikidata_p625', geometryType: 'point' },
           confidence: 0.97,
         },
         ...entity.instances.map((instance) => ({
           type: 'source_instance_of',
-          value: {
-            property: 'P31',
-            qid: instance.qid,
-            label: instance.label,
-          },
+          value: { property: 'P31', qid: instance.qid, label: instance.label },
           confidence: 0.95,
         })),
       ],
-      metadata: {
-        queryCenter: context.center,
-        radiusKm: context.radiusKm,
-      },
+      metadata: { queryCenter: context.center, radiusKm: context.radiusKm },
     }, context.observedAt);
   }
 
@@ -191,11 +165,8 @@
     const queryUrl = buildQueryUrl({ ...center, radiusKm, limit, language, endpoint });
 
     const response = await fetch(queryUrl, {
-      headers: {
-        accept: 'application/sparql-results+json, application/json;q=0.9',
-      },
+      headers: { accept: 'application/sparql-results+json, application/json;q=0.9' },
     });
-
     if (!response.ok) {
       const error = new Error(`Wikidata query failed with HTTP ${response.status}`);
       error.code = 'WIKIDATA_HTTP_ERROR';
@@ -206,13 +177,7 @@
     const payload = await response.json();
     const bindings = Array.isArray(payload?.results?.bindings) ? payload.results.bindings : [];
     const entities = aggregateBindings(bindings);
-    const context = {
-      center,
-      radiusKm,
-      observedAt,
-      destination: input.destination || null,
-    };
-
+    const context = { center, radiusKm, observedAt, destination: input.destination || null };
     return {
       pois: entities.map((entity) => normalizeEntity(entity, context)),
       diagnostics: {
@@ -231,10 +196,7 @@
     id: ID,
     version: VERSION,
     capabilities: Object.freeze([
-      'nearby-search',
-      'qid',
-      'p625-location',
-      'p31-categories',
+      'nearby-search', 'qid', 'p625-location', 'p31-categories', 'cross-source-identifiers',
     ]),
     endpoint: DEFAULT_ENDPOINT,
     buildNearbyQuery,
