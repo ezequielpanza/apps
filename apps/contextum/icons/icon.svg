@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Contextum">
+  <rect width="512" height="512" rx="104" fill="#080c11"/>
+  <rect x="56" y="56" width="400" height="400" rx="92" fill="#101720" stroke="#2b3c48" stroke-width="8"/>
+  <circle cx="256" cy="256" r="138" fill="none" stroke="#8be9c1" stroke-width="16"/>
+  <circle cx="390" cy="154" r="24" fill="#6cb7ff"/>
+  <path d="M326 179c-20-23-47-35-80-35-65 0-110 47-110 112s45 112 110 112c34 0 62-12 82-37l-36-31c-11 14-25 21-44 21-36 0-60-27-60-65s24-65 60-65c18 0 33 7 44 20l34-32z" fill="#eef4f8"/>
+</svg>
