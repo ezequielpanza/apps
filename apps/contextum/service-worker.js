@@ -1,9 +1,10 @@
-const CACHE_NAME = "contextum-v0.1.1";
+const CACHE_NAME = "contextum-v0.2.0";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/styles.css?v=0.1.1",
+  "/styles.css?v=0.2.0",
   "/app.js?v=0.1.1",
+  "/cloud-sync.js?v=0.2.0",
   "/manifest.webmanifest",
   "/icons/icon.svg"
 ];
@@ -22,6 +23,9 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
