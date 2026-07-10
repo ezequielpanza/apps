@@ -45,5 +45,11 @@ jobs:
       - name: Run NearbyProvider field tests
         run: node apps/wander-travel/tests/nearby-provider.mjs
 
+      - name: Run field guide tests
+        run: node apps/wander-travel/tests/field-guide.mjs
+
+      - name: Run field test logger tests
+        run: node apps/wander-travel/tests/field-test-logger.mjs
+
       - name: Check Browser Run worker syntax
         run: node --check services/wander-web-acquisition/src/index.js
