@@ -55,6 +55,11 @@
     'place.city': 3600000,
     'place.zone': 1800000,
     'places.items': 300000,
+    'nearby.status': 600000,
+    'nearby.current': 900000,
+    'nearby.items': 900000,
+    'nearby.updatedAt': 900000,
+    'nearby.diagnostics': 1800000,
   };
 
   const DEFAULT_KIND = {
@@ -79,6 +84,11 @@
     'history.currentPlace': 'derived',
     'situation.placeEvent': 'inferred',
     'places.items': 'derived',
+    'nearby.status': 'derived',
+    'nearby.current': 'derived',
+    'nearby.items': 'derived',
+    'nearby.updatedAt': 'derived',
+    'nearby.diagnostics': 'derived',
   };
 
   const now = () => Date.now();
