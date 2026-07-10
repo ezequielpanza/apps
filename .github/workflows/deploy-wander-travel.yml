@@ -76,6 +76,12 @@ jobs:
       - name: Run NearbyProvider field tests
         run: node apps/wander-travel/tests/nearby-provider.mjs
 
+      - name: Run field guide tests
+        run: node apps/wander-travel/tests/field-guide.mjs
+
+      - name: Run field test logger tests
+        run: node apps/wander-travel/tests/field-test-logger.mjs
+
       - name: Publish to Cloudflare Pages
         working-directory: apps/wander-travel
         env:
