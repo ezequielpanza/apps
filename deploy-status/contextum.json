@@ -1,8 +1,10 @@
 {
   "app": "contextum",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "url": "https://contextum.pages.dev",
-  "verified": false,
-  "bridge": "kv-permission-or-deploy-error",
-  "verified_at": "2026-07-10T13:06:13Z"
+  "mcp_url": "https://contextum.pages.dev/mcp",
+  "verified": true,
+  "bridge": "ready",
+  "mcp": "ready",
+  "verified_at": "2026-07-10T13:15:51Z"
 }
