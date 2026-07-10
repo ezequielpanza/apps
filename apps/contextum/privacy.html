@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0a0f14">
+  <title>Contextum Privacy Policy</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0a0f14;--card:#111922;--text:#eef5fb;--muted:#9aabba;--line:#25313d;--accent:#6bd5ff}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:820px;margin:0 auto;padding:32px 20px 64px}h1,h2{line-height:1.2}h1{font-size:2rem;margin-bottom:.25rem}h2{margin-top:2rem;font-size:1.25rem}p,li{color:var(--muted)}a{color:var(--accent)}.meta{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card)}code{color:var(--text)}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Contextum Privacy Policy</h1>
+  <p class="meta">Effective date: July 10, 2026</p>
+
+  <h2>What Contextum does</h2>
+  <p>Contextum is an opt-in context bridge. When a user explicitly enables cloud sync, Contextum can upload a current context snapshot so the user can temporarily access it from compatible services, including a custom GPT Action.</p>
+
+  <h2>Data processed</h2>
+  <p>A context snapshot may include precise latitude and longitude, GPS accuracy, speed, heading, altitude, timestamps, an optional active note entered by the user, and limited runtime state such as whether the Contextum page is visible, focused, or in Companion Mode.</p>
+
+  <h2>When data leaves the device</h2>
+  <p>Cloud sync is disabled by default and requires explicit activation by the user. When disabled, Contextum does not upload the context snapshot through this cloud bridge.</p>
+
+  <h2>Temporary access codes</h2>
+  <p>Users may generate an 8-character temporary code. A valid code grants read-only access to the associated context snapshot. Codes expire after approximately 10 minutes. Anyone who obtains a still-valid code may be able to read that snapshot, so users should treat codes as temporary secrets.</p>
+
+  <h2>Retention</h2>
+  <p>Uploaded context snapshots are stored in Contextum's Cloudflare KV-backed bridge with a time-to-live of up to 30 days from the latest stored snapshot. Temporary code mappings expire after approximately 10 minutes. Contextum may revise retention as the product evolves; material changes will be reflected in this policy.</p>
+
+  <h2>Purpose and sharing</h2>
+  <p>Context data is processed to provide the user-requested Contextum service, including retrieval through a temporary code or a configured GPT Action. Contextum does not sell personal data. When a user asks ChatGPT or another external service to retrieve Contextum data, that service may receive the temporary code and the returned context needed to fulfill the request. The external service's own privacy terms also apply.</p>
+
+  <h2>Security</h2>
+  <p>Contextum uses HTTPS endpoints, no-store response headers for context responses, hashed device-key addressing in the cloud bridge, and short-lived temporary access codes. No system can guarantee absolute security.</p>
+
+  <h2>User choices</h2>
+  <p>Users can keep cloud sync disabled, avoid generating temporary codes, remove optional active notes, or stop using Contextum. Future versions may add account-based deletion and OAuth controls.</p>
+
+  <h2>Changes</h2>
+  <p>This policy may be updated as Contextum adds authentication, memory, additional sensors, or other capabilities. The effective date will be revised when material changes are made.</p>
+
+  <h2>Service</h2>
+  <p>Contextum is currently an experimental project. Privacy questions should be raised through the support or project contact channel provided with the Contextum distribution.</p>
+</main>
+</body>
+</html>
