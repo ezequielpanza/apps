@@ -67,7 +67,7 @@
 
     return {
       schemaVersion: 1,
-      appVersion: "0.2.0",
+      appVersion: "0.3.1",
       capturedAt: new Date().toISOString(),
       location,
       context: { activeNote: localStorage.getItem(STORAGE.note) || null },
