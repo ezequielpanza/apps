@@ -2,7 +2,7 @@
   "app": "contextum",
   "version": "0.2.1",
   "url": "https://contextum.pages.dev",
-  "verified": true,
-  "bridge": "ready",
-  "verified_at": "2026-07-10T13:04:39Z"
+  "verified": false,
+  "bridge": "kv-permission-or-deploy-error",
+  "verified_at": "2026-07-10T13:06:13Z"
 }
