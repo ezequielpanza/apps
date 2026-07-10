@@ -63,6 +63,31 @@
     return Array.from(byId.values());
   }
 
+  function mergeIdentifiers(left = [], right = []) {
+    const byKey = new Map();
+    [...left, ...right].forEach((item) => {
+      if (!item?.namespace || !item?.value) return;
+      byKey.set(`${item.namespace}:${item.value}`, clone(item));
+    });
+    return Array.from(byKey.values());
+  }
+
+  function noteKey(note) {
+    return JSON.stringify([
+      note?.source?.id || '',
+      note?.source?.ref || note?.source?.url || '',
+      note?.kind || '',
+      note?.language || '',
+      note?.text || '',
+    ]);
+  }
+
+  function mergeNotes(left = [], right = []) {
+    const byKey = new Map();
+    [...left, ...right].forEach((note) => byKey.set(noteKey(note), clone(note)));
+    return Array.from(byKey.values());
+  }
+
   function evidenceKey(item) {
     return JSON.stringify([
       item?.type || '',
@@ -90,6 +115,8 @@
       observedAt: poi.observedAt || existing.observedAt,
       aliases: Array.from(new Set([...(existing.aliases || []), ...(poi.aliases || [])])),
       categories: mergeCategories(existing.categories, poi.categories),
+      identifiers: mergeIdentifiers(existing.identifiers, poi.identifiers),
+      notes: mergeNotes(existing.notes, poi.notes),
       tags: { ...(existing.tags || {}), ...(poi.tags || {}) },
       attributes: { ...(existing.attributes || {}), ...(poi.attributes || {}) },
       metadata: { ...(existing.metadata || {}), ...(poi.metadata || {}) },
