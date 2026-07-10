@@ -29,6 +29,7 @@ jobs:
           test -f apps/contextum/styles.css
           test -f apps/contextum/app.js
           test -f apps/contextum/cloud-sync.js
+          test -f apps/contextum/copy-code.js
           test -f apps/contextum/manifest.webmanifest
           test -f apps/contextum/service-worker.js
           test -f apps/contextum/icons/icon.svg
@@ -110,7 +111,7 @@ jobs:
           APP_OK=false
           API_OK=false
           for attempt in {1..20}; do
-            if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum v0.2.0"; then
+            if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum v0.2.1"; then
               APP_OK=true
             fi
             API_BODY="$(curl --silent --show-error https://contextum.pages.dev/api/pair/ABCDEFGH || true)"
@@ -143,7 +144,7 @@ jobs:
           cat > deploy-status/contextum.json <<EOF
           {
             "app": "contextum",
-            "version": "0.2.0",
+            "version": "0.2.1",
             "url": "https://contextum.pages.dev",
             "verified": ${VERIFIED},
             "bridge": "${STATUS}",
@@ -154,12 +155,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deploy-status/contextum.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore(contextum): record v0.2.0 deployment result"
+            git commit -m "chore(contextum): record v0.2.1 deployment result"
             git push
           fi
 
       - name: Fail when bridge is unavailable
         if: steps.kv.outputs.ready != 'true' || steps.verify.outputs.verified != 'true'
         run: |
-          echo "Contextum v0.2.0 bridge was not verified."
+          echo "Contextum v0.2.1 bridge was not verified."
           exit 1
