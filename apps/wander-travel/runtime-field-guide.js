@@ -5,6 +5,7 @@
   const STORAGE_KEY = 'wander.field.guide.v1';
   const GLOBAL_COOLDOWN_MS = 8 * 60 * 1000;
   const POI_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const CANDIDATE_TTL_MS = 2 * 60 * 1000;
   const MAX_MEMORY = 500;
 
   let config = {
@@ -12,6 +13,7 @@
     minScore: Number(window.WanderFieldGuideConfig?.minScore) || 0.58,
   };
   let memory = loadMemory();
+  let candidateTimer = null;
 
   function clone(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -56,6 +58,15 @@
     return 700;
   }
 
+  function contentIdFor(item) {
+    return item?.id ? `field-guide:poi:${item.id}:proximity-v1` : null;
+  }
+
+  function hasToldContent(item) {
+    const contentId = contentIdFor(item);
+    return Boolean(contentId && window.WanderEngine?.hasToldContent?.(contentId));
+  }
+
   function selectCandidate(current, at = Date.now()) {
     if (!config.enabled || !current?.items?.length) return null;
     if (at - Number(memory.lastShownAt || 0) < GLOBAL_COOLDOWN_MS) return null;
@@ -65,6 +76,7 @@
       if (!item?.id || !isGuideworthy(item)) return false;
       if (!Number.isFinite(Number(item.distanceM)) || Number(item.distanceM) > maxDistanceM) return false;
       if ((Number(item.relevanceScore) || 0) < config.minScore) return false;
+      if (hasToldContent(item)) return false;
       const lastShown = Number(memory.shown?.[item.id] || 0);
       return at - lastShown >= POI_COOLDOWN_MS;
     }) || null;
@@ -89,13 +101,104 @@
     return `a unos ${(distance / 1000).toFixed(distance < 3000 ? 1 : 0)} km`;
   }
 
-  function formatSuggestion(item) {
+  function relativeDirectionLabel(item) {
+    const heading = Number(context.value('motion.heading'));
+    const bearing = Number(item?.bearingDeg);
+    if (!Number.isFinite(heading) || !Number.isFinite(bearing)) return null;
+    const delta = ((bearing - heading + 540) % 360) - 180;
+    const absolute = Math.abs(delta);
+    if (absolute <= 30) return 'adelante tuyo';
+    if (absolute >= 150) return 'detrás tuyo';
+    return delta > 0 ? 'a tu derecha' : 'a tu izquierda';
+  }
+
+  function noteExcerpt(item) {
+    const note = (item?.notes || [])
+      .filter((entry) => entry?.text && Number(entry.confidence ?? 1) >= 0.75)
+      .sort((left, right) => Number(right.confidence ?? 1) - Number(left.confidence ?? 1))[0];
+    if (!note) return null;
+    const text = String(note.text).replace(/\s+/g, ' ').trim();
+    if (!text) return null;
+    return text.length <= 180 ? text : `${text.slice(0, 177).trimEnd()}...`;
+  }
+
+  function formatSuggestion(item, current = context.value('nearby.current')) {
+    const direction = relativeDirectionLabel(item);
+    const directionText = direction ? `, ${direction},` : '';
+    const note = noteExcerpt(item);
     const sourceCount = item.sources?.length || 0;
     const corroboration = sourceCount > 1 ? ' Varias fuentes coinciden en este lugar.' : '';
+    const detail = note ? ` ${note}` : '';
     return {
       title: item.name,
-      message: `Estás ${distanceLabel(item.distanceM)} de ${placeKind(item)}.${corroboration}`,
+      message: `Tenés ${distanceLabel(item.distanceM)}${directionText} ${placeKind(item)}.${detail}${corroboration}`,
     };
+  }
+
+  function interruptionScore(item) {
+    const relevance = Math.max(0, Math.min(1, Number(item?.relevanceScore) || 0));
+    const sourceBoost = Math.min(2, item?.sources?.length || 0) * 0.025;
+    const noteBoost = noteExcerpt(item) ? 0.02 : 0;
+    return Math.round(Math.min(0.89, 0.54 + relevance * 0.35 + sourceBoost + noteBoost) * 1000) / 1000;
+  }
+
+  function buildCandidate(item, current = context.value('nearby.current'), at = Date.now()) {
+    if (!item?.id) return null;
+    const contentId = contentIdFor(item);
+    return {
+      type: 'poi_nearby',
+      poiId: item.id,
+      contentId,
+      score: interruptionScore(item),
+      createdAt: new Date(at).toISOString(),
+      expiresAt: at + CANDIDATE_TTL_MS,
+      item: clone(item),
+      presentation: formatSuggestion(item, current),
+      context: {
+        nearbyUpdatedAt: current?.updatedAt || null,
+        mobility: clone(current?.mobility || null),
+      },
+    };
+  }
+
+  function clearCandidate(expectedContentId = null) {
+    const existing = context.value('fieldGuide.candidate');
+    if (!existing) return false;
+    if (expectedContentId && existing.contentId !== expectedContentId) return false;
+    if (candidateTimer) clearTimeout(candidateTimer);
+    candidateTimer = null;
+    return context.remove('fieldGuide.candidate');
+  }
+
+  function scheduleCandidateExpiry(candidate) {
+    if (candidateTimer) clearTimeout(candidateTimer);
+    const delay = Math.max(50, Number(candidate.expiresAt) - Date.now());
+    candidateTimer = setTimeout(() => {
+      candidateTimer = null;
+      clearCandidate(candidate.contentId);
+    }, delay);
+  }
+
+  function consider(current = context.value('nearby.current'), at = Date.now()) {
+    const item = selectCandidate(current, at);
+    if (!item) {
+      const existing = context.value('fieldGuide.candidate');
+      if (existing && Number(existing.expiresAt) <= at) clearCandidate(existing.contentId);
+      return null;
+    }
+
+    const candidate = buildCandidate(item, current, at);
+    const existing = context.value('fieldGuide.candidate');
+    if (existing?.contentId === candidate.contentId && Number(existing.expiresAt) > at) return clone(existing);
+
+    context.set('fieldGuide.candidate', candidate, {
+      source: 'field-guide',
+      kind: 'inferred',
+      ttlMs: CANDIDATE_TTL_MS,
+      confidence: item.confidence ?? 0.8,
+    });
+    scheduleCandidateExpiry(candidate);
+    return clone(candidate);
   }
 
   function remember(item, at = Date.now()) {
@@ -104,28 +207,42 @@
     persistMemory();
   }
 
-  function consider(current = context.value('nearby.current')) {
-    const item = selectCandidate(current);
-    if (!item) return null;
-    const message = formatSuggestion(item);
-    const ui = window.WanderUI;
-    if (!ui?.showWander) return null;
+  function currentPlaceId() {
+    const current = context.value('history.currentPlace');
+    return current?.city?.placeId || current?.zone?.placeId || current?.country?.placeId || null;
+  }
 
-    ui.showWander(message.title, message.message);
-    remember(item);
-    context.set('fieldGuide.lastSuggestion', {
-      poiId: item.id,
-      name: item.name,
-      distanceM: item.distanceM,
-      relevanceScore: item.relevanceScore,
-      shownAt: new Date().toISOString(),
-    }, {
+  function markPresented(candidateInput = context.value('fieldGuide.candidate'), at = Date.now()) {
+    const candidate = candidateInput && typeof candidateInput === 'object'
+      ? candidateInput
+      : context.value('fieldGuide.candidate');
+    if (!candidate?.poiId || !candidate?.item) return null;
+
+    remember(candidate.item, at);
+    if (candidate.contentId) {
+      window.WanderEngine?.rememberContent?.({
+        contentId: candidate.contentId,
+        placeId: currentPlaceId(),
+        topic: 'poi_proximity',
+      });
+    }
+
+    const record = {
+      poiId: candidate.poiId,
+      contentId: candidate.contentId || null,
+      name: candidate.item.name,
+      distanceM: candidate.item.distanceM,
+      relevanceScore: candidate.item.relevanceScore,
+      shownAt: new Date(at).toISOString(),
+    };
+    context.set('fieldGuide.lastSuggestion', record, {
       source: 'field-guide',
       kind: 'derived',
       ttlMs: 24 * 60 * 60 * 1000,
-      confidence: item.confidence ?? 0.8,
+      confidence: candidate.item.confidence ?? 0.8,
     });
-    return clone({ item, message });
+    clearCandidate(candidate.contentId);
+    return clone(record);
   }
 
   function configure(next = {}) {
@@ -141,6 +258,7 @@
   function clearMemory() {
     memory = { version: 1, lastShownAt: 0, shown: {} };
     persistMemory();
+    clearCandidate();
   }
 
   context.subscribe((key) => {
@@ -150,7 +268,11 @@
   window.WanderFieldGuide = Object.freeze({
     consider,
     selectCandidate,
+    buildCandidate,
     formatSuggestion,
+    contentIdFor,
+    markPresented,
+    clearCandidate,
     configure,
     getConfig: () => ({ ...config }),
     clearMemory,
