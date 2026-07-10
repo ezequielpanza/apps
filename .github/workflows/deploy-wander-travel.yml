@@ -73,6 +73,9 @@ jobs:
       - name: Run POI consolidation tests
         run: node apps/wander-travel/tests/poi-consolidation.mjs
 
+      - name: Run NearbyProvider field tests
+        run: node apps/wander-travel/tests/nearby-provider.mjs
+
       - name: Publish to Cloudflare Pages
         working-directory: apps/wander-travel
         env:
