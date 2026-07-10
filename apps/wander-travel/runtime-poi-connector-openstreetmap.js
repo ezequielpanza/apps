@@ -1,14 +1,14 @@
 (() => {
   const ID = 'openstreetmap';
-  const VERSION = '0.3.0';
+  const VERSION = '0.3.1';
   const DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
   const QUERY_PROFILES = Object.freeze({
     discovery: Object.freeze([
-      '["tourism"]',
+      '["tourism"~"^(attraction|museum|gallery|viewpoint|information|artwork|theme_park|zoo|aquarium)$"]',
       '["historic"]',
-      '["leisure"]',
-      '["natural"]',
+      '["leisure"~"^(park|garden|marina|nature_reserve)$"]',
+      '["natural"~"^(beach|peak|cave_entrance|spring|bay|cliff)$"]',
       '["amenity"~"^(restaurant|cafe|fast_food|bar|pub|pharmacy|atm|bank|hospital|clinic|fuel|ferry_terminal|drinking_water|toilets)$"]',
     ]),
     food: Object.freeze(['["amenity"~"^(restaurant|cafe|fast_food|bar|pub|ice_cream|food_court)$"]']),
@@ -43,10 +43,11 @@
     return { lat, lng };
   }
 
-  function clampRadiusM(value) {
+  function clampRadiusM(value, profileKey = 'discovery') {
     const radius = Number(value == null ? 5000 : value);
     if (!Number.isFinite(radius)) throw new Error('Invalid OpenStreetMap radiusM');
-    return Math.min(Math.max(Math.round(radius), 50), 50000);
+    const maxRadiusM = profileKey === 'discovery' ? 10000 : 50000;
+    return Math.min(Math.max(Math.round(radius), 50), maxRadiusM);
   }
 
   function profileSelectors(profileKey) {
@@ -57,8 +58,8 @@
 
   function buildQuery(input = {}) {
     const center = validateCenter(input);
-    const radiusM = clampRadiusM(input.radiusM);
     const profileKey = input.profile || 'discovery';
+    const radiusM = clampRadiusM(input.radiusM, profileKey);
     const statements = profileSelectors(profileKey)
       .map((selector) => `  nwr(around:${radiusM},${center.lat},${center.lng})${selector};`);
     return ['[out:json][timeout:25];', '(', ...statements, ');', 'out center tags;'].join('\n');
@@ -175,9 +176,9 @@
 
   async function search(input = {}) {
     const center = validateCenter(input);
-    const radiusM = clampRadiusM(input.radiusM);
     const profile = input.profile || 'discovery';
     profileSelectors(profile);
+    const radiusM = clampRadiusM(input.radiusM, profile);
     const endpoint = String(input.endpoint || DEFAULT_ENDPOINT);
     const observedAt = input.observedAt || Date.now();
     const query = buildQuery({ ...center, radiusM, profile });
