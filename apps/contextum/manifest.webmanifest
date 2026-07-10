@@ -1,0 +1,15 @@
+{
+  "name": "Contextum",
+  "short_name": "Contextum",
+  "description": "Capa personal de contexto para ampliar las capacidades de ChatGPT.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080c11",
+  "theme_color": "#0a0f14",
+  "orientation": "any",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
