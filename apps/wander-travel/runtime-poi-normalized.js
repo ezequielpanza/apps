@@ -1,5 +1,5 @@
 (() => {
-  const SCHEMA_VERSION = 2;
+  const SCHEMA_VERSION = 3;
 
   function clone(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -124,63 +124,23 @@
     });
   }
 
-  function normalizeContentItem(item, defaultSource, options = {}) {
-    const text = String(item?.text || '').trim();
-    if (!text) return null;
-    const confidence = Number(item.confidence == null ? 1 : item.confidence);
-    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
-      throw new Error('Normalized POI content confidence must be between 0 and 1');
-    }
-    return {
-      text,
-      kind: item.kind || options.defaultKind || null,
-      language: item.language || null,
-      confidence,
-      source: normalizeSource(item.source || defaultSource),
-      metadata: clone(item.metadata || {}),
-    };
-  }
-
-  function normalizeRating(item, defaultSource) {
-    const value = Number(item?.value);
-    const scaleMin = Number(item?.scaleMin == null ? 0 : item.scaleMin);
-    const scaleMax = Number(item?.scaleMax);
-    if (!Number.isFinite(value) || !Number.isFinite(scaleMin) || !Number.isFinite(scaleMax) || scaleMax <= scaleMin) {
-      throw new Error('Invalid normalized POI rating');
-    }
-    if (value < scaleMin || value > scaleMax) throw new Error('Normalized POI rating is outside its scale');
-    return {
-      value,
-      scaleMin,
-      scaleMax,
-      count: Number.isFinite(Number(item.count)) ? Math.max(0, Math.trunc(Number(item.count))) : null,
-      label: item.label || null,
-      source: normalizeSource(item.source || defaultSource),
-      observedAt: item.observedAt ? iso(item.observedAt) : null,
-      metadata: clone(item.metadata || {}),
-    };
-  }
-
-  function normalizeContent(content = {}, defaultSource) {
-    const descriptions = (Array.isArray(content.descriptions) ? content.descriptions : [])
-      .map((item) => normalizeContentItem(item, defaultSource, { defaultKind: 'description' }))
-      .filter(Boolean);
-    const reviewSummaries = (Array.isArray(content.reviewSummaries) ? content.reviewSummaries : [])
-      .map((item) => {
-        const normalized = normalizeContentItem(item, defaultSource, { defaultKind: 'review_summary' });
-        return normalized ? {
-          ...normalized,
-          basedOnCount: Number.isFinite(Number(item.basedOnCount)) ? Math.max(0, Math.trunc(Number(item.basedOnCount))) : null,
-        } : null;
-      })
-      .filter(Boolean);
-    const notes = (Array.isArray(content.notes) ? content.notes : [])
-      .map((item) => normalizeContentItem(item, defaultSource, { defaultKind: 'note' }))
-      .filter(Boolean);
-    const ratings = (Array.isArray(content.ratings) ? content.ratings : [])
-      .map((item) => normalizeRating(item, defaultSource));
-
-    return { descriptions, ratings, reviewSummaries, notes };
+  function normalizeNotes(notes = [], defaultSource) {
+    return (Array.isArray(notes) ? notes : []).map((item) => {
+      const text = String(item?.text || '').trim();
+      if (!text) return null;
+      const confidence = Number(item.confidence == null ? 1 : item.confidence);
+      if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+        throw new Error('Normalized POI note confidence must be between 0 and 1');
+      }
+      return {
+        text,
+        kind: item.kind || 'note',
+        language: item.language || null,
+        confidence,
+        source: normalizeSource(item.source || defaultSource),
+        metadata: clone(item.metadata || {}),
+      };
+    }).filter(Boolean);
   }
 
   function makeId({ name, source, location }) {
@@ -217,7 +177,7 @@
       countryCode: input.destination.countryCode ? String(input.destination.countryCode).toLowerCase() : null,
     } : null;
 
-    const normalized = {
+    return {
       schemaVersion: SCHEMA_VERSION,
       id: input.id || makeId({ name, source, location }),
       name,
@@ -231,14 +191,10 @@
       confidence,
       observedAt: iso(input.observedAt || at),
       destination,
-      content: normalizeContent(input.content, source),
+      notes: normalizeNotes(input.notes, source),
       tags: clone(input.tags || {}),
       attributes: clone(input.attributes || {}),
       metadata: clone(input.metadata || {}),
-    };
-
-    return {
-      ...normalized,
       evidence: normalizeEvidence(input.evidence, source),
     };
   }
@@ -256,12 +212,8 @@
       value.confidence <= 1 &&
       Array.isArray(value.categories) &&
       Array.isArray(value.identifiers) &&
-      Array.isArray(value.evidence) &&
-      value.content &&
-      Array.isArray(value.content.descriptions) &&
-      Array.isArray(value.content.ratings) &&
-      Array.isArray(value.content.reviewSummaries) &&
-      Array.isArray(value.content.notes),
+      Array.isArray(value.notes) &&
+      Array.isArray(value.evidence),
     );
   }
 
@@ -273,7 +225,7 @@
     normalizeLocation,
     normalizeSource,
     normalizeIdentifiers,
-    normalizeContent,
+    normalizeNotes,
     makeId,
   });
 })();
