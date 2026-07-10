@@ -42,5 +42,8 @@ jobs:
       - name: Run POI consolidation tests
         run: node apps/wander-travel/tests/poi-consolidation.mjs
 
+      - name: Run NearbyProvider field tests
+        run: node apps/wander-travel/tests/nearby-provider.mjs
+
       - name: Check Browser Run worker syntax
         run: node --check services/wander-web-acquisition/src/index.js
