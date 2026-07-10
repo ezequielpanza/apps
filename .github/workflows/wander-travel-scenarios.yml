@@ -48,6 +48,9 @@ jobs:
       - name: Run field guide tests
         run: node apps/wander-travel/tests/field-guide.mjs
 
+      - name: Run field guide engine-flow tests
+        run: node apps/wander-travel/tests/field-guide-engine-flow.mjs
+
       - name: Run field test logger tests
         run: node apps/wander-travel/tests/field-test-logger.mjs
 
