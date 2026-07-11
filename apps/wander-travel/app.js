@@ -1,11 +1,18 @@
 (() => {
-  const APP_BUILD = 'v0.85.5';
+  const APP_BUILD = 'v0.85.6';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
   document.write('<script src="runtime-map-position.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
   document.write('<script src="runtime-map-controls.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
   document.write('<script src="runtime-map.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
+
+  window.addEventListener('load', () => {
+    const script = document.createElement('script');
+    script.src = 'runtime-dashboard-debug.js?v=20260711-06';
+    script.async = false;
+    document.body.appendChild(script);
+  });
 
   if ('serviceWorker' in navigator) {
     const hadController = Boolean(navigator.serviceWorker.controller);
