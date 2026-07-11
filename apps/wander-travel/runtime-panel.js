@@ -3,7 +3,6 @@
   const app = $('.wander-app');
   const menu = $('#main-menu');
   const menuButton = $('#main-menu-button');
-  const reloadAppButton = $('#reload-app-button');
   const contextDashboard = $('#context-dashboard');
 
   function screens() {
@@ -45,16 +44,7 @@
     document.body.classList.toggle('drawer-open', open);
   }
 
-  function reloadApp(event) {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-    const url = new URL(window.location.href);
-    url.searchParams.set('reload', String(Date.now()));
-    window.location.replace(url.toString());
-  }
-
   menuButton?.addEventListener('click', () => setMenuOpen(app?.dataset.menu !== 'open'));
-  reloadAppButton?.addEventListener('click', reloadApp);
   contextDashboard?.addEventListener('click', () => openScreen('context'));
 
   menu?.addEventListener('click', (event) => {
