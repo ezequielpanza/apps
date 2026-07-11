@@ -48,5 +48,8 @@ jobs:
       - name: Run context dashboard test
         run: node apps/wander-travel/tests/context-dashboard.mjs
 
+      - name: Run context dashboard configuration tests
+        run: node apps/wander-travel/tests/context-dashboard-config.mjs
+
       - name: Check Browser Run worker syntax
         run: node --check services/wander-web-acquisition/src/index.js
