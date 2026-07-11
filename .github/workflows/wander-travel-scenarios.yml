@@ -51,6 +51,9 @@ jobs:
       - name: Run field guide engine-flow tests
         run: node apps/wander-travel/tests/field-guide-engine-flow.mjs
 
+      - name: Run ContextRail tests
+        run: node apps/wander-travel/tests/context-rail.mjs
+
       - name: Run field test logger tests
         run: node apps/wander-travel/tests/field-test-logger.mjs
 
