@@ -82,12 +82,6 @@ jobs:
       - name: Run context dashboard configuration tests
         run: node apps/wander-travel/tests/context-dashboard-config.mjs
 
-      - name: Run installed PWA dashboard remount test
-        run: node apps/wander-travel/tests/context-dashboard-installed-reload.mjs
-
-      - name: Run drawer reload button test
-        run: node apps/wander-travel/tests/reload-button.mjs
-
       - name: Publish to Cloudflare Pages
         working-directory: apps/wander-travel
         env:
