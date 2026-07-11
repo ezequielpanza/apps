@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.85.6';
+  const APP_BUILD = 'v0.85.7';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -7,10 +7,23 @@
   document.write('<script src="runtime-map-controls.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
   document.write('<script src="runtime-map.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
 
+  function afterAppLayout() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.WanderContextDashboard?.restore?.();
+        window.WanderAppReady = true;
+        window.dispatchEvent(new CustomEvent('wander:app-ready', {
+          detail: { at: Date.now() },
+        }));
+      });
+    });
+  }
+
   window.addEventListener('load', () => {
     const script = document.createElement('script');
-    script.src = 'runtime-dashboard-debug.js?v=20260711-06';
+    script.src = 'runtime-dashboard-debug.js?v=20260711-07';
     script.async = false;
+    script.addEventListener('load', afterAppLayout, { once: true });
     document.body.appendChild(script);
   });
 
