@@ -48,7 +48,9 @@
   function reloadApp(event) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
-    window.location.reload();
+    const url = new URL(window.location.href);
+    url.searchParams.set('reload', String(Date.now()));
+    window.location.replace(url.toString());
   }
 
   menuButton?.addEventListener('click', () => setMenuOpen(app?.dataset.menu !== 'open'));
