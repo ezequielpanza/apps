@@ -3,6 +3,7 @@
   const app = $('.wander-app');
   const menu = $('#main-menu');
   const menuButton = $('#main-menu-button');
+  const contextDashboard = $('#context-dashboard');
 
   function screens() {
     return Array.from(document.querySelectorAll('[data-app-screen]'));
@@ -44,6 +45,7 @@
   }
 
   menuButton?.addEventListener('click', () => setMenuOpen(app?.dataset.menu !== 'open'));
+  contextDashboard?.addEventListener('click', () => openScreen('context'));
 
   menu?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-screen-target]');
