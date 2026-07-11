@@ -1,0 +1,6 @@
+{
+  "app": "wander-travel",
+  "version": "v0.87.2",
+  "build": "20260710-08",
+  "purpose": "deploy-version-probe"
+}
