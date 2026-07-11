@@ -11,6 +11,7 @@ node apps/wander-travel/tests/poi-consolidation.mjs
 node apps/wander-travel/tests/nearby-provider.mjs
 node apps/wander-travel/tests/field-guide.mjs
 node apps/wander-travel/tests/field-guide-engine-flow.mjs
+node apps/wander-travel/tests/context-rail.mjs
 node apps/wander-travel/tests/field-test-logger.mjs
 ```
 
@@ -168,6 +169,31 @@ Content Memory + cooldown
 ```
 
 `runtime-field-guide.js` no longer calls `WanderUI` directly.
+
+## Configurable ContextRail
+
+`context-rail.mjs` covers:
+
+1. Default visible fields: `summary`, `speed`, `heading`
+2. Tapping the rail opens the Context panel
+3. Visible fields can be changed and persisted in `wander.contextRail.config.v1`
+4. Individual fields can be toggled on and off
+5. Invalid stored field IDs are filtered
+6. Empty configuration still leaves a tappable Context fallback
+
+The production ContextRail flow is:
+
+```text
+WanderContext
+      ↓
+WanderContextRail registry + persisted config
+      ↓
+ContextRail visible fields
+      ↓
+tap opens Context Panel
+      ↓
+Resumen visible controls toggle fields
+```
 
 ## Field test logger
 
