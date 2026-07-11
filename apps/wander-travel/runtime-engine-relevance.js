@@ -52,7 +52,6 @@
           signal: { type: entry?.type || 'unknown', score },
           transition: entry,
           placeEvent: null,
-          fieldGuideCandidate: null,
           currentPlace: null,
         };
       }
@@ -85,7 +84,6 @@
       },
       transition,
       placeEvent: null,
-      fieldGuideCandidate: null,
       currentPlace: currentPlace || null,
     };
   }
@@ -116,7 +114,6 @@
           },
           transition: null,
           placeEvent: entry,
-          fieldGuideCandidate: null,
           currentPlace: currentPlace || null,
         };
       }
@@ -124,40 +121,12 @@
     return best;
   }
 
-  function fieldGuideCandidate(candidate, situation, currentPlace) {
-    if (!candidate || typeof candidate !== 'object') return null;
-    if (!situation?.locationAvailable) return null;
-    if (!candidate.poiId || !candidate.contentId || !candidate.presentation) return null;
-    if (Number(candidate.expiresAt) <= Date.now()) return null;
-
-    const rawScore = Number(candidate.score);
-    if (!Number.isFinite(rawScore) || rawScore <= 0) return null;
-    const score = Math.max(0, Math.min(0.89, rawScore));
-
-    return {
-      score,
-      reason: 'field_guide_poi_nearby',
-      signal: {
-        type: 'field_guide.poi_nearby',
-        score,
-        poiId: candidate.poiId,
-        contentId: candidate.contentId,
-        placeName: candidate.item?.name || candidate.presentation?.title || null,
-      },
-      transition: null,
-      placeEvent: null,
-      fieldGuideCandidate: candidate,
-      currentPlace: currentPlace || null,
-    };
-  }
-
-  function evaluate({ situation, transitions = [], place = {}, fieldGuide = null } = {}) {
+  function evaluate({ situation, transitions = [], place = {} } = {}) {
     const currentPlace = place?.current || null;
     const placeEvents = Array.isArray(place?.events) ? place.events : [];
     const candidates = [
       placeCandidate(placeEvents, currentPlace, situation),
       arrivalCandidate(transitions, currentPlace),
-      fieldGuideCandidate(fieldGuide, situation, currentPlace),
       transitionCandidate(transitions),
     ].filter(Boolean);
 
@@ -175,7 +144,6 @@
         signal: { type: 'wait', score: 0 },
         transition: null,
         placeEvent: null,
-        fieldGuideCandidate: null,
         currentPlace,
       };
     }
@@ -186,7 +154,6 @@
       signal: { type: 'wait', score: 0 },
       transition: null,
       placeEvent: null,
-      fieldGuideCandidate: null,
       currentPlace,
     };
   }
