@@ -236,14 +236,12 @@
   }
 
   function buildEvaluation(situation, transitionResult, journeyResult, memoryResult, placeResult) {
-    const fieldGuide = context.value('fieldGuide.candidate');
     const relevance = relevanceEngine.evaluate({
       situation,
       transitions: transitionResult.events,
       memory: memoryResult,
       journey: journeyResult,
       place: placeResult,
-      fieldGuide,
     });
     const action = decision.decideAction({
       situation,
@@ -251,7 +249,6 @@
       memory: memoryResult,
       journey: journeyResult,
       place: placeResult,
-      fieldGuide,
     });
 
     return {
@@ -292,14 +289,12 @@
       pendingClarification: context.value('conversation.pendingClarification'),
       nextCheckAt: null,
     };
-    const fieldGuide = context.value('fieldGuide.candidate');
     const relevance = relevanceEngine.evaluate({
       situation,
       transitions: [],
       memory: memorySnapshot,
       journey: journeySnapshot,
       place: placeSnapshot,
-      fieldGuide,
     });
     const action = decision.decideAction({
       situation,
@@ -307,7 +302,6 @@
       memory: memorySnapshot,
       journey: journeySnapshot,
       place: placeSnapshot,
-      fieldGuide,
     });
     return {
       ...action,
@@ -378,8 +372,7 @@
       key.startsWith('mobility.override.') ||
       key.startsWith('mobility.provider.') ||
       key === 'place.current' ||
-      key === 'place.status' ||
-      key === 'fieldGuide.candidate'
+      key === 'place.status'
     ) {
       run('context:' + key);
     }

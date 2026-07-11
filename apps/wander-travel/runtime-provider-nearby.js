@@ -23,16 +23,23 @@
   let queuedForce = false;
   let requestSequence = 0;
 
-  function clone(value) { return value == null ? value : JSON.parse(JSON.stringify(value)); }
+  function clone(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+
   function finiteNumber(value) {
     if (value === null || value === undefined || value === '') return null;
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
   }
+
   function validCoordinate(lat, lng) {
     return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
   }
-  function radians(value) { return value * Math.PI / 180; }
+
+  function radians(value) {
+    return value * Math.PI / 180;
+  }
 
   function distanceMeters(left, right) {
     if (!left || !right) return Infinity;
@@ -61,6 +68,7 @@
     const lat = finiteNumber(effective.lat);
     const lng = finiteNumber(effective.lng);
     if (!validCoordinate(lat, lng)) return null;
+
     const effectiveSpeedKmh = Math.max(0, (finiteNumber(effective.speedMps) || 0) * 3.6);
     const inferredSpeedKmh = finiteNumber(context.value('motion.speedKmh'));
     return {
@@ -76,12 +84,25 @@
   function planFor(location) {
     const speed = Math.max(0, finiteNumber(location?.speedKmh) || 0);
     const mode = String(location?.mobilityMode || 'unknown');
-    if (mode === 'walking' || mode === 'running') return { radiusM: 1800, moveThresholdM: 350, maxAgeMs: 10 * 60 * 1000 };
-    if (mode === 'cycling') return { radiusM: 4500, moveThresholdM: 900, maxAgeMs: 8 * 60 * 1000 };
-    if (speed >= 80 || mode === 'aircraft') return { radiusM: 15000, moveThresholdM: 5000, maxAgeMs: 4 * 60 * 1000 };
-    if (speed >= 30 || ['car', 'bus', 'train', 'motorcycle'].includes(mode)) return { radiusM: 8000, moveThresholdM: 2200, maxAgeMs: 6 * 60 * 1000 };
-    if (speed >= 8 || ['boat', 'sailing'].includes(mode)) return { radiusM: 5000, moveThresholdM: 1000, maxAgeMs: 8 * 60 * 1000 };
-    if (speed >= 2) return { radiusM: 2200, moveThresholdM: 450, maxAgeMs: 10 * 60 * 1000 };
+
+    if (mode === 'walking' || mode === 'running') {
+      return { radiusM: 1800, moveThresholdM: 350, maxAgeMs: 10 * 60 * 1000 };
+    }
+    if (mode === 'cycling') {
+      return { radiusM: 4500, moveThresholdM: 900, maxAgeMs: 8 * 60 * 1000 };
+    }
+    if (speed >= 80 || mode === 'aircraft') {
+      return { radiusM: 15000, moveThresholdM: 5000, maxAgeMs: 4 * 60 * 1000 };
+    }
+    if (speed >= 30 || ['car', 'bus', 'train', 'motorcycle'].includes(mode)) {
+      return { radiusM: 8000, moveThresholdM: 2200, maxAgeMs: 6 * 60 * 1000 };
+    }
+    if (speed >= 8 || ['boat', 'sailing'].includes(mode)) {
+      return { radiusM: 5000, moveThresholdM: 1000, maxAgeMs: 8 * 60 * 1000 };
+    }
+    if (speed >= 2) {
+      return { radiusM: 2200, moveThresholdM: 450, maxAgeMs: 10 * 60 * 1000 };
+    }
     return { radiusM: 3000, moveThresholdM: 250, maxAgeMs: 15 * 60 * 1000 };
   }
 
@@ -104,8 +125,11 @@
   }
 
   function categoryText(poi) {
-    return (poi.categories || []).map((category) => `${category.id || ''} ${category.label || ''}`.toLowerCase()).join(' ');
+    return (poi.categories || [])
+      .map((category) => `${category.id || ''} ${category.label || ''}`.toLowerCase())
+      .join(' ');
   }
+
   function interestBoost(poi) {
     const text = categoryText(poi);
     if (/historic|museum|attraction|monument|castle|fort|archae|heritage/.test(text)) return 1;
@@ -147,27 +171,42 @@
   }
 
   function writeStatus(status, confidence = 1) {
-    context.set('nearby.status', status, { source: 'nearby-provider', kind: 'derived', ttlMs: 10 * 60 * 1000, confidence });
+    context.set('nearby.status', status, {
+      source: 'nearby-provider',
+      kind: 'derived',
+      ttlMs: 10 * 60 * 1000,
+      confidence,
+    });
   }
+
   function writeResult(payload, confidence = 0.9) {
-    const options = { source: 'nearby-provider', kind: 'derived', ttlMs: 15 * 60 * 1000, confidence };
+    const options = {
+      source: 'nearby-provider',
+      kind: 'derived',
+      ttlMs: 15 * 60 * 1000,
+      confidence,
+    };
     context.set('nearby.current', payload, options);
     context.set('nearby.items', payload.items, options);
     context.set('nearby.updatedAt', payload.updatedAt, options);
-    context.set('nearby.diagnostics', payload.diagnostics, { ...options, ttlMs: 30 * 60 * 1000 });
+    context.set('nearby.diagnostics', payload.diagnostics, {
+      ...options,
+      ttlMs: 30 * 60 * 1000,
+    });
   }
 
-  function scheduleRefresh(delayMs = 500, force = false) {
+  function scheduleRefresh(delayMs = 500) {
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
-      refresh(force);
+      refresh(false);
     }, delayMs);
   }
 
   async function runSearch(location, force = false) {
     const sequence = ++requestSequence;
     const plan = planFor(location);
+    const destination = destinationFromContext();
     const request = {
       lat: location.lat,
       lng: location.lng,
@@ -176,7 +215,7 @@
       profile: config.profile,
       language: config.language,
       limit: config.wikidataLimit,
-      destination: destinationFromContext(),
+      destination,
       observedAt: new Date().toISOString(),
     };
 
@@ -211,12 +250,26 @@
         : (result.errors.length === config.sources.length ? 'unavailable' : 'empty');
       const updatedAt = new Date().toISOString();
 
-      lastSearch = { center: { lat: location.lat, lng: location.lng }, at: Date.now(), radiusM: plan.radiusM, status };
+      lastSearch = {
+        center: { lat: location.lat, lng: location.lng },
+        at: Date.now(),
+        radiusM: plan.radiusM,
+        status,
+      };
+
       const payload = {
         status,
-        center: { lat: location.lat, lng: location.lng, accuracy: location.accuracy, source: location.source },
+        center: {
+          lat: location.lat,
+          lng: location.lng,
+          accuracy: location.accuracy,
+          source: location.source,
+        },
         radiusM: plan.radiusM,
-        mobility: { mode: location.mobilityMode, speedKmh: Math.round(location.speedKmh * 10) / 10 },
+        mobility: {
+          mode: location.mobilityMode,
+          speedKmh: Math.round(location.speedKmh * 10) / 10,
+        },
         items,
         updatedAt,
         diagnostics: {
@@ -242,7 +295,12 @@
         error: error?.message || String(error),
         code: error?.code || null,
         at: new Date().toISOString(),
-      }, { source: 'nearby-provider', kind: 'derived', ttlMs: 10 * 60 * 1000, confidence: 0.4 });
+      }, {
+        source: 'nearby-provider',
+        kind: 'derived',
+        ttlMs: 10 * 60 * 1000,
+        confidence: 0.4,
+      });
       return null;
     }
   }
@@ -253,6 +311,7 @@
       writeStatus('pending', 0.5);
       return null;
     }
+
     if (!shouldSearch(location, force)) return null;
 
     if (activePromise) {
@@ -262,15 +321,16 @@
 
     const elapsed = Date.now() - lastNetworkAt;
     if (!force && elapsed < config.minNetworkIntervalMs) {
-      scheduleRefresh(Math.max(500, config.minNetworkIntervalMs - elapsed), false);
+      scheduleRefresh(Math.max(500, config.minNetworkIntervalMs - elapsed));
       return null;
     }
 
     activePromise = runSearch(location, force).finally(() => {
       activePromise = null;
-      const forceNext = queuedForce;
-      queuedForce = false;
-      if (forceNext) scheduleRefresh(50, true);
+      if (queuedForce) {
+        queuedForce = false;
+        scheduleRefresh(50);
+      }
     });
     return activePromise;
   }
@@ -287,13 +347,18 @@
     return getConfig();
   }
 
-  function getConfig() { return clone(config); }
-  function getCurrent() { return clone(context.value('nearby.current')); }
+  function getConfig() {
+    return clone(config);
+  }
+
+  function getCurrent() {
+    return clone(context.value('nearby.current'));
+  }
 
   context.subscribe((key) => {
-    if (key === 'location.effective' || key.startsWith('location.effective.')) scheduleRefresh(450, false);
-    else if (key === 'motion.speedKmh' || key === 'mobility.mode') scheduleRefresh(900, false);
-    else if (key === 'place.current') scheduleRefresh(1200, false);
+    if (key === 'location.effective' || key.startsWith('location.effective.')) scheduleRefresh(450);
+    else if (key === 'motion.speedKmh' || key === 'mobility.mode') scheduleRefresh(900);
+    else if (key === 'place.current') scheduleRefresh(1200);
   });
 
   providers.nearby = Object.freeze({
