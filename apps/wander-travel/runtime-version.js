@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.85.6';
+  const VERSION = 'v0.85.7';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
