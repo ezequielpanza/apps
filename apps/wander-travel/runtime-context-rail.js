@@ -196,15 +196,50 @@
     rail.innerHTML = fields.length
       ? fields.map(fieldHtml).join('')
       : '<span class="context-rail-item context-rail-empty"><svg class="status-icon" aria-hidden="true"><use href="wander-icons.svg#brain"></use></svg><strong>Contexto</strong></span>';
-    rail.setAttribute('aria-label', 'Abrir resumen de contexto');
+    rail.setAttribute('aria-label', 'Abrir panel de contexto');
   }
 
-  function openContextPanel() {
-    window.WanderScreen?.open?.('context');
+  function openContextPanel(event = null) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    if (window.WanderScreen?.open) {
+      window.WanderScreen.open('context');
+      return true;
+    }
+
+    const app = document.querySelector('.wander-app');
+    const screens = Array.from(document.querySelectorAll('[data-app-screen]'));
+    let opened = false;
+    screens.forEach((screen) => {
+      const active = screen.dataset.appScreen === 'context';
+      screen.hidden = !active;
+      opened = opened || active;
+    });
+    if (app && opened) app.dataset.screen = 'context';
+    document.querySelectorAll('[data-screen-target]').forEach((button) => {
+      const active = button.dataset.screenTarget === 'context';
+      button.classList.toggle('is-active', active);
+      if (active) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    });
+    return opened;
+  }
+
+  function isContextRailEvent(event) {
+    return Boolean(event?.target?.closest?.('#context-rail'));
+  }
+
+  function handleRailActivation(event) {
+    if (!isContextRailEvent(event)) return;
+    openContextPanel(event);
   }
 
   const rail = $('#context-rail');
   rail?.addEventListener('click', openContextPanel);
+  rail?.addEventListener('pointerup', openContextPanel);
+  document.addEventListener('click', handleRailActivation, true);
+  document.addEventListener('pointerup', handleRailActivation, true);
 
   context.subscribe(render);
   render();
@@ -217,5 +252,6 @@
     setVisibleFields,
     toggleField,
     render,
+    openContextPanel,
   });
 })();
