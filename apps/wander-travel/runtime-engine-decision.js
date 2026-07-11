@@ -61,18 +61,6 @@
       };
     }
 
-    if (signalType === 'field_guide.poi_nearby' && relevance?.fieldGuideCandidate) {
-      const candidate = relevance.fieldGuideCandidate;
-      return {
-        type: 'field_guide_suggestion',
-        reason: 'poi_nearby_relevant',
-        poiId: candidate.poiId,
-        contentId: candidate.contentId,
-        presentation: candidate.presentation,
-        fieldGuideCandidate: candidate,
-      };
-    }
-
     if (!situation?.locationAvailable) {
       return {
         type: 'wait',
