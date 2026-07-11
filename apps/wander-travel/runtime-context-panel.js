@@ -128,8 +128,8 @@
   function humanRow(key, label, iconName, fieldId) {
     const entry = context.get(key);
     return '<div class="context-row' + (fieldId ? ' has-dashboard-toggle' : '') + '">' +
-      '<div class="context-label">' + icon(iconName) + '<strong>' + label + '</strong></div>' +
-      '<div class="context-row-value"><b>' + readableValue(key, entry) + '</b>' + dashboardToggle(fieldId, label) + '</div>' +
+      '<div class="context-label">' + dashboardToggle(fieldId, label) + icon(iconName) + '<strong>' + label + '</strong></div>' +
+      '<div class="context-row-value"><b>' + readableValue(key, entry) + '</b></div>' +
       '</div>';
   }
 
@@ -137,8 +137,8 @@
     const field = dashboardField(fieldId);
     if (!field) return '';
     return '<div class="context-row has-dashboard-toggle">' +
-      '<div class="context-label">' + icon(field.icon) + '<strong>' + field.label + '</strong></div>' +
-      '<div class="context-row-value"><b>' + field.value() + '</b>' + dashboardToggle(field.id, field.label) + '</div>' +
+      '<div class="context-label">' + dashboardToggle(field.id, field.label) + icon(field.icon) + '<strong>' + field.label + '</strong></div>' +
+      '<div class="context-row-value"><b>' + field.value() + '</b></div>' +
       '</div>';
   }
 
