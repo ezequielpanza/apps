@@ -33,7 +33,6 @@ jobs:
         run: |
           test -s apps/wander-travel/index.html
           test -s apps/wander-travel/wander-ui.css
-          test -s apps/wander-travel/wander-context-dashboard.css
           test -s apps/wander-travel/wander-icons.svg
           test -s apps/wander-travel/wander-app-icon.svg
           test -s apps/wander-travel/manifest.webmanifest
@@ -79,6 +78,9 @@ jobs:
 
       - name: Run context dashboard test
         run: node apps/wander-travel/tests/context-dashboard.mjs
+
+      - name: Run context dashboard configuration tests
+        run: node apps/wander-travel/tests/context-dashboard-config.mjs
 
       - name: Publish to Cloudflare Pages
         working-directory: apps/wander-travel
