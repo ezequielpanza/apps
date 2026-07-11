@@ -6,23 +6,25 @@
   const icon = (name) => '<svg class="section-icon" aria-hidden="true"><use href="wander-icons.svg#' + name + '"></use></svg>';
 
   const HUMAN = [
-    ['context.status', 'Estado actual', 'target'],
+    ['context.status', 'Estado actual', 'target', 'summary'],
     ['context.activity', 'Actividad', 'route'],
     ['time.now', 'Hora', 'clock'],
     ['time.dayPeriod', 'Momento del día', 'day'],
     ['location.effective.status', 'Ubicación', 'pin'],
     ['location.effective.source', 'Fuente de ubicación', 'target'],
-    ['location.effective.accuracy', 'Precisión', 'target'],
+    ['location.effective.accuracy', 'Precisión', 'target', 'accuracy'],
     ['motion.status', 'Movimiento físico', 'route'],
-    ['mobility.mode', 'Modo de movilidad', 'compass'],
-    ['motion.speedKmh', 'Velocidad', 'speed'],
-    ['motion.heading', 'Rumbo', 'heading'],
+    ['mobility.mode', 'Modo de movilidad', 'compass', 'mobility'],
+    ['motion.speedKmh', 'Velocidad', 'speed', 'speed'],
+    ['motion.heading', 'Rumbo', 'heading', 'heading'],
     ['journey.current', 'Journey', 'route'],
     ['place.country', 'País', 'pin'],
-    ['place.city', 'Ciudad', 'city'],
+    ['place.city', 'Ciudad', 'city', 'place'],
     ['place.zone', 'Zona', 'zone'],
     ['history.currentPlace', 'Memoria del lugar', 'brain'],
   ];
+
+  const EXTRA_DASHBOARD_FIELDS = ['currentPOI', 'nearby', 'lastSuggestion', 'simulation'];
 
   const TECHNICAL = [
     'app.version','simulation.status','context.status','context.activity','time.now','time.dayPeriod',
@@ -38,6 +40,23 @@
     'history.currentPlace','conversation.pendingClarification',
     'history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
   ];
+
+  function dashboard() {
+    return window.WanderContextDashboard;
+  }
+
+  function dashboardField(fieldId) {
+    return dashboard()?.fields?.find((field) => field.id === fieldId) || null;
+  }
+
+  function dashboardToggle(fieldId, label) {
+    if (!fieldId || !dashboardField(fieldId)) return '';
+    const checked = dashboard()?.isVisible?.(fieldId) ? ' checked' : '';
+    return '<label class="context-dashboard-inline-toggle" title="Mostrar en el dashboard">' +
+      '<input type="checkbox" data-dashboard-inline-toggle="' + fieldId + '" aria-label="Mostrar ' + label + ' en el dashboard"' + checked + '>' +
+      '<span aria-hidden="true"></span>' +
+      '</label>';
+  }
 
   function placeMemoryValue(place) {
     if (!place) return 'Pendiente';
@@ -106,13 +125,27 @@
     return 'hace ' + Math.round(minutes / 60) + ' h';
   }
 
+  function humanRow(key, label, iconName, fieldId) {
+    const entry = context.get(key);
+    return '<div class="context-row' + (fieldId ? ' has-dashboard-toggle' : '') + '">' +
+      '<div class="context-label">' + icon(iconName) + '<strong>' + label + '</strong></div>' +
+      '<div class="context-row-value"><b>' + readableValue(key, entry) + '</b>' + dashboardToggle(fieldId, label) + '</div>' +
+      '</div>';
+  }
+
+  function extraDashboardRow(fieldId) {
+    const field = dashboardField(fieldId);
+    if (!field) return '';
+    return '<div class="context-row has-dashboard-toggle">' +
+      '<div class="context-label">' + icon(field.icon) + '<strong>' + field.label + '</strong></div>' +
+      '<div class="context-row-value"><b>' + field.value() + '</b>' + dashboardToggle(field.id, field.label) + '</div>' +
+      '</div>';
+  }
+
   function renderHuman() {
     const list = $('#context-list');
     if (!list) return;
-    list.innerHTML = HUMAN.map(([key, label, iconName]) => {
-      const entry = context.get(key);
-      return '<div class="context-row"><div class="context-label">' + icon(iconName) + '<strong>' + label + '</strong></div><div><b>' + readableValue(key, entry) + '</b></div></div>';
-    }).join('');
+    list.innerHTML = HUMAN.map((item) => humanRow(...item)).join('') + EXTRA_DASHBOARD_FIELDS.map(extraDashboardRow).join('');
   }
 
   function renderTechnical() {
@@ -132,11 +165,24 @@
     if (period) window.WanderUI?.setText('#context-period', period);
   }
 
+  function removeLegacyDashboardSelector() {
+    const selector = $('#context-dashboard-fields');
+    selector?.closest('.screen-card')?.remove();
+  }
+
   function render() {
+    removeLegacyDashboardSelector();
     renderHuman();
     renderTechnical();
     syncSummary();
   }
+
+  $('#context-list')?.addEventListener('change', (event) => {
+    const input = event.target.closest('[data-dashboard-inline-toggle]');
+    if (!input) return;
+    dashboard()?.setFieldVisible?.(input.dataset.dashboardInlineToggle, input.checked);
+    renderHuman();
+  });
 
   $('#refresh-context-button')?.addEventListener('click', () => {
     context.updateTime();
