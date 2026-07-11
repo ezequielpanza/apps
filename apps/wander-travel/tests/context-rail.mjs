@@ -13,26 +13,65 @@ class MemoryStorage {
   removeItem(key) { this.map.delete(String(key)); }
 }
 
-function createElement() {
+function createElement({ dataset = {}, className = '', hidden = false } = {}) {
   const listeners = new Map();
-  return {
+  const element = {
     innerHTML: '',
     attributes: {},
+    dataset,
+    className,
+    hidden,
+    classList: {
+      values: new Set(String(className).split(/\s+/).filter(Boolean)),
+      toggle(name, active) {
+        if (active) this.values.add(name);
+        else this.values.delete(name);
+      },
+      contains(name) { return this.values.has(name); },
+    },
     addEventListener(type, listener) {
       if (!listeners.has(type)) listeners.set(type, []);
       listeners.get(type).push(listener);
     },
-    click() {
-      for (const listener of listeners.get('click') || []) listener({ type: 'click' });
+    dispatch(type, event = {}) {
+      const payload = {
+        type,
+        target: this,
+        preventDefault() { this.defaultPrevented = true; },
+        stopPropagation() { this.propagationStopped = true; },
+        defaultPrevented: false,
+        propagationStopped: false,
+        ...event,
+      };
+      for (const listener of listeners.get(type) || []) listener(payload);
+      return payload;
     },
+    click() { return this.dispatch('click'); },
+    pointerup() { return this.dispatch('pointerup'); },
     setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; },
     getAttribute(name) { return this.attributes[name] || null; },
+    closest(selector) {
+      if (selector === '#context-rail' && this.id === 'context-rail') return this;
+      if (selector === '[data-screen-target]' && this.dataset.screenTarget) return this;
+      return null;
+    },
   };
+  return element;
 }
 
 function createRuntime(seed = {}) {
   const rail = createElement();
+  rail.id = 'context-rail';
+  const contextScreen = createElement({ dataset: { appScreen: 'context' }, hidden: true });
+  const mapScreen = createElement({ dataset: { appScreen: 'map' }, hidden: false });
+  const app = createElement({ dataset: { screen: 'map' }, className: 'wander-app' });
+  const navContext = createElement({ dataset: { screenTarget: 'context' } });
+  const child = createElement();
+  child.closest = (selector) => selector === '#context-rail' ? rail : null;
+
   const documentEvents = [];
+  const documentListeners = new Map();
   const listeners = new Set();
   const values = new Map(Object.entries({
     'context.status': 'En pausa',
@@ -41,6 +80,11 @@ function createRuntime(seed = {}) {
     'motion.status': 'moving',
     ...seed.contextValues,
   }));
+
+  const queryAll = {
+    '[data-app-screen]': [mapScreen, contextScreen],
+    '[data-screen-target]': [navContext],
+  };
 
   const sandbox = {
     console,
@@ -52,19 +96,44 @@ function createRuntime(seed = {}) {
     },
     localStorage: new MemoryStorage(seed.storage || {}),
     document: {
-      querySelector(selector) { return selector === '#context-rail' ? rail : null; },
-      addEventListener() {},
+      querySelector(selector) {
+        if (selector === '#context-rail') return rail;
+        if (selector === '.wander-app') return app;
+        return null;
+      },
+      querySelectorAll(selector) { return queryAll[selector] || []; },
+      addEventListener(type, listener) {
+        if (!documentListeners.has(type)) documentListeners.set(type, []);
+        documentListeners.get(type).push(listener);
+      },
       dispatchEvent(event) { documentEvents.push(event); return true; },
+      dispatch(type, event = {}) {
+        const payload = {
+          type,
+          target: rail,
+          preventDefault() { this.defaultPrevented = true; },
+          stopPropagation() { this.propagationStopped = true; },
+          defaultPrevented: false,
+          propagationStopped: false,
+          ...event,
+        };
+        for (const listener of documentListeners.get(type) || []) listener(payload);
+        return payload;
+      },
     },
     WanderContext: {
       value(key, fallback = null) { return values.has(key) ? values.get(key) : fallback; },
       subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     },
-    WanderScreen: {
+  };
+
+  if (seed.withoutScreen !== true) {
+    sandbox.WanderScreen = {
       opened: [],
       open(name) { this.opened.push(name); },
-    },
-  };
+    };
+  }
+
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
 
@@ -75,10 +144,16 @@ function createRuntime(seed = {}) {
   return {
     api: context.WanderContextRail,
     rail,
+    child,
+    app,
+    contextScreen,
+    mapScreen,
+    navContext,
     values,
     listeners,
     storage: sandbox.localStorage,
     screen: context.WanderScreen,
+    document: sandbox.document,
     documentEvents,
   };
 }
@@ -98,6 +173,31 @@ test('clicking the rail opens the Context panel', () => {
   const rt = createRuntime();
   rt.rail.click();
   assert.deepEqual(rt.screen.opened, ['context']);
+});
+
+test('pointerup on the rail opens the Context panel and stops propagation', () => {
+  const rt = createRuntime();
+  const event = rt.rail.pointerup();
+  assert.deepEqual(rt.screen.opened, ['context']);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(event.propagationStopped, true);
+});
+
+test('delegated pointerup from an internal rail child still opens Context', () => {
+  const rt = createRuntime();
+  rt.document.dispatch('pointerup', { target: rt.child });
+  assert.deepEqual(rt.screen.opened, ['context']);
+});
+
+test('manual fallback opens Context when WanderScreen is not ready yet', () => {
+  const rt = createRuntime({ withoutScreen: true });
+  const opened = rt.api.openContextPanel();
+  assert.equal(opened, true);
+  assert.equal(rt.app.dataset.screen, 'context');
+  assert.equal(rt.contextScreen.hidden, false);
+  assert.equal(rt.mapScreen.hidden, true);
+  assert.equal(rt.navContext.classList.contains('is-active'), true);
+  assert.equal(rt.navContext.getAttribute('aria-current'), 'page');
 });
 
 test('visible fields can be changed and are persisted', () => {
