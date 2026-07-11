@@ -136,7 +136,18 @@
     return getVisibleFields();
   }
 
+  function ensureDashboardMounted() {
+    const dashboard = document.querySelector('#context-dashboard');
+    if (!dashboard) return null;
+    dashboard.hidden = false;
+    dashboard.removeAttribute?.('hidden');
+    dashboard.style?.removeProperty?.('display');
+    dashboard.setAttribute?.('aria-hidden', 'false');
+    return dashboard;
+  }
+
   function render() {
+    ensureDashboardMounted();
     let shown = 0;
     document.querySelectorAll('[data-dashboard-field]').forEach((element) => {
       const visible = isVisible(element.dataset.dashboardField);
@@ -165,6 +176,13 @@
     }).join('');
   }
 
+  function restore() {
+    visibleFields = loadVisibleFields();
+    render();
+    renderControls();
+    return getVisibleFields();
+  }
+
   document.querySelector('#context-dashboard-fields')?.addEventListener('change', (event) => {
     const input = event.target.closest('[data-dashboard-toggle]');
     if (!input) return;
@@ -172,8 +190,13 @@
   });
 
   context.subscribe(() => render());
-  render();
-  renderControls();
+  window.addEventListener?.('load', restore);
+  window.addEventListener?.('pageshow', restore);
+  document.addEventListener?.('visibilitychange', () => {
+    if (!document.visibilityState || document.visibilityState === 'visible') restore();
+  });
+
+  restore();
 
   window.WanderContextDashboard = Object.freeze({
     storageKey: STORAGE_KEY,
@@ -182,6 +205,7 @@
     isVisible,
     setFieldVisible,
     reset,
+    restore,
     render,
     renderControls,
   });
