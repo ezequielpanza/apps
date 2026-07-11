@@ -1,4 +1,13 @@
 .status-rail#context-dashboard {
+  position: fixed !important;
+  left: 12px !important;
+  right: auto !important;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 120 !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: translateZ(0);
   border: 0;
   font: inherit;
   color: inherit;
@@ -10,7 +19,7 @@
 }
 
 .status-rail#context-dashboard:active {
-  transform: scale(0.985);
+  transform: translateZ(0) scale(0.985);
 }
 
 .status-rail#context-dashboard:focus-visible {
