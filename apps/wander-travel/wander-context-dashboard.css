@@ -1,4 +1,7 @@
 .status-rail#context-dashboard {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   border: 0;
   font: inherit;
   color: inherit;
