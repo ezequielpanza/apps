@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>Actualizar Wander Travel</title>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f3f5f7;color:#1f2a35;padding:24px}
+  main{max-width:520px;background:#fff;border-radius:24px;padding:28px;box-shadow:0 18px 48px rgba(20,35,55,.14)}
+  h1{margin:0 0 10px;font-size:1.4rem}p{line-height:1.45;color:#607080}button{border:0;border-radius:999px;background:#01e0cb;color:#073733;font-weight:850;padding:14px 18px;font-size:1rem}code{background:#eef3f3;border-radius:8px;padding:2px 6px}.status{font-weight:800;color:#1f2a35}
+</style>
+</head>
+<body>
+<main>
+  <h1>Actualizar Wander Travel</h1>
+  <p>Esta pantalla borra el Service Worker y las caches locales de Wander para salir de una versión vieja.</p>
+  <p class="status" id="status">Listo para actualizar.</p>
+  <button id="reset-button" type="button">Actualizar ahora</button>
+</main>
+<script>
+(() => {
+  const TARGET = './?app=v0.87.2&reset=' + Date.now();
+  const status = document.querySelector('#status');
+  const button = document.querySelector('#reset-button');
+
+  async function reset() {
+    button.disabled = true;
+    status.textContent = 'Borrando caches locales...';
+
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+    } catch {}
+
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter((key) => key.startsWith('wander-travel')).map((key) => caches.delete(key)));
+      }
+    } catch {}
+
+    status.textContent = 'Abriendo versión nueva...';
+    window.location.replace(TARGET);
+  }
+
+  button.addEventListener('click', reset);
+  setTimeout(reset, 600);
+})();
+</script>
+</body>
+</html>
