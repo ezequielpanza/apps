@@ -37,20 +37,7 @@
     'place.zone','place.zoneId','place.type','place.displayName','place.source','place.sourceRef','place.resolvedLat','place.resolvedLng','place.updatedAt','place.attribution',
     'history.currentPlace','conversation.pendingClarification',
     'history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
-    'nearby.status','nearby.current','nearby.items','nearby.updatedAt','nearby.diagnostics',
-    'fieldGuide.candidate','fieldGuide.lastSuggestion',
-    'currentPOI.status','currentPOI.value','currentPOI.alternatives','currentPOI.updatedAt',
   ];
-
-  function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    }[char]));
-  }
 
   function placeMemoryValue(place) {
     if (!place) return 'Pendiente';
@@ -104,10 +91,6 @@
     if (key === 'history.currentPlace') return placeMemoryValue(entry.value);
     if (key === 'conversation.pendingClarification') return entry.value?.question || 'Aclaración pendiente';
     if (key === 'places.items' && Array.isArray(entry.value)) return entry.value.length + ' lugares';
-    if (key === 'nearby.items' && Array.isArray(entry.value)) return entry.value.length + ' POIs';
-    if (key === 'fieldGuide.lastSuggestion' && entry.value?.name) return entry.value.name;
-    if (key === 'currentPOI.value' && entry.value?.name) return entry.value.name;
-    if (key === 'currentPOI.alternatives' && Array.isArray(entry.value)) return entry.value.length + ' alternativas';
     if (entry.value && typeof entry.value === 'object') {
       try { return JSON.stringify(entry.value); } catch { return '[objeto]'; }
     }
@@ -128,7 +111,7 @@
     if (!list) return;
     list.innerHTML = HUMAN.map(([key, label, iconName]) => {
       const entry = context.get(key);
-      return '<div class="context-row"><div class="context-label">' + icon(iconName) + '<strong>' + escapeHtml(label) + '</strong></div><div><b>' + escapeHtml(readableValue(key, entry)) + '</b></div></div>';
+      return '<div class="context-row"><div class="context-label">' + icon(iconName) + '<strong>' + label + '</strong></div><div><b>' + readableValue(key, entry) + '</b></div></div>';
     }).join('');
   }
 
@@ -138,22 +121,7 @@
     list.innerHTML = TECHNICAL.map((key) => {
       const entry = context.get(key);
       const kind = entry?.kind || 'pending';
-      return '<div class="technical-row"><code>' + escapeHtml(key) + '</code><span>' + escapeHtml(readableValue(key, entry)) + ' · ' + escapeHtml(kind) + ' · ' + escapeHtml(context.statusFor(entry)) + ' · ' + escapeHtml(formatAge(entry)) + '</span></div>';
-    }).join('');
-  }
-
-  function renderContextRailControls() {
-    const list = $('#context-rail-field-list');
-    const rail = window.WanderContextRail;
-    if (!list || !rail) return;
-    const config = rail.getConfig();
-    const visible = new Set(config.visibleFields || []);
-    list.innerHTML = rail.getFields().map((field) => {
-      const checked = visible.has(field.id) ? ' checked' : '';
-      return '<div class="context-rail-field-row">' +
-        '<div class="context-rail-field-label">' + icon(field.icon) + '<div><strong>' + escapeHtml(field.label) + '</strong><span>' + escapeHtml(field.id) + '</span></div></div>' +
-        '<label class="context-rail-toggle"><input type="checkbox" data-context-rail-field-toggle="' + escapeHtml(field.id) + '"' + checked + '><span>Mostrar</span></label>' +
-      '</div>';
+      return '<div class="technical-row"><code>' + key + '</code><span>' + readableValue(key, entry) + ' · ' + kind + ' · ' + context.statusFor(entry) + ' · ' + formatAge(entry) + '</span></div>';
     }).join('');
   }
 
@@ -167,7 +135,6 @@
   function render() {
     renderHuman();
     renderTechnical();
-    renderContextRailControls();
     syncSummary();
   }
 
@@ -177,17 +144,9 @@
     render();
   });
 
-  $('#context-rail-field-list')?.addEventListener('change', (event) => {
-    const input = event.target.closest('[data-context-rail-field-toggle]');
-    if (!input) return;
-    window.WanderContextRail?.toggleField(input.dataset.contextRailFieldToggle, input.checked);
-    renderContextRailControls();
-  });
-
-  document.addEventListener('wander:context-rail-config', renderContextRailControls);
   context.subscribe(render);
   render();
   setInterval(render, 15000);
 
-  window.WanderContextPanel = { render, syncSummary, renderContextRailControls };
+  window.WanderContextPanel = { render, syncSummary };
 })();
