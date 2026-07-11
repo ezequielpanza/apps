@@ -3,6 +3,7 @@
   const app = $('.wander-app');
   const menu = $('#main-menu');
   const menuButton = $('#main-menu-button');
+  const reloadAppButton = $('#reload-app-button') || $('.drawer-logo');
   const contextDashboard = $('#context-dashboard');
 
   function screens() {
@@ -31,7 +32,10 @@
     setMenuOpen(false);
 
     if (normalized === 'map') {
-      setTimeout(() => window.WanderBase?.map?.invalidateSize(), 80);
+      setTimeout(() => {
+        window.WanderBase?.map?.invalidateSize();
+        window.WanderDashboardViewport?.mount?.();
+      }, 80);
     }
   }
 
@@ -42,6 +46,24 @@
     menu.setAttribute('aria-hidden', String(!open));
     menuButton?.setAttribute('aria-expanded', String(open));
     document.body.classList.toggle('drawer-open', open);
+  }
+
+  function reloadApp(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const url = new URL(window.location.href);
+    url.searchParams.set('reload', String(Date.now()));
+    window.location.replace(url.toString());
+  }
+
+  if (reloadAppButton) {
+    reloadAppButton.setAttribute('role', 'button');
+    reloadAppButton.setAttribute('tabindex', '0');
+    reloadAppButton.setAttribute('aria-label', 'Recargar Wander');
+    reloadAppButton.addEventListener('click', reloadApp);
+    reloadAppButton.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') reloadApp(event);
+    });
   }
 
   menuButton?.addEventListener('click', () => setMenuOpen(app?.dataset.menu !== 'open'));
