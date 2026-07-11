@@ -1,13 +1,4 @@
 .status-rail#context-dashboard {
-  position: fixed !important;
-  left: 8px !important;
-  right: auto !important;
-  bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
-  z-index: 120 !important;
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  max-width: calc(100vw - 16px);
   border: 0;
   font: inherit;
   color: inherit;
@@ -15,13 +6,11 @@
   pointer-events: auto;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transform: translateZ(0);
-  will-change: transform;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
 .status-rail#context-dashboard:active {
-  transform: translateZ(0) scale(0.985);
+  transform: scale(0.985);
 }
 
 .status-rail#context-dashboard:focus-visible {
