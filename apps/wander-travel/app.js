@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.85.7';
+  const APP_BUILD = 'v0.85.8';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -10,6 +10,7 @@
   function afterAppLayout() {
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
+        window.WanderDashboardHost?.mount?.();
         window.WanderContextDashboard?.restore?.();
         window.WanderAppReady = true;
         window.dispatchEvent(new CustomEvent('wander:app-ready', {
@@ -20,11 +21,17 @@
   }
 
   window.addEventListener('load', () => {
-    const script = document.createElement('script');
-    script.src = 'runtime-dashboard-debug.js?v=20260711-07';
-    script.async = false;
-    script.addEventListener('load', afterAppLayout, { once: true });
-    document.body.appendChild(script);
+    const hostScript = document.createElement('script');
+    hostScript.src = 'runtime-dashboard-host.js?v=20260711-08';
+    hostScript.async = false;
+    hostScript.addEventListener('load', () => {
+      const debugScript = document.createElement('script');
+      debugScript.src = 'runtime-dashboard-debug.js?v=20260711-08';
+      debugScript.async = false;
+      debugScript.addEventListener('load', afterAppLayout, { once: true });
+      document.body.appendChild(debugScript);
+    }, { once: true });
+    document.body.appendChild(hostScript);
   });
 
   if ('serviceWorker' in navigator) {
