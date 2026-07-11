@@ -33,6 +33,7 @@ jobs:
         run: |
           test -s apps/wander-travel/index.html
           test -s apps/wander-travel/wander-ui.css
+          test -s apps/wander-travel/wander-context-rail.css
           test -s apps/wander-travel/wander-icons.svg
           test -s apps/wander-travel/wander-app-icon.svg
           test -s apps/wander-travel/manifest.webmanifest
@@ -81,6 +82,9 @@ jobs:
 
       - name: Run field guide engine-flow tests
         run: node apps/wander-travel/tests/field-guide-engine-flow.mjs
+
+      - name: Run ContextRail tests
+        run: node apps/wander-travel/tests/context-rail.mjs
 
       - name: Run field test logger tests
         run: node apps/wander-travel/tests/field-test-logger.mjs
