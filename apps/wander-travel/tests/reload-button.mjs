@@ -78,11 +78,16 @@ const document = {
   },
 };
 
-let reloadCount = 0;
+let replacedUrl = null;
 const sandbox = {
   console,
   document,
-  location: { reload() { reloadCount += 1; } },
+  URL,
+  Date: { now: () => 1720000000000 },
+  location: {
+    href: 'https://wander-travel.pages.dev/?app=v0.85.3',
+    replace(url) { replacedUrl = url; },
+  },
   setTimeout: () => 1,
   clearTimeout: () => {},
 };
@@ -93,12 +98,12 @@ const context = vm.createContext(sandbox);
 const source = fs.readFileSync(path.join(ROOT, 'runtime-panel.js'), 'utf8');
 new vm.Script(source, { filename: 'runtime-panel.js' }).runInContext(context);
 
-assert.equal(reloadCount, 0);
+assert.equal(replacedUrl, null);
 reloadButton.dispatch('click');
-assert.equal(reloadCount, 1);
+assert.equal(replacedUrl, 'https://wander-travel.pages.dev/?app=v0.85.3&reload=1720000000000');
 
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 assert.match(html, /<button id="reload-app-button"[^>]*class="drawer-logo drawer-reload-button"/);
 assert.match(html, /aria-label="Recargar Wander"/);
 
-console.log('PASS drawer logo reloads Wander');
+console.log('PASS drawer logo forces a fresh Wander navigation');
