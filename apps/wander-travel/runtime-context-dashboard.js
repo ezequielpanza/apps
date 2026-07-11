@@ -4,7 +4,6 @@
 
   const STORAGE_KEY = 'wander.contextDashboard.config.v1';
   const DEFAULT_VISIBLE_FIELDS = Object.freeze(['summary', 'speed', 'heading']);
-  const BOOT_RESTORE_DELAYS = Object.freeze([0, 120, 500, 1400]);
 
   function textValue(value, fallback) {
     if (value == null || value === '') return fallback;
@@ -137,25 +136,7 @@
     return getVisibleFields();
   }
 
-  function ensureDashboardMounted() {
-    const dashboard = document.querySelector('#context-dashboard');
-    if (!dashboard) return null;
-
-    dashboard.hidden = false;
-    dashboard.removeAttribute?.('hidden');
-    dashboard.setAttribute?.('aria-hidden', 'false');
-    if (dashboard.dataset) dashboard.dataset.dashboardMounted = 'true';
-
-    const style = dashboard.style;
-    style?.setProperty?.('display', 'flex', 'important');
-    style?.setProperty?.('visibility', 'visible', 'important');
-    style?.setProperty?.('opacity', '1', 'important');
-
-    return dashboard;
-  }
-
   function render() {
-    ensureDashboardMounted();
     let shown = 0;
     document.querySelectorAll('[data-dashboard-field]').forEach((element) => {
       const visible = isVisible(element.dataset.dashboardField);
@@ -184,21 +165,6 @@
     }).join('');
   }
 
-  function restore() {
-    visibleFields = loadVisibleFields();
-    render();
-    renderControls();
-    return getVisibleFields();
-  }
-
-  function restoreAfterBoot() {
-    restore();
-    window.requestAnimationFrame?.(() => restore());
-    BOOT_RESTORE_DELAYS.forEach((delay) => {
-      window.setTimeout?.(() => restore(), delay);
-    });
-  }
-
   document.querySelector('#context-dashboard-fields')?.addEventListener('change', (event) => {
     const input = event.target.closest('[data-dashboard-toggle]');
     if (!input) return;
@@ -206,13 +172,8 @@
   });
 
   context.subscribe(() => render());
-  window.addEventListener?.('load', restoreAfterBoot);
-  window.addEventListener?.('pageshow', restoreAfterBoot);
-  document.addEventListener?.('visibilitychange', () => {
-    if (!document.visibilityState || document.visibilityState === 'visible') restoreAfterBoot();
-  });
-
-  restoreAfterBoot();
+  render();
+  renderControls();
 
   window.WanderContextDashboard = Object.freeze({
     storageKey: STORAGE_KEY,
@@ -221,8 +182,6 @@
     isVisible,
     setFieldVisible,
     reset,
-    restore,
-    restoreAfterBoot,
     render,
     renderControls,
   });
