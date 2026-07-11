@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.85.8';
+  const APP_BUILD = 'v0.85.9';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -21,7 +21,6 @@
   window.addEventListener('load', async () => {
     try {
       await loadRuntime('runtime-dashboard-viewport.js?v=20260711-08');
-      await loadRuntime('runtime-dashboard-debug.js?v=20260711-08');
     } catch {}
 
     requestAnimationFrame(() => {
