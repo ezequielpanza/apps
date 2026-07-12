@@ -7,21 +7,21 @@
 
   const HUMAN = [
     ['context.status', 'Estado actual', 'target', 'summary'],
-    ['context.activity', 'Actividad', 'route'],
-    ['time.now', 'Hora', 'clock'],
-    ['time.dayPeriod', 'Momento del día', 'day'],
-    ['location.effective.status', 'Ubicación', 'pin'],
-    ['location.effective.source', 'Fuente de ubicación', 'target'],
+    ['context.activity', 'Actividad', 'route', 'activity'],
+    ['time.now', 'Hora', 'clock', 'time'],
+    ['time.dayPeriod', 'Momento del día', 'day', 'dayPeriod'],
+    ['location.effective.status', 'Ubicación', 'pin', 'locationStatus'],
+    ['location.effective.source', 'Fuente de ubicación', 'target', 'locationSource'],
     ['location.effective.accuracy', 'Precisión', 'target', 'accuracy'],
-    ['motion.status', 'Movimiento físico', 'route'],
+    ['motion.status', 'Movimiento físico', 'route', 'motionStatus'],
     ['mobility.mode', 'Modo de movilidad', 'compass', 'mobility'],
     ['motion.speedKmh', 'Velocidad', 'speed', 'speed'],
     ['motion.heading', 'Rumbo', 'heading', 'heading'],
-    ['journey.current', 'Journey', 'route'],
-    ['place.country', 'País', 'pin'],
+    ['journey.current', 'Journey', 'route', 'journey'],
+    ['place.country', 'País', 'pin', 'country'],
     ['place.city', 'Ciudad', 'city', 'place'],
-    ['place.zone', 'Zona', 'zone'],
-    ['history.currentPlace', 'Memoria del lugar', 'brain'],
+    ['place.zone', 'Zona', 'zone', 'zone'],
+    ['history.currentPlace', 'Memoria del lugar', 'brain', 'placeMemory'],
   ];
 
   const EXTRA_DASHBOARD_FIELDS = ['currentPOI', 'nearby', 'lastSuggestion', 'simulation'];
@@ -41,37 +41,24 @@
     'history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
   ];
 
-  function dashboard() {
-    return window.WanderContextDashboard;
-  }
-
-  function dashboardField(fieldId) {
-    return dashboard()?.fields?.find((field) => field.id === fieldId) || null;
-  }
+  function dashboard() { return window.WanderContextDashboard; }
+  function dashboardField(fieldId) { return dashboard()?.fields?.find((field) => field.id === fieldId) || null; }
 
   function dashboardToggle(fieldId, label) {
     if (!fieldId || !dashboardField(fieldId)) return '';
     const checked = dashboard()?.isVisible?.(fieldId) ? ' checked' : '';
     return '<label class="context-dashboard-inline-toggle" title="Mostrar en el dashboard">' +
       '<input type="checkbox" data-dashboard-inline-toggle="' + fieldId + '" aria-label="Mostrar ' + label + ' en el dashboard"' + checked + '>' +
-      '<span aria-hidden="true"></span>' +
-      '</label>';
+      '<span aria-hidden="true"></span></label>';
   }
 
   function placeMemoryValue(place) {
     if (!place) return 'Pendiente';
     const current = place.city || place.zone || place.country;
     if (!current) return 'Sin memoria';
-
-    const labels = {
-      assumed_new: 'asumido nuevo',
-      new_confirmed: 'nuevo confirmado',
-      recent_presence: 'presencia reciente',
-      known: 'conocido por vos',
-    };
+    const labels = { assumed_new: 'asumido nuevo', new_confirmed: 'nuevo confirmado', recent_presence: 'presencia reciente', known: 'conocido por vos' };
     const status = labels[current.presenceStatus] || current.presenceStatus || 'sin historial';
-    const yesterday = current.seenYesterday ? ' · estuvo ayer' : '';
-    return (current.name || 'Lugar actual') + ' · ' + status + yesterday;
+    return (current.name || 'Lugar actual') + ' · ' + status + (current.seenYesterday ? ' · estuvo ayer' : '');
   }
 
   function journeyValue(journey) {
@@ -81,18 +68,10 @@
     return state + ' · ' + distanceKm.toFixed(distanceKm >= 10 ? 0 : 1) + ' km';
   }
 
-  function mobilityValue(value) {
-    if (!value || value === 'unknown') return 'Desconocido';
-    return String(value);
-  }
+  function mobilityValue(value) { return !value || value === 'unknown' ? 'Desconocido' : String(value); }
 
   function placeStatusValue(value) {
-    const labels = {
-      pending: 'Pendiente',
-      resolving: 'Resolviendo',
-      available: 'Disponible',
-      unavailable: 'No disponible',
-    };
+    const labels = { pending: 'Pendiente', resolving: 'Resolviendo', available: 'Disponible', unavailable: 'No disponible' };
     return labels[value] || String(value || 'Pendiente');
   }
 
@@ -127,19 +106,15 @@
 
   function humanRow(key, label, iconName, fieldId) {
     const entry = context.get(key);
-    return '<div class="context-row' + (fieldId ? ' has-dashboard-toggle' : '') + '">' +
+    return '<div class="context-row has-dashboard-toggle">' +
       '<div class="context-label">' + dashboardToggle(fieldId, label) + icon(iconName) + '<strong>' + label + '</strong></div>' +
-      '<div class="context-row-value"><b>' + readableValue(key, entry) + '</b></div>' +
-      '</div>';
+      '<div class="context-row-value"><b>' + readableValue(key, entry) + '</b></div></div>';
   }
 
   function extraDashboardRow(fieldId) {
     const field = dashboardField(fieldId);
     if (!field) return '';
-    return '<div class="context-row has-dashboard-toggle">' +
-      '<div class="context-label">' + dashboardToggle(field.id, field.label) + icon(field.icon) + '<strong>' + field.label + '</strong></div>' +
-      '<div class="context-row-value"><b>' + field.value() + '</b></div>' +
-      '</div>';
+    return '<div class="context-row has-dashboard-toggle"><div class="context-label">' + dashboardToggle(field.id, field.label) + icon(field.icon) + '<strong>' + field.label + '</strong></div><div class="context-row-value"><b>' + field.value() + '</b></div></div>';
   }
 
   function renderHuman() {
