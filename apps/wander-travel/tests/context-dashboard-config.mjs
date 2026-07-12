@@ -10,7 +10,6 @@ class MemoryStorage {
   constructor(shared = new Map()) { this.shared = shared; }
   getItem(key) { return this.shared.has(String(key)) ? this.shared.get(String(key)) : null; }
   setItem(key, value) { this.shared.set(String(key), String(value)); }
-  removeItem(key) { this.shared.delete(String(key)); }
 }
 
 class MockElement {
@@ -22,15 +21,21 @@ class MockElement {
     this.hidden = false;
     this.textContent = '';
     this.innerHTML = '';
-    this.listeners = new Map();
+    this.className = '';
+    this.children = [];
   }
 
-  addEventListener(type, listener) {
-    this.listeners.set(type, listener);
+  querySelector(selector) {
+    if (selector === '[data-dashboard-empty]') return this.children.find((child) => 'dashboardEmpty' in child.dataset) || null;
+    const fieldMatch = selector.match(/^\[data-dashboard-field="([^"]+)"\]$/);
+    if (fieldMatch) return this.children.find((child) => child.dataset.dashboardField === fieldMatch[1]) || null;
+    return null;
   }
 
-  dispatch(type, event) {
-    this.listeners.get(type)?.(event);
+  insertBefore(child, before) {
+    const index = before ? this.children.indexOf(before) : -1;
+    if (index >= 0) this.children.splice(index, 0, child);
+    else this.children.push(child);
   }
 }
 
@@ -48,10 +53,12 @@ function createRuntime(sharedStorage = new Map()) {
     subscribe(listener) { subscribers.add(listener); return () => subscribers.delete(listener); },
   };
 
-  const fields = ['summary', 'speed', 'heading', 'currentPOI', 'place', 'mobility', 'accuracy', 'nearby', 'lastSuggestion', 'simulation'];
-  const fieldElements = fields.map((field) => new MockElement({ field }));
+  const staticFields = ['summary', 'speed', 'heading', 'currentPOI', 'place', 'mobility', 'accuracy', 'nearby', 'lastSuggestion', 'simulation'];
+  const dashboard = new MockElement({ id: 'context-dashboard' });
+  for (const field of staticFields) dashboard.children.push(new MockElement({ field }));
   const empty = new MockElement({ empty: true });
-  const controls = new MockElement({ id: 'context-dashboard-fields' });
+  dashboard.children.push(empty);
+
   const metrics = new Map([
     ['metric-status', new MockElement({ id: 'metric-status' })],
     ['metric-speed', new MockElement({ id: 'metric-speed' })],
@@ -66,14 +73,15 @@ function createRuntime(sharedStorage = new Map()) {
   ]);
 
   const document = {
+    createElement() { return new MockElement(); },
     querySelector(selector) {
-      if (selector === '#context-dashboard-fields') return controls;
+      if (selector === '#context-dashboard') return dashboard;
       if (selector === '[data-dashboard-empty]') return empty;
-      if (selector.startsWith('#')) return metrics.get(selector.slice(1)) || null;
+      if (selector.startsWith('#')) return metrics.get(selector.slice(1)) || dashboard.children.find((child) => child.id === selector.slice(1)) || null;
       return null;
     },
     querySelectorAll(selector) {
-      return selector === '[data-dashboard-field]' ? fieldElements : [];
+      return selector === '[data-dashboard-field]' ? dashboard.children.filter((child) => child.dataset.dashboardField) : [];
     },
   };
 
@@ -92,42 +100,33 @@ function createRuntime(sharedStorage = new Map()) {
   const source = fs.readFileSync(path.join(ROOT, 'runtime-context-dashboard.js'), 'utf8');
   new vm.Script(source, { filename: 'runtime-context-dashboard.js' }).runInContext(vmContext);
 
-  return {
-    api: vmContext.WanderContextDashboard,
-    controls,
-    empty,
-    fieldElements,
-    metrics,
-    storage: sharedStorage,
-  };
+  return { api: vmContext.WanderContextDashboard, dashboard, empty, metrics, storage: sharedStorage };
 }
 
 const shared = new Map();
 const first = createRuntime(shared);
 
 assert.deepEqual(Array.from(first.api.getVisibleFields()), ['summary', 'speed', 'heading']);
-assert.equal(first.fieldElements.find((item) => item.dataset.dashboardField === 'summary').hidden, false);
-assert.equal(first.fieldElements.find((item) => item.dataset.dashboardField === 'place').hidden, true);
+assert.equal(first.dashboard.querySelector('[data-dashboard-field="summary"]').hidden, false);
+assert.equal(first.dashboard.querySelector('[data-dashboard-field="place"]').hidden, true);
 assert.equal(first.metrics.get('metric-status').textContent, 'Listo para explorar');
 assert.equal(first.metrics.get('metric-speed').textContent, '4.2 km/h');
 assert.equal(first.metrics.get('metric-heading').textContent, '90°');
-assert.match(first.controls.innerHTML, /Resumen/);
-assert.match(first.controls.innerHTML, /POI actual/);
-assert.match(first.controls.innerHTML, /data-dashboard-toggle="summary"[^>]*checked/);
+assert.equal(first.api.fields.length, 20);
+assert.ok(first.dashboard.querySelector('[data-dashboard-field="activity"]'));
+assert.ok(first.dashboard.querySelector('[data-dashboard-field="placeMemory"]'));
 
 first.api.setFieldVisible('place', true);
 assert.equal(first.api.isVisible('place'), true);
-assert.equal(first.fieldElements.find((item) => item.dataset.dashboardField === 'place').hidden, false);
+assert.equal(first.dashboard.querySelector('[data-dashboard-field="place"]').hidden, false);
 assert.equal(first.metrics.get('metric-place').textContent, 'Luperón');
 assert.match(shared.get(first.api.storageKey), /"place"/);
 
 const reopened = createRuntime(shared);
 assert.equal(reopened.api.isVisible('place'), true);
-assert.equal(reopened.fieldElements.find((item) => item.dataset.dashboardField === 'place').hidden, false);
+assert.equal(reopened.dashboard.querySelector('[data-dashboard-field="place"]').hidden, false);
 
-for (const fieldId of reopened.api.getVisibleFields()) {
-  reopened.api.setFieldVisible(fieldId, false);
-}
+for (const fieldId of reopened.api.getVisibleFields()) reopened.api.setFieldVisible(fieldId, false);
 assert.deepEqual(Array.from(reopened.api.getVisibleFields()), []);
 assert.equal(reopened.empty.hidden, false);
 
