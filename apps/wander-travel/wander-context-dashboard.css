@@ -1,7 +1,7 @@
 .status-rail#context-dashboard {
   position: fixed !important;
   left: 12px !important;
-  right: 12px !important;
+  right: auto !important;
   bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
   z-index: 120 !important;
   display: flex !important;
@@ -11,8 +11,8 @@
   justify-content: flex-start;
   column-gap: 1px;
   row-gap: 2px;
-  width: auto;
-  max-width: none;
+  width: fit-content;
+  max-width: calc(100vw - 96px);
   min-height: 0;
   height: auto;
   padding: 5px 6px;
@@ -166,11 +166,12 @@
 @media (max-width: 520px) {
   .status-rail#context-dashboard {
     left: 12px !important;
-    right: 12px !important;
-    width: auto;
+    right: auto !important;
+    width: fit-content;
+    max-width: calc(100vw - 96px);
   }
 
   .status-rail#context-dashboard .status-item strong {
-    max-width: calc(100vw - 84px);
+    max-width: calc(100vw - 168px);
   }
 }
