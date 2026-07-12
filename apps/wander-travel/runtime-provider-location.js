@@ -4,6 +4,10 @@
 
   const providers = window.WanderProviders || (window.WanderProviders = {});
   let watchId = null;
+  const samples = [];
+  let stableMode = 'unknown';
+  let candidateMode = 'unknown';
+  let candidateSince = 0;
 
   function mapError(error) {
     if (!error) return 'unavailable';
@@ -13,8 +17,102 @@
     return 'unavailable';
   }
 
+  function finite(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function radians(value) {
+    return value * Math.PI / 180;
+  }
+
+  function distanceMeters(a, b) {
+    const radius = 6371008.8;
+    const dLat = radians(b.lat - a.lat);
+    const dLng = radians(b.lng - a.lng);
+    const lat1 = radians(a.lat);
+    const lat2 = radians(b.lat);
+    const value = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return radius * 2 * Math.asin(Math.min(1, Math.sqrt(value)));
+  }
+
+  function addSample(position) {
+    const coords = position.coords;
+    const sample = {
+      lat: coords.latitude,
+      lng: coords.longitude,
+      accuracy: finite(coords.accuracy) ?? 999,
+      speedMps: finite(coords.speed),
+      at: position.timestamp || Date.now(),
+    };
+    samples.push(sample);
+    const cutoff = sample.at - 45000;
+    while (samples.length > 2 && samples[0].at < cutoff) samples.shift();
+    return sample;
+  }
+
+  function estimatedSpeedKmh() {
+    const recent = samples.filter((sample) => sample.accuracy <= 80);
+    if (!recent.length) return null;
+
+    const gpsSpeeds = recent
+      .map((sample) => sample.speedMps)
+      .filter((speed) => speed !== null && speed >= 0 && speed < 100)
+      .map((speed) => speed * 3.6);
+
+    let displacementSpeed = null;
+    if (recent.length >= 2) {
+      const first = recent[0];
+      const last = recent[recent.length - 1];
+      const seconds = Math.max(1, (last.at - first.at) / 1000);
+      const distance = distanceMeters(first, last);
+      const noise = Math.min(60, Math.max(first.accuracy, last.accuracy));
+      displacementSpeed = Math.max(0, distance - noise) / seconds * 3.6;
+    }
+
+    if (gpsSpeeds.length) {
+      const sorted = [...gpsSpeeds].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      return displacementSpeed === null ? median : Math.max(median, displacementSpeed);
+    }
+    return displacementSpeed;
+  }
+
+  function rawMode(speedKmh) {
+    if (speedKmh === null) return 'unknown';
+    if (speedKmh < 1.2) return 'stationary';
+    if (speedKmh < 7.5) return 'walking';
+    if (speedKmh < 22) return 'cycling';
+    return 'car';
+  }
+
+  function publishMobility(now = Date.now()) {
+    const speedKmh = estimatedSpeedKmh();
+    const next = rawMode(speedKmh);
+
+    if (next !== candidateMode) {
+      candidateMode = next;
+      candidateSince = now;
+    }
+
+    const requiredMs = next === 'stationary' ? 10000 : next === 'car' ? 8000 : 12000;
+    if (next !== stableMode && now - candidateSince >= requiredMs) stableMode = next;
+
+    const confidence = stableMode === 'unknown' ? 0.25 : stableMode === 'stationary' ? 0.92 : 0.82;
+    context.set('mobility.provider.mode', stableMode, {
+      source: 'gps-motion-provider', kind: 'derived', ttlMs: 45000, confidence,
+    });
+    context.set('mobility.provider.confidence', confidence, {
+      source: 'gps-motion-provider', kind: 'derived', ttlMs: 45000, confidence: 1,
+    });
+    context.set('mobility.provider.speedKmh', speedKmh, {
+      source: 'gps-motion-provider', kind: 'derived', ttlMs: 45000, confidence,
+    });
+  }
+
   function onPosition(position) {
     const coords = position.coords;
+    addSample(position);
     context.setRealLocation({
       lat: coords.latitude,
       lng: coords.longitude,
@@ -26,6 +124,7 @@
       source: 'gps',
       confidence: 1,
     });
+    publishMobility(position.timestamp || Date.now());
   }
 
   function onError(error) {
@@ -41,7 +140,7 @@
     context.setRealLocationStatus('pending', { source: 'geolocation' });
     watchId = navigator.geolocation.watchPosition(onPosition, onError, {
       enableHighAccuracy: true,
-      maximumAge: 5000,
+      maximumAge: 2000,
       timeout: 15000,
     });
     return true;
@@ -69,6 +168,7 @@
     start,
     stop,
     isWatching: () => watchId != null,
+    getMobilitySamples: () => samples.map((sample) => ({ ...sample })),
   };
 
   inspectPermission();
