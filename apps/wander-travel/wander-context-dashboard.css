@@ -5,10 +5,17 @@
   bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
   z-index: 120 !important;
   display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: center;
+  gap: 1px;
+  width: auto;
+  max-width: calc(100vw - 24px);
   visibility: visible !important;
   opacity: 1 !important;
   transform: translateZ(0);
   border: 0;
+  border-radius: 20px;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -16,6 +23,15 @@
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.status-rail#context-dashboard .status-item {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.status-rail#context-dashboard .status-item strong {
+  max-width: min(46vw, 240px);
 }
 
 .status-rail#context-dashboard:active {
@@ -132,4 +148,15 @@
 
 .context-dashboard-inline-toggle input:focus-visible + span {
   box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+@media (max-width: 520px) {
+  .status-rail#context-dashboard {
+    right: 12px !important;
+    width: auto;
+  }
+
+  .status-rail#context-dashboard .status-item strong {
+    max-width: calc(100vw - 84px);
+  }
 }
