@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.86.2';
+  const APP_BUILD = 'v0.86.3';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
