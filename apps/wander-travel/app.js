@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.86.6';
+  const APP_BUILD = 'v0.87.0';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -20,11 +20,16 @@
 
   window.addEventListener('load', async () => {
     try {
+      await loadRuntime('runtime-provider-current-poi.js?v=20260712-04');
+    } catch {}
+
+    try {
       await loadRuntime('runtime-dashboard-viewport.js?v=20260711-08');
     } catch {}
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        window.WanderProviders?.currentPOI?.detect?.();
         window.WanderDashboardViewport?.mount?.();
         window.WanderContextDashboard?.restore?.();
         window.WanderAppReady = true;
