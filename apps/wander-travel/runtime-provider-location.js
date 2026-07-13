@@ -46,7 +46,7 @@
       at: position.timestamp || Date.now(),
     };
     samples.push(sample);
-    const cutoff = sample.at - 45000;
+    const cutoff = sample.at - 60000;
     while (samples.length > 2 && samples[0].at < cutoff) samples.shift();
     return sample;
   }
@@ -54,33 +54,33 @@
   function estimatedSpeedKmh() {
     const recent = samples.filter((sample) => sample.accuracy <= 80);
     if (!recent.length) return null;
+    if (recent.length < 2) return 0;
 
+    const first = recent[0];
+    const last = recent[recent.length - 1];
+    const seconds = Math.max(1, (last.at - first.at) / 1000);
+    const distance = distanceMeters(first, last);
+    const accuracyNoise = Math.min(70, Math.max(8, first.accuracy, last.accuracy));
+    const stationaryRadius = Math.max(10, accuracyNoise * 1.35);
+
+    // GPS drift inside the accuracy envelope is not real movement.
+    if (distance <= stationaryRadius) return 0;
+
+    const displacementSpeed = Math.max(0, distance - accuracyNoise) / seconds * 3.6;
     const gpsSpeeds = recent
       .map((sample) => sample.speedMps)
       .filter((speed) => speed !== null && speed >= 0 && speed < 100)
-      .map((speed) => speed * 3.6);
+      .map((speed) => speed * 3.6)
+      .sort((a, b) => a - b);
+    const medianGpsSpeed = gpsSpeeds.length ? gpsSpeeds[Math.floor(gpsSpeeds.length / 2)] : 0;
 
-    let displacementSpeed = null;
-    if (recent.length >= 2) {
-      const first = recent[0];
-      const last = recent[recent.length - 1];
-      const seconds = Math.max(1, (last.at - first.at) / 1000);
-      const distance = distanceMeters(first, last);
-      const noise = Math.min(60, Math.max(first.accuracy, last.accuracy));
-      displacementSpeed = Math.max(0, distance - noise) / seconds * 3.6;
-    }
-
-    if (gpsSpeeds.length) {
-      const sorted = [...gpsSpeeds].sort((a, b) => a - b);
-      const median = sorted[Math.floor(sorted.length / 2)];
-      return displacementSpeed === null ? median : Math.max(median, displacementSpeed);
-    }
-    return displacementSpeed;
+    // A single noisy speed reading cannot declare movement without net displacement.
+    return Math.max(displacementSpeed, medianGpsSpeed >= 2 ? medianGpsSpeed : 0);
   }
 
   function rawMode(speedKmh) {
     if (speedKmh === null) return 'unknown';
-    if (speedKmh < 1.2) return 'stationary';
+    if (speedKmh < 1.8) return 'stationary';
     if (speedKmh < 7.5) return 'walking';
     if (speedKmh < 22) return 'cycling';
     return 'car';
@@ -95,17 +95,18 @@
       candidateSince = now;
     }
 
-    const requiredMs = next === 'stationary' ? 10000 : next === 'car' ? 8000 : 12000;
+    // Returning to stationary should be quick; declaring movement must be sustained.
+    const requiredMs = next === 'stationary' ? 6000 : next === 'car' ? 12000 : 18000;
     if (next !== stableMode && now - candidateSince >= requiredMs) stableMode = next;
 
-    const confidence = stableMode === 'unknown' ? 0.25 : stableMode === 'stationary' ? 0.92 : 0.82;
+    const confidence = stableMode === 'unknown' ? 0.25 : stableMode === 'stationary' ? 0.95 : 0.82;
     context.set('mobility.provider.mode', stableMode, {
       source: 'gps-motion-provider', kind: 'derived', ttlMs: 45000, confidence,
     });
     context.set('mobility.provider.confidence', confidence, {
       source: 'gps-motion-provider', kind: 'derived', ttlMs: 45000, confidence: 1,
     });
-    context.set('mobility.provider.speedKmh', speedKmh, {
+    context.set('mobility.provider.speedKmh', stableMode === 'stationary' ? 0 : speedKmh, {
       source: 'gps-motion-provider', kind: 'derived', ttlMs: 45000, confidence,
     });
   }
