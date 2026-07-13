@@ -1,0 +1,409 @@
+{
+  "ok": true,
+  "query": {
+    "latitude": 19.372667,
+    "longitude": -69.852783,
+    "radius": 300
+  },
+  "count": 20,
+  "places": [
+    {
+      "id": "ChIJ8aIh3jRbro4Rbq6WgGyEetQ",
+      "types": [
+        "hotel",
+        "extended_stay_hotel",
+        "lodging",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "C. Jorge Awad 5, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3726916,
+        "longitude": -69.85271019999999
+      },
+      "displayName": {
+        "text": "Hotel Juliana",
+        "languageCode": "es"
+      },
+      "primaryType": "hotel"
+    },
+    {
+      "id": "ChIJK0QEG65aro4RjPpdQXk10-E",
+      "types": [
+        "resort_hotel",
+        "massage_spa",
+        "massage",
+        "spa",
+        "hotel",
+        "lodging",
+        "point_of_interest",
+        "service",
+        "establishment"
+      ],
+      "formattedAddress": "94FW+5R5, C. Jorge Awad, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.372892,
+        "longitude": -69.85287509999999
+      },
+      "displayName": {
+        "text": "OASIS CENTRO DE ESTETICA Y SPA",
+        "languageCode": "en"
+      },
+      "primaryType": "resort_hotel"
+    },
+    {
+      "id": "ChIJ5adhBkhbro4RnH5lDw_9Nwo",
+      "types": [
+        "coffee_shop",
+        "cafe",
+        "food_store",
+        "store",
+        "food",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "94FW+2QV, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3726104,
+        "longitude": -69.8530852
+      },
+      "displayName": {
+        "text": "Cafeteria Carmen",
+        "languageCode": "es"
+      },
+      "primaryType": "coffee_shop"
+    },
+    {
+      "id": "ChIJcTcJTE1bro4Rtk-mPP5A6DI",
+      "types": [
+        "housing_complex",
+        "point_of_interest",
+        "service",
+        "establishment"
+      ],
+      "formattedAddress": "94CW+WWX, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.372368700000003,
+        "longitude": -69.8526548
+      },
+      "displayName": {
+        "text": "Casa color crema marrón y naranja",
+        "languageCode": "es"
+      },
+      "primaryType": "housing_complex"
+    },
+    {
+      "id": "ChIJZ8Sdxzxbro4RP4H6LEFvyhs",
+      "types": [
+        "clothing_store",
+        "store",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "C. Jorge Awad 2, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3727029,
+        "longitude": -69.853275
+      },
+      "displayName": {
+        "text": "D'Luz Tienda & Más",
+        "languageCode": "es"
+      },
+      "primaryType": "clothing_store"
+    },
+    {
+      "id": "ChIJJa1eQ3Fbro4R3o2dIfHSH9M",
+      "types": [
+        "lawyer",
+        "consultant",
+        "point_of_interest",
+        "service",
+        "establishment"
+      ],
+      "formattedAddress": "por la UASD vieja, C. Jorge Awad 8, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.372187099999998,
+        "longitude": -69.8525537
+      },
+      "displayName": {
+        "text": "LEGALMIGRA",
+        "languageCode": "es"
+      },
+      "primaryType": "lawyer"
+    },
+    {
+      "id": "ChIJ4UfOBa5aro4R4ZL8ipmWHvs",
+      "types": [
+        "grocery_store",
+        "food_store",
+        "store",
+        "food",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "C. Jorge Awad, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.372823200000003,
+        "longitude": -69.8533565
+      },
+      "displayName": {
+        "text": "Comercial Maridalia",
+        "languageCode": "es"
+      },
+      "primaryType": "grocery_store"
+    },
+    {
+      "id": "ChIJSSZ6Pa5aro4RpX8NzmhUB1M",
+      "types": [
+        "university",
+        "educational_institution",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "94CX+X35, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3723839,
+        "longitude": -69.85225710000002
+      },
+      "displayName": {
+        "text": "Universidad Autónoma de Santo Domingo - Recinto Nagua",
+        "languageCode": "en"
+      },
+      "primaryType": "university"
+    },
+    {
+      "id": "ChIJ74WcMQBbro4R3MYLeN7Y92g",
+      "types": [
+        "housing_complex",
+        "point_of_interest",
+        "service",
+        "establishment"
+      ],
+      "formattedAddress": "94FW+7RW, C. Salomé Ureña, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3732363,
+        "longitude": -69.8529253
+      },
+      "displayName": {
+        "text": "Casa de Anabelle",
+        "languageCode": "es"
+      },
+      "primaryType": "housing_complex"
+    },
+    {
+      "id": "ChIJV4FJLQBbro4Roekh4qM_wSk",
+      "types": [
+        "association_or_organization",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "C. Jorge Awad 13, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3728731,
+        "longitude": -69.8521759
+      },
+      "displayName": {
+        "text": "centro familiar",
+        "languageCode": "en"
+      },
+      "primaryType": "association_or_organization"
+    },
+    {
+      "id": "ChIJaQbsH65aro4RUeBnxhK5Ewg",
+      "types": [
+        "courthouse",
+        "local_government_office",
+        "government_office",
+        "point_of_interest",
+        "service",
+        "establishment"
+      ],
+      "formattedAddress": "94FX+73C, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3731893,
+        "longitude": -69.8523438
+      },
+      "displayName": {
+        "text": "Tribunal de Niños, Niñas y Adolescentes",
+        "languageCode": "es"
+      },
+      "primaryType": "courthouse"
+    },
+    {
+      "id": "ChIJG9yZIAhbro4Rx1fOEMPoQ78",
+      "types": [
+        "barber_shop",
+        "hair_care",
+        "health",
+        "point_of_interest",
+        "service",
+        "establishment"
+      ],
+      "formattedAddress": "C7, C. Jorge Awad 51, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.372717599999998,
+        "longitude": -69.8534964
+      },
+      "displayName": {
+        "text": "The Best Barber Studio",
+        "languageCode": "en"
+      },
+      "primaryType": "barber_shop"
+    },
+    {
+      "id": "ChIJH9wqOABbro4RoKEL-jZsjRk",
+      "types": [
+        "food_store",
+        "store",
+        "food",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "casi esquina, C. Jorge Awad 26, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3728062,
+        "longitude": -69.8534916
+      },
+      "displayName": {
+        "text": "Queso Nagua",
+        "languageCode": "es"
+      },
+      "primaryType": "food_store"
+    },
+    {
+      "id": "ChIJo_hnBq5aro4RK4e53YWOgpE",
+      "types": [
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "33000 Nagua, Dominican Republic",
+      "location": {
+        "latitude": 19.372816399999998,
+        "longitude": -69.85350509999999
+      },
+      "displayName": {
+        "text": "Inversiones Rurosu",
+        "languageCode": "es"
+      },
+      "primaryType": "point_of_interest"
+    },
+    {
+      "id": "ChIJ-TUA4LFaro4RXYKenl8tff0",
+      "types": [
+        "lawyer",
+        "consultant",
+        "point_of_interest",
+        "service",
+        "establishment"
+      ],
+      "formattedAddress": "94FX+73W, C. Salomé Ureña, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3732301,
+        "longitude": -69.8522833
+      },
+      "displayName": {
+        "text": "Bufete Juridico Abel Gonzalez",
+        "languageCode": "en"
+      },
+      "primaryType": "lawyer"
+    },
+    {
+      "id": "ChIJYwr8tkRbro4R2DuGUNCwxxE",
+      "types": [
+        "wholesaler",
+        "point_of_interest",
+        "service",
+        "establishment"
+      ],
+      "formattedAddress": "C. Colon 85b, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.372844399999998,
+        "longitude": -69.8535595
+      },
+      "displayName": {
+        "text": "Ozoria Tech",
+        "languageCode": "es"
+      },
+      "primaryType": "service"
+    },
+    {
+      "id": "ChIJxzh4C65aro4R5qLu7yt_Vyg",
+      "types": [
+        "hotel",
+        "lodging",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "94CW+RJR, Av. María Trinidad Sánchez, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3721246,
+        "longitude": -69.85348189999999
+      },
+      "displayName": {
+        "text": "Hotel María Trinidad Sánchez",
+        "languageCode": "es"
+      },
+      "primaryType": "hotel"
+    },
+    {
+      "id": "ChIJe57RsMJbro4RQMHaG9wkjTY",
+      "types": [
+        "building_materials_store",
+        "home_goods_store",
+        "store",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "Av. María Trinidad Sánchez, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.372562500000004,
+        "longitude": -69.8536812
+      },
+      "displayName": {
+        "text": "Spazzola Color Shop - Nagua",
+        "languageCode": "es"
+      },
+      "primaryType": "building_materials_store"
+    },
+    {
+      "id": "ChIJFziz_tVbro4ReF75Lo1Hl2I",
+      "types": [
+        "pet_store",
+        "store",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "Av. María Trinidad Sánchez, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.3724092,
+        "longitude": -69.85364849999999
+      },
+      "displayName": {
+        "text": "Nidito Pet Shop",
+        "languageCode": "es"
+      },
+      "primaryType": "pet_store"
+    },
+    {
+      "id": "ChIJKSF9RkFbro4RnMWRGmRBF_0",
+      "types": [
+        "general_store",
+        "food_store",
+        "store",
+        "food",
+        "point_of_interest",
+        "establishment"
+      ],
+      "formattedAddress": "C. Salomé Ureña 19, Nagua 33000, Dominican Republic",
+      "location": {
+        "latitude": 19.373519899999998,
+        "longitude": -69.85265679999999
+      },
+      "displayName": {
+        "text": "Survive Rd",
+        "languageCode": "es"
+      },
+      "primaryType": "general_store"
+    }
+  ]
+}
