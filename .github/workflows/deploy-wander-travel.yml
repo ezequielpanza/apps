@@ -29,22 +29,6 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Generate temporary Overture extract for Nagua
-        run: |
-          python -m pip install --disable-pip-version-check overturemaps
-          mkdir -p apps/wander-travel/data/overture
-          overturemaps download \
-            --bbox=-69.872,19.355,-69.834,19.390 \
-            -t place \
-            -f geojson \
-            -o apps/wander-travel/data/overture/nagua-places.geojson
-          test -s apps/wander-travel/data/overture/nagua-places.geojson
-
       - name: Verify app shell and local script references
         run: |
           test -s apps/wander-travel/index.html
@@ -93,15 +77,14 @@ jobs:
             echo "Attempt $attempt returned HTTP $status"
             sleep 10
           done
-          python - <<'PY'
-          import json
-          path = 'debug-results/google-places-test.json'
-          with open(path, encoding='utf-8') as source:
-              payload = json.load(source)
-          if not payload.get('ok'):
-              raise SystemExit(f"Google Places test failed: {payload}")
-          print(f"Google Places test returned {payload.get('count', 0)} places")
-          PY
+          node <<'NODE'
+          const fs = require('fs');
+          const payload = JSON.parse(fs.readFileSync('debug-results/google-places-test.json', 'utf8'));
+          if (!payload.ok) {
+            throw new Error(`Google Places test failed: ${JSON.stringify(payload)}`);
+          }
+          console.log(`Google Places test returned ${payload.count || 0} places`);
+          NODE
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add debug-results/google-places-test.json
