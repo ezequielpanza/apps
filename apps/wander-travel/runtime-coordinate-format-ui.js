@@ -13,7 +13,6 @@
         grid-template-columns: minmax(0, 1fr) !important;
         align-items: start !important;
         gap: 8px !important;
-        cursor: pointer;
       }
       [data-coordinate-format-row] .context-row-value {
         width: 100%;
@@ -21,7 +20,21 @@
         padding-left: 27px;
         text-align: left !important;
       }
-      [data-coordinate-format-row] .context-row-value b {
+      .coordinate-format-button {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        margin: 0;
+        padding: 4px 0;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      .coordinate-format-button b {
         display: block;
         max-width: 100%;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -30,7 +43,9 @@
         white-space: normal;
         overflow-wrap: anywhere;
       }
-      [data-coordinate-format-row]:active {
+      .coordinate-format-button:active,
+      .coordinate-format-button:focus-visible {
+        outline: none;
         background: rgba(1,224,203,.12);
       }
     `;
