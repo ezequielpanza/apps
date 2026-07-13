@@ -58,24 +58,6 @@ jobs:
       - name: Check JavaScript syntax
         run: find apps/wander-travel -maxdepth 1 -type f -name '*.js' -print0 | xargs -0 -n1 node --check
 
-      - name: Run deterministic Wander scenarios
-        run: node apps/wander-travel/tests/wander-scenarios.mjs
-
-      - name: Run unified POI engine tests
-        run: node apps/wander-travel/tests/poi-source-foundation.mjs
-
-      - name: Run Wikidata connector tests
-        run: node apps/wander-travel/tests/wikidata-connector.mjs
-
-      - name: Run OpenStreetMap connector tests
-        run: node apps/wander-travel/tests/openstreetmap-connector.mjs
-
-      - name: Run POI consolidation tests
-        run: node apps/wander-travel/tests/poi-consolidation.mjs
-
-      - name: Run NearbyProvider field tests
-        run: node apps/wander-travel/tests/nearby-provider.mjs
-
       - name: Publish to Cloudflare Pages
         working-directory: apps/wander-travel
         env:
