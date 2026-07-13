@@ -80,8 +80,15 @@
       };
     }
 
-    const speedMps = finiteNumber(effective.speedMps);
-    const speedKmh = speedMps === null ? null : Math.max(0, speedMps * 3.6);
+    const rawSpeedMps = finiteNumber(effective.speedMps);
+    const rawSpeedKmh = rawSpeedMps === null ? null : Math.max(0, rawSpeedMps * 3.6);
+    const providerSpeedKmh = finiteNumber(context.value?.('mobility.provider.speedKmh', null));
+    const providerMode = context.value?.('mobility.provider.mode', null);
+    const providerConfidence = finiteNumber(context.value?.('mobility.provider.confidence', null));
+
+    let speedKmh = providerSpeedKmh !== null ? Math.max(0, providerSpeedKmh) : rawSpeedKmh;
+    if (providerMode === 'stationary' && providerConfidence !== null && providerConfidence >= 0.6) speedKmh = 0;
+
     const heading = finiteNumber(effective.heading);
     const motion = inferMotionState(speedKmh);
 
