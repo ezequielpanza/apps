@@ -53,7 +53,7 @@ jobs:
 
       - name: Save Overture test extract
         run: |
-          if git diff --quiet -- apps/wander-travel/data/overture/nagua-places.geojson; then
+          if [ -z "$(git status --porcelain -- apps/wander-travel/data/overture/nagua-places.geojson)" ]; then
             echo "Nagua extract is unchanged."
             exit 0
           fi
