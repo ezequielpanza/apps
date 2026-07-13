@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wander-travel-v0.87.8';
+const CACHE_NAME = 'wander-travel-v0.87.9';
 const APP_SHELL = [
   './index.html',
   './wander-ui.css',
@@ -16,6 +16,7 @@ const APP_SHELL = [
   './runtime-coordinate-format-ui.js',
   './runtime-debug-overture.js',
   './runtime-source-policy.js',
+  './runtime-source-policy-google-places.js',
   './runtime-poi-normalized.js',
   './runtime-poi-consolidated.js',
   './runtime-poi-store.js',
@@ -24,6 +25,7 @@ const APP_SHELL = [
   './runtime-external-source-google-maps.js',
   './runtime-poi-connector-wikidata.js',
   './runtime-poi-connector-openstreetmap.js',
+  './runtime-poi-connector-google-places.js',
   './runtime-map-core.js',
   './runtime-map-position.js',
   './runtime-map-controls.js',
