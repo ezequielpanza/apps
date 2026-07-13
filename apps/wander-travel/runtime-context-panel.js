@@ -148,10 +148,13 @@
 
   function humanRow(key, label, iconName, fieldId) {
     const entry = context.get(key);
-    const interactive = fieldId === 'coordinates' ? ' data-coordinate-format-row title="Tocar para cambiar el formato" role="button" tabindex="0"' : '';
-    return '<div class="context-row has-dashboard-toggle"' + interactive + '>' +
+    const value = readableValue(key, entry);
+    const valueHtml = fieldId === 'coordinates'
+      ? '<button type="button" class="coordinate-format-button" data-coordinate-format-button title="Tocar para cambiar el formato" aria-label="Cambiar formato de coordenadas"><b>' + value + '</b></button>'
+      : '<b>' + value + '</b>';
+    return '<div class="context-row has-dashboard-toggle"' + (fieldId === 'coordinates' ? ' data-coordinate-format-row' : '') + '>' +
       '<div class="context-label">' + dashboardToggle(fieldId, label) + icon(iconName) + '<strong>' + label + '</strong></div>' +
-      '<div class="context-row-value"><b>' + readableValue(key, entry) + '</b></div></div>';
+      '<div class="context-row-value">' + valueHtml + '</div></div>';
   }
 
   function extraDashboardRow(fieldId) {
@@ -203,15 +206,11 @@
   });
 
   $('#context-list')?.addEventListener('click', (event) => {
-    if (event.target.closest('[data-dashboard-inline-toggle]')) return;
-    if (event.target.closest('[data-coordinate-format-row]')) cycleCoordinateFormat();
-  });
-
-  $('#context-list')?.addEventListener('keydown', (event) => {
-    if ((event.key === 'Enter' || event.key === ' ') && event.target.closest('[data-coordinate-format-row]')) {
-      event.preventDefault();
-      cycleCoordinateFormat();
-    }
+    const button = event.target.closest('[data-coordinate-format-button]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    cycleCoordinateFormat();
   });
 
   $('#refresh-context-button')?.addEventListener('click', () => {
