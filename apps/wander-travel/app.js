@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.87.5';
+  const APP_BUILD = 'v0.87.6';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -24,7 +24,7 @@
     } catch {}
 
     try {
-      await loadRuntime('runtime-coordinate-format-ui.js?v=20260712-07');
+      await loadRuntime('runtime-coordinate-format-ui.js?v=20260712-09');
     } catch {}
 
     try {
