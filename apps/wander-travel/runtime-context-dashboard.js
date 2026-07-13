@@ -3,6 +3,7 @@
   if (!context) return;
 
   const STORAGE_KEY = 'wander.contextDashboard.config.v1';
+  const COORDINATE_FORMAT_KEY = 'wander.coordinates.format.v1';
   const DEFAULT_VISIBLE_FIELDS = Object.freeze(['summary', 'speed', 'heading']);
 
   function textValue(value, fallback) {
@@ -16,12 +17,33 @@
     return Number.isFinite(value) ? value.toFixed(digits) + suffix : fallback;
   }
 
+  function coordinateFormat() {
+    try {
+      const stored = localStorage.getItem(COORDINATE_FORMAT_KEY);
+      return ['dd', 'dm', 'dms'].includes(stored) ? stored : 'dd';
+    } catch { return 'dd'; }
+  }
+
+  function coordinatePart(value, positive, negative, format) {
+    const hemisphere = value >= 0 ? positive : negative;
+    const absolute = Math.abs(value);
+    if (format === 'dd') return absolute.toFixed(6) + '° ' + hemisphere;
+    const degrees = Math.floor(absolute);
+    const minutesFull = (absolute - degrees) * 60;
+    if (format === 'dm') return degrees + '° ' + minutesFull.toFixed(3) + '′ ' + hemisphere;
+    const minutes = Math.floor(minutesFull);
+    const seconds = (minutesFull - minutes) * 60;
+    return degrees + '° ' + minutes + '′ ' + seconds.toFixed(1) + '″ ' + hemisphere;
+  }
+
   function coordinatesValue() {
     const effective = context.getEffectiveLocation?.();
     const lat = Number(effective?.lat ?? context.value('location.effective.lat'));
     const lng = Number(effective?.lng ?? context.value('location.effective.lng'));
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 'Pendiente';
-    return lat.toFixed(6) + ', ' + lng.toFixed(6);
+    const format = coordinateFormat();
+    if (format === 'dd') return lat.toFixed(6) + ', ' + lng.toFixed(6);
+    return coordinatePart(lat, 'N', 'S', format) + ' · ' + coordinatePart(lng, 'E', 'W', format);
   }
 
   function mobilityValue() {
@@ -173,6 +195,7 @@
   }
 
   context.subscribe(render);
+  window.addEventListener('wander:coordinate-format-change', render);
   render();
 
   window.WanderContextDashboard = Object.freeze({
