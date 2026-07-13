@@ -71,9 +71,13 @@
     if (metric) metric.textContent = value();
   }
 
+  function scheduleRender() {
+    requestAnimationFrame(renderDashboardCoordinate);
+  }
+
   context.subscribe((key) => {
-    if (!key || key.startsWith('location.effective')) renderDashboardCoordinate();
+    if (!key || key.startsWith('location.effective')) scheduleRender();
   });
-  window.addEventListener('wander:coordinate-format-change', renderDashboardCoordinate);
-  renderDashboardCoordinate();
+  window.addEventListener('wander:coordinate-format-change', scheduleRender);
+  scheduleRender();
 })();
