@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: deploy-wander-travel
@@ -80,3 +80,32 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@latest pages deploy . --project-name=wander-travel --branch=main
+
+      - name: Test Google Places API through Wander
+        run: |
+          mkdir -p debug-results
+          endpoint='https://wander-travel.pages.dev/api/places/nearby?lat=19.372667&lng=-69.852783&radius=300'
+          for attempt in 1 2 3 4 5 6; do
+            status=$(curl --silent --show-error --location --output debug-results/google-places-test.json --write-out '%{http_code}' "$endpoint" || true)
+            if [ "$status" = "200" ]; then
+              break
+            fi
+            echo "Attempt $attempt returned HTTP $status"
+            sleep 10
+          done
+          python - <<'PY'
+          import json
+          path = 'debug-results/google-places-test.json'
+          with open(path, encoding='utf-8') as source:
+              payload = json.load(source)
+          if not payload.get('ok'):
+              raise SystemExit(f"Google Places test failed: {payload}")
+          print(f"Google Places test returned {payload.get('count', 0)} places")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add debug-results/google-places-test.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Record Google Places API test result"
+            git push
+          fi
