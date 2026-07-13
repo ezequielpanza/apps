@@ -9,16 +9,24 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      [data-coordinate-format-row] {
+      #context-list .context-row {
         grid-template-columns: minmax(0, 1fr) !important;
         align-items: start !important;
-        gap: 8px !important;
+        gap: 7px !important;
       }
-      [data-coordinate-format-row] .context-row-value {
+      #context-list .context-row-value {
         width: 100%;
         min-width: 0;
         padding-left: 27px;
         text-align: left !important;
+      }
+      #context-list .context-row-value b {
+        display: block;
+        max-width: 100%;
+        font-size: .82rem;
+        line-height: 1.4;
+        white-space: normal;
+        overflow-wrap: anywhere;
       }
       .coordinate-format-button {
         display: block;
