@@ -4,6 +4,8 @@
 
   const $ = (selector) => document.querySelector(selector);
   const icon = (name) => '<svg class="section-icon" aria-hidden="true"><use href="wander-icons.svg#' + name + '"></use></svg>';
+  const COORDINATE_FORMAT_KEY = 'wander.coordinates.format.v1';
+  const COORDINATE_FORMATS = ['dd', 'dm', 'dms'];
 
   const HUMAN = [
     ['context.status', 'Estado actual', 'target', 'summary'],
@@ -76,12 +78,42 @@
     return labels[value] || String(value || 'Pendiente');
   }
 
+  function coordinateFormat() {
+    try {
+      const stored = localStorage.getItem(COORDINATE_FORMAT_KEY);
+      return COORDINATE_FORMATS.includes(stored) ? stored : 'dd';
+    } catch { return 'dd'; }
+  }
+
+  function coordinatePart(value, positive, negative, format) {
+    const hemisphere = value >= 0 ? positive : negative;
+    const absolute = Math.abs(value);
+    if (format === 'dd') return absolute.toFixed(6) + '° ' + hemisphere;
+    const degrees = Math.floor(absolute);
+    const minutesFull = (absolute - degrees) * 60;
+    if (format === 'dm') return degrees + '° ' + minutesFull.toFixed(3) + '′ ' + hemisphere;
+    const minutes = Math.floor(minutesFull);
+    const seconds = (minutesFull - minutes) * 60;
+    return degrees + '° ' + minutes + '′ ' + seconds.toFixed(1) + '″ ' + hemisphere;
+  }
+
   function coordinatesValue() {
     const effective = context.getEffectiveLocation?.();
     const lat = Number(effective?.lat ?? context.value('location.effective.lat'));
     const lng = Number(effective?.lng ?? context.value('location.effective.lng'));
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 'Pendiente';
-    return lat.toFixed(6) + ', ' + lng.toFixed(6);
+    const format = coordinateFormat();
+    if (format === 'dd') return lat.toFixed(6) + ', ' + lng.toFixed(6);
+    return coordinatePart(lat, 'N', 'S', format) + ' · ' + coordinatePart(lng, 'E', 'W', format);
+  }
+
+  function cycleCoordinateFormat() {
+    const current = coordinateFormat();
+    const next = COORDINATE_FORMATS[(COORDINATE_FORMATS.indexOf(current) + 1) % COORDINATE_FORMATS.length];
+    try { localStorage.setItem(COORDINATE_FORMAT_KEY, next); } catch {}
+    window.dispatchEvent(new CustomEvent('wander:coordinate-format-change', { detail: { format: next } }));
+    dashboard()?.render?.();
+    renderHuman();
   }
 
   function readableValue(key, entry) {
@@ -116,7 +148,8 @@
 
   function humanRow(key, label, iconName, fieldId) {
     const entry = context.get(key);
-    return '<div class="context-row has-dashboard-toggle">' +
+    const interactive = fieldId === 'coordinates' ? ' data-coordinate-format-row title="Tocar para cambiar el formato" role="button" tabindex="0"' : '';
+    return '<div class="context-row has-dashboard-toggle"' + interactive + '>' +
       '<div class="context-label">' + dashboardToggle(fieldId, label) + icon(iconName) + '<strong>' + label + '</strong></div>' +
       '<div class="context-row-value"><b>' + readableValue(key, entry) + '</b></div></div>';
   }
@@ -169,6 +202,18 @@
     renderHuman();
   });
 
+  $('#context-list')?.addEventListener('click', (event) => {
+    if (event.target.closest('[data-dashboard-inline-toggle]')) return;
+    if (event.target.closest('[data-coordinate-format-row]')) cycleCoordinateFormat();
+  });
+
+  $('#context-list')?.addEventListener('keydown', (event) => {
+    if ((event.key === 'Enter' || event.key === ' ') && event.target.closest('[data-coordinate-format-row]')) {
+      event.preventDefault();
+      cycleCoordinateFormat();
+    }
+  });
+
   $('#refresh-context-button')?.addEventListener('click', () => {
     context.updateTime();
     window.WanderProviders?.place?.refresh?.(true);
@@ -176,8 +221,9 @@
   });
 
   context.subscribe(render);
+  window.addEventListener('wander:coordinate-format-change', renderHuman);
   render();
   setInterval(render, 15000);
 
-  window.WanderContextPanel = { render, syncSummary };
+  window.WanderContextPanel = { render, syncSummary, cycleCoordinateFormat };
 })();
