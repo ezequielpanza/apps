@@ -29,6 +29,22 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate temporary Overture extract for Nagua
+        run: |
+          python -m pip install --disable-pip-version-check overturemaps
+          mkdir -p apps/wander-travel/data/overture
+          overturemaps download \
+            --bbox=-69.872,19.355,-69.834,19.390 \
+            -t place \
+            -f geojson \
+            -o apps/wander-travel/data/overture/nagua-places.geojson
+          test -s apps/wander-travel/data/overture/nagua-places.geojson
+
       - name: Verify app shell and local script references
         run: |
           test -s apps/wander-travel/index.html
