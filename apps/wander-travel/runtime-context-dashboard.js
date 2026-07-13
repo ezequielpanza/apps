@@ -16,6 +16,14 @@
     return Number.isFinite(value) ? value.toFixed(digits) + suffix : fallback;
   }
 
+  function coordinatesValue() {
+    const effective = context.getEffectiveLocation?.();
+    const lat = Number(effective?.lat ?? context.value('location.effective.lat'));
+    const lng = Number(effective?.lng ?? context.value('location.effective.lng'));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 'Pendiente';
+    return lat.toFixed(6) + ', ' + lng.toFixed(6);
+  }
+
   function mobilityValue() {
     const value = context.value('mobility.mode');
     const labels = {
@@ -74,6 +82,7 @@
     { id: 'time', label: 'Hora', icon: 'clock', metricId: 'metric-time', value: () => textValue(context.value('time.now'), 'Pendiente') },
     { id: 'dayPeriod', label: 'Momento del día', icon: 'day', metricId: 'metric-day-period', value: () => textValue(context.value('time.dayPeriod'), 'Pendiente') },
     { id: 'locationStatus', label: 'Ubicación', icon: 'pin', metricId: 'metric-location-status', value: () => textValue(context.value('location.effective.status'), 'Pendiente') },
+    { id: 'coordinates', label: 'Coordenadas', icon: 'pin', metricId: 'metric-coordinates', value: coordinatesValue },
     { id: 'locationSource', label: 'Fuente de ubicación', icon: 'target', metricId: 'metric-location-source', value: () => textValue(context.value('location.effective.source'), 'Pendiente') },
     { id: 'accuracy', label: 'Precisión', icon: 'target', metricId: 'metric-accuracy', value: () => numberValue('location.effective.accuracy', ' m') },
     { id: 'motionStatus', label: 'Movimiento físico', icon: 'route', metricId: 'metric-motion-status', value: () => textValue(context.value('motion.status'), 'Pendiente') },
