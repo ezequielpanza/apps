@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: deploy-wander-travel
@@ -28,40 +28,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Extract Overture places for Nagua
-        run: |
-          python -m pip install --disable-pip-version-check overturemaps
-          mkdir -p apps/wander-travel/data/overture
-          overturemaps download \
-            --bbox=-69.872,19.355,-69.834,19.390 \
-            --type=place \
-            --format=geojson \
-            --output=apps/wander-travel/data/overture/nagua-places.geojson
-          python - <<'PY'
-          import json
-          path = 'apps/wander-travel/data/overture/nagua-places.geojson'
-          with open(path, encoding='utf-8') as source:
-              data = json.load(source)
-          print(f"Overture Nagua places: {len(data.get('features', []))}")
-          PY
-
-      - name: Save Overture test extract
-        run: |
-          if [ -z "$(git status --porcelain -- apps/wander-travel/data/overture/nagua-places.geojson)" ]; then
-            echo "Nagua extract is unchanged."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/wander-travel/data/overture/nagua-places.geojson
-          git commit -m "Update Nagua Overture POI test extract"
-          git push
 
       - name: Verify app shell and local script references
         run: |
