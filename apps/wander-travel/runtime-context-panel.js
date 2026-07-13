@@ -11,6 +11,7 @@
     ['time.now', 'Hora', 'clock', 'time'],
     ['time.dayPeriod', 'Momento del día', 'day', 'dayPeriod'],
     ['location.effective.status', 'Ubicación', 'pin', 'locationStatus'],
+    ['location.effective.coordinates', 'Coordenadas', 'pin', 'coordinates'],
     ['location.effective.source', 'Fuente de ubicación', 'target', 'locationSource'],
     ['location.effective.accuracy', 'Precisión', 'target', 'accuracy'],
     ['motion.status', 'Movimiento físico', 'route', 'motionStatus'],
@@ -75,7 +76,16 @@
     return labels[value] || String(value || 'Pendiente');
   }
 
+  function coordinatesValue() {
+    const effective = context.getEffectiveLocation?.();
+    const lat = Number(effective?.lat ?? context.value('location.effective.lat'));
+    const lng = Number(effective?.lng ?? context.value('location.effective.lng'));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 'Pendiente';
+    return lat.toFixed(6) + ', ' + lng.toFixed(6);
+  }
+
   function readableValue(key, entry) {
+    if (key === 'location.effective.coordinates') return coordinatesValue();
     if (!entry) return 'Pendiente';
     if (key.endsWith('.accuracy')) return Number(entry.value).toFixed(0) + ' m';
     if (key.endsWith('.speedMps')) return (Number(entry.value) * 3.6).toFixed(1) + ' km/h';
