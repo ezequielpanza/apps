@@ -42,9 +42,9 @@
       "types": [
         "resort_hotel",
         "massage_spa",
+        "spa",
         "massage",
         "hotel",
-        "spa",
         "lodging",
         "service",
         "point_of_interest",
@@ -77,9 +77,9 @@
         "coffee_shop",
         "cafe",
         "food_store",
-        "food",
         "store",
         "point_of_interest",
+        "food",
         "establishment"
       ],
       "formattedAddress": "94FW+2QV, Nagua 33000, Dominican Republic",
@@ -196,9 +196,9 @@
       "types": [
         "grocery_store",
         "food_store",
-        "food",
         "store",
         "point_of_interest",
+        "food",
         "establishment"
       ],
       "formattedAddress": "C. Jorge Awad, Nagua 33000, Dominican Republic",
@@ -374,9 +374,9 @@
       "id": "ChIJH9wqOABbro4RoKEL-jZsjRk",
       "types": [
         "food_store",
-        "food",
         "store",
         "point_of_interest",
+        "food",
         "establishment"
       ],
       "formattedAddress": "casi esquina, C. Jorge Awad 26, Nagua 33000, Dominican Republic",
@@ -518,8 +518,8 @@
     {
       "id": "ChIJe57RsMJbro4RQMHaG9wkjTY",
       "types": [
-        "building_materials_store",
         "home_goods_store",
+        "building_materials_store",
         "store",
         "point_of_interest",
         "establishment"
@@ -579,9 +579,9 @@
       "types": [
         "general_store",
         "food_store",
-        "food",
         "store",
         "point_of_interest",
+        "food",
         "establishment"
       ],
       "formattedAddress": "C. Salomé Ureña 19, Nagua 33000, Dominican Republic",
