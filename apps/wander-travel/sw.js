@@ -1,9 +1,10 @@
-const CACHE_NAME = 'wander-travel-v0.88.7';
+const CACHE_NAME = 'wander-travel-v0.88.8';
 const APP_SHELL = [
   './index.html',
   './wander-ui.css',
   './wander-simulator-interactions.css',
   './wander-context-dashboard.css',
+  './wander-dashboard-order.css',
   './wander-icons.svg',
   './wander-app-icon.svg',
   './manifest.webmanifest',
@@ -13,6 +14,7 @@ const APP_SHELL = [
   './runtime-version.js',
   './app.js',
   './runtime-dashboard-viewport.js',
+  './runtime-dashboard-order.js',
   './runtime-coordinate-format-ui.js',
   './runtime-debug-overture.js',
   './runtime-source-policy.js',
