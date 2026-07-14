@@ -1,0 +1,13 @@
+.wander-card{
+  top:calc(68px + env(safe-area-inset-top,0px));
+  bottom:auto;
+  max-height:calc(100dvh - 154px - env(safe-area-inset-top,0px));
+}
+
+@media (min-width:700px){
+  .wander-card{
+    left:72px;
+    right:auto;
+    width:min(430px,calc(100vw - 96px));
+  }
+}
