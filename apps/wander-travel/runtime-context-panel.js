@@ -17,7 +17,7 @@
     ['location.effective.source', 'Fuente de ubicación', 'target', 'locationSource'],
     ['location.effective.accuracy', 'Precisión', 'target', 'accuracy'],
     ['motion.status', 'Movimiento físico', 'route', 'motionStatus'],
-    ['mobility.mode', 'Modo de movilidad', 'compass', 'mobility'],
+    ['mobility.method', 'Método de desplazamiento', 'compass', 'mobility'],
     ['motion.speedKmh', 'Velocidad', 'speed', 'speed'],
     ['motion.heading', 'Rumbo', 'heading', 'heading'],
     ['journey.current', 'Journey', 'route', 'journey'],
@@ -28,31 +28,26 @@
   ];
 
   const EXTRA_DASHBOARD_FIELDS = ['currentPOI', 'nearby', 'lastSuggestion', 'simulation', 'appVersion'];
-
   const TECHNICAL = [
     'app.version','simulation.status','context.status','context.activity','time.now','time.dayPeriod',
     'location.real.status','location.real.lat','location.real.lng','location.real.accuracy','location.real.altitude','location.real.heading','location.real.speedMps','location.real.updatedAt','location.real.source',
     'location.override.enabled','location.override.status','location.override.lat','location.override.lng','location.override.accuracy','location.override.altitude','location.override.heading','location.override.speedMps','location.override.updatedAt','location.override.source',
     'location.effective.status','location.effective.lat','location.effective.lng','location.effective.accuracy','location.effective.altitude','location.effective.heading','location.effective.speedMps','location.effective.updatedAt','location.effective.source',
     'motion.status','motion.speedKmh','motion.heading',
-    'mobility.mode','mobility.evidence','mobility.override.mode','mobility.provider.mode','mobility.provider.confidence',
-    'journey.current','journey.event','situation.transition','situation.placeEvent',
+    'mobility.method','mobility.methodId','mobility.methodConfidence','mobility.methodEvidence','mobility.methodCandidates','mobility.mode','mobility.evidence','mobility.override.mode','mobility.provider.mode','mobility.provider.confidence',
+    'journey.current','journey.event','situation.transition','situation.placeEvent','situation.current',
     'place.status','place.current','place.country','place.countryCode','place.countryId','place.region','place.regionId',
     'place.city','place.cityId','place.district','place.districtId','place.neighborhood','place.neighborhoodId',
     'place.zone','place.zoneId','place.type','place.displayName','place.source','place.sourceRef','place.resolvedLat','place.resolvedLng','place.updatedAt','place.attribution',
-    'history.currentPlace','conversation.pendingClarification',
-    'history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
+    'history.currentPlace','conversation.pendingClarification','history.currentArea','history.areaEvent','environment.weatherStatus','places.items',
   ];
 
   function dashboard() { return window.WanderContextDashboard; }
   function dashboardField(fieldId) { return dashboard()?.fields?.find((field) => field.id === fieldId) || null; }
-
   function dashboardToggle(fieldId, label) {
     if (!fieldId || !dashboardField(fieldId)) return '';
     const checked = dashboard()?.isVisible?.(fieldId) ? ' checked' : '';
-    return '<label class="context-dashboard-inline-toggle" title="Mostrar en el dashboard">' +
-      '<input type="checkbox" data-dashboard-inline-toggle="' + fieldId + '" aria-label="Mostrar ' + label + ' en el dashboard"' + checked + '>' +
-      '<span aria-hidden="true"></span></label>';
+    return '<label class="context-dashboard-inline-toggle" title="Mostrar en el dashboard"><input type="checkbox" data-dashboard-inline-toggle="' + fieldId + '" aria-label="Mostrar ' + label + ' en el dashboard"' + checked + '><span aria-hidden="true"></span></label>';
   }
 
   function placeMemoryValue(place) {
@@ -71,7 +66,12 @@
     return state + ' · ' + distanceKm.toFixed(distanceKm >= 10 ? 0 : 1) + ' km';
   }
 
-  function mobilityValue(value) { return !value || value === 'unknown' ? 'Desconocido' : String(value); }
+  function movementMethodValue(method) {
+    if (!method) return 'Desconocido';
+    const label = method.label || method.id || 'Desconocido';
+    const confidence = Number(method.confidence);
+    return Number.isFinite(confidence) ? label + ' · ' + Math.round(confidence * 100) + '%' : label;
+  }
 
   function placeStatusValue(value) {
     const labels = { pending: 'Pendiente', resolving: 'Resolviendo', available: 'Disponible', unavailable: 'No disponible' };
@@ -79,10 +79,8 @@
   }
 
   function coordinateFormat() {
-    try {
-      const stored = localStorage.getItem(COORDINATE_FORMAT_KEY);
-      return COORDINATE_FORMATS.includes(stored) ? stored : 'dd';
-    } catch { return 'dd'; }
+    try { const stored = localStorage.getItem(COORDINATE_FORMAT_KEY); return COORDINATE_FORMATS.includes(stored) ? stored : 'dd'; }
+    catch { return 'dd'; }
   }
 
   function coordinatePart(value, positive, negative, format) {
@@ -112,8 +110,7 @@
     const next = COORDINATE_FORMATS[(COORDINATE_FORMATS.indexOf(current) + 1) % COORDINATE_FORMATS.length];
     try { localStorage.setItem(COORDINATE_FORMAT_KEY, next); } catch {}
     window.dispatchEvent(new CustomEvent('wander:coordinate-format-change', { detail: { format: next } }));
-    dashboard()?.render?.();
-    renderHuman();
+    dashboard()?.render?.(); renderHuman();
   }
 
   function readableValue(key, entry) {
@@ -123,17 +120,15 @@
     if (key.endsWith('.speedMps')) return (Number(entry.value) * 3.6).toFixed(1) + ' km/h';
     if (key.endsWith('.heading') || key === 'motion.heading') return Number.isFinite(Number(entry.value)) ? Math.round(Number(entry.value)) + '°' : '—';
     if (key === 'motion.speedKmh') return Number(entry.value || 0).toFixed(1) + ' km/h';
-    if (key === 'mobility.mode') return mobilityValue(entry.value);
-    if (key === 'mobility.evidence' && Array.isArray(entry.value)) return entry.value.join(', ') || 'Sin evidencia';
+    if (key === 'mobility.method') return movementMethodValue(entry.value);
+    if ((key === 'mobility.methodEvidence' || key === 'mobility.evidence') && Array.isArray(entry.value)) return entry.value.join(', ') || 'Sin evidencia';
     if (key === 'journey.current') return journeyValue(entry.value);
     if (key === 'place.status') return placeStatusValue(entry.value);
     if ((key === 'journey.event' || key === 'situation.transition' || key === 'situation.placeEvent' || key === 'history.areaEvent') && entry.value?.type) return entry.value.type;
     if (key === 'history.currentPlace') return placeMemoryValue(entry.value);
     if (key === 'conversation.pendingClarification') return entry.value?.question || 'Aclaración pendiente';
     if (key === 'places.items' && Array.isArray(entry.value)) return entry.value.length + ' lugares';
-    if (entry.value && typeof entry.value === 'object') {
-      try { return JSON.stringify(entry.value); } catch { return '[objeto]'; }
-    }
+    if (entry.value && typeof entry.value === 'object') { try { return JSON.stringify(entry.value); } catch { return '[objeto]'; } }
     return entry.value == null || entry.value === '' ? 'Pendiente' : String(entry.value);
   }
 
@@ -149,12 +144,8 @@
   function humanRow(key, label, iconName, fieldId) {
     const entry = context.get(key);
     const value = readableValue(key, entry);
-    const valueHtml = fieldId === 'coordinates'
-      ? '<button type="button" class="coordinate-format-button" data-coordinate-format-button title="Tocar para cambiar el formato" aria-label="Cambiar formato de coordenadas"><b>' + value + '</b></button>'
-      : '<b>' + value + '</b>';
-    return '<div class="context-row has-dashboard-toggle"' + (fieldId === 'coordinates' ? ' data-coordinate-format-row' : '') + '>' +
-      '<div class="context-label">' + dashboardToggle(fieldId, label) + icon(iconName) + '<strong>' + label + '</strong></div>' +
-      '<div class="context-row-value">' + valueHtml + '</div></div>';
+    const valueHtml = fieldId === 'coordinates' ? '<button type="button" class="coordinate-format-button" data-coordinate-format-button title="Tocar para cambiar el formato" aria-label="Cambiar formato de coordenadas"><b>' + value + '</b></button>' : '<b>' + value + '</b>';
+    return '<div class="context-row has-dashboard-toggle"' + (fieldId === 'coordinates' ? ' data-coordinate-format-row' : '') + '><div class="context-label">' + dashboardToggle(fieldId, label) + icon(iconName) + '<strong>' + label + '</strong></div><div class="context-row-value">' + valueHtml + '</div></div>';
   }
 
   function extraDashboardRow(fieldId) {
@@ -163,66 +154,22 @@
     return '<div class="context-row has-dashboard-toggle"><div class="context-label">' + dashboardToggle(field.id, field.label) + icon(field.icon) + '<strong>' + field.label + '</strong></div><div class="context-row-value"><b>' + field.value() + '</b></div></div>';
   }
 
-  function renderHuman() {
-    const list = $('#context-list');
-    if (!list) return;
-    list.innerHTML = HUMAN.map((item) => humanRow(...item)).join('') + EXTRA_DASHBOARD_FIELDS.map(extraDashboardRow).join('');
-  }
-
+  function renderHuman() { const list = $('#context-list'); if (list) list.innerHTML = HUMAN.map((item) => humanRow(...item)).join('') + EXTRA_DASHBOARD_FIELDS.map(extraDashboardRow).join(''); }
   function renderTechnical() {
     const list = $('#context-technical');
     if (!list) return;
-    list.innerHTML = TECHNICAL.map((key) => {
-      const entry = context.get(key);
-      const kind = entry?.kind || 'pending';
-      return '<div class="technical-row"><code>' + key + '</code><span>' + readableValue(key, entry) + ' · ' + kind + ' · ' + context.statusFor(entry) + ' · ' + formatAge(entry) + '</span></div>';
-    }).join('');
+    list.innerHTML = TECHNICAL.map((key) => { const entry = context.get(key); const kind = entry?.kind || 'pending'; return '<div class="technical-row"><code>' + key + '</code><span>' + readableValue(key, entry) + ' · ' + kind + ' · ' + context.statusFor(entry) + ' · ' + formatAge(entry) + '</span></div>'; }).join('');
   }
+  function syncSummary() { const time = context.value('time.now'); const period = context.value('time.dayPeriod'); if (time) window.WanderUI?.setText('#context-time', time); if (period) window.WanderUI?.setText('#context-period', period); }
+  function removeLegacyDashboardSelector() { $('#context-dashboard-fields')?.closest('.screen-card')?.remove(); }
+  function render() { removeLegacyDashboardSelector(); renderHuman(); renderTechnical(); syncSummary(); }
 
-  function syncSummary() {
-    const time = context.value('time.now');
-    const period = context.value('time.dayPeriod');
-    if (time) window.WanderUI?.setText('#context-time', time);
-    if (period) window.WanderUI?.setText('#context-period', period);
-  }
-
-  function removeLegacyDashboardSelector() {
-    const selector = $('#context-dashboard-fields');
-    selector?.closest('.screen-card')?.remove();
-  }
-
-  function render() {
-    removeLegacyDashboardSelector();
-    renderHuman();
-    renderTechnical();
-    syncSummary();
-  }
-
-  $('#context-list')?.addEventListener('change', (event) => {
-    const input = event.target.closest('[data-dashboard-inline-toggle]');
-    if (!input) return;
-    dashboard()?.setFieldVisible?.(input.dataset.dashboardInlineToggle, input.checked);
-    renderHuman();
-  });
-
-  $('#context-list')?.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-coordinate-format-button]');
-    if (!button) return;
-    event.preventDefault();
-    event.stopPropagation();
-    cycleCoordinateFormat();
-  });
-
-  $('#refresh-context-button')?.addEventListener('click', () => {
-    context.updateTime();
-    window.WanderProviders?.place?.refresh?.(true);
-    render();
-  });
+  $('#context-list')?.addEventListener('change', (event) => { const input = event.target.closest('[data-dashboard-inline-toggle]'); if (!input) return; dashboard()?.setFieldVisible?.(input.dataset.dashboardInlineToggle, input.checked); renderHuman(); });
+  $('#context-list')?.addEventListener('click', (event) => { const button = event.target.closest('[data-coordinate-format-button]'); if (!button) return; event.preventDefault(); event.stopPropagation(); cycleCoordinateFormat(); });
+  $('#refresh-context-button')?.addEventListener('click', () => { context.updateTime(); window.WanderProviders?.place?.refresh?.(true); window.WanderSituationEngine?.evaluate?.(); render(); });
 
   context.subscribe(render);
   window.addEventListener('wander:coordinate-format-change', renderHuman);
-  render();
-  setInterval(render, 15000);
-
+  render(); setInterval(render, 15000);
   window.WanderContextPanel = { render, syncSummary, cycleCoordinateFormat };
 })();
