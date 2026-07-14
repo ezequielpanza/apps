@@ -86,27 +86,10 @@
       .trim();
   }
 
-  function containerLabel(value) {
-    const tags = value?.container?.tags || value?.tags || {};
-    const types = new Set([tags.primaryType, ...(Array.isArray(tags.types) ? tags.types : [])].filter(Boolean));
-    if (types.has('resort_hotel')) return 'Dentro del resort';
-    if (types.has('shopping_mall')) return 'Dentro del shopping';
-    if (types.has('airport')) return 'Dentro del aeropuerto';
-    if (types.has('hospital')) return 'Dentro del hospital';
-    if (types.has('university') || types.has('college') || types.has('school')) return 'Dentro del campus';
-    if (types.has('marina')) return 'Dentro de la marina';
-    if (types.has('stadium') || types.has('sports_complex')) return 'Dentro del complejo';
-    if (types.has('theme_park') || types.has('amusement_park')) return 'Dentro del parque';
-    if (types.has('hotel') || types.has('lodging')) return 'Dentro del hotel';
-    return value?.detectionMode === 'inside_area' ? 'Dentro del establecimiento' : null;
-  }
-
   function currentPOIValue() {
     const current = context.value('currentPOI.value') || context.value('currentPOI.current');
     if (!current) return 'Sin POI actual';
-    const name = shortPlaceName(textValue(current, 'POI actual')) || 'POI actual';
-    const label = containerLabel(current);
-    return label ? name + ' · ' + label : name;
+    return shortPlaceName(textValue(current, 'POI actual')) || 'POI actual';
   }
 
   function nearbyValue() {
@@ -123,6 +106,10 @@
     if (value === true || value === 'active' || value === 'enabled') return 'Activada';
     if (value === false || value === 'inactive' || value === 'disabled') return 'Desactivada';
     return textValue(value, 'Desactivada');
+  }
+
+  function appVersionValue() {
+    return textValue(context.value('app.version') || window.WanderVersion, 'Pendiente');
   }
 
   const FIELDS = Object.freeze([
@@ -147,6 +134,7 @@
     { id: 'nearby', label: 'Estado Nearby', icon: 'pin', metricId: 'metric-nearby', value: nearbyValue },
     { id: 'lastSuggestion', label: 'Última sugerencia', icon: 'chat', metricId: 'metric-last-suggestion', value: () => textValue(context.value('fieldGuide.lastSuggestion'), 'Sin sugerencia') },
     { id: 'simulation', label: 'Simulación', icon: 'flask', metricId: 'metric-simulation', value: simulationValue },
+    { id: 'appVersion', label: 'Versión de la app', icon: 'info', metricId: 'metric-app-version', value: appVersionValue },
   ].map(Object.freeze));
 
   const fieldIds = new Set(FIELDS.map((field) => field.id));
