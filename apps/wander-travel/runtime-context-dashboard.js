@@ -46,22 +46,11 @@
     return coordinatePart(lat, 'N', 'S', format) + ' · ' + coordinatePart(lng, 'E', 'W', format);
   }
 
-  function mobilityValue() {
-    const value = context.value('mobility.inferredMode') || context.value('mobility.mode');
-    const labels = {
-      walking: 'Caminando', on_foot: 'Caminando', running: 'Corriendo', cycling: 'Bicicleta', bicycle: 'Bicicleta', bike: 'Bicicleta',
-      scooter: 'Monopatín', electric_scooter: 'Monopatín eléctrico', motorcycle: 'Moto', motorbike: 'Moto',
-      driving: 'Auto', car: 'Auto', bus: 'Bus', train: 'Tren', transit: 'Transporte público', boat: 'Barco', boating: 'Barco', sailing: 'Navegando',
-      aircraft: 'Avión', stationary: 'Detenido', unknown: 'Desconocido',
-    };
-    return labels[value] || textValue(value, 'Desconocido');
-  }
-
-  function vehicleValue() {
-    const vehicle = context.value('mobility.vehicle');
-    if (!vehicle) return 'Sin vehículo inferido';
-    const label = textValue(vehicle, 'Vehículo');
-    const confidence = Number(vehicle.confidence);
+  function movementMethodValue() {
+    const method = context.value('mobility.method');
+    if (!method) return 'Desconocido';
+    const label = method.label || method.id || 'Desconocido';
+    const confidence = Number(method.confidence);
     return Number.isFinite(confidence) ? label + ' · ' + Math.round(confidence * 100) + '%' : label;
   }
 
@@ -121,8 +110,7 @@
     { id: 'locationSource', label: 'Fuente de ubicación', icon: 'target', metricId: 'metric-location-source', value: () => textValue(context.value('location.effective.source'), 'Pendiente') },
     { id: 'accuracy', label: 'Precisión', icon: 'target', metricId: 'metric-accuracy', value: () => numberValue('location.effective.accuracy', ' m') },
     { id: 'motionStatus', label: 'Movimiento físico', icon: 'route', metricId: 'metric-motion-status', value: () => textValue(context.value('motion.status'), 'Pendiente') },
-    { id: 'mobility', label: 'Modo de movilidad', icon: 'compass', metricId: 'metric-mobility', value: mobilityValue },
-    { id: 'vehicle', label: 'Vehículo', icon: 'route', metricId: 'metric-vehicle', value: vehicleValue },
+    { id: 'mobility', label: 'Método de desplazamiento', icon: 'compass', metricId: 'metric-mobility', value: movementMethodValue },
     { id: 'speed', label: 'Velocidad', icon: 'speed', metricId: 'metric-speed', value: () => numberValue('motion.speedKmh', ' km/h', 1) },
     { id: 'heading', label: 'Rumbo', icon: 'heading', metricId: 'metric-heading', value: () => numberValue('motion.heading', '°') },
     { id: 'journey', label: 'Journey', icon: 'route', metricId: 'metric-journey', value: journeyValue },
