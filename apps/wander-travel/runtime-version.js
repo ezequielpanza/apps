@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.89.9';
+  const VERSION = 'v0.90.0';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -38,6 +38,7 @@
     loadStyle('wander-record-button.css?v=20260714-12');
     loadStyle('wander-simulator-dashboard-offset.css?v=20260714-13');
     loadStyle('wander-message-actions.css?v=20260714-14');
+    loadStyle('wander-personal-poi-sheet.css?v=20260714-17');
     loadWhenReady({
       ready: () => Boolean(window.WanderSituationEngine?.subscribe),
       loaded: () => Boolean(window.WanderMovementMethodRefinement),
@@ -46,12 +47,17 @@
     loadWhenReady({
       ready: () => Boolean(window.WanderBase?.map && window.WanderTracks && window.WanderMapControls),
       loaded: () => Boolean(window.WanderPersonalPOIs),
-      src: 'runtime-personal-map-tools.js?v=20260714-10',
+      src: 'runtime-personal-map-tools.js?v=20260714-17',
     });
     loadWhenReady({
       ready: () => Boolean(window.WanderBase?.map && window.WanderPersonalPOIs?.createAt),
       loaded: () => Boolean(window.WanderPersonalPOITapFix),
       src: 'runtime-personal-poi-tap-fix.js?v=20260714-16',
+    });
+    loadWhenReady({
+      ready: () => Boolean(window.WanderPersonalPOIs?.get && document.querySelector('.map-stage')),
+      loaded: () => Boolean(window.WanderPersonalPOISheet),
+      src: 'runtime-personal-poi-sheet.js?v=20260714-17',
     });
     loadWhenReady({
       ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('#simulation-map-controls')),
