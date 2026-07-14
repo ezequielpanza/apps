@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.89.3';
+  const VERSION = 'v0.89.4';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -7,6 +7,14 @@
     window.WanderContext.set('app.version', VERSION, { source: 'runtime-version', ttlMs: Infinity, confidence: 1 });
   }
   window.WanderVersion = VERSION;
+
+  function loadStyle(href) {
+    if (document.querySelector('link[href="' + href + '"]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  }
 
   function loadWhenReady({ ready, loaded, src }) {
     let attempts = 0;
@@ -26,6 +34,7 @@
   }
 
   function bootstrap() {
+    loadStyle('wander-message-top.css?v=20260714-11');
     loadWhenReady({
       ready: () => Boolean(window.WanderSituationEngine?.subscribe),
       loaded: () => Boolean(window.WanderMovementMethodRefinement),
