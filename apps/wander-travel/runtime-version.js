@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.89.2';
+  const VERSION = 'v0.89.3';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -8,19 +8,36 @@
   }
   window.WanderVersion = VERSION;
 
-  let attempts = 0;
-  function loadMovementMethodRefinement() {
-    if (window.WanderMovementMethodRefinement) return;
-    if (!window.WanderSituationEngine?.subscribe) {
-      attempts += 1;
-      if (attempts < 120) setTimeout(loadMovementMethodRefinement, 250);
-      return;
+  function loadWhenReady({ ready, loaded, src }) {
+    let attempts = 0;
+    function tryLoad() {
+      if (loaded()) return;
+      if (!ready()) {
+        attempts += 1;
+        if (attempts < 160) setTimeout(tryLoad, 250);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = false;
+      document.body.appendChild(script);
     }
-    const script = document.createElement('script');
-    script.src = 'runtime-movement-method-refinement.js?v=20260714-09';
-    script.async = false;
-    document.body.appendChild(script);
+    tryLoad();
   }
-  if (document.readyState === 'complete') loadMovementMethodRefinement();
-  else window.addEventListener('load', loadMovementMethodRefinement, { once: true });
+
+  function bootstrap() {
+    loadWhenReady({
+      ready: () => Boolean(window.WanderSituationEngine?.subscribe),
+      loaded: () => Boolean(window.WanderMovementMethodRefinement),
+      src: 'runtime-movement-method-refinement.js?v=20260714-09',
+    });
+    loadWhenReady({
+      ready: () => Boolean(window.WanderBase?.map && window.WanderTracks && window.WanderMapControls),
+      loaded: () => Boolean(window.WanderPersonalPOIs),
+      src: 'runtime-personal-map-tools.js?v=20260714-10',
+    });
+  }
+
+  if (document.readyState === 'complete') bootstrap();
+  else window.addEventListener('load', bootstrap, { once: true });
 })();
