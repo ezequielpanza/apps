@@ -74,18 +74,40 @@
       /^(commercial|retail|recreation_ground)$/.test(landuse);
   }
 
-  function containingArea(point) {
-    if (!store?.listConsolidated) return null;
-    const candidates = [];
+  function addAreaCandidate(candidates, point, poi, attributes, tags) {
+    const geometry = attributes?.containmentGeometry;
+    if (!geometry || !isContainerTags(tags) || !insideBounds(point, geometry.bounds)) return;
+    const polygons = Array.isArray(geometry.polygons) ? geometry.polygons : [];
+    if (!polygons.some((ring) => pointInRing(point, ring))) return;
+    candidates.push({ poi, geometry, areaHint: geometryAreaHint(geometry) });
+  }
 
-    for (const poi of store.listConsolidated()) {
-      const osmAttributes = poi?.attributesBySource?.openstreetmap;
-      const geometry = osmAttributes?.containmentGeometry;
-      const tags = poi?.tagsBySource?.openstreetmap || {};
-      if (!geometry || !isContainerTags(tags) || !insideBounds(point, geometry.bounds)) continue;
-      const polygons = Array.isArray(geometry.polygons) ? geometry.polygons : [];
-      if (!polygons.some((ring) => pointInRing(point, ring))) continue;
-      candidates.push({ poi, geometry, areaHint: geometryAreaHint(geometry) });
+  function containingArea(point, activeItems = []) {
+    const candidates = [];
+    const seen = new Set();
+
+    for (const item of Array.isArray(activeItems) ? activeItems : []) {
+      for (const memberId of Array.isArray(item?.memberIds) ? item.memberIds : []) {
+        const member = store?.getNormalized?.(memberId);
+        if (!member || member.source?.id !== 'openstreetmap') continue;
+        const key = `${item.id}:${member.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        addAreaCandidate(candidates, point, item, member.attributes || {}, member.tags || {});
+      }
+    }
+
+    if (store?.listConsolidated) {
+      for (const poi of store.listConsolidated()) {
+        if (seen.has(poi.id)) continue;
+        addAreaCandidate(
+          candidates,
+          point,
+          poi,
+          poi?.attributesBySource?.openstreetmap || {},
+          poi?.tagsBySource?.openstreetmap || {},
+        );
+      }
     }
 
     candidates.sort((left, right) => left.areaHint - right.areaHint || right.poi.confidence - left.poi.confidence);
@@ -118,7 +140,7 @@
     }
 
     const point = { lat, lng };
-    const containerMatch = containingArea(point);
+    const containerMatch = containingArea(point, items);
     const container = containerMatch ? {
       id: containerMatch.poi.id,
       name: containerMatch.poi.name || 'Establecimiento',
