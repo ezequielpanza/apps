@@ -1,0 +1,54 @@
+.context-row.has-dashboard-toggle {
+  position: relative;
+  padding-right: 76px;
+}
+
+.context-field-order {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.context-field-order button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: #e8efed;
+  color: #174943;
+  font: 700 17px/1 system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.context-field-order button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.context-field-order button:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.context-field-order button:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+@media (max-width: 520px) {
+  .context-row.has-dashboard-toggle {
+    padding-right: 72px;
+  }
+
+  .context-field-order {
+    top: 10px;
+    right: 10px;
+  }
+}
