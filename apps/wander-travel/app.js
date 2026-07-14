@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.88.1';
+  const APP_BUILD = 'v0.88.2';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -29,7 +29,12 @@
     } catch {}
 
     try {
+      await loadRuntime('runtime-provider-container.js?v=20260713-01');
+    } catch {}
+
+    try {
       await loadRuntime('runtime-provider-current-poi.js?v=20260713-03');
+      await loadRuntime('runtime-provider-current-container-bridge.js?v=20260713-01');
     } catch {}
 
     try {
@@ -46,7 +51,9 @@
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        window.WanderProviders?.container?.refresh?.(true);
         window.WanderProviders?.currentPOI?.detect?.();
+        window.WanderProviders?.currentContainerBridge?.apply?.();
         window.WanderDashboardViewport?.mount?.();
         window.WanderContextDashboard?.restore?.();
         window.WanderAppReady = true;
