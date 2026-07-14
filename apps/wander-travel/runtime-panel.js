@@ -10,6 +10,13 @@
     return Array.from(document.querySelectorAll('[data-app-screen]'));
   }
 
+  function setDashboardVisibility() {
+    if (!contextDashboard || !app) return;
+    const mapVisible = app.dataset.screen === 'map';
+    const drawerClosed = app.dataset.menu !== 'open';
+    contextDashboard.hidden = !(mapVisible && drawerClosed);
+  }
+
   function setActiveNavigation(screenName) {
     menu?.querySelectorAll('[data-screen-target]').forEach((button) => {
       const active = button.dataset.screenTarget === screenName;
@@ -30,11 +37,14 @@
     if (app) app.dataset.screen = normalized;
     setActiveNavigation(normalized);
     setMenuOpen(false);
+    setDashboardVisibility();
 
     if (normalized === 'map') {
       setTimeout(() => {
         window.WanderBase?.map?.invalidateSize();
         window.WanderDashboardViewport?.mount?.();
+        window.WanderContextDashboard?.restore?.();
+        setDashboardVisibility();
       }, 80);
     }
   }
@@ -46,6 +56,7 @@
     menu.setAttribute('aria-hidden', String(!open));
     menuButton?.setAttribute('aria-expanded', String(open));
     document.body.classList.toggle('drawer-open', open);
+    setDashboardVisibility();
   }
 
   function reloadApp(event) {
