@@ -4,8 +4,8 @@
   if (!map || !personalPOIs?.createAt) return;
 
   const container = map.getContainer();
-  const MOVE_TOLERANCE_PX = 14;
-  let pointerState = null;
+  const MOVE_TOLERANCE_PX = 18;
+  let gesture = null;
   let handledAt = 0;
 
   function placementButton() {
@@ -16,69 +16,87 @@
     return Boolean(placementButton());
   }
 
+  function insideMap(x, y) {
+    const rect = container.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+
   function isExcludedTarget(target) {
     return Boolean(target?.closest?.(
-      '.leaflet-control, .leaflet-marker-icon, .wander-top-controls, .wander-card, #context-dashboard, .simulation-map-controls'
+      '.leaflet-control, .leaflet-marker-icon, .wander-top-controls, .wander-card, #context-dashboard, .simulation-map-controls, .personal-poi-sheet'
     ));
   }
 
-  function cancelPointer(pointerId = null) {
-    if (!pointerState) return;
-    if (pointerId !== null && pointerState.pointerId !== pointerId) return;
-    pointerState = null;
+  function pointFromEvent(event) {
+    if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+      return { x: event.clientX, y: event.clientY };
+    }
+    const touch = event.changedTouches?.[0] || event.touches?.[0];
+    return touch ? { x: touch.clientX, y: touch.clientY } : null;
   }
 
-  function beginPointer(event) {
-    if (!isPlacementArmed() || event.isPrimary === false || event.button > 0 || isExcludedTarget(event.target)) return;
-    pointerState = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      moved: false,
-    };
+  function begin(event) {
+    if (!isPlacementArmed() || isExcludedTarget(event.target)) return;
+    const point = pointFromEvent(event);
+    if (!point || !insideMap(point.x, point.y)) return;
+    gesture = { x: point.x, y: point.y, moved: false };
   }
 
-  function movePointer(event) {
-    if (!pointerState || event.pointerId !== pointerState.pointerId) return;
-    const distance = Math.hypot(event.clientX - pointerState.startX, event.clientY - pointerState.startY);
-    if (distance > MOVE_TOLERANCE_PX) pointerState.moved = true;
+  function move(event) {
+    if (!gesture) return;
+    const point = pointFromEvent(event);
+    if (!point) return;
+    if (Math.hypot(point.x - gesture.x, point.y - gesture.y) > MOVE_TOLERANCE_PX) gesture.moved = true;
   }
 
-  function finishPointer(event) {
-    if (!pointerState || event.pointerId !== pointerState.pointerId) return;
-    const state = pointerState;
-    pointerState = null;
-    if (state.moved || !isPlacementArmed() || isExcludedTarget(event.target)) return;
+  function finish(event) {
+    if (!gesture) return;
+    const start = gesture;
+    gesture = null;
+    const point = pointFromEvent(event);
+    if (!point || start.moved || !isPlacementArmed() || !insideMap(point.x, point.y) || isExcludedTarget(event.target)) return;
 
     const rect = container.getBoundingClientRect();
-    const point = L.point(event.clientX - rect.left, event.clientY - rect.top);
-    const latLng = map.containerPointToLatLng(point);
+    const containerPoint = L.point(point.x - rect.left, point.y - rect.top);
+    const latLng = map.containerPointToLatLng(containerPoint);
 
-    const button = placementButton();
-    button?.classList.remove('is-armed');
+    placementButton()?.classList.remove('is-armed');
     handledAt = Date.now();
 
-    event.preventDefault();
-    event.stopPropagation();
+    event.preventDefault?.();
+    event.stopPropagation?.();
     event.stopImmediatePropagation?.();
 
-    personalPOIs.createAt(latLng);
+    const saved = personalPOIs.createAt(latLng);
+    if (saved) {
+      const card = document.querySelector('#wander-card');
+      if (card) card.hidden = true;
+      navigator.vibrate?.(25);
+    }
   }
 
-  function suppressSyntheticClick(event) {
-    if (Date.now() - handledAt > 900) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation?.();
+  function clickFallback(event) {
+    if (Date.now() - handledAt < 1000) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      return;
+    }
+    if (!isPlacementArmed() || isExcludedTarget(event.target)) return;
+    const point = pointFromEvent(event);
+    if (!point || !insideMap(point.x, point.y)) return;
+    gesture = { x: point.x, y: point.y, moved: false };
+    finish(event);
   }
 
-  container.addEventListener('pointerdown', beginPointer, true);
-  container.addEventListener('pointermove', movePointer, true);
-  container.addEventListener('pointerup', finishPointer, true);
-  container.addEventListener('pointercancel', (event) => cancelPointer(event.pointerId), true);
-  container.addEventListener('click', suppressSyntheticClick, true);
+  document.addEventListener('pointerdown', begin, true);
+  document.addEventListener('pointermove', move, true);
+  document.addEventListener('pointerup', finish, true);
+  document.addEventListener('pointercancel', () => { gesture = null; }, true);
+  document.addEventListener('touchstart', begin, { capture: true, passive: true });
+  document.addEventListener('touchmove', move, { capture: true, passive: true });
+  document.addEventListener('touchend', finish, { capture: true, passive: false });
+  document.addEventListener('click', clickFallback, true);
 
-  window.WanderPersonalPOITapFix = Object.freeze({
-    isPlacementArmed,
-  });
+  window.WanderPersonalPOITapFix = Object.freeze({ isPlacementArmed });
 })();
