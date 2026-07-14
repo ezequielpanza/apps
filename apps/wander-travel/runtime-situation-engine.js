@@ -3,7 +3,7 @@
   const engine = window.WanderEngine;
   if (!context || !engine?.subscribeEvaluation) return;
 
-  const RULE_SET_VERSION = '1.2.0';
+  const RULE_SET_VERSION = '1.3.0';
   const listeners = new Set();
   let lastResult = null;
   let stationarySince = null;
@@ -46,34 +46,26 @@
     const suffix = placeName ? ` por ${placeName}` : '';
     switch (mode) {
       case 'walking':
-      case 'on_foot':
-        return `Caminando${suffix}`;
+      case 'on_foot': return `Caminando${suffix}`;
       case 'cycling':
       case 'bicycle':
-      case 'bike':
-        return `Andando en bicicleta${suffix}`;
+      case 'bike': return `Andando en bicicleta${suffix}`;
       case 'scooter':
       case 'kick_scooter':
       case 'electric_scooter':
-      case 'escooter':
-        return `Andando en monopatín${suffix}`;
+      case 'escooter': return `Andando en monopatín${suffix}`;
       case 'motorcycle':
-      case 'motorbike':
-        return `En moto${suffix}`;
+      case 'motorbike': return `En moto${suffix}`;
       case 'driving':
       case 'car':
-      case 'automobile':
-        return `Conduciendo${suffix}`;
+      case 'automobile': return `Conduciendo${suffix}`;
       case 'bus':
       case 'train':
       case 'transit':
-      case 'public_transport':
-        return `Viajando${suffix}`;
+      case 'public_transport': return `Viajando${suffix}`;
       case 'sailing':
-      case 'boating':
-        return placeName ? `Navegando cerca de ${placeName}` : 'Navegando';
-      default:
-        return placeName ? `En movimiento por ${placeName}` : 'En movimiento';
+      case 'boating': return placeName ? `Navegando cerca de ${placeName}` : 'Navegando';
+      default: return placeName ? `En movimiento por ${placeName}` : 'En movimiento';
     }
   }
 
@@ -87,11 +79,34 @@
     return explicit;
   }
 
+  function inferVehicle(mobility, rawMobility) {
+    const mode = String(mobility || 'unknown').toLowerCase();
+    const explicit = rawMobility && !['unknown', 'moving', 'stationary'].includes(String(rawMobility).toLowerCase());
+    const source = explicit ? 'mobility-provider' : 'speed-inference';
+    const confidence = explicit ? 0.94 : 0.58;
+    const vehicles = {
+      cycling: ['bicycle', 'Bicicleta'], bicycle: ['bicycle', 'Bicicleta'], bike: ['bicycle', 'Bicicleta'],
+      scooter: ['scooter', 'Monopatín'], kick_scooter: ['scooter', 'Monopatín'], electric_scooter: ['electric_scooter', 'Monopatín eléctrico'], escooter: ['electric_scooter', 'Monopatín eléctrico'],
+      motorcycle: ['motorcycle', 'Moto'], motorbike: ['motorcycle', 'Moto'],
+      driving: ['car', 'Auto'], car: ['car', 'Auto'], automobile: ['car', 'Auto'],
+      bus: ['bus', 'Bus'], train: ['train', 'Tren'], transit: ['public_transport', 'Transporte público'], public_transport: ['public_transport', 'Transporte público'],
+      sailing: ['boat', 'Barco'], boating: ['boat', 'Barco'], aircraft: ['aircraft', 'Avión'],
+    };
+    const match = vehicles[mode];
+    if (!match) return null;
+    return { type: match[0], label: match[1], confidence, source, inferred: true };
+  }
+
+  function explicitMobilitySource(rawMobility) {
+    return rawMobility && !['unknown', 'moving', 'stationary'].includes(String(rawMobility).toLowerCase()) ? 'provider' : 'speed_inference';
+  }
+
   function build(evaluation, reason = 'engine') {
     const situation = evaluation?.situation || engine.inferSituation?.() || {};
     const speed = number(situation.speedKmh);
     const rawMobility = String(situation.mobility?.mode || 'unknown');
     const mobility = normalizedMobility(rawMobility, speed);
+    const vehicle = inferVehicle(mobility, rawMobility);
     const motion = String(situation.motion?.status || 'pending');
     const stationaryName = stationaryPlaceName();
     const movementName = movementPlaceName();
@@ -100,9 +115,7 @@
 
     if (motion === 'stationary') {
       if (!stationarySince) stationarySince = now;
-    } else {
-      stationarySince = null;
-    }
+    } else stationarySince = null;
 
     const stationaryMinutes = stationarySince ? Math.max(0, (now - stationarySince) / 60000) : 0;
     const candidates = [];
@@ -120,14 +133,7 @@
         ));
         if (stationaryMinutes >= 45) {
           const socialVenue = /bar|night_club|restaurant|cafe/i.test(String(type || ''));
-          candidates.push(candidate(
-            'possible_rest',
-            'prolonged_stationary_possible_rest',
-            socialVenue ? 0.42 : 0.62,
-            'Posible descanso',
-            ['stationary_45m'],
-            socialVenue ? ['social_venue'] : []
-          ));
+          candidates.push(candidate('possible_rest', 'prolonged_stationary_possible_rest', socialVenue ? 0.42 : 0.62, 'Posible descanso', ['stationary_45m'], socialVenue ? ['social_venue'] : []));
         }
       }
 
@@ -147,7 +153,7 @@
           explicitMobility ? 'provider_mobility_inside_area' : 'speed_inferred_mobility_inside_area',
           score,
           movementLabel(mobility, movementName),
-          [explicitMobility ? `provider_${mobility}` : `speed_inferred_${mobility}`, movementName ? 'movement_area_context' : 'movement_area_unknown', 'poi_suppressed_while_moving']
+          [explicitMobility ? `provider_${mobility}` : `speed_inferred_${mobility}`, vehicle ? `vehicle_${vehicle.type}` : 'vehicle_unknown', movementName ? 'movement_area_context' : 'movement_area_unknown', 'poi_suppressed_while_moving']
         ));
       }
     }
@@ -162,20 +168,11 @@
       timestamp: now,
       reason,
       ruleSetVersion: RULE_SET_VERSION,
-      selectedState: {
-        id: selected.stateId,
-        label: selected.label,
-        score: selected.score,
-        confidence,
-        ruleId: selected.ruleId,
-      },
+      selectedState: { id: selected.stateId, label: selected.label, score: selected.score, confidence, ruleId: selected.ruleId },
       candidates,
       evidence: {
-        locationAvailable: Boolean(situation.locationAvailable),
-        speedKmh: speed,
-        mobility,
-        mobilitySource: explicitMobilitySource(rawMobility),
-        motion,
+        locationAvailable: Boolean(situation.locationAvailable), speedKmh: speed, mobility,
+        mobilitySource: explicitMobilitySource(rawMobility), vehicle, motion,
         stationaryMinutes: Math.round(stationaryMinutes * 10) / 10,
         placeName: motion === 'stationary' ? stationaryName : movementName,
         placeType: motion === 'stationary' ? type : null,
@@ -188,13 +185,18 @@
     };
   }
 
-  function explicitMobilitySource(rawMobility) {
-    return rawMobility && !['unknown', 'moving', 'stationary'].includes(String(rawMobility).toLowerCase()) ? 'provider' : 'speed_inference';
-  }
-
   function publish(result) {
     lastResult = result;
-    context.set?.('situation.current', result, { source: 'situation-engine', kind: 'inferred', confidence: result.selectedState.confidence });
+    const options = { source: 'situation-engine', kind: 'inferred', confidence: result.selectedState.confidence };
+    context.set?.('situation.current', result, options);
+    context.set?.('mobility.inferredMode', result.evidence.mobility, { ...options, confidence: result.selectedState.confidence });
+    if (result.evidence.vehicle) {
+      context.set?.('mobility.vehicle', result.evidence.vehicle, { source: result.evidence.vehicle.source, kind: 'inferred', confidence: result.evidence.vehicle.confidence });
+      context.set?.('mobility.vehicleType', result.evidence.vehicle.type, { source: result.evidence.vehicle.source, kind: 'inferred', confidence: result.evidence.vehicle.confidence });
+    } else {
+      context.remove?.('mobility.vehicle');
+      context.remove?.('mobility.vehicleType');
+    }
     context.setContext?.({ status: result.selectedState.label, source: 'situation-engine', confidence: result.selectedState.confidence });
     listeners.forEach((listener) => { try { listener(result); } catch {} });
     window.dispatchEvent(new CustomEvent('wander:situation', { detail: result }));
