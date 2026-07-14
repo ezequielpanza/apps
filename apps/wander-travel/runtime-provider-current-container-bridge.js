@@ -2,6 +2,23 @@
   const context = window.WanderContext;
   if (!context) return;
 
+  function shortPlaceName(value) {
+    return String(value || '')
+      .replace(/^hotel\s+/i, '')
+      .replace(/\s*[-–—]\s*(adults? only|solo adultos|all[- ]inclusive.*)$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function compactContainer(container) {
+    return {
+      id: container.id,
+      name: shortPlaceName(container.name) || container.name || 'Establecimiento',
+      source: container.source || null,
+      detectionMode: container.detectionMode || null,
+    };
+  }
+
   function applyContainerFallback() {
     const container = context.value('container.current');
     const current = context.value('currentPOI.current');
@@ -15,7 +32,7 @@
           ttlMs: 60000,
           confidence: 0.97,
         };
-        const enriched = { ...current, container };
+        const enriched = { ...current, container: compactContainer(container) };
         context.set('currentPOI.current', enriched, options);
         context.set('currentPOI.value', enriched, options);
         context.set('currentPOI.container', container, options);
@@ -26,15 +43,15 @@
     const accuracy = Math.max(5, Number(context.getEffectiveLocation?.()?.accuracy) || 50);
     const value = {
       id: container.id,
-      name: container.name || 'Establecimiento',
+      name: shortPlaceName(container.name) || container.name || 'Establecimiento',
       categories: [],
       location: container.location || null,
       address: null,
       distanceM: 0,
       accuracyM: Math.round(accuracy),
-      detectionMode: 'inside_area',
+      detectionMode: 'inside_container',
       source: container.source || 'openstreetmap',
-      container,
+      container: compactContainer(container),
       detectedAt: new Date().toISOString(),
     };
     const options = {
