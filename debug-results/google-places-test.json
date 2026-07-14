@@ -43,9 +43,9 @@
         "resort_hotel",
         "massage_spa",
         "spa",
+        "massage",
         "hotel",
         "lodging",
-        "massage",
         "service",
         "point_of_interest",
         "establishment"
@@ -344,8 +344,8 @@
       "types": [
         "barber_shop",
         "hair_care",
-        "service",
         "health",
+        "service",
         "point_of_interest",
         "establishment"
       ],
@@ -460,8 +460,8 @@
     {
       "id": "ChIJYwr8tkRbro4R2DuGUNCwxxE",
       "types": [
-        "service",
         "wholesaler",
+        "service",
         "point_of_interest",
         "establishment"
       ],
@@ -518,8 +518,8 @@
     {
       "id": "ChIJe57RsMJbro4RQMHaG9wkjTY",
       "types": [
-        "building_materials_store",
         "home_goods_store",
+        "building_materials_store",
         "store",
         "point_of_interest",
         "establishment"
