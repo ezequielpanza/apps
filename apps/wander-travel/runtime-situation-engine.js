@@ -3,7 +3,7 @@
   const engine = window.WanderEngine;
   if (!context || !engine?.subscribeEvaluation) return;
 
-  const RULE_SET_VERSION = '1.1.0';
+  const RULE_SET_VERSION = '1.2.0';
   const listeners = new Set();
   let lastResult = null;
   let stationarySince = null;
@@ -13,16 +13,23 @@
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  function named(value) {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    return value.name || value.label || value.displayName || null;
+  }
+
   function stationaryPlaceName() {
     const poi = context.value?.('currentPOI.current') || context.value?.('poi.current') || context.value?.('place.currentPOI');
     const container = context.value?.('place.currentContainer') || context.value?.('container.current');
     const place = context.value?.('place.current');
-    return poi?.name || container?.name || place?.zone || place?.neighborhood || place?.city || place?.name || null;
+    return named(poi) || named(container) || named(place?.zone) || named(place?.neighborhood) || named(place?.city) || named(place) || null;
   }
 
   function movementPlaceName() {
+    const container = context.value?.('place.currentContainer') || context.value?.('container.current');
     const place = context.value?.('place.current');
-    return place?.zone || place?.neighborhood || place?.district || place?.city || place?.region || place?.name || null;
+    return named(container) || named(place?.zone) || named(place?.neighborhood) || named(place?.district) || named(place?.city) || named(place?.region) || named(place) || null;
   }
 
   function placeType() {
@@ -35,10 +42,56 @@
     return { stateId: id, ruleId, score, label, evidence, contradictions };
   }
 
+  function movementLabel(mode, placeName) {
+    const suffix = placeName ? ` por ${placeName}` : '';
+    switch (mode) {
+      case 'walking':
+      case 'on_foot':
+        return `Caminando${suffix}`;
+      case 'cycling':
+      case 'bicycle':
+      case 'bike':
+        return `Andando en bicicleta${suffix}`;
+      case 'scooter':
+      case 'kick_scooter':
+      case 'electric_scooter':
+      case 'escooter':
+        return `Andando en monopatín${suffix}`;
+      case 'motorcycle':
+      case 'motorbike':
+        return `En moto${suffix}`;
+      case 'driving':
+      case 'car':
+      case 'automobile':
+        return `Conduciendo${suffix}`;
+      case 'bus':
+      case 'train':
+      case 'transit':
+      case 'public_transport':
+        return `Viajando${suffix}`;
+      case 'sailing':
+      case 'boating':
+        return placeName ? `Navegando cerca de ${placeName}` : 'Navegando';
+      default:
+        return placeName ? `En movimiento por ${placeName}` : 'En movimiento';
+    }
+  }
+
+  function normalizedMobility(mode, speed) {
+    const explicit = String(mode || 'unknown').toLowerCase();
+    if (explicit !== 'unknown' && explicit !== 'moving' && explicit !== 'stationary') return explicit;
+    if (speed === null) return explicit;
+    if (speed > 0.3 && speed <= 7) return 'walking';
+    if (speed > 7 && speed <= 12) return 'cycling';
+    if (speed > 12) return 'driving';
+    return explicit;
+  }
+
   function build(evaluation, reason = 'engine') {
     const situation = evaluation?.situation || engine.inferSituation?.() || {};
     const speed = number(situation.speedKmh);
-    const mobility = String(situation.mobility?.mode || 'unknown');
+    const rawMobility = String(situation.mobility?.mode || 'unknown');
+    const mobility = normalizedMobility(rawMobility, speed);
     const motion = String(situation.motion?.status || 'pending');
     const stationaryName = stationaryPlaceName();
     const movementName = movementPlaceName();
@@ -78,17 +131,24 @@
         }
       }
 
-      if (mobility === 'walking' || (speed !== null && speed > 0.3 && speed <= 7)) {
-        candidates.push(candidate('walking', 'walking_speed_or_provider', mobility === 'walking' ? 0.93 : 0.78, movementName ? `Caminando por ${movementName}` : 'Caminando', [mobility === 'walking' ? 'provider_walking' : 'walking_speed', 'poi_suppressed_while_moving']));
-      }
-      if (mobility === 'driving' || (speed !== null && speed > 12 && speed <= 180)) {
-        candidates.push(candidate('driving', 'driving_speed_or_provider', mobility === 'driving' ? 0.94 : 0.8, movementName ? `Conduciendo por ${movementName}` : 'Conduciendo', [mobility === 'driving' ? 'provider_driving' : 'driving_speed', 'poi_suppressed_while_moving']));
-      }
-      if (mobility === 'sailing' || mobility === 'boating') {
-        candidates.push(candidate('sailing', 'marine_mobility_provider', 0.95, movementName ? `Navegando cerca de ${movementName}` : 'Navegando', ['provider_marine_mode', 'poi_suppressed_while_moving']));
-      }
-      if (!candidates.length && motion === 'moving') {
-        candidates.push(candidate('moving', 'generic_motion', 0.68, movementName ? `En movimiento por ${movementName}` : 'En movimiento', ['motion_moving', 'poi_suppressed_while_moving']));
+      if (motion === 'moving' || (speed !== null && speed > 0.3)) {
+        const explicitMobility = rawMobility !== 'unknown' && rawMobility !== 'moving' && rawMobility !== 'stationary';
+        const score = explicitMobility ? 0.94 : 0.78;
+        const stateId = ['walking', 'on_foot'].includes(mobility) ? 'walking'
+          : ['cycling', 'bicycle', 'bike'].includes(mobility) ? 'cycling'
+          : ['scooter', 'kick_scooter', 'electric_scooter', 'escooter'].includes(mobility) ? 'scooter'
+          : ['motorcycle', 'motorbike'].includes(mobility) ? 'motorcycle'
+          : ['driving', 'car', 'automobile'].includes(mobility) ? 'driving'
+          : ['sailing', 'boating'].includes(mobility) ? 'sailing'
+          : ['bus', 'train', 'transit', 'public_transport'].includes(mobility) ? 'transit'
+          : 'moving';
+        candidates.push(candidate(
+          stateId,
+          explicitMobility ? 'provider_mobility_inside_area' : 'speed_inferred_mobility_inside_area',
+          score,
+          movementLabel(mobility, movementName),
+          [explicitMobility ? `provider_${mobility}` : `speed_inferred_${mobility}`, movementName ? 'movement_area_context' : 'movement_area_unknown', 'poi_suppressed_while_moving']
+        ));
       }
     }
 
@@ -114,16 +174,22 @@
         locationAvailable: Boolean(situation.locationAvailable),
         speedKmh: speed,
         mobility,
+        mobilitySource: explicitMobilitySource(rawMobility),
         motion,
         stationaryMinutes: Math.round(stationaryMinutes * 10) / 10,
         placeName: motion === 'stationary' ? stationaryName : movementName,
         placeType: motion === 'stationary' ? type : null,
+        movementArea: motion === 'moving' ? movementName : null,
         currentPOIAllowed: motion === 'stationary',
         dayOfWeek: new Date(now).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase(),
         hour: new Date(now).getHours(),
       },
       ambiguity: runnerUp ? Math.max(0, selected.score - runnerUp.score) : 1,
     };
+  }
+
+  function explicitMobilitySource(rawMobility) {
+    return rawMobility && !['unknown', 'moving', 'stationary'].includes(String(rawMobility).toLowerCase()) ? 'provider' : 'speed_inference';
   }
 
   function publish(result) {
