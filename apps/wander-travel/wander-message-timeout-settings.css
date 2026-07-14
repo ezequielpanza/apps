@@ -1,0 +1,44 @@
+.message-timeout-setting-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  padding:14px 0 2px;
+}
+
+.message-timeout-setting-row>div{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
+}
+
+.message-timeout-setting-row span{
+  color:var(--muted);
+  font-size:.82rem;
+  line-height:1.35;
+}
+
+.message-timeout-setting-row select{
+  flex:0 0 auto;
+  min-width:148px;
+  min-height:44px;
+  padding:0 12px;
+  border:1px solid rgba(20,50,48,.14);
+  border-radius:14px;
+  background:#f4f7f6;
+  color:var(--text);
+  font:inherit;
+  font-weight:750;
+}
+
+@media(max-width:520px){
+  .message-timeout-setting-row{
+    align-items:stretch;
+    flex-direction:column;
+  }
+
+  .message-timeout-setting-row select{
+    width:100%;
+  }
+}
