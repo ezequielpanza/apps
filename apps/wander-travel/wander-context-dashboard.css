@@ -30,6 +30,16 @@
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
+.status-rail#context-dashboard[hidden],
+.wander-app:not([data-screen="map"]) > #context-dashboard,
+.wander-app[data-menu="open"] > #context-dashboard,
+body.drawer-open #context-dashboard {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .status-rail#context-dashboard .status-item {
   display: flex;
   flex: 0 1 auto;
