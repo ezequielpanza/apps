@@ -1,7 +1,6 @@
 (() => {
   const context = window.WanderContext;
   const base = window.WanderBase;
-  const mapControls = window.WanderMapControls;
   const tracks = window.WanderTracks;
   if (!context || !base?.map || !tracks) return;
 
@@ -22,9 +21,7 @@
     try {
       const stored = JSON.parse(localStorage.getItem(POI_STORAGE_KEY) || '[]');
       return Array.isArray(stored) ? stored : [];
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   }
 
   function savePOIs() {
@@ -36,9 +33,7 @@
     try {
       const stored = localStorage.getItem(AUTO_TRACK_KEY);
       return stored === null ? true : stored === 'true';
-    } catch {
-      return true;
-    }
+    } catch { return true; }
   }
 
   function setAutoTrackEnabled(enabled) {
@@ -48,10 +43,6 @@
 
   function effectivePosition() {
     return base.getPosition?.() || window.WanderMapPosition?.getPosition?.() || null;
-  }
-
-  function escapeHTML(value) {
-    return String(value || '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
   }
 
   function makeButton(iconName, label) {
@@ -68,18 +59,14 @@
   function bindHold(button, onClick, onHold, suppressSetter) {
     let timer = null;
     let held = false;
-
-    const cancel = () => {
-      if (timer) clearTimeout(timer);
-      timer = null;
-    };
-
+    const cancel = () => { if (timer) clearTimeout(timer); timer = null; };
     button.addEventListener('pointerdown', () => {
       held = false;
       cancel();
       timer = setTimeout(() => {
         held = true;
         suppressSetter(true);
+        navigator.vibrate?.(35);
         onHold();
       }, HOLD_MS);
     });
@@ -88,8 +75,7 @@
     button.addEventListener('pointerleave', cancel);
     button.addEventListener('click', (event) => {
       event.preventDefault();
-      if (held) return;
-      onClick();
+      if (!held) onClick();
     });
   }
 
@@ -105,14 +91,11 @@
   }
 
   function toggleTrackRecording() {
-    if (suppressTrackClick) {
-      suppressTrackClick = false;
-      return;
-    }
+    if (suppressTrackClick) { suppressTrackClick = false; return; }
     if (tracks.isRecording?.()) {
       tracks.stop?.();
       setAutoTrackEnabled(false);
-      window.WanderUI?.showWander('Grabación pausada', 'Wander dejó de registrar el recorrido. Al reanudar, comenzará un nuevo tramo.');
+      window.WanderUI?.showWander('Grabación pausada', 'El tramo actual quedó guardado. Al reanudar comenzará uno nuevo.');
     } else {
       const started = tracks.start?.();
       if (started) setAutoTrackEnabled(true);
@@ -123,7 +106,7 @@
   function openTracksManager() {
     suppressTrackClick = true;
     document.querySelector('[data-screen-target="travel"]')?.click();
-    window.WanderUI?.showWander('Mis recorridos', 'Desde Travel podés revisar, exportar y continuar tus tramos guardados.');
+    window.WanderUI?.showWander('Mis recorridos', 'Desde Travel podés revisar y exportar tus tramos guardados.');
   }
 
   function ensureAutoRecording() {
@@ -153,10 +136,7 @@
   function renderPOIs() {
     const ids = new Set(personalPOIs.map((poi) => poi.id));
     poiLayers.forEach((layer, id) => {
-      if (!ids.has(id)) {
-        map.removeLayer(layer);
-        poiLayers.delete(id);
-      }
+      if (!ids.has(id)) { map.removeLayer(layer); poiLayers.delete(id); }
     });
     personalPOIs.forEach((poi) => {
       let marker = poiLayers.get(poi.id);
@@ -164,9 +144,7 @@
         marker = L.marker([poi.lat, poi.lng], { icon: poiMarkerIcon(), title: poi.name }).addTo(map);
         marker.on('click', () => editPOI(poi.id));
         poiLayers.set(poi.id, marker);
-      } else {
-        marker.setLatLng([poi.lat, poi.lng]);
-      }
+      } else marker.setLatLng([poi.lat, poi.lng]);
       marker.bindTooltip(poi.name, { direction: 'top', offset: [0, -30] });
     });
   }
@@ -188,13 +166,9 @@
     const data = askPOIData();
     if (!data || !latLng) return false;
     const poi = {
-      id: 'personal-poi-' + Date.now(),
-      ...data,
-      lat: Number(latLng.lat),
-      lng: Number(latLng.lng),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      source: 'user',
+      id: 'personal-poi-' + Date.now(), ...data,
+      lat: Number(latLng.lat), lng: Number(latLng.lng),
+      createdAt: Date.now(), updatedAt: Date.now(), source: 'user',
     };
     personalPOIs.push(poi);
     savePOIs();
@@ -214,18 +188,14 @@
       if (!window.confirm('¿Eliminar ' + poi.name + '?')) return;
       const index = personalPOIs.findIndex((item) => item.id === id);
       if (index >= 0) personalPOIs.splice(index, 1);
-      savePOIs();
-      renderPOIs();
-      evaluateCurrentPersonalPOI();
+      savePOIs(); renderPOIs(); evaluateCurrentPersonalPOI();
       return;
     }
     if (normalized !== 'editar') return;
     const data = askPOIData(poi);
     if (!data) return;
     Object.assign(poi, data, { updatedAt: Date.now() });
-    savePOIs();
-    renderPOIs();
-    evaluateCurrentPersonalPOI();
+    savePOIs(); renderPOIs(); evaluateCurrentPersonalPOI();
   }
 
   function openPOIManager() {
@@ -241,10 +211,7 @@
   }
 
   function handlePOIClick() {
-    if (suppressPOIClick) {
-      suppressPOIClick = false;
-      return;
-    }
+    if (suppressPOIClick) { suppressPOIClick = false; return; }
     if (window.WanderMapPosition?.isFollowingPosition?.()) {
       const position = effectivePosition();
       if (!position) {
@@ -261,32 +228,20 @@
 
   function evaluateCurrentPersonalPOI() {
     const position = effectivePosition();
-    if (!position || !personalPOIs.length) {
-      currentPersonalPOIId = null;
-      return;
-    }
+    if (!position || !personalPOIs.length) { currentPersonalPOIId = null; return; }
     const nearest = personalPOIs
       .map((poi) => ({ poi, distance: map.distance(position, [poi.lat, poi.lng]) }))
       .filter((item) => item.distance <= item.poi.radiusM)
       .sort((left, right) => left.distance - right.distance)[0];
-
     if (!nearest) {
-      if (currentPersonalPOIId) {
-        currentPersonalPOIId = null;
-        context.remove?.('personalPOI.current');
-      }
+      if (currentPersonalPOIId) { currentPersonalPOIId = null; context.remove?.('personalPOI.current'); }
       return;
     }
-
     currentPersonalPOIId = nearest.poi.id;
     const current = {
-      ...nearest.poi,
-      name: nearest.poi.name,
-      label: nearest.poi.name,
-      primaryType: nearest.poi.type,
-      distanceM: Math.round(nearest.distance),
-      source: 'personal-poi',
-      confidence: 1,
+      ...nearest.poi, name: nearest.poi.name, label: nearest.poi.name,
+      primaryType: nearest.poi.type, distanceM: Math.round(nearest.distance),
+      source: 'personal-poi', confidence: 1,
     };
     context.set('personalPOI.current', current, { source: 'personal-poi', kind: 'confirmed', confidence: 1 });
     if (context.value('motion.status') === 'stationary') {
@@ -296,7 +251,7 @@
   }
 
   const PersonalActions = L.Control.extend({
-    options: { position: 'bottomleft' },
+    options: { position: 'bottomright' },
     onAdd() {
       const wrap = L.DomUtil.create('div', 'wander-map-actions wander-personal-map-actions');
       poiButton = makeButton('pin', 'Guardar POI personal');
@@ -310,6 +265,9 @@
   });
 
   map.addControl(new PersonalActions());
+  const corner = map.getContainer().querySelector('.leaflet-bottom.leaflet-right');
+  const personalWrap = corner?.querySelector('.wander-personal-map-actions')?.parentElement;
+  if (personalWrap && corner.firstElementChild !== personalWrap) corner.insertBefore(personalWrap, corner.firstElementChild);
 
   map.on('click', (event) => {
     if (!poiPlacementArmed) return;
@@ -345,9 +303,7 @@
       const index = personalPOIs.findIndex((poi) => poi.id === id);
       if (index < 0) return false;
       personalPOIs.splice(index, 1);
-      savePOIs();
-      renderPOIs();
-      evaluateCurrentPersonalPOI();
+      savePOIs(); renderPOIs(); evaluateCurrentPersonalPOI();
       return true;
     },
     manage: openPOIManager,
