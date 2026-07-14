@@ -1,7 +1,24 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
+  const MESSAGE_TIMEOUT_KEY = 'wander.settings.messageTimeoutMs';
   const DEFAULT_MESSAGE_TIMEOUT_MS = 5000;
   let messageTimer = null;
+
+  function getMessageTimeoutMs() {
+    try {
+      const stored = Number(localStorage.getItem(MESSAGE_TIMEOUT_KEY));
+      return Number.isFinite(stored) ? Math.max(0, Math.min(60000, stored)) : DEFAULT_MESSAGE_TIMEOUT_MS;
+    } catch {
+      return DEFAULT_MESSAGE_TIMEOUT_MS;
+    }
+  }
+
+  function setMessageTimeoutMs(value) {
+    const timeoutMs = Math.max(0, Math.min(60000, Number(value) || 0));
+    try { localStorage.setItem(MESSAGE_TIMEOUT_KEY, String(timeoutMs)); } catch {}
+    window.WanderContext?.set?.('settings.messageTimeoutMs', timeoutMs, { source: 'settings', kind: 'confirmed', confidence: 1 });
+    return timeoutMs;
+  }
 
   function setText(selector, value) {
     const item = $(selector);
@@ -30,7 +47,7 @@
     if (options.persistent === true) return;
     const timeoutMs = Number.isFinite(Number(options.timeoutMs))
       ? Math.max(0, Number(options.timeoutMs))
-      : DEFAULT_MESSAGE_TIMEOUT_MS;
+      : getMessageTimeoutMs();
     if (timeoutMs > 0) messageTimer = setTimeout(hideWander, timeoutMs);
   }
 
@@ -79,6 +96,7 @@
     if (key === 'time.now') updateClock();
   });
 
+  window.WanderContext?.set?.('settings.messageTimeoutMs', getMessageTimeoutMs(), { source: 'settings', kind: 'confirmed', confidence: 1 });
   syncRuntimeMetrics();
   updateClock();
 
@@ -88,6 +106,8 @@
     hideWander,
     syncRuntimeMetrics,
     setLocationPending,
+    getMessageTimeoutMs,
+    setMessageTimeoutMs,
     defaultMessageTimeoutMs: DEFAULT_MESSAGE_TIMEOUT_MS,
   };
 })();
