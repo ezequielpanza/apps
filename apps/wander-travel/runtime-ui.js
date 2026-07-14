@@ -1,16 +1,37 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
+  const DEFAULT_MESSAGE_TIMEOUT_MS = 5000;
+  let messageTimer = null;
 
   function setText(selector, value) {
     const item = $(selector);
     if (item) item.textContent = value;
   }
 
-  function showWander(title, message) {
+  function clearMessageTimer() {
+    if (!messageTimer) return;
+    clearTimeout(messageTimer);
+    messageTimer = null;
+  }
+
+  function hideWander() {
+    clearMessageTimer();
     const card = $('#wander-card');
+    if (card) card.hidden = true;
+  }
+
+  function showWander(title, message, options = {}) {
+    const card = $('#wander-card');
+    clearMessageTimer();
     if (card) card.hidden = false;
     setText('#wander-title', title);
     setText('#wander-message', message);
+
+    if (options.persistent === true) return;
+    const timeoutMs = Number.isFinite(Number(options.timeoutMs))
+      ? Math.max(0, Number(options.timeoutMs))
+      : DEFAULT_MESSAGE_TIMEOUT_MS;
+    if (timeoutMs > 0) messageTimer = setTimeout(hideWander, timeoutMs);
   }
 
   function syncRuntimeMetrics() {
@@ -44,10 +65,7 @@
     ask: ['Preguntar', 'La IA contextual será la próxima capa. Va a leer WanderContext en vez de datos sueltos de la pantalla.'],
   };
 
-  $('#close-wander')?.addEventListener('click', () => {
-    const card = $('#wander-card');
-    if (card) card.hidden = true;
-  });
+  $('#close-wander')?.addEventListener('click', hideWander);
 
   document.querySelectorAll('[data-message]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -67,7 +85,9 @@
   window.WanderUI = {
     setText,
     showWander,
+    hideWander,
     syncRuntimeMetrics,
     setLocationPending,
+    defaultMessageTimeoutMs: DEFAULT_MESSAGE_TIMEOUT_MS,
   };
 })();
