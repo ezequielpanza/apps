@@ -22,6 +22,22 @@
     return { label: String(label) };
   }
 
+  function normalizeViewport(viewport) {
+    const low = viewport?.low || viewport?.southwest || viewport?.southWest || null;
+    const high = viewport?.high || viewport?.northeast || viewport?.northEast || null;
+    const south = finite(low?.latitude ?? low?.lat);
+    const west = finite(low?.longitude ?? low?.lng);
+    const north = finite(high?.latitude ?? high?.lat);
+    const east = finite(high?.longitude ?? high?.lng);
+    if ([south, west, north, east].some((value) => value === null)) return null;
+    return {
+      south: Math.min(south, north),
+      west: Math.min(west, east),
+      north: Math.max(south, north),
+      east: Math.max(west, east),
+    };
+  }
+
   function normalizePlace(place, request) {
     const latitude = finite(place?.location?.latitude);
     const longitude = finite(place?.location?.longitude);
@@ -32,6 +48,7 @@
       place.primaryType,
       ...(Array.isArray(place.types) ? place.types : []),
     ].filter(Boolean).map(String)));
+    const viewport = normalizeViewport(place.viewport);
 
     const source = {
       id: SOURCE_ID,
@@ -64,6 +81,7 @@
       attributes: {
         formattedAddress: place.formattedAddress || null,
         languageCode: place.displayName?.languageCode || null,
+        viewport,
       },
       metadata: {
         validatedBy: 'Google Places API (New)',
@@ -72,7 +90,7 @@
       },
       evidence: [{
         type: 'api_place_record',
-        value: { placeId: String(place.id), primaryType: place.primaryType || null },
+        value: { placeId: String(place.id), primaryType: place.primaryType || null, viewport },
         location: { lat: latitude, lng: longitude, method: 'google-places-api', accuracyRadiusM: 8 },
         confidence: 0.98,
         source,
@@ -120,7 +138,7 @@
   engine.register(Object.freeze({
     id: SOURCE_ID,
     version: SOURCE_VERSION,
-    capabilities: Object.freeze(['nearby-search', 'validated-pois']),
+    capabilities: Object.freeze(['nearby-search', 'validated-pois', 'place-viewport']),
     search,
   }));
 })();
