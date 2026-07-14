@@ -162,19 +162,34 @@
     return { name: name.trim(), type: String(type || 'personal').trim(), radiusM, notes: String(notes || '').trim() };
   }
 
+  function nextMarkerName() {
+    const highest = personalPOIs.reduce((max, poi) => {
+      const match = String(poi?.name || '').match(/^Marcador\s+(\d+)$/i);
+      return match ? Math.max(max, Number(match[1]) || 0) : max;
+    }, 0);
+    return 'Marcador ' + String(highest + 1).padStart(2, '0');
+  }
+
   function createPOIAt(latLng) {
-    const data = askPOIData();
-    if (!data || !latLng) return false;
+    if (!latLng) return false;
+    const now = Date.now();
     const poi = {
-      id: 'personal-poi-' + Date.now(), ...data,
-      lat: Number(latLng.lat), lng: Number(latLng.lng),
-      createdAt: Date.now(), updatedAt: Date.now(), source: 'user',
+      id: 'personal-poi-' + now,
+      name: nextMarkerName(),
+      type: 'personal',
+      radiusM: 35,
+      notes: '',
+      lat: Number(latLng.lat),
+      lng: Number(latLng.lng),
+      createdAt: now,
+      updatedAt: now,
+      source: 'user',
     };
     personalPOIs.push(poi);
     savePOIs();
     renderPOIs();
     evaluateCurrentPersonalPOI();
-    window.WanderUI?.showWander('POI guardado', poi.name + ' quedó guardado en tus lugares personales.');
+    window.WanderUI?.showWander('POI guardado', poi.name + ' quedó guardado.');
     return true;
   }
 
