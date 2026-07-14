@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.88.7';
+  const APP_BUILD = 'v0.88.8';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -18,7 +18,20 @@
     });
   }
 
+  function loadStyle(href) {
+    if (document.querySelector('link[href="' + href + '"]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  }
+
   window.addEventListener('load', async () => {
+    try {
+      loadStyle('wander-dashboard-order.css?v=20260714-04');
+      await loadRuntime('runtime-dashboard-order.js?v=20260714-04');
+    } catch {}
+
     try {
       await loadRuntime('runtime-source-policy-google-places.js?v=20260713-01');
       await loadRuntime('runtime-poi-connector-google-places.js?v=20260713-02');
