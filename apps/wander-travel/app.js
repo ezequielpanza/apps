@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.88.2';
+  const APP_BUILD = 'v0.88.3';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -21,7 +21,7 @@
   window.addEventListener('load', async () => {
     try {
       await loadRuntime('runtime-source-policy-google-places.js?v=20260713-01');
-      await loadRuntime('runtime-poi-connector-google-places.js?v=20260713-01');
+      await loadRuntime('runtime-poi-connector-google-places.js?v=20260713-02');
       window.WanderProviders?.nearby?.configure?.({
         sources: ['google-places', 'openstreetmap', 'wikidata'],
       });
@@ -30,6 +30,7 @@
 
     try {
       await loadRuntime('runtime-provider-container.js?v=20260713-01');
+      await loadRuntime('runtime-provider-container-google.js?v=20260713-01');
     } catch {}
 
     try {
@@ -52,6 +53,7 @@
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         window.WanderProviders?.container?.refresh?.(true);
+        window.WanderProviders?.googleContainer?.apply?.();
         window.WanderProviders?.currentPOI?.detect?.();
         window.WanderProviders?.currentContainerBridge?.apply?.();
         window.WanderDashboardViewport?.mount?.();
