@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.90.3';
+  const VERSION = 'v0.90.4';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -60,6 +60,11 @@
       ready: () => Boolean(window.WanderPersonalPOIs?.get && document.querySelector('.map-stage')),
       loaded: () => Boolean(window.WanderPersonalPOISheet),
       src: 'runtime-personal-poi-sheet.js?v=20260714-17',
+    });
+    loadWhenReady({
+      ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('.wander-app')),
+      loaded: () => Boolean(window.WanderDashboardVisibilityGuard),
+      src: 'runtime-dashboard-visibility-guard.js?v=20260714-21',
     });
     loadWhenReady({
       ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('#simulation-map-controls')),
