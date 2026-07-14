@@ -78,8 +78,35 @@
     return (current.name || 'Lugar actual') + ' · ' + status + (current.seenYesterday ? ' · estuvo ayer' : '');
   }
 
+  function shortPlaceName(value) {
+    return String(value || '')
+      .replace(/^hotel\s+/i, '')
+      .replace(/\s*[-–—]\s*(adults? only|solo adultos|all[- ]inclusive.*)$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function containerLabel(value) {
+    const tags = value?.container?.tags || value?.tags || {};
+    const types = new Set([tags.primaryType, ...(Array.isArray(tags.types) ? tags.types : [])].filter(Boolean));
+    if (types.has('resort_hotel')) return 'Dentro del resort';
+    if (types.has('shopping_mall')) return 'Dentro del shopping';
+    if (types.has('airport')) return 'Dentro del aeropuerto';
+    if (types.has('hospital')) return 'Dentro del hospital';
+    if (types.has('university') || types.has('college') || types.has('school')) return 'Dentro del campus';
+    if (types.has('marina')) return 'Dentro de la marina';
+    if (types.has('stadium') || types.has('sports_complex')) return 'Dentro del complejo';
+    if (types.has('theme_park') || types.has('amusement_park')) return 'Dentro del parque';
+    if (types.has('hotel') || types.has('lodging')) return 'Dentro del hotel';
+    return value?.detectionMode === 'inside_area' ? 'Dentro del establecimiento' : null;
+  }
+
   function currentPOIValue() {
-    return textValue(context.value('currentPOI.value') || context.value('currentPOI.current'), 'Sin POI actual');
+    const current = context.value('currentPOI.value') || context.value('currentPOI.current');
+    if (!current) return 'Sin POI actual';
+    const name = shortPlaceName(textValue(current, 'POI actual')) || 'POI actual';
+    const label = containerLabel(current);
+    return label ? name + ' · ' + label : name;
   }
 
   function nearbyValue() {
