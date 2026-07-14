@@ -37,7 +37,7 @@ export async function onRequestGet(context) {
     headers: {
       'content-type': 'application/json',
       'x-goog-api-key': apiKey,
-      'x-goog-fieldmask': 'places.id,places.displayName,places.primaryType,places.types,places.location,places.formattedAddress',
+      'x-goog-fieldmask': 'places.id,places.displayName,places.primaryType,places.types,places.location,places.viewport,places.formattedAddress',
     },
     body: JSON.stringify({
       maxResultCount: 20,
