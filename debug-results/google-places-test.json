@@ -42,8 +42,8 @@
       "types": [
         "resort_hotel",
         "massage_spa",
-        "massage",
         "spa",
+        "massage",
         "hotel",
         "lodging",
         "service",
@@ -77,8 +77,8 @@
         "coffee_shop",
         "cafe",
         "food_store",
-        "food",
         "store",
+        "food",
         "point_of_interest",
         "establishment"
       ],
@@ -196,8 +196,8 @@
       "types": [
         "grocery_store",
         "food_store",
-        "food",
         "store",
+        "food",
         "point_of_interest",
         "establishment"
       ],
@@ -312,9 +312,9 @@
       "id": "ChIJaQbsH65aro4RUeBnxhK5Ewg",
       "types": [
         "courthouse",
-        "service",
         "local_government_office",
         "government_office",
+        "service",
         "point_of_interest",
         "establishment"
       ],
@@ -344,8 +344,8 @@
       "types": [
         "barber_shop",
         "hair_care",
-        "service",
         "health",
+        "service",
         "point_of_interest",
         "establishment"
       ],
@@ -374,8 +374,8 @@
       "id": "ChIJH9wqOABbro4RoKEL-jZsjRk",
       "types": [
         "food_store",
-        "food",
         "store",
+        "food",
         "point_of_interest",
         "establishment"
       ],
@@ -579,8 +579,8 @@
       "types": [
         "general_store",
         "food_store",
-        "food",
         "store",
+        "food",
         "point_of_interest",
         "establishment"
       ],
