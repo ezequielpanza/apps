@@ -7,6 +7,7 @@
   const STORAGE_KEY = base.storageKey || 'wander.contextDashboard.config.v1';
   const canonicalOrder = base.fields.map((field) => field.id);
   let decorating = false;
+  let observer = null;
 
   function uniqueKnown(values) {
     const result = [];
@@ -19,11 +20,10 @@
   function readConfig() {
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {};
-      const visibleFields = uniqueKnown(stored.visibleFields);
       const fieldOrder = uniqueKnown(stored.fieldOrder);
       for (const id of canonicalOrder) if (!fieldOrder.includes(id)) fieldOrder.push(id);
       return {
-        visibleFields: visibleFields.length ? visibleFields : base.getVisibleFields(),
+        visibleFields: Array.isArray(stored.visibleFields) ? uniqueKnown(stored.visibleFields) : base.getVisibleFields(),
         fieldOrder,
       };
     } catch {
@@ -68,6 +68,7 @@
 
   function setFieldVisible(fieldId, visible) {
     if (!canonicalOrder.includes(fieldId)) throw new Error('Unknown context dashboard field: ' + fieldId);
+    base.setFieldVisible(fieldId, visible);
     config.visibleFields = config.visibleFields.filter((id) => id !== fieldId);
     if (visible) config.visibleFields.push(fieldId);
     persist();
@@ -91,6 +92,7 @@
   }
 
   function reset() {
+    base.reset();
     config = { visibleFields: ['summary', 'speed', 'heading'], fieldOrder: [...canonicalOrder] };
     persist();
     renderDashboard();
@@ -124,9 +126,14 @@
       '</span>';
   }
 
+  function observeRows() {
+    observer?.observe(list, { childList: true, subtree: true });
+  }
+
   function decorateRows() {
     if (decorating) return;
     decorating = true;
+    observer?.disconnect();
     try {
       const rows = Array.from(list.querySelectorAll('.context-row'));
       const byId = new Map();
@@ -140,14 +147,14 @@
       for (const fieldId of config.fieldOrder) {
         const row = byId.get(fieldId);
         if (!row) continue;
-        let controls = row.querySelector('.context-field-order');
-        if (controls) controls.remove();
+        row.querySelector('.context-field-order')?.remove();
         row.insertAdjacentHTML('beforeend', orderControls(fieldId));
         list.appendChild(row);
       }
       for (const row of withoutId) list.appendChild(row);
     } finally {
       decorating = false;
+      observeRows();
     }
   }
 
@@ -159,10 +166,10 @@
     moveField(button.dataset.fieldId, button.dataset.fieldOrder);
   });
 
-  const observer = new MutationObserver(() => {
+  observer = new MutationObserver(() => {
     if (!decorating) queueMicrotask(decorateRows);
   });
-  observer.observe(list, { childList: true, subtree: true });
+  observeRows();
 
   renderDashboard();
   decorateRows();
