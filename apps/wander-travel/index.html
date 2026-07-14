@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<title>Wander Travel v0.88.8</title>
+<title>Wander Travel v0.88.9</title>
 <meta name="theme-color" content="#01E0CB">
 <meta name="application-name" content="Wander">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wander">
-<link rel="manifest" href="manifest.webmanifest?v=20260714-04">
-<link rel="icon" href="wander-app-icon.svg?v=20260714-04" type="image/svg+xml">
-<link rel="apple-touch-icon" href="wander-app-icon.svg?v=20260714-04">
+<link rel="manifest" href="manifest.webmanifest?v=20260714-05">
+<link rel="icon" href="wander-app-icon.svg?v=20260714-05" type="image/svg+xml">
+<link rel="apple-touch-icon" href="wander-app-icon.svg?v=20260714-05">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-<link rel="stylesheet" href="wander-ui.css?v=20260714-04">
-<link rel="stylesheet" href="wander-simulator-interactions.css?v=20260714-04">
-<link rel="stylesheet" href="wander-context-dashboard.css?v=20260714-04">
+<link rel="stylesheet" href="wander-ui.css?v=20260714-05">
+<link rel="stylesheet" href="wander-simulator-interactions.css?v=20260714-05">
+<link rel="stylesheet" href="wander-context-dashboard.css?v=20260714-05">
 </head>
 <body>
 <main class="wander-app" data-screen="map" data-menu="closed">
@@ -26,7 +26,7 @@
 <div class="wander-search-pill"><input id="wander-query-input" class="wander-query-input" type="text" placeholder="Preguntar a Wander" autocomplete="off" aria-label="Preguntar a Wander"><button id="wander-search-button" class="wander-search-button" type="button" aria-label="Enviar pregunta a Wander"><svg class="ui-icon"><use href="wander-icons.svg#search"></use></svg></button></div>
 </header>
 <nav id="main-menu" class="main-menu" aria-label="Menú principal" hidden>
-<div class="drawer-brand"><div class="drawer-logo" aria-hidden="true">W</div><div><strong>Wander</strong><span>Tu compañero de viaje</span><small id="drawer-version">v0.88.8</small></div></div>
+<div class="drawer-brand"><div class="drawer-logo" aria-hidden="true">W</div><div><strong>Wander</strong><span>Tu compañero de viaje</span><small id="drawer-version">v0.88.9</small></div></div>
 <div class="drawer-group"><button type="button" data-screen-target="travel"><svg class="nav-icon"><use href="wander-icons.svg#compass"></use></svg><span>Travel</span></button><button type="button" data-screen-target="context"><svg class="nav-icon"><use href="wander-icons.svg#brain"></use></svg><span>Contexto</span></button></div>
 <div class="drawer-divider"></div>
 <div class="drawer-group"><button type="button" data-screen-target="simulator"><svg class="nav-icon"><use href="wander-icons.svg#flask"></use></svg><span>Simulador</span></button><button type="button" data-screen-target="settings"><svg class="nav-icon"><use href="wander-icons.svg#settings"></use></svg><span>Ajustes</span></button></div>
@@ -53,38 +53,38 @@
 <section class="app-screen" data-app-screen="settings" hidden><header class="app-screen-header"><button class="screen-close" type="button" data-close-screen aria-label="Cerrar Ajustes"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button><h1>Ajustes</h1><span></span></header><div class="app-screen-scroll"><div class="screen-content"><section id="settings-panel" class="panel-section"><div class="screen-card settings-group"><h3>Mapa y viaje</h3><div class="setting-card"><svg class="setting-icon"><use href="wander-icons.svg#record"></use></svg><div><strong>Tracks</strong><span>Grabación manual desde Travel.</span></div></div><div class="setting-card"><svg class="setting-icon"><use href="wander-icons.svg#compass"></use></svg><div><strong>Mapa libre</strong><span>El mapa representa la ubicación efectiva disponible.</span></div></div></div><div class="screen-card settings-group"><h3>Arquitectura de Wander</h3><div class="setting-card"><svg class="setting-icon"><use href="wander-icons.svg#brain"></use></svg><div><strong>Context → Engine</strong><span>Los providers alimentan WanderContext; WanderEngine interpreta, aprende y decide.</span></div></div></div></section></div></div></section>
 </main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="runtime-context-store.js?v=20260714-04"></script>
-<script src="runtime-context-location.js?v=20260714-04"></script>
-<script src="runtime-context-init.js?v=20260714-04"></script>
-<script src="runtime-version.js?v=20260714-04"></script>
-<script src="app.js?v=20260714-04"></script>
-<script src="runtime-source-policy.js?v=20260714-04"></script>
-<script src="runtime-poi-normalized.js?v=20260714-04"></script>
-<script src="runtime-poi-consolidated.js?v=20260714-04"></script>
-<script src="runtime-poi-store.js?v=20260714-04"></script>
-<script src="runtime-poi-engine.js?v=20260714-04"></script>
-<script src="runtime-external-source-tripadvisor.js?v=20260714-04"></script>
-<script src="runtime-external-source-google-maps.js?v=20260714-04"></script>
-<script src="runtime-poi-connector-wikidata.js?v=20260714-04"></script>
-<script src="runtime-poi-connector-openstreetmap.js?v=20260714-04"></script>
-<script src="runtime-provider-location.js?v=20260714-04"></script>
-<script src="runtime-provider-place.js?v=20260714-04"></script>
-<script src="runtime-provider-nearby.js?v=20260714-04"></script>
-<script src="runtime-engine-state.js?v=20260714-04"></script>
-<script src="runtime-engine-inference.js?v=20260714-04"></script>
-<script src="runtime-engine-transition.js?v=20260714-04"></script>
-<script src="runtime-engine-journey.js?v=20260714-04"></script>
-<script src="runtime-engine-memory.js?v=20260714-04"></script>
-<script src="runtime-engine-place.js?v=20260714-04"></script>
-<script src="runtime-engine-relevance.js?v=20260714-04"></script>
-<script src="runtime-engine-decision.js?v=20260714-04"></script>
-<script src="runtime-engine.js?v=20260714-04"></script>
-<script src="runtime-ui.js?v=20260714-04"></script>
-<script src="runtime-context-dashboard.js?v=20260714-04"></script>
-<script src="runtime-panel.js?v=20260714-04"></script>
-<script src="runtime-context-panel.js?v=20260714-04"></script>
-<script src="runtime-topbar.js?v=20260714-04"></script>
-<script src="runtime-tracks.js?v=20260714-04"></script>
-<script src="runtime-provider-simulator.js?v=20260714-04"></script>
+<script src="runtime-context-store.js?v=20260714-05"></script>
+<script src="runtime-context-location.js?v=20260714-05"></script>
+<script src="runtime-context-init.js?v=20260714-05"></script>
+<script src="runtime-version.js?v=20260714-05"></script>
+<script src="app.js?v=20260714-05"></script>
+<script src="runtime-source-policy.js?v=20260714-05"></script>
+<script src="runtime-poi-normalized.js?v=20260714-05"></script>
+<script src="runtime-poi-consolidated.js?v=20260714-05"></script>
+<script src="runtime-poi-store.js?v=20260714-05"></script>
+<script src="runtime-poi-engine.js?v=20260714-05"></script>
+<script src="runtime-external-source-tripadvisor.js?v=20260714-05"></script>
+<script src="runtime-external-source-google-maps.js?v=20260714-05"></script>
+<script src="runtime-poi-connector-wikidata.js?v=20260714-05"></script>
+<script src="runtime-poi-connector-openstreetmap.js?v=20260714-05"></script>
+<script src="runtime-provider-location.js?v=20260714-05"></script>
+<script src="runtime-provider-place.js?v=20260714-05"></script>
+<script src="runtime-provider-nearby.js?v=20260714-05"></script>
+<script src="runtime-engine-state.js?v=20260714-05"></script>
+<script src="runtime-engine-inference.js?v=20260714-05"></script>
+<script src="runtime-engine-transition.js?v=20260714-05"></script>
+<script src="runtime-engine-journey.js?v=20260714-05"></script>
+<script src="runtime-engine-memory.js?v=20260714-05"></script>
+<script src="runtime-engine-place.js?v=20260714-05"></script>
+<script src="runtime-engine-relevance.js?v=20260714-05"></script>
+<script src="runtime-engine-decision.js?v=20260714-05"></script>
+<script src="runtime-engine.js?v=20260714-05"></script>
+<script src="runtime-ui.js?v=20260714-05"></script>
+<script src="runtime-context-dashboard.js?v=20260714-05"></script>
+<script src="runtime-panel.js?v=20260714-05"></script>
+<script src="runtime-context-panel.js?v=20260714-05"></script>
+<script src="runtime-topbar.js?v=20260714-05"></script>
+<script src="runtime-tracks.js?v=20260714-05"></script>
+<script src="runtime-provider-simulator.js?v=20260714-05"></script>
 </body>
 </html>
