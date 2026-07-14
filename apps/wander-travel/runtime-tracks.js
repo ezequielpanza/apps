@@ -76,9 +76,14 @@
 
     list.innerHTML = rows.map((track) => {
       const distance = distanceFor(track.points);
-      return '<button class="track-row" type="button" data-track-id="' + track.id + '">' +
-        '<div><strong>' + track.name + '</strong><span>' + durationLabel(durationFor(track)) + ' · ' + distanceLabel(distance) + ' · ' + track.points.length + ' puntos</span></div>' +
-        icon('eye', 'ui-icon track-eye') + '</button>';
+      const deletable = !current || current.id !== track.id;
+      return '<div class="track-row" data-track-id="' + track.id + '">' +
+        '<button class="track-main" type="button" data-track-view="' + track.id + '">' +
+          '<div><strong>' + track.name + '</strong><span>' + durationLabel(durationFor(track)) + ' · ' + distanceLabel(distance) + ' · ' + track.points.length + ' puntos</span></div>' +
+          icon('eye', 'ui-icon track-eye') +
+        '</button>' +
+        (deletable ? '<button class="track-delete" type="button" data-track-delete="' + track.id + '" aria-label="Eliminar ' + track.name + '">' + icon('clear', 'ui-icon') + '</button>' : '') +
+      '</div>';
     }).join('');
   }
 
@@ -142,6 +147,16 @@
     window.WanderUI?.showWander('Recorrido', track.name + ' · ' + distanceLabel(distanceFor(track.points)) + '.');
   }
 
+  function removeTrack(id) {
+    const track = tracks.find((item) => item.id === id);
+    if (!track) return false;
+    if (!window.confirm('¿Eliminar ' + track.name + '?')) return false;
+    tracks = tracks.filter((item) => item.id !== id);
+    save();
+    render();
+    return true;
+  }
+
   function exportTrack(track) {
     if (!track) return;
     const blob = new Blob([JSON.stringify(track, null, 2)], { type: 'application/json' });
@@ -174,10 +189,7 @@
       const name = window.prompt('Nombre del tramo', track.name);
       if (name?.trim()) { track.name = name.trim(); save(); render(); }
     }
-    if (normalized === 'eliminar' && window.confirm('¿Eliminar ' + track.name + '?')) {
-      tracks = tracks.filter((item) => item.id !== track.id);
-      save(); render();
-    }
+    if (normalized === 'eliminar') removeTrack(track.id);
   }
 
   $('#record-button')?.addEventListener('click', () => current ? stop() : start());
@@ -187,8 +199,15 @@
   });
   $('#export-track-button')?.addEventListener('click', exportLast);
   $('#track-list')?.addEventListener('click', (event) => {
-    const row = event.target.closest('[data-track-id]');
-    if (row) showTrack(row.dataset.trackId);
+    const deleteButton = event.target.closest('[data-track-delete]');
+    if (deleteButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      removeTrack(deleteButton.dataset.trackDelete);
+      return;
+    }
+    const viewButton = event.target.closest('[data-track-view]');
+    if (viewButton) showTrack(viewButton.dataset.trackView);
   });
 
   window.WanderTracks = {
@@ -198,6 +217,7 @@
     stop,
     manage,
     showTrack,
+    removeTrack,
     exportTrack,
     list: () => tracks.map((track) => ({ ...track, points: track.points.map((point) => ({ ...point })) })),
     isRecording: () => Boolean(current),
