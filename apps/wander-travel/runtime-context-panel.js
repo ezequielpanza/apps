@@ -27,7 +27,7 @@
     ['history.currentPlace', 'Memoria del lugar', 'brain', 'placeMemory'],
   ];
 
-  const EXTRA_DASHBOARD_FIELDS = ['currentPOI', 'nearby', 'lastSuggestion', 'simulation'];
+  const EXTRA_DASHBOARD_FIELDS = ['currentPOI', 'nearby', 'lastSuggestion', 'simulation', 'appVersion'];
 
   const TECHNICAL = [
     'app.version','simulation.status','context.status','context.activity','time.now','time.dayPeriod',
