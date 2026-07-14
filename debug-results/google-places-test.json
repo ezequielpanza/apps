@@ -21,6 +21,16 @@
         "latitude": 19.3726916,
         "longitude": -69.85271019999999
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.371397319708496,
+          "longitude": -69.8540570302915
+        },
+        "high": {
+          "latitude": 19.3740952802915,
+          "longitude": -69.8513590697085
+        }
+      },
       "displayName": {
         "text": "Hotel Juliana",
         "languageCode": "es"
@@ -33,8 +43,8 @@
         "resort_hotel",
         "massage_spa",
         "massage",
-        "hotel",
         "spa",
+        "hotel",
         "lodging",
         "point_of_interest",
         "service",
@@ -44,6 +54,16 @@
       "location": {
         "latitude": 19.372892,
         "longitude": -69.85287509999999
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.371496869708498,
+          "longitude": -69.8542218802915
+        },
+        "high": {
+          "latitude": 19.374194830291504,
+          "longitude": -69.85152391970848
+        }
       },
       "displayName": {
         "text": "OASIS CENTRO DE ESTETICA Y SPA",
@@ -58,14 +78,24 @@
         "cafe",
         "food_store",
         "store",
-        "point_of_interest",
         "food",
+        "point_of_interest",
         "establishment"
       ],
       "formattedAddress": "94FW+2QV, Nagua 33000, Dominican Republic",
       "location": {
         "latitude": 19.3726104,
         "longitude": -69.8530852
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.3713513197085,
+          "longitude": -69.8544384802915
+        },
+        "high": {
+          "latitude": 19.3740492802915,
+          "longitude": -69.85174051970849
+        }
       },
       "displayName": {
         "text": "Cafeteria Carmen",
@@ -86,6 +116,16 @@
         "latitude": 19.372368700000003,
         "longitude": -69.8526548
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.3710343197085,
+          "longitude": -69.8539661302915
+        },
+        "high": {
+          "latitude": 19.373732280291506,
+          "longitude": -69.85126816970849
+        }
+      },
       "displayName": {
         "text": "Casa color crema marrón y naranja",
         "languageCode": "es"
@@ -104,6 +144,16 @@
       "location": {
         "latitude": 19.3727029,
         "longitude": -69.853275
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.3713936697085,
+          "longitude": -69.8546258802915
+        },
+        "high": {
+          "latitude": 19.374091630291502,
+          "longitude": -69.85192791970849
+        }
       },
       "displayName": {
         "text": "D'Luz Tienda & Más",
@@ -125,6 +175,16 @@
         "latitude": 19.372187099999998,
         "longitude": -69.8525537
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.370845269708497,
+          "longitude": -69.85388168029151
+        },
+        "high": {
+          "latitude": 19.373543230291503,
+          "longitude": -69.8511837197085
+        }
+      },
       "displayName": {
         "text": "LEGALMIGRA",
         "languageCode": "es"
@@ -137,14 +197,24 @@
         "grocery_store",
         "food_store",
         "store",
-        "point_of_interest",
         "food",
+        "point_of_interest",
         "establishment"
       ],
       "formattedAddress": "C. Jorge Awad, Nagua 33000, Dominican Republic",
       "location": {
         "latitude": 19.372823200000003,
         "longitude": -69.8533565
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.371458969708495,
+          "longitude": -69.8547051802915
+        },
+        "high": {
+          "latitude": 19.3741569302915,
+          "longitude": -69.8520072197085
+        }
       },
       "displayName": {
         "text": "Comercial Maridalia",
@@ -165,6 +235,16 @@
         "latitude": 19.3723839,
         "longitude": -69.85225710000002
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.371181169708496,
+          "longitude": -69.85374443029151
+        },
+        "high": {
+          "latitude": 19.3738791302915,
+          "longitude": -69.8510464697085
+        }
+      },
       "displayName": {
         "text": "Universidad Autónoma de Santo Domingo - Recinto Nagua",
         "languageCode": "en"
@@ -184,6 +264,16 @@
         "latitude": 19.3732363,
         "longitude": -69.8529253
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.371901719708497,
+          "longitude": -69.8542115802915
+        },
+        "high": {
+          "latitude": 19.374599680291503,
+          "longitude": -69.8515136197085
+        }
+      },
       "displayName": {
         "text": "Casa de Anabelle",
         "languageCode": "es"
@@ -201,6 +291,16 @@
       "location": {
         "latitude": 19.3728731,
         "longitude": -69.8521759
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.371450369708498,
+          "longitude": -69.85353918029152
+        },
+        "high": {
+          "latitude": 19.374148330291504,
+          "longitude": -69.8508412197085
+        }
       },
       "displayName": {
         "text": "centro familiar",
@@ -223,6 +323,16 @@
         "latitude": 19.3731893,
         "longitude": -69.8523438
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.371882619708497,
+          "longitude": -69.85368558029151
+        },
+        "high": {
+          "latitude": 19.3745805802915,
+          "longitude": -69.8509876197085
+        }
+      },
       "displayName": {
         "text": "Tribunal de Niños, Niñas y Adolescentes",
         "languageCode": "es"
@@ -244,6 +354,16 @@
         "latitude": 19.372717599999998,
         "longitude": -69.8534964
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.371386519708498,
+          "longitude": -69.85484673029151
+        },
+        "high": {
+          "latitude": 19.3740844802915,
+          "longitude": -69.85214876970849
+        }
+      },
       "displayName": {
         "text": "The Best Barber Studio",
         "languageCode": "en"
@@ -255,14 +375,24 @@
       "types": [
         "food_store",
         "store",
-        "point_of_interest",
         "food",
+        "point_of_interest",
         "establishment"
       ],
       "formattedAddress": "casi esquina, C. Jorge Awad 26, Nagua 33000, Dominican Republic",
       "location": {
         "latitude": 19.3728062,
         "longitude": -69.8534916
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.371450019708497,
+          "longitude": -69.8548400302915
+        },
+        "high": {
+          "latitude": 19.3741479802915,
+          "longitude": -69.85214206970849
+        }
       },
       "displayName": {
         "text": "Queso Nagua",
@@ -280,6 +410,16 @@
       "location": {
         "latitude": 19.372816399999998,
         "longitude": -69.85350509999999
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.3714492197085,
+          "longitude": -69.8548527302915
+        },
+        "high": {
+          "latitude": 19.3741471802915,
+          "longitude": -69.85215476970849
+        }
       },
       "displayName": {
         "text": "Inversiones Rurosu",
@@ -301,6 +441,16 @@
         "latitude": 19.3732301,
         "longitude": -69.8522833
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.371885919708497,
+          "longitude": -69.85363148029151
+        },
+        "high": {
+          "latitude": 19.3745838802915,
+          "longitude": -69.8509335197085
+        }
+      },
       "displayName": {
         "text": "Bufete Juridico Abel Gonzalez",
         "languageCode": "en"
@@ -319,6 +469,16 @@
       "location": {
         "latitude": 19.372844399999998,
         "longitude": -69.8535595
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.371454919708498,
+          "longitude": -69.85490553029152
+        },
+        "high": {
+          "latitude": 19.3741528802915,
+          "longitude": -69.8522075697085
+        }
       },
       "displayName": {
         "text": "Ozoria Tech",
@@ -339,6 +499,16 @@
         "latitude": 19.3721246,
         "longitude": -69.85348189999999
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.370757969708496,
+          "longitude": -69.8548998302915
+        },
+        "high": {
+          "latitude": 19.373455930291502,
+          "longitude": -69.85220186970848
+        }
+      },
       "displayName": {
         "text": "Hotel María Trinidad Sánchez",
         "languageCode": "es"
@@ -348,8 +518,8 @@
     {
       "id": "ChIJe57RsMJbro4RQMHaG9wkjTY",
       "types": [
-        "home_goods_store",
         "building_materials_store",
+        "home_goods_store",
         "store",
         "point_of_interest",
         "establishment"
@@ -358,6 +528,16 @@
       "location": {
         "latitude": 19.372562500000004,
         "longitude": -69.8536812
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.371204569708503,
+          "longitude": -69.8550628302915
+        },
+        "high": {
+          "latitude": 19.373902530291506,
+          "longitude": -69.8523648697085
+        }
       },
       "displayName": {
         "text": "Spazzola Color Shop - Nagua",
@@ -378,6 +558,16 @@
         "latitude": 19.3724092,
         "longitude": -69.85364849999999
       },
+      "viewport": {
+        "low": {
+          "latitude": 19.3710542197085,
+          "longitude": -69.8550220802915
+        },
+        "high": {
+          "latitude": 19.373752180291508,
+          "longitude": -69.8523241197085
+        }
+      },
       "displayName": {
         "text": "Nidito Pet Shop",
         "languageCode": "es"
@@ -390,14 +580,24 @@
         "general_store",
         "food_store",
         "store",
-        "point_of_interest",
         "food",
+        "point_of_interest",
         "establishment"
       ],
       "formattedAddress": "C. Salomé Ureña 19, Nagua 33000, Dominican Republic",
       "location": {
         "latitude": 19.373519899999998,
         "longitude": -69.85265679999999
+      },
+      "viewport": {
+        "low": {
+          "latitude": 19.372173069708495,
+          "longitude": -69.8540014802915
+        },
+        "high": {
+          "latitude": 19.3748710302915,
+          "longitude": -69.8513035197085
+        }
       },
       "displayName": {
         "text": "Survive Rd",
