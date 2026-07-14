@@ -3,7 +3,7 @@
   const engine = window.WanderEngine;
   if (!context || !engine?.subscribeEvaluation) return;
 
-  const RULE_SET_VERSION = '1.0.0';
+  const RULE_SET_VERSION = '1.1.0';
   const listeners = new Set();
   let lastResult = null;
   let stationarySince = null;
@@ -13,15 +13,20 @@
     return Number.isFinite(parsed) ? parsed : null;
   }
 
-  function placeName() {
-    const poi = context.value?.('poi.current') || context.value?.('place.currentPOI');
+  function stationaryPlaceName() {
+    const poi = context.value?.('currentPOI.current') || context.value?.('poi.current') || context.value?.('place.currentPOI');
     const container = context.value?.('place.currentContainer') || context.value?.('container.current');
     const place = context.value?.('place.current');
-    return poi?.name || container?.name || place?.zone?.name || place?.city?.name || place?.name || null;
+    return poi?.name || container?.name || place?.zone || place?.neighborhood || place?.city || place?.name || null;
+  }
+
+  function movementPlaceName() {
+    const place = context.value?.('place.current');
+    return place?.zone || place?.neighborhood || place?.district || place?.city || place?.region || place?.name || null;
   }
 
   function placeType() {
-    const poi = context.value?.('poi.current') || context.value?.('place.currentPOI');
+    const poi = context.value?.('currentPOI.current') || context.value?.('poi.current') || context.value?.('place.currentPOI');
     const container = context.value?.('place.currentContainer') || context.value?.('container.current');
     return poi?.primaryType || poi?.type || container?.primaryType || container?.type || null;
   }
@@ -35,7 +40,8 @@
     const speed = number(situation.speedKmh);
     const mobility = String(situation.mobility?.mode || 'unknown');
     const motion = String(situation.motion?.status || 'pending');
-    const name = placeName();
+    const stationaryName = stationaryPlaceName();
+    const movementName = movementPlaceName();
     const type = placeType();
     const now = Date.now();
 
@@ -53,11 +59,11 @@
     } else {
       if (motion === 'stationary') {
         candidates.push(candidate(
-          name ? 'stationary_at_place' : 'stationary',
-          name ? 'stationary_inside_known_place' : 'stationary_generic',
-          name ? 0.86 : 0.76,
-          name ? `Detenido en ${name}` : 'Detenido',
-          ['motion_stationary', name ? 'known_place' : 'place_unknown']
+          stationaryName ? 'stationary_at_place' : 'stationary',
+          stationaryName ? 'stationary_inside_known_place' : 'stationary_generic',
+          stationaryName ? 0.86 : 0.76,
+          stationaryName ? `Detenido en ${stationaryName}` : 'Detenido',
+          ['motion_stationary', stationaryName ? 'known_place' : 'place_unknown']
         ));
         if (stationaryMinutes >= 45) {
           const socialVenue = /bar|night_club|restaurant|cafe/i.test(String(type || ''));
@@ -73,16 +79,16 @@
       }
 
       if (mobility === 'walking' || (speed !== null && speed > 0.3 && speed <= 7)) {
-        candidates.push(candidate('walking', 'walking_speed_or_provider', mobility === 'walking' ? 0.93 : 0.78, name ? `Caminando por ${name}` : 'Caminando', [mobility === 'walking' ? 'provider_walking' : 'walking_speed']));
+        candidates.push(candidate('walking', 'walking_speed_or_provider', mobility === 'walking' ? 0.93 : 0.78, movementName ? `Caminando por ${movementName}` : 'Caminando', [mobility === 'walking' ? 'provider_walking' : 'walking_speed', 'poi_suppressed_while_moving']));
       }
       if (mobility === 'driving' || (speed !== null && speed > 12 && speed <= 180)) {
-        candidates.push(candidate('driving', 'driving_speed_or_provider', mobility === 'driving' ? 0.94 : 0.8, name ? `Conduciendo por ${name}` : 'Conduciendo', [mobility === 'driving' ? 'provider_driving' : 'driving_speed']));
+        candidates.push(candidate('driving', 'driving_speed_or_provider', mobility === 'driving' ? 0.94 : 0.8, movementName ? `Conduciendo por ${movementName}` : 'Conduciendo', [mobility === 'driving' ? 'provider_driving' : 'driving_speed', 'poi_suppressed_while_moving']));
       }
       if (mobility === 'sailing' || mobility === 'boating') {
-        candidates.push(candidate('sailing', 'marine_mobility_provider', 0.95, name ? `Navegando cerca de ${name}` : 'Navegando', ['provider_marine_mode']));
+        candidates.push(candidate('sailing', 'marine_mobility_provider', 0.95, movementName ? `Navegando cerca de ${movementName}` : 'Navegando', ['provider_marine_mode', 'poi_suppressed_while_moving']));
       }
       if (!candidates.length && motion === 'moving') {
-        candidates.push(candidate('moving', 'generic_motion', 0.68, name ? `En movimiento por ${name}` : 'En movimiento', ['motion_moving']));
+        candidates.push(candidate('moving', 'generic_motion', 0.68, movementName ? `En movimiento por ${movementName}` : 'En movimiento', ['motion_moving', 'poi_suppressed_while_moving']));
       }
     }
 
@@ -110,8 +116,9 @@
         mobility,
         motion,
         stationaryMinutes: Math.round(stationaryMinutes * 10) / 10,
-        placeName: name,
-        placeType: type,
+        placeName: motion === 'stationary' ? stationaryName : movementName,
+        placeType: motion === 'stationary' ? type : null,
+        currentPOIAllowed: motion === 'stationary',
         dayOfWeek: new Date(now).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase(),
         hour: new Date(now).getHours(),
       },
