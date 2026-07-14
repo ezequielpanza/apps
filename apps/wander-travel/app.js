@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.88.9';
+  const APP_BUILD = 'v0.89.0';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -34,7 +34,7 @@
 
     try {
       loadStyle('wander-rule-checker.css?v=20260714-05');
-      await loadRuntime('runtime-situation-engine.js?v=20260714-05');
+      await loadRuntime('runtime-situation-engine.js?v=20260714-06');
       await loadRuntime('runtime-rule-checker.js?v=20260714-05');
     } catch {}
 
@@ -55,6 +55,7 @@
     try {
       await loadRuntime('runtime-provider-current-poi.js?v=20260713-03');
       await loadRuntime('runtime-provider-current-container-bridge.js?v=20260714-01');
+      await loadRuntime('runtime-current-poi-motion-guard.js?v=20260714-06');
     } catch {}
 
     try {
@@ -75,6 +76,7 @@
         window.WanderProviders?.googleContainer?.apply?.();
         window.WanderProviders?.currentPOI?.detect?.();
         window.WanderProviders?.currentContainerBridge?.apply?.();
+        window.WanderCurrentPOIMotionGuard?.enforce?.();
         window.WanderDashboardViewport?.mount?.();
         window.WanderContextDashboard?.restore?.();
         window.WanderSituationEngine?.evaluate?.();
