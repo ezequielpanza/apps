@@ -47,14 +47,22 @@
   }
 
   function mobilityValue() {
-    const value = context.value('mobility.mode');
+    const value = context.value('mobility.inferredMode') || context.value('mobility.mode');
     const labels = {
-      walking: 'Caminando', running: 'Corriendo', cycling: 'Bicicleta', motorcycle: 'Moto',
-      car: 'Auto', bus: 'Bus', train: 'Tren', boat: 'Barco', sailing: 'Navegando',
-      aircraft: 'Avión', paragliding: 'Parapente', skiing: 'Esquí', horse: 'Caballo',
-      stationary: 'Detenido', unknown: 'Desconocido',
+      walking: 'Caminando', on_foot: 'Caminando', running: 'Corriendo', cycling: 'Bicicleta', bicycle: 'Bicicleta', bike: 'Bicicleta',
+      scooter: 'Monopatín', electric_scooter: 'Monopatín eléctrico', motorcycle: 'Moto', motorbike: 'Moto',
+      driving: 'Auto', car: 'Auto', bus: 'Bus', train: 'Tren', transit: 'Transporte público', boat: 'Barco', boating: 'Barco', sailing: 'Navegando',
+      aircraft: 'Avión', stationary: 'Detenido', unknown: 'Desconocido',
     };
     return labels[value] || textValue(value, 'Desconocido');
+  }
+
+  function vehicleValue() {
+    const vehicle = context.value('mobility.vehicle');
+    if (!vehicle) return 'Sin vehículo inferido';
+    const label = textValue(vehicle, 'Vehículo');
+    const confidence = Number(vehicle.confidence);
+    return Number.isFinite(confidence) ? label + ' · ' + Math.round(confidence * 100) + '%' : label;
   }
 
   function journeyValue() {
@@ -70,20 +78,13 @@
     if (!place) return 'Pendiente';
     const current = place.city || place.zone || place.country;
     if (!current) return 'Sin memoria';
-    const labels = {
-      assumed_new: 'asumido nuevo', new_confirmed: 'nuevo confirmado',
-      recent_presence: 'presencia reciente', known: 'conocido por vos',
-    };
+    const labels = { assumed_new: 'asumido nuevo', new_confirmed: 'nuevo confirmado', recent_presence: 'presencia reciente', known: 'conocido por vos' };
     const status = labels[current.presenceStatus] || current.presenceStatus || 'sin historial';
     return (current.name || 'Lugar actual') + ' · ' + status + (current.seenYesterday ? ' · estuvo ayer' : '');
   }
 
   function shortPlaceName(value) {
-    return String(value || '')
-      .replace(/^hotel\s+/i, '')
-      .replace(/\s*[-–—]\s*(adults? only|solo adultos|all[- ]inclusive.*)$/i, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return String(value || '').replace(/^hotel\s+/i, '').replace(/\s*[-–—]\s*(adults? only|solo adultos|all[- ]inclusive.*)$/i, '').replace(/\s+/g, ' ').trim();
   }
 
   function currentPOIValue() {
@@ -108,9 +109,7 @@
     return textValue(value, 'Desactivada');
   }
 
-  function appVersionValue() {
-    return textValue(context.value('app.version') || window.WanderVersion, 'Pendiente');
-  }
+  function appVersionValue() { return textValue(context.value('app.version') || window.WanderVersion, 'Pendiente'); }
 
   const FIELDS = Object.freeze([
     { id: 'summary', label: 'Estado actual', icon: 'target', metricId: 'metric-status', value: () => textValue(context.value('context.status'), 'Preparando contexto') },
@@ -123,6 +122,7 @@
     { id: 'accuracy', label: 'Precisión', icon: 'target', metricId: 'metric-accuracy', value: () => numberValue('location.effective.accuracy', ' m') },
     { id: 'motionStatus', label: 'Movimiento físico', icon: 'route', metricId: 'metric-motion-status', value: () => textValue(context.value('motion.status'), 'Pendiente') },
     { id: 'mobility', label: 'Modo de movilidad', icon: 'compass', metricId: 'metric-mobility', value: mobilityValue },
+    { id: 'vehicle', label: 'Vehículo', icon: 'route', metricId: 'metric-vehicle', value: vehicleValue },
     { id: 'speed', label: 'Velocidad', icon: 'speed', metricId: 'metric-speed', value: () => numberValue('motion.speedKmh', ' km/h', 1) },
     { id: 'heading', label: 'Rumbo', icon: 'heading', metricId: 'metric-heading', value: () => numberValue('motion.heading', '°') },
     { id: 'journey', label: 'Journey', icon: 'route', metricId: 'metric-journey', value: journeyValue },
@@ -139,7 +139,6 @@
 
   const fieldIds = new Set(FIELDS.map((field) => field.id));
   let visibleFields = loadVisibleFields();
-
   function loadVisibleFields() {
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -147,13 +146,8 @@
     } catch {}
     return [...DEFAULT_VISIBLE_FIELDS];
   }
-
-  function persist() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ visibleFields })); } catch {}
-  }
-
+  function persist() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ visibleFields })); } catch {} }
   function isVisible(fieldId) { return visibleFields.includes(fieldId); }
-
   function setFieldVisible(fieldId, visible) {
     if (!fieldIds.has(fieldId)) throw new Error('Unknown context dashboard field: ' + fieldId);
     const next = visibleFields.filter((id) => id !== fieldId);
@@ -162,21 +156,10 @@
       next.push(fieldId);
       next.sort((left, right) => order.indexOf(left) - order.indexOf(right));
     }
-    visibleFields = next;
-    persist();
-    render();
-    return getVisibleFields();
+    visibleFields = next; persist(); render(); return getVisibleFields();
   }
-
   function getVisibleFields() { return [...visibleFields]; }
-
-  function reset() {
-    visibleFields = [...DEFAULT_VISIBLE_FIELDS];
-    persist();
-    render();
-    return getVisibleFields();
-  }
-
+  function reset() { visibleFields = [...DEFAULT_VISIBLE_FIELDS]; persist(); render(); return getVisibleFields(); }
   function ensureDashboardItems() {
     const dashboard = document.querySelector('#context-dashboard');
     const empty = dashboard?.querySelector('[data-dashboard-empty]');
@@ -184,43 +167,20 @@
     FIELDS.forEach((field) => {
       let item = dashboard.querySelector('[data-dashboard-field="' + field.id + '"]');
       if (!item) {
-        item = document.createElement('span');
-        item.className = 'status-item';
-        item.dataset.dashboardField = field.id;
+        item = document.createElement('span'); item.className = 'status-item'; item.dataset.dashboardField = field.id;
         item.innerHTML = '<svg class="status-icon"><use href="wander-icons.svg#' + field.icon + '"></use></svg><strong id="' + field.metricId + '">—</strong>';
         dashboard.insertBefore(item, empty || null);
       }
     });
   }
-
   function render() {
-    ensureDashboardItems();
-    let shown = 0;
-    document.querySelectorAll('[data-dashboard-field]').forEach((element) => {
-      const visible = isVisible(element.dataset.dashboardField);
-      element.hidden = !visible;
-      if (visible) shown += 1;
-    });
-    FIELDS.forEach((field) => {
-      const element = document.querySelector('#' + field.metricId);
-      if (element) element.textContent = field.value();
-    });
-    const empty = document.querySelector('[data-dashboard-empty]');
-    if (empty) empty.hidden = shown > 0;
+    ensureDashboardItems(); let shown = 0;
+    document.querySelectorAll('[data-dashboard-field]').forEach((element) => { const visible = isVisible(element.dataset.dashboardField); element.hidden = !visible; if (visible) shown += 1; });
+    FIELDS.forEach((field) => { const element = document.querySelector('#' + field.metricId); if (element) element.textContent = field.value(); });
+    const empty = document.querySelector('[data-dashboard-empty]'); if (empty) empty.hidden = shown > 0;
   }
-
   context.subscribe(render);
   window.addEventListener('wander:coordinate-format-change', render);
   render();
-
-  window.WanderContextDashboard = Object.freeze({
-    storageKey: STORAGE_KEY,
-    fields: FIELDS,
-    getVisibleFields,
-    isVisible,
-    setFieldVisible,
-    reset,
-    render,
-    restore: render,
-  });
+  window.WanderContextDashboard = Object.freeze({ storageKey: STORAGE_KEY, fields: FIELDS, getVisibleFields, isVisible, setFieldVisible, reset, render, restore: render });
 })();
