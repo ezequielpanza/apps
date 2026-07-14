@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.89.6';
+  const VERSION = 'v0.89.7';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -37,6 +37,7 @@
     loadStyle('wander-message-top.css?v=20260714-11');
     loadStyle('wander-record-button.css?v=20260714-12');
     loadStyle('wander-simulator-dashboard-offset.css?v=20260714-13');
+    loadStyle('wander-message-actions.css?v=20260714-14');
     loadWhenReady({
       ready: () => Boolean(window.WanderSituationEngine?.subscribe),
       loaded: () => Boolean(window.WanderMovementMethodRefinement),
