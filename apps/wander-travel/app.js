@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.88.4';
+  const APP_BUILD = 'v0.88.5';
   const MAP_RUNTIME_VERSION = '20260708-03';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -35,7 +35,7 @@
 
     try {
       await loadRuntime('runtime-provider-current-poi.js?v=20260713-03');
-      await loadRuntime('runtime-provider-current-container-bridge.js?v=20260713-01');
+      await loadRuntime('runtime-provider-current-container-bridge.js?v=20260714-01');
     } catch {}
 
     try {
