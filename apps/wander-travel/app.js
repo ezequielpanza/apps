@@ -34,16 +34,14 @@
 
     try {
       loadStyle('wander-rule-checker.css?v=20260714-05');
-      await loadRuntime('runtime-situation-engine.js?v=20260714-07');
+      await loadRuntime('runtime-situation-engine.js?v=20260714-08');
       await loadRuntime('runtime-rule-checker.js?v=20260714-05');
     } catch {}
 
     try {
       await loadRuntime('runtime-source-policy-google-places.js?v=20260713-01');
       await loadRuntime('runtime-poi-connector-google-places.js?v=20260713-02');
-      window.WanderProviders?.nearby?.configure?.({
-        sources: ['google-places', 'openstreetmap', 'wikidata'],
-      });
+      window.WanderProviders?.nearby?.configure?.({ sources: ['google-places', 'openstreetmap', 'wikidata'] });
       await window.WanderProviders?.nearby?.refresh?.(true);
     } catch {}
 
@@ -58,17 +56,9 @@
       await loadRuntime('runtime-current-poi-motion-guard.js?v=20260714-06');
     } catch {}
 
-    try {
-      await loadRuntime('runtime-coordinate-format-ui.js?v=20260712-09');
-    } catch {}
-
-    try {
-      await loadRuntime('runtime-debug-overture.js?v=20260713-01');
-    } catch {}
-
-    try {
-      await loadRuntime('runtime-dashboard-viewport.js?v=20260711-08');
-    } catch {}
+    try { await loadRuntime('runtime-coordinate-format-ui.js?v=20260712-09'); } catch {}
+    try { await loadRuntime('runtime-debug-overture.js?v=20260713-01'); } catch {}
+    try { await loadRuntime('runtime-dashboard-viewport.js?v=20260711-08'); } catch {}
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -97,22 +87,14 @@
     });
 
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?build=' + encodeURIComponent(APP_BUILD), {
-        updateViaCache: 'none',
-      }).then((registration) => {
+      navigator.serviceWorker.register('./sw.js?build=' + encodeURIComponent(APP_BUILD), { updateViaCache: 'none' }).then((registration) => {
         registration.update().catch(() => {});
-
-        if (registration.waiting) {
-          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
-
+        if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         registration.addEventListener('updatefound', () => {
           const worker = registration.installing;
           if (!worker) return;
           worker.addEventListener('statechange', () => {
-            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-              worker.postMessage({ type: 'SKIP_WAITING' });
-            }
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) worker.postMessage({ type: 'SKIP_WAITING' });
           });
         });
       }).catch(() => {});
