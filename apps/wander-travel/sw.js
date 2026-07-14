@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wander-travel-v0.88.2';
+const CACHE_NAME = 'wander-travel-v0.88.3';
 const APP_SHELL = [
   './index.html',
   './wander-ui.css',
@@ -34,6 +34,7 @@ const APP_SHELL = [
   './runtime-provider-place.js',
   './runtime-provider-nearby.js',
   './runtime-provider-container.js',
+  './runtime-provider-container-google.js',
   './runtime-provider-current-poi.js',
   './runtime-provider-current-container-bridge.js',
   './runtime-provider-simulator.js',
