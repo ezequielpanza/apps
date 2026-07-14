@@ -133,6 +133,13 @@
     });
   }
 
+  function selectPOI(poi) {
+    if (!poi) return;
+    window.dispatchEvent(new CustomEvent('wander:personal-poi-selected', {
+      detail: { poi: { ...poi } },
+    }));
+  }
+
   function renderPOIs() {
     const ids = new Set(personalPOIs.map((poi) => poi.id));
     poiLayers.forEach((layer, id) => {
@@ -142,7 +149,10 @@
       let marker = poiLayers.get(poi.id);
       if (!marker) {
         marker = L.marker([poi.lat, poi.lng], { icon: poiMarkerIcon(), title: poi.name }).addTo(map);
-        marker.on('click', () => editPOI(poi.id));
+        marker.on('click', (event) => {
+          event?.originalEvent?.stopPropagation?.();
+          selectPOI(poi);
+        });
         poiLayers.set(poi.id, marker);
       } else marker.setLatLng([poi.lat, poi.lng]);
       marker.bindTooltip(poi.name, { direction: 'top', offset: [0, -30] });
@@ -196,21 +206,38 @@
   function editPOI(id) {
     const poi = personalPOIs.find((item) => item.id === id);
     if (!poi) return;
-    const action = window.prompt('Administrar "' + poi.name + '": escribí editar, eliminar o cancelar', 'editar');
-    if (!action) return;
-    const normalized = action.trim().toLowerCase();
-    if (normalized === 'eliminar') {
-      if (!window.confirm('¿Eliminar ' + poi.name + '?')) return;
-      const index = personalPOIs.findIndex((item) => item.id === id);
-      if (index >= 0) personalPOIs.splice(index, 1);
-      savePOIs(); renderPOIs(); evaluateCurrentPersonalPOI();
-      return;
-    }
-    if (normalized !== 'editar') return;
     const data = askPOIData(poi);
     if (!data) return;
     Object.assign(poi, data, { updatedAt: Date.now() });
-    savePOIs(); renderPOIs(); evaluateCurrentPersonalPOI();
+    savePOIs();
+    renderPOIs();
+    evaluateCurrentPersonalPOI();
+    selectPOI(poi);
+  }
+
+  function updatePOI(id, changes = {}) {
+    const poi = personalPOIs.find((item) => item.id === id);
+    if (!poi) return null;
+    if (typeof changes.name === 'string' && changes.name.trim()) poi.name = changes.name.trim();
+    if (typeof changes.type === 'string') poi.type = changes.type.trim() || 'personal';
+    if (typeof changes.notes === 'string') poi.notes = changes.notes.trim();
+    if (Number.isFinite(Number(changes.radiusM))) poi.radiusM = Math.max(5, Math.min(500, Number(changes.radiusM)));
+    poi.updatedAt = Date.now();
+    savePOIs();
+    renderPOIs();
+    evaluateCurrentPersonalPOI();
+    return { ...poi };
+  }
+
+  function removePOI(id) {
+    const index = personalPOIs.findIndex((poi) => poi.id === id);
+    if (index < 0) return false;
+    personalPOIs.splice(index, 1);
+    savePOIs();
+    renderPOIs();
+    evaluateCurrentPersonalPOI();
+    window.dispatchEvent(new CustomEvent('wander:personal-poi-removed', { detail: { id } }));
+    return true;
   }
 
   function openPOIManager() {
@@ -219,10 +246,7 @@
       window.WanderUI?.showWander('Mis POIs', 'Todavía no guardaste lugares personales. Tocá el botón de POIs para crear el primero.');
       return;
     }
-    const summary = personalPOIs.map((poi, index) => (index + 1) + '. ' + poi.name + ' · ' + poi.type).join('\n');
-    const selection = window.prompt('Mis POIs:\n\n' + summary + '\n\nEscribí el número del POI que querés administrar.');
-    const index = Number(selection) - 1;
-    if (Number.isInteger(index) && personalPOIs[index]) editPOI(personalPOIs[index].id);
+    selectPOI(personalPOIs[personalPOIs.length - 1]);
   }
 
   function handlePOIClick() {
@@ -312,13 +336,18 @@
 
   window.WanderPersonalPOIs = Object.freeze({
     list: () => personalPOIs.map((poi) => ({ ...poi })),
+    get: (id) => {
+      const poi = personalPOIs.find((item) => item.id === id);
+      return poi ? { ...poi } : null;
+    },
     createAt: createPOIAt,
     edit: editPOI,
-    remove(id) {
-      const index = personalPOIs.findIndex((poi) => poi.id === id);
-      if (index < 0) return false;
-      personalPOIs.splice(index, 1);
-      savePOIs(); renderPOIs(); evaluateCurrentPersonalPOI();
+    update: updatePOI,
+    remove: removePOI,
+    select(id) {
+      const poi = personalPOIs.find((item) => item.id === id);
+      if (!poi) return false;
+      selectPOI(poi);
       return true;
     },
     manage: openPOIManager,
