@@ -10,11 +10,8 @@
   const HOLD_MS = 650;
   const personalPOIs = loadPOIs();
   const poiLayers = new Map();
-  let poiPlacementArmed = false;
   let suppressTrackClick = false;
-  let suppressPOIClick = false;
   let trackButton = null;
-  let poiButton = null;
   let currentPersonalPOIId = null;
 
   function loadPOIs() {
@@ -135,9 +132,7 @@
 
   function selectPOI(poi) {
     if (!poi) return;
-    window.dispatchEvent(new CustomEvent('wander:personal-poi-selected', {
-      detail: { poi: { ...poi } },
-    }));
+    window.dispatchEvent(new CustomEvent('wander:personal-poi-selected', { detail: { poi: { ...poi } } }));
   }
 
   function renderPOIs() {
@@ -241,28 +236,11 @@
   }
 
   function openPOIManager() {
-    suppressPOIClick = true;
     if (!personalPOIs.length) {
-      window.WanderUI?.showWander('Mis POIs', 'Todavía no guardaste lugares personales. Tocá el botón de POIs para crear el primero.');
+      window.WanderUI?.showWander('Mis POIs', 'Todavía no guardaste lugares personales.');
       return;
     }
     selectPOI(personalPOIs[personalPOIs.length - 1]);
-  }
-
-  function handlePOIClick() {
-    if (suppressPOIClick) { suppressPOIClick = false; return; }
-    if (window.WanderMapPosition?.isFollowingPosition?.()) {
-      const position = effectivePosition();
-      if (!position) {
-        window.WanderUI?.showWander('Sin ubicación', 'Wander necesita una posición válida para guardar el POI sobre vos.');
-        return;
-      }
-      createPOIAt(position);
-      return;
-    }
-    poiPlacementArmed = true;
-    poiButton?.classList.add('is-armed');
-    window.WanderUI?.showWander('Elegí la ubicación', 'Tocá el mapa donde querés guardar el nuevo POI.');
   }
 
   function evaluateCurrentPersonalPOI() {
@@ -278,9 +256,13 @@
     }
     currentPersonalPOIId = nearest.poi.id;
     const current = {
-      ...nearest.poi, name: nearest.poi.name, label: nearest.poi.name,
-      primaryType: nearest.poi.type, distanceM: Math.round(nearest.distance),
-      source: 'personal-poi', confidence: 1,
+      ...nearest.poi,
+      name: nearest.poi.name,
+      label: nearest.poi.name,
+      primaryType: nearest.poi.type,
+      distanceM: Math.round(nearest.distance),
+      source: 'personal-poi',
+      confidence: 1,
     };
     context.set('personalPOI.current', current, { source: 'personal-poi', kind: 'confirmed', confidence: 1 });
     if (context.value('motion.status') === 'stationary') {
@@ -293,11 +275,15 @@
     options: { position: 'bottomright' },
     onAdd() {
       const wrap = L.DomUtil.create('div', 'wander-map-actions wander-personal-map-actions');
-      poiButton = makeButton('pin', 'Guardar POI personal');
+      const waypointButton = makeButton('pin', 'Seleccionar punto en el centro del mapa');
       trackButton = makeButton('record', 'Pausar grabación automática');
-      bindHold(poiButton, handlePOIClick, openPOIManager, (value) => { suppressPOIClick = value; });
+      waypointButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (window.WanderMapSelectedPoint?.openAtCenter) window.WanderMapSelectedPoint.openAtCenter();
+        else window.dispatchEvent(new CustomEvent('wander:open-waypoint-center'));
+      });
       bindHold(trackButton, toggleTrackRecording, openTracksManager, (value) => { suppressTrackClick = value; });
-      wrap.append(poiButton, trackButton);
+      wrap.append(waypointButton, trackButton);
       syncTrackButton();
       return wrap;
     },
@@ -307,13 +293,6 @@
   const corner = map.getContainer().querySelector('.leaflet-bottom.leaflet-right');
   const personalWrap = corner?.querySelector('.wander-personal-map-actions')?.parentElement;
   if (personalWrap && corner.firstElementChild !== personalWrap) corner.insertBefore(personalWrap, corner.firstElementChild);
-
-  map.on('click', (event) => {
-    if (!poiPlacementArmed) return;
-    poiPlacementArmed = false;
-    poiButton?.classList.remove('is-armed');
-    createPOIAt(event.latlng);
-  });
 
   context.subscribe((key) => {
     if (key === 'location.effective' || key.startsWith('location.effective.')) {
