@@ -11,7 +11,7 @@
   sheet.className = 'map-point-sheet';
   sheet.hidden = true;
   sheet.innerHTML = '<div class="map-point-handle"></div><div class="map-point-head"><div><span>PUNTO SELECCIONADO</span><input id="map-point-name" value="Punto seleccionado" aria-label="Nombre del punto"></div><button id="map-point-close" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div></div><div class="map-point-actions"><button id="map-point-route"><svg class="button-icon"><use href="wander-icons.svg#route"></use></svg>Ruta hasta</button><button id="map-point-save"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg>Guardar</button></div>';
-  document.querySelector('.map-stage')?.appendChild(sheet);
+  document.body.appendChild(sheet);
 
   const name = sheet.querySelector('#map-point-name');
   const distance = sheet.querySelector('#map-point-distance');
@@ -41,10 +41,17 @@
     const p=L.latLng(latlng);
     point={lat:p.lat,lng:p.lng,name:'Punto seleccionado',selectedAt:Date.now(),saved:false};
     if(!marker)marker=L.marker(p,{icon:icon(),zIndexOffset:1200}).addTo(map);else marker.setLatLng(p).addTo(map);
-    name.value=point.name;sheet.hidden=false;update();navigator.vibrate?.(35);
+    name.value=point.name;
+    sheet.hidden=false;
+    sheet.style.display='block';
+    sheet.style.visibility='visible';
+    sheet.style.pointerEvents='auto';
+    sheet.setAttribute('aria-hidden','false');
+    update();
+    navigator.vibrate?.(35);
   }
   function clear(){
-    if(marker)map.removeLayer(marker);marker=null;point=null;sheet.hidden=true;ctx.remove?.('map.selectedPoint');
+    if(marker)map.removeLayer(marker);marker=null;point=null;sheet.hidden=true;sheet.style.removeProperty('display');sheet.style.removeProperty('visibility');sheet.style.removeProperty('pointer-events');sheet.setAttribute('aria-hidden','true');ctx.remove?.('map.selectedPoint');
   }
   function excluded(t){return Boolean(t?.closest?.('.leaflet-control,.leaflet-marker-icon,.wander-top-controls,.wander-card,#context-dashboard,.simulation-map-controls,.personal-poi-sheet,.map-point-sheet'));}
   function cancel(){if(timer)clearTimeout(timer);timer=null;}
