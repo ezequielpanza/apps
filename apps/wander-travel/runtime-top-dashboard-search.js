@@ -12,8 +12,16 @@
 
   function updateDashboardRows() {
     const visibleItems = Array.from(dashboard.querySelectorAll('.status-item:not([hidden])'));
-    dashboard.classList.toggle('wander-dashboard-double-row', visibleItems.length >= 4);
-    header.classList.toggle('wander-top-status-bar-double-row', visibleItems.length >= 4);
+    const hasSummary = visibleItems.some((item) => item.dataset.dashboardField === 'summary');
+    const occupiedSlots = visibleItems.length + (hasSummary && visibleItems.length > 3 ? 1 : 0);
+    const rows = Math.max(1, Math.ceil(occupiedSlots / 3));
+
+    dashboard.dataset.dashboardRows = String(rows);
+    header.dataset.dashboardRows = String(rows);
+    dashboard.classList.toggle('wander-dashboard-expanded', rows > 1);
+    header.classList.toggle('wander-top-status-bar-expanded', rows > 1);
+    dashboard.style.setProperty('--dashboard-rows', String(rows));
+    header.style.setProperty('--dashboard-rows', String(rows));
   }
 
   function ensureTopbarPlacement() {
