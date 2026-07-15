@@ -1,11 +1,9 @@
 (() => {
-  const VERSION = 'v0.91.3';
+  const VERSION = 'v0.91.4';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
-  if (window.WanderContext) {
-    window.WanderContext.set('app.version', VERSION, { source: 'runtime-version', ttlMs: Infinity, confidence: 1 });
-  }
+  if (window.WanderContext) window.WanderContext.set('app.version', VERSION, { source: 'runtime-version', ttlMs: Infinity, confidence: 1 });
   window.WanderVersion = VERSION;
 
   function loadStyle(href) {
@@ -14,6 +12,14 @@
     link.rel = 'stylesheet';
     link.href = href;
     document.head.appendChild(link);
+  }
+
+  function loadScript(src) {
+    if (document.querySelector('script[src="' + src + '"]')) return;
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = false;
+    document.body.appendChild(script);
   }
 
   function loadWhenReady({ ready, loaded, src }) {
@@ -25,10 +31,7 @@
         if (attempts < 160) setTimeout(tryLoad, 250);
         return;
       }
-      const script = document.createElement('script');
-      script.src = src;
-      script.async = false;
-      document.body.appendChild(script);
+      loadScript(src);
     }
     tryLoad();
   }
@@ -42,7 +45,8 @@
     loadStyle('wander-track-delete.css?v=20260714-19');
     loadStyle('wander-dashboard-visibility.css?v=20260714-20');
     loadStyle('wander-message-timeout-settings.css?v=20260714-22');
-    loadStyle('wander-map-selected-point.css?v=20260715-04');
+    loadStyle('wander-map-selected-point.css?v=20260715-05');
+    loadScript('runtime-waypoint-debug-dialog.js?v=20260715-05');
     loadWhenReady({ ready: () => Boolean(window.WanderSituationEngine?.subscribe), loaded: () => Boolean(window.WanderMovementMethodRefinement), src: 'runtime-movement-method-refinement.js?v=20260714-09' });
     loadWhenReady({ ready: () => Boolean(window.WanderBase?.map && window.WanderTracks && window.WanderMapControls), loaded: () => Boolean(window.WanderPersonalPOIs), src: 'runtime-personal-map-tools.js?v=20260714-17' });
     loadWhenReady({ ready: () => Boolean(window.WanderBase?.map && window.WanderPersonalPOIs?.list && document.querySelector('.map-stage')), loaded: () => Boolean(window.WanderMapSelectedPoint), src: 'runtime-map-selected-point.js?v=20260715-04' });
