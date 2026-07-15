@@ -12,7 +12,7 @@
   sheet.className = 'map-point-sheet';
   sheet.setAttribute('aria-label', 'Punto seleccionado');
   sheet.innerHTML = '<div class="map-point-handle"></div><div class="map-point-head"><div><span>PUNTO SELECCIONADO</span><input id="map-point-name" value="Punto seleccionado" aria-label="Nombre del punto"></div><button id="map-point-close" type="button" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div></div><div class="map-point-actions"><button id="map-point-route" type="button"><svg class="button-icon"><use href="wander-icons.svg#route"></use></svg>Ruta hasta</button><button id="map-point-save" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg>Guardar</button></div>';
-  document.body.appendChild(sheet);
+  document.documentElement.appendChild(sheet);
 
   const name = sheet.querySelector('#map-point-name');
   const distance = sheet.querySelector('#map-point-distance');
@@ -50,14 +50,40 @@
     return L.divIcon({ className: '', html: '<div class="map-point-marker"><span></span></div>', iconSize: [34, 42], iconAnchor: [17, 21] });
   }
 
+  function showSheet() {
+    if (sheet.open) return true;
+    try {
+      sheet.showModal();
+      return true;
+    } catch (error) {
+      console.error('[Wander] No se pudo abrir la ficha de Waypoint como modal.', error);
+      try {
+        sheet.show();
+        return true;
+      } catch {
+        sheet.setAttribute('open', '');
+        sheet.style.setProperty('display', 'block', 'important');
+        sheet.style.setProperty('position', 'fixed', 'important');
+        sheet.style.setProperty('z-index', '2147483647', 'important');
+        return false;
+      }
+    }
+  }
+
   function openAtCenter() {
     const center = map.getCenter();
     point = { lat: center.lat, lng: center.lng, name: 'Punto seleccionado', selectedAt: Date.now(), saved: false };
-    if (!marker) marker = L.marker(center, { icon: icon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
-    else marker.setLatLng(center).addTo(map);
     name.value = point.name;
-    if (!sheet.open) sheet.show();
+
+    showSheet();
     updateFromCenter();
+
+    try {
+      if (!marker) marker = L.marker(center, { icon: icon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
+      else marker.setLatLng(center).addTo(map);
+    } catch (error) {
+      console.error('[Wander] No se pudo crear el marcador de Waypoint.', error);
+    }
   }
 
   function clear() {
@@ -65,11 +91,16 @@
     marker = null;
     point = null;
     if (sheet.open) sheet.close();
+    else sheet.removeAttribute('open');
     ctx.remove?.('map.selectedPoint');
   }
 
   name.addEventListener('input', updateFromCenter);
   sheet.querySelector('#map-point-close').addEventListener('click', clear);
+  sheet.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    clear();
+  });
   map.on('move zoom', updateFromCenter);
   window.addEventListener('wander:open-waypoint-center', openAtCenter);
 
