@@ -7,9 +7,8 @@
   let marker = null;
   let point = null;
 
-  const sheet = document.createElement('section');
+  const sheet = document.createElement('dialog');
   sheet.className = 'map-point-sheet';
-  sheet.hidden = true;
   sheet.innerHTML = '<div class="map-point-handle"></div><div class="map-point-head"><div><span>PUNTO SELECCIONADO</span><input id="map-point-name" value="Punto seleccionado" aria-label="Nombre del punto"></div><button id="map-point-close" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div></div><div class="map-point-actions"><button id="map-point-route"><svg class="button-icon"><use href="wander-icons.svg#route"></use></svg>Ruta hasta</button><button id="map-point-save"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg>Guardar</button></div>';
   document.body.appendChild(sheet);
 
@@ -21,7 +20,9 @@
   const distanceLabel = (m) => !Number.isFinite(m) ? '—' : m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
 
   function bearingTo(a, b) {
-    const p1 = a.lat * Math.PI / 180, p2 = b.lat * Math.PI / 180, d = (b.lng - a.lng) * Math.PI / 180;
+    const p1 = a.lat * Math.PI / 180;
+    const p2 = b.lat * Math.PI / 180;
+    const d = (b.lng - a.lng) * Math.PI / 180;
     const y = Math.sin(d) * Math.cos(p2);
     const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(d);
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
@@ -53,11 +54,9 @@
     if (!marker) marker = L.marker(center, { icon: icon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
     else marker.setLatLng(center).addTo(map);
     name.value = point.name;
-    sheet.hidden = false;
-    sheet.style.setProperty('display', 'block', 'important');
-    sheet.style.setProperty('visibility', 'visible', 'important');
-    sheet.style.setProperty('opacity', '1', 'important');
-    sheet.setAttribute('aria-hidden', 'false');
+    if (!sheet.open) {
+      try { sheet.showModal(); } catch { sheet.setAttribute('open', ''); }
+    }
     updateFromCenter();
   }
 
@@ -65,16 +64,13 @@
     if (marker) map.removeLayer(marker);
     marker = null;
     point = null;
-    sheet.hidden = true;
-    sheet.style.removeProperty('display');
-    sheet.style.removeProperty('visibility');
-    sheet.style.removeProperty('opacity');
-    sheet.setAttribute('aria-hidden', 'true');
+    if (sheet.open) sheet.close();
     ctx.remove?.('map.selectedPoint');
   }
 
   name.addEventListener('input', updateFromCenter);
   sheet.querySelector('#map-point-close').addEventListener('click', clear);
+  sheet.addEventListener('cancel', (event) => { event.preventDefault(); clear(); });
   map.on('move zoom', updateFromCenter);
 
   sheet.querySelector('#map-point-route').addEventListener('click', () => {
@@ -106,5 +102,5 @@
     clear,
   });
 
-  window.setTimeout(openAtCenter, 700);
+  setTimeout(openAtCenter, 700);
 })();
