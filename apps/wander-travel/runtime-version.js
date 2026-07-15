@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.90.6';
+  const VERSION = 'v0.90.7';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -42,6 +42,7 @@
     loadStyle('wander-track-delete.css?v=20260714-19');
     loadStyle('wander-dashboard-visibility.css?v=20260714-20');
     loadStyle('wander-message-timeout-settings.css?v=20260714-22');
+    loadStyle('wander-map-selected-point.css?v=20260714-23');
     loadWhenReady({
       ready: () => Boolean(window.WanderSituationEngine?.subscribe),
       loaded: () => Boolean(window.WanderMovementMethodRefinement),
@@ -56,6 +57,11 @@
       ready: () => Boolean(window.WanderBase?.map && window.WanderPersonalPOIs?.createAt),
       loaded: () => Boolean(window.WanderPersonalPOITapFix),
       src: 'runtime-personal-poi-tap-fix.js?v=20260714-18',
+    });
+    loadWhenReady({
+      ready: () => Boolean(window.WanderBase?.map && window.WanderPersonalPOIs?.list && document.querySelector('.map-stage')),
+      loaded: () => Boolean(window.WanderMapSelectedPoint),
+      src: 'runtime-map-selected-point.js?v=20260714-23',
     });
     loadWhenReady({
       ready: () => Boolean(window.WanderPersonalPOIs?.get && document.querySelector('.map-stage')),
