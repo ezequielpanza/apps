@@ -1,23 +1,24 @@
 (() => {
   function attach() {
-    const button = document.querySelector('.wander-personal-map-actions .wander-personal-map-action');
-    if (!button || button.dataset.waypointCenterMode === 'true' || !window.WanderMapSelectedPoint?.openAtCenter) return false;
+    const legacyButton = document.querySelector('.wander-personal-map-actions .wander-personal-map-action');
+    if (!legacyButton || !window.WanderMapSelectedPoint?.openAtCenter) return false;
+    if (legacyButton.dataset.waypointCenterMode === 'true') return true;
+
+    const button = legacyButton.cloneNode(true);
     button.dataset.waypointCenterMode = 'true';
+    button.classList.remove('is-armed');
     button.title = 'Seleccionar punto en el centro del mapa';
     button.setAttribute('aria-label', button.title);
+    button.removeAttribute('aria-pressed');
+    legacyButton.replaceWith(button);
 
-    const stopLegacyHold = (event) => {
-      event.stopImmediatePropagation();
-    };
-    button.addEventListener('pointerdown', stopLegacyHold, true);
-    button.addEventListener('pointerup', stopLegacyHold, true);
-    button.addEventListener('pointercancel', stopLegacyHold, true);
-    button.addEventListener('pointerleave', stopLegacyHold, true);
+    L.DomEvent.disableClickPropagation(button);
+    L.DomEvent.disableScrollPropagation(button);
     button.addEventListener('click', (event) => {
       event.preventDefault();
-      event.stopImmediatePropagation();
+      event.stopPropagation();
       window.WanderMapSelectedPoint.openAtCenter();
-    }, true);
+    });
     return true;
   }
 
