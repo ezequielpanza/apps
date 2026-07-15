@@ -41,11 +41,11 @@
       "id": "ChIJK0QEG65aro4RjPpdQXk10-E",
       "types": [
         "resort_hotel",
-        "hotel",
-        "lodging",
         "massage_spa",
         "spa",
         "massage",
+        "hotel",
+        "lodging",
         "point_of_interest",
         "service",
         "establishment"
@@ -78,8 +78,8 @@
         "cafe",
         "food_store",
         "food",
-        "store",
         "point_of_interest",
+        "store",
         "establishment"
       ],
       "formattedAddress": "94FW+2QV, Nagua 33000, Dominican Republic",
@@ -136,8 +136,8 @@
       "id": "ChIJZ8Sdxzxbro4RP4H6LEFvyhs",
       "types": [
         "clothing_store",
-        "store",
         "point_of_interest",
+        "store",
         "establishment"
       ],
       "formattedAddress": "C. Jorge Awad 2, Nagua 33000, Dominican Republic",
@@ -197,8 +197,8 @@
         "grocery_store",
         "food_store",
         "food",
-        "store",
         "point_of_interest",
+        "store",
         "establishment"
       ],
       "formattedAddress": "C. Jorge Awad, Nagua 33000, Dominican Republic",
@@ -343,9 +343,9 @@
       "id": "ChIJG9yZIAhbro4Rx1fOEMPoQ78",
       "types": [
         "barber_shop",
-        "hair_care",
-        "point_of_interest",
         "health",
+        "point_of_interest",
+        "hair_care",
         "service",
         "establishment"
       ],
@@ -375,8 +375,8 @@
       "types": [
         "food_store",
         "food",
-        "store",
         "point_of_interest",
+        "store",
         "establishment"
       ],
       "formattedAddress": "casi esquina, C. Jorge Awad 26, Nagua 33000, Dominican Republic",
@@ -460,8 +460,8 @@
     {
       "id": "ChIJYwr8tkRbro4R2DuGUNCwxxE",
       "types": [
-        "point_of_interest",
         "wholesaler",
+        "point_of_interest",
         "service",
         "establishment"
       ],
@@ -518,10 +518,10 @@
     {
       "id": "ChIJe57RsMJbro4RQMHaG9wkjTY",
       "types": [
-        "home_goods_store",
         "building_materials_store",
-        "store",
+        "home_goods_store",
         "point_of_interest",
+        "store",
         "establishment"
       ],
       "formattedAddress": "Av. María Trinidad Sánchez, Nagua 33000, Dominican Republic",
@@ -549,8 +549,8 @@
       "id": "ChIJFziz_tVbro4ReF75Lo1Hl2I",
       "types": [
         "pet_store",
-        "store",
         "point_of_interest",
+        "store",
         "establishment"
       ],
       "formattedAddress": "Av. María Trinidad Sánchez, Nagua 33000, Dominican Republic",
@@ -580,8 +580,8 @@
         "general_store",
         "food_store",
         "food",
-        "store",
         "point_of_interest",
+        "store",
         "establishment"
       ],
       "formattedAddress": "C. Salomé Ureña 19, Nagua 33000, Dominican Republic",
