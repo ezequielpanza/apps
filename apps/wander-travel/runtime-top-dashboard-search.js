@@ -10,6 +10,12 @@
   search.classList.add('wander-bottom-search');
   search.hidden = true;
 
+  function updateDashboardRows() {
+    const visibleItems = Array.from(dashboard.querySelectorAll('.status-item:not([hidden])'));
+    dashboard.classList.toggle('wander-dashboard-double-row', visibleItems.length >= 4);
+    header.classList.toggle('wander-top-status-bar-double-row', visibleItems.length >= 4);
+  }
+
   function ensureTopbarPlacement() {
     if (brand.parentElement !== header || header.firstElementChild !== brand) header.insertBefore(brand, header.firstElementChild);
     if (dashboard.parentElement !== header || dashboard.previousElementSibling !== brand) header.insertBefore(dashboard, search);
@@ -22,7 +28,8 @@
     brand.style.setProperty('pointer-events', 'auto', 'important');
 
     dashboard.classList.add('wander-dashboard-in-header');
-    ['left','right','top','bottom','width','max-width'].forEach((prop) => dashboard.style.removeProperty(prop));
+    ['left','right','top','bottom','width','max-width','height','min-height'].forEach((prop) => dashboard.style.removeProperty(prop));
+    updateDashboardRows();
   }
 
   ensureTopbarPlacement();
@@ -84,5 +91,5 @@
   window.addEventListener('pageshow', ensureTopbarPlacement);
   window.addEventListener('wander:dashboard-restored', ensureTopbarPlacement);
 
-  window.WanderTopDashboardSearch = { openSearch, closeSearch, ensureTopbarPlacement };
+  window.WanderTopDashboardSearch = { openSearch, closeSearch, ensureTopbarPlacement, updateDashboardRows };
 })();
