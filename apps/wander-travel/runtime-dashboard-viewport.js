@@ -1,30 +1,28 @@
 (() => {
-  function mountDashboardToViewport() {
+  function mountDashboardToHeader() {
     const dashboard = document.querySelector('#context-dashboard');
-    const app = document.querySelector('.wander-app');
-    if (!dashboard || !app) return false;
+    const header = document.querySelector('#wander-top-query-bar');
+    const search = header?.querySelector('.wander-search-pill');
+    if (!dashboard || !header) return false;
 
-    if (dashboard.parentElement !== app) app.appendChild(dashboard);
+    if (dashboard.parentElement !== header) header.insertBefore(dashboard, search || null);
 
+    dashboard.classList.add('wander-dashboard-in-header');
     dashboard.hidden = false;
     dashboard.removeAttribute('hidden');
     dashboard.setAttribute('aria-hidden', 'false');
-    dashboard.dataset.dashboardViewportMounted = 'true';
-    dashboard.style.setProperty('position', 'fixed', 'important');
-    dashboard.style.setProperty('left', '12px', 'important');
-    dashboard.style.setProperty('bottom', 'calc(12px + env(safe-area-inset-bottom, 0px))', 'important');
-    dashboard.style.setProperty('z-index', '120', 'important');
-    dashboard.style.setProperty('display', 'flex', 'important');
-    dashboard.style.setProperty('visibility', 'visible', 'important');
-    dashboard.style.setProperty('opacity', '1', 'important');
-    dashboard.style.setProperty('transform', 'translateZ(0)', 'important');
+    dashboard.dataset.dashboardViewportMounted = 'header';
+
+    for (const property of ['position','left','right','top','bottom','width','max-width','min-width','z-index','display','visibility','opacity','transform']) {
+      dashboard.style.removeProperty(property);
+    }
 
     window.WanderContextDashboard?.restore?.();
     return true;
   }
 
   function afterLayout() {
-    requestAnimationFrame(() => requestAnimationFrame(mountDashboardToViewport));
+    requestAnimationFrame(() => requestAnimationFrame(mountDashboardToHeader));
   }
 
   window.addEventListener('load', afterLayout);
@@ -34,7 +32,8 @@
     if (document.visibilityState === 'visible') afterLayout();
   });
   window.addEventListener('wander:app-ready', afterLayout);
+  window.addEventListener('wander:dashboard-restored', afterLayout);
 
   afterLayout();
-  window.WanderDashboardViewport = Object.freeze({ mount: mountDashboardToViewport });
+  window.WanderDashboardViewport = Object.freeze({ mount: mountDashboardToHeader });
 })();
