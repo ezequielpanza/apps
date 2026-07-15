@@ -1,6 +1,7 @@
 (() => {
   const app = document.querySelector('.wander-app');
-  if (!app) return;
+  const header = document.querySelector('#wander-top-query-bar');
+  if (!app || !header) return;
 
   let applying = false;
 
@@ -14,6 +15,12 @@
     if (!dashboard) return;
 
     applying = true;
+    header.classList.add('wander-top-status-bar');
+    if (dashboard.parentElement !== header) {
+      const search = header.querySelector('.wander-search-pill');
+      header.insertBefore(dashboard, search || null);
+    }
+
     const visible = shouldShow();
     dashboard.hidden = !visible;
     dashboard.setAttribute('aria-hidden', String(!visible));
