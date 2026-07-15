@@ -3,14 +3,15 @@
   const ctx = window.WanderContext;
   const pois = window.WanderPersonalPOIs;
   if (!base?.map || !ctx || !pois) return;
+
   const map = base.map;
   let marker = null;
   let point = null;
 
-  const sheet = document.createElement('section');
+  const sheet = document.createElement('dialog');
   sheet.className = 'map-point-sheet';
-  sheet.setAttribute('popover', 'manual');
-  sheet.innerHTML = '<div class="map-point-handle"></div><div class="map-point-head"><div><span>PUNTO SELECCIONADO</span><input id="map-point-name" value="Punto seleccionado" aria-label="Nombre del punto"></div><button id="map-point-close" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div></div><div class="map-point-actions"><button id="map-point-route"><svg class="button-icon"><use href="wander-icons.svg#route"></use></svg>Ruta hasta</button><button id="map-point-save"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg>Guardar</button></div>';
+  sheet.setAttribute('aria-label', 'Punto seleccionado');
+  sheet.innerHTML = '<div class="map-point-handle"></div><div class="map-point-head"><div><span>PUNTO SELECCIONADO</span><input id="map-point-name" value="Punto seleccionado" aria-label="Nombre del punto"></div><button id="map-point-close" type="button" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div></div><div class="map-point-actions"><button id="map-point-route" type="button"><svg class="button-icon"><use href="wander-icons.svg#route"></use></svg>Ruta hasta</button><button id="map-point-save" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg>Guardar</button></div>';
   document.body.appendChild(sheet);
 
   const name = sheet.querySelector('#map-point-name');
@@ -55,8 +56,7 @@
     if (!marker) marker = L.marker(center, { icon: icon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
     else marker.setLatLng(center).addTo(map);
     name.value = point.name;
-    try { if (!sheet.matches(':popover-open')) sheet.showPopover(); }
-    catch { sheet.style.display = 'block'; sheet.style.position = 'fixed'; }
+    if (!sheet.open) sheet.show();
     updateFromCenter();
   }
 
@@ -64,14 +64,14 @@
     if (marker) map.removeLayer(marker);
     marker = null;
     point = null;
-    try { if (sheet.matches(':popover-open')) sheet.hidePopover(); }
-    catch { sheet.style.display = 'none'; }
+    if (sheet.open) sheet.close();
     ctx.remove?.('map.selectedPoint');
   }
 
   name.addEventListener('input', updateFromCenter);
   sheet.querySelector('#map-point-close').addEventListener('click', clear);
   map.on('move zoom', updateFromCenter);
+  window.addEventListener('wander:open-waypoint-center', openAtCenter);
 
   sheet.querySelector('#map-point-route').addEventListener('click', () => {
     if (!point) return;
@@ -101,6 +101,4 @@
     openAtCenter,
     clear,
   });
-
-  setTimeout(openAtCenter, 700);
 })();
