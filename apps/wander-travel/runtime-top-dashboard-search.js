@@ -2,25 +2,30 @@
   const header = document.querySelector('#wander-top-query-bar');
   const dashboard = document.querySelector('#context-dashboard');
   const search = document.querySelector('.wander-search-pill');
-  if (!header || !dashboard || !search) return;
+  const brand = document.querySelector('#main-menu-button');
+  if (!header || !dashboard || !search || !brand) return;
 
   header.classList.add('wander-top-status-bar');
   dashboard.classList.add('wander-dashboard-in-header');
   search.classList.add('wander-bottom-search');
   search.hidden = true;
 
-  function ensureDashboardPlacement() {
-    if (dashboard.parentElement !== header) header.insertBefore(dashboard, search);
+  function ensureTopbarPlacement() {
+    if (brand.parentElement !== header || header.firstElementChild !== brand) header.insertBefore(brand, header.firstElementChild);
+    if (dashboard.parentElement !== header || dashboard.previousElementSibling !== brand) header.insertBefore(dashboard, search);
+
+    brand.hidden = false;
+    brand.removeAttribute('aria-hidden');
+    brand.style.setProperty('display', 'grid', 'important');
+    brand.style.setProperty('visibility', 'visible', 'important');
+    brand.style.setProperty('opacity', '1', 'important');
+    brand.style.setProperty('pointer-events', 'auto', 'important');
+
     dashboard.classList.add('wander-dashboard-in-header');
-    dashboard.style.removeProperty('left');
-    dashboard.style.removeProperty('right');
-    dashboard.style.removeProperty('top');
-    dashboard.style.removeProperty('bottom');
-    dashboard.style.removeProperty('width');
-    dashboard.style.removeProperty('max-width');
+    ['left','right','top','bottom','width','max-width'].forEach((prop) => dashboard.style.removeProperty(prop));
   }
 
-  ensureDashboardPlacement();
+  ensureTopbarPlacement();
 
   let close = search.querySelector('.wander-bottom-search-close');
   if (!close) {
@@ -69,15 +74,15 @@
   let tries = 0;
   const timer = setInterval(() => {
     tries += 1;
-    ensureDashboardPlacement();
+    ensureTopbarPlacement();
     if (attachButton() && tries > 20) clearInterval(timer);
     if (tries > 160) clearInterval(timer);
   }, 250);
 
-  const observer = new MutationObserver(() => requestAnimationFrame(ensureDashboardPlacement));
-  observer.observe(document.querySelector('.wander-app'), { childList: true, subtree: true });
-  window.addEventListener('pageshow', ensureDashboardPlacement);
-  window.addEventListener('wander:dashboard-restored', ensureDashboardPlacement);
+  const observer = new MutationObserver(() => requestAnimationFrame(ensureTopbarPlacement));
+  observer.observe(document.querySelector('.wander-app'), { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'style', 'class'] });
+  window.addEventListener('pageshow', ensureTopbarPlacement);
+  window.addEventListener('wander:dashboard-restored', ensureTopbarPlacement);
 
-  window.WanderTopDashboardSearch = { openSearch, closeSearch, ensureDashboardPlacement };
+  window.WanderTopDashboardSearch = { openSearch, closeSearch, ensureTopbarPlacement };
 })();
