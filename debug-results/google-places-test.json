@@ -41,13 +41,13 @@
       "id": "ChIJK0QEG65aro4RjPpdQXk10-E",
       "types": [
         "resort_hotel",
+        "hotel",
+        "lodging",
         "massage_spa",
         "spa",
         "massage",
-        "hotel",
-        "lodging",
-        "service",
         "point_of_interest",
+        "service",
         "establishment"
       ],
       "formattedAddress": "94FW+5R5, C. Jorge Awad, Nagua 33000, Dominican Republic",
@@ -77,8 +77,8 @@
         "coffee_shop",
         "cafe",
         "food_store",
-        "store",
         "food",
+        "store",
         "point_of_interest",
         "establishment"
       ],
@@ -107,8 +107,8 @@
       "id": "ChIJcTcJTE1bro4Rtk-mPP5A6DI",
       "types": [
         "housing_complex",
-        "service",
         "point_of_interest",
+        "service",
         "establishment"
       ],
       "formattedAddress": "94CW+WWX, Nagua 33000, Dominican Republic",
@@ -166,8 +166,8 @@
       "types": [
         "lawyer",
         "consultant",
-        "service",
         "point_of_interest",
+        "service",
         "establishment"
       ],
       "formattedAddress": "por la UASD vieja, C. Jorge Awad 8, Nagua 33000, Dominican Republic",
@@ -196,8 +196,8 @@
       "types": [
         "grocery_store",
         "food_store",
-        "store",
         "food",
+        "store",
         "point_of_interest",
         "establishment"
       ],
@@ -255,8 +255,8 @@
       "id": "ChIJ74WcMQBbro4R3MYLeN7Y92g",
       "types": [
         "housing_complex",
-        "service",
         "point_of_interest",
+        "service",
         "establishment"
       ],
       "formattedAddress": "94FW+7RW, C. Salomé Ureña, Nagua 33000, Dominican Republic",
@@ -314,8 +314,8 @@
         "courthouse",
         "local_government_office",
         "government_office",
-        "service",
         "point_of_interest",
+        "service",
         "establishment"
       ],
       "formattedAddress": "94FX+73C, Nagua 33000, Dominican Republic",
@@ -344,9 +344,9 @@
       "types": [
         "barber_shop",
         "hair_care",
+        "point_of_interest",
         "health",
         "service",
-        "point_of_interest",
         "establishment"
       ],
       "formattedAddress": "C7, C. Jorge Awad 51, Nagua 33000, Dominican Republic",
@@ -374,8 +374,8 @@
       "id": "ChIJH9wqOABbro4RoKEL-jZsjRk",
       "types": [
         "food_store",
-        "store",
         "food",
+        "store",
         "point_of_interest",
         "establishment"
       ],
@@ -432,8 +432,8 @@
       "types": [
         "lawyer",
         "consultant",
-        "service",
         "point_of_interest",
+        "service",
         "establishment"
       ],
       "formattedAddress": "94FX+73W, C. Salomé Ureña, Nagua 33000, Dominican Republic",
@@ -460,9 +460,9 @@
     {
       "id": "ChIJYwr8tkRbro4R2DuGUNCwxxE",
       "types": [
+        "point_of_interest",
         "wholesaler",
         "service",
-        "point_of_interest",
         "establishment"
       ],
       "formattedAddress": "C. Colon 85b, Nagua 33000, Dominican Republic",
@@ -518,8 +518,8 @@
     {
       "id": "ChIJe57RsMJbro4RQMHaG9wkjTY",
       "types": [
-        "building_materials_store",
         "home_goods_store",
+        "building_materials_store",
         "store",
         "point_of_interest",
         "establishment"
@@ -579,8 +579,8 @@
       "types": [
         "general_store",
         "food_store",
-        "store",
         "food",
+        "store",
         "point_of_interest",
         "establishment"
       ],
