@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.91.0';
+  const VERSION = 'v0.91.1';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -43,46 +43,14 @@
     loadStyle('wander-dashboard-visibility.css?v=20260714-20');
     loadStyle('wander-message-timeout-settings.css?v=20260714-22');
     loadStyle('wander-map-selected-point.css?v=20260715-01');
-    loadWhenReady({
-      ready: () => Boolean(window.WanderSituationEngine?.subscribe),
-      loaded: () => Boolean(window.WanderMovementMethodRefinement),
-      src: 'runtime-movement-method-refinement.js?v=20260714-09',
-    });
-    loadWhenReady({
-      ready: () => Boolean(window.WanderBase?.map && window.WanderTracks && window.WanderMapControls),
-      loaded: () => Boolean(window.WanderPersonalPOIs),
-      src: 'runtime-personal-map-tools.js?v=20260714-17',
-    });
-    loadWhenReady({
-      ready: () => Boolean(window.WanderBase?.map && window.WanderPersonalPOIs?.list && document.querySelector('.map-stage')),
-      loaded: () => Boolean(window.WanderMapSelectedPoint),
-      src: 'runtime-map-selected-point.js?v=20260715-01',
-    });
-    loadWhenReady({
-      ready: () => Boolean(window.WanderMapSelectedPoint?.openAtCenter && document.querySelector('.wander-personal-map-actions .wander-personal-map-action')),
-      loaded: () => Boolean(window.WanderWaypointButtonMode),
-      src: 'runtime-waypoint-button-mode.js?v=20260715-01',
-    });
-    loadWhenReady({
-      ready: () => Boolean(window.WanderPersonalPOIs?.get && document.querySelector('.map-stage')),
-      loaded: () => Boolean(window.WanderPersonalPOISheet),
-      src: 'runtime-personal-poi-sheet.js?v=20260714-17',
-    });
-    loadWhenReady({
-      ready: () => Boolean(window.WanderUI?.getMessageTimeoutMs && document.querySelector('#settings-panel')),
-      loaded: () => Boolean(window.WanderMessageTimeoutSettings),
-      src: 'runtime-message-timeout-settings.js?v=20260714-22',
-    });
-    loadWhenReady({
-      ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('.wander-app')),
-      loaded: () => Boolean(window.WanderDashboardVisibilityGuard),
-      src: 'runtime-dashboard-visibility-guard.js?v=20260714-21',
-    });
-    loadWhenReady({
-      ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('#simulation-map-controls')),
-      loaded: () => Boolean(window.WanderSimulatorDashboardOffset),
-      src: 'runtime-simulator-dashboard-offset.js?v=20260714-13',
-    });
+    loadWhenReady({ ready: () => Boolean(window.WanderSituationEngine?.subscribe), loaded: () => Boolean(window.WanderMovementMethodRefinement), src: 'runtime-movement-method-refinement.js?v=20260714-09' });
+    loadWhenReady({ ready: () => Boolean(window.WanderBase?.map && window.WanderTracks && window.WanderMapControls), loaded: () => Boolean(window.WanderPersonalPOIs), src: 'runtime-personal-map-tools.js?v=20260714-17' });
+    loadWhenReady({ ready: () => Boolean(window.WanderBase?.map && window.WanderPersonalPOIs?.list && document.querySelector('.map-stage')), loaded: () => Boolean(window.WanderMapSelectedPoint), src: 'runtime-map-selected-point.js?v=20260715-01' });
+    loadWhenReady({ ready: () => Boolean(window.WanderMapSelectedPoint?.openAtCenter && document.querySelector('.wander-personal-map-actions .wander-personal-map-action')), loaded: () => Boolean(window.WanderWaypointButtonMode), src: 'runtime-waypoint-button-mode.js?v=20260715-02' });
+    loadWhenReady({ ready: () => Boolean(window.WanderPersonalPOIs?.get && document.querySelector('.map-stage')), loaded: () => Boolean(window.WanderPersonalPOISheet), src: 'runtime-personal-poi-sheet.js?v=20260714-17' });
+    loadWhenReady({ ready: () => Boolean(window.WanderUI?.getMessageTimeoutMs && document.querySelector('#settings-panel')), loaded: () => Boolean(window.WanderMessageTimeoutSettings), src: 'runtime-message-timeout-settings.js?v=20260714-22' });
+    loadWhenReady({ ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('.wander-app')), loaded: () => Boolean(window.WanderDashboardVisibilityGuard), src: 'runtime-dashboard-visibility-guard.js?v=20260714-21' });
+    loadWhenReady({ ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('#simulation-map-controls')), loaded: () => Boolean(window.WanderSimulatorDashboardOffset), src: 'runtime-simulator-dashboard-offset.js?v=20260714-13' });
   }
 
   if (document.readyState === 'complete') bootstrap();
