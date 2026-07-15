@@ -54,7 +54,9 @@
     else marker.setLatLng(center).addTo(map);
     name.value = point.name;
     sheet.hidden = false;
-    sheet.style.display = 'block';
+    sheet.style.setProperty('display', 'block', 'important');
+    sheet.style.setProperty('visibility', 'visible', 'important');
+    sheet.style.setProperty('opacity', '1', 'important');
     sheet.setAttribute('aria-hidden', 'false');
     updateFromCenter();
   }
@@ -65,6 +67,8 @@
     point = null;
     sheet.hidden = true;
     sheet.style.removeProperty('display');
+    sheet.style.removeProperty('visibility');
+    sheet.style.removeProperty('opacity');
     sheet.setAttribute('aria-hidden', 'true');
     ctx.remove?.('map.selectedPoint');
   }
@@ -101,4 +105,6 @@
     openAtCenter,
     clear,
   });
+
+  window.setTimeout(openAtCenter, 700);
 })();
