@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.90.9';
+  const VERSION = 'v0.91.0';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -42,7 +42,7 @@
     loadStyle('wander-track-delete.css?v=20260714-19');
     loadStyle('wander-dashboard-visibility.css?v=20260714-20');
     loadStyle('wander-message-timeout-settings.css?v=20260714-22');
-    loadStyle('wander-map-selected-point.css?v=20260714-25');
+    loadStyle('wander-map-selected-point.css?v=20260715-01');
     loadWhenReady({
       ready: () => Boolean(window.WanderSituationEngine?.subscribe),
       loaded: () => Boolean(window.WanderMovementMethodRefinement),
@@ -54,14 +54,14 @@
       src: 'runtime-personal-map-tools.js?v=20260714-17',
     });
     loadWhenReady({
-      ready: () => Boolean(window.WanderBase?.map && window.WanderPersonalPOIs?.createAt),
-      loaded: () => Boolean(window.WanderPersonalPOITapFix),
-      src: 'runtime-personal-poi-tap-fix.js?v=20260714-18',
-    });
-    loadWhenReady({
       ready: () => Boolean(window.WanderBase?.map && window.WanderPersonalPOIs?.list && document.querySelector('.map-stage')),
       loaded: () => Boolean(window.WanderMapSelectedPoint),
-      src: 'runtime-map-selected-point.js?v=20260714-25',
+      src: 'runtime-map-selected-point.js?v=20260715-01',
+    });
+    loadWhenReady({
+      ready: () => Boolean(window.WanderMapSelectedPoint?.openAtCenter && document.querySelector('.wander-personal-map-actions .wander-personal-map-action')),
+      loaded: () => Boolean(window.WanderWaypointButtonMode),
+      src: 'runtime-waypoint-button-mode.js?v=20260715-01',
     });
     loadWhenReady({
       ready: () => Boolean(window.WanderPersonalPOIs?.get && document.querySelector('.map-stage')),
