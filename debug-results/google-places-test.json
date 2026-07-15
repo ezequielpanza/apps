@@ -226,8 +226,8 @@
       "id": "ChIJSSZ6Pa5aro4RpX8NzmhUB1M",
       "types": [
         "university",
-        "educational_institution",
         "point_of_interest",
+        "educational_institution",
         "establishment"
       ],
       "formattedAddress": "94CX+X35, Nagua 33000, Dominican Republic",
@@ -311,8 +311,8 @@
     {
       "id": "ChIJaQbsH65aro4RUeBnxhK5Ewg",
       "types": [
-        "courthouse",
         "local_government_office",
+        "courthouse",
         "government_office",
         "service",
         "point_of_interest",
