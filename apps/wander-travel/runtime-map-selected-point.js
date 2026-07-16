@@ -11,13 +11,16 @@
   sheet.className = 'map-point-sheet';
   sheet.setAttribute('aria-label', 'Punto seleccionado');
   sheet.hidden = true;
-  sheet.innerHTML = '<div class="map-point-head"><input id="map-point-name" aria-label="Nombre del punto" placeholder="Nombre del punto"><button id="map-point-close" type="button" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div></div><button id="map-point-save" class="map-point-save" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg><span>Guardar</span></button>';
+  sheet.innerHTML = '<div class="map-point-head"><input id="map-point-name" aria-label="Nombre del punto" placeholder="Nombre del punto"><button id="map-point-close" type="button" aria-label="Cerrar" title="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div></div><div class="map-point-actions"><button id="map-point-center" type="button" aria-label="Centrar POI" title="Centrar POI"><svg class="button-icon"><use href="wander-icons.svg#center"></use></svg></button><button id="map-point-properties" type="button" aria-label="Propiedades" title="Propiedades"><svg class="button-icon"><use href="wander-icons.svg#settings"></use></svg></button><button id="map-point-save" class="primary" type="button" aria-label="Guardar punto" title="Guardar punto"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg></button></div>';
   document.body.appendChild(sheet);
 
   const name = sheet.querySelector('#map-point-name');
   const distance = sheet.querySelector('#map-point-distance');
   const bearing = sheet.querySelector('#map-point-bearing');
   const coordinates = sheet.querySelector('#map-point-coordinates');
+  const centerButton = sheet.querySelector('#map-point-center');
+  const propertiesButton = sheet.querySelector('#map-point-properties');
+  const saveButton = sheet.querySelector('#map-point-save');
   const current = () => base.getPosition?.() || window.WanderMapPosition?.getPosition?.() || null;
   const distanceLabel = (m) => !Number.isFinite(m) ? '—' : m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
 
@@ -39,24 +42,35 @@
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   }
 
-  function updateFromCenter() {
+  function updateMetrics() {
     if (!point) return;
-    const center = map.getCenter();
-    point.lat = center.lat;
-    point.lng = center.lng;
-    point.name = name.value.trim() || nextMarkerName();
+    const target = point.mode === 'new' ? map.getCenter() : { lat: point.lat, lng: point.lng };
+    if (point.mode === 'new') {
+      point.lat = target.lat;
+      point.lng = target.lng;
+      point.name = name.value.trim() || nextMarkerName();
+      marker?.setLatLng(target);
+    }
     const here = current();
-    point.distanceM = here ? map.distance(here, center) : null;
-    point.bearingDeg = here ? bearingTo(here, center) : null;
-    marker?.setLatLng(center);
+    point.distanceM = here ? map.distance(here, target) : null;
+    point.bearingDeg = here ? bearingTo(here, target) : null;
     distance.textContent = distanceLabel(point.distanceM);
     bearing.textContent = Number.isFinite(point.bearingDeg) ? `${Math.round(point.bearingDeg)}°` : '—';
-    coordinates.textContent = `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`;
-    ctx.set('map.selectedPoint', { ...point }, { source: 'waypoint-center', kind: 'selected', confidence: 1 });
+    coordinates.textContent = `${Number(point.lat).toFixed(6)}, ${Number(point.lng).toFixed(6)}`;
+    ctx.set('map.selectedPoint', { ...point }, { source: 'waypoint-selector', kind: 'selected', confidence: 1 });
   }
 
   function icon() {
     return L.divIcon({ className: '', html: '<div class="map-point-marker" aria-hidden="true"><span></span></div>', iconSize: [42, 42], iconAnchor: [21, 21] });
+  }
+
+  function configureMode(mode) {
+    const existing = mode === 'existing';
+    sheet.dataset.mode = mode;
+    name.readOnly = existing;
+    centerButton.hidden = !existing;
+    propertiesButton.hidden = !existing;
+    saveButton.hidden = existing;
   }
 
   function showSheet() {
@@ -65,39 +79,60 @@
   }
 
   function openAtCenter() {
+    clearMarker();
     const center = map.getCenter();
     const defaultName = nextMarkerName();
-    point = { lat: center.lat, lng: center.lng, name: defaultName, selectedAt: Date.now(), saved: false };
+    point = { mode: 'new', lat: center.lat, lng: center.lng, name: defaultName, selectedAt: Date.now(), saved: false };
     name.value = defaultName;
+    configureMode('new');
     showSheet();
+    marker = L.marker(center, { icon: icon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
+    updateMetrics();
+  }
 
-    if (!marker) marker = L.marker(center, { icon: icon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
-    else marker.setLatLng(center).addTo(map);
+  function openPOI(poi) {
+    if (!poi) return;
+    clearMarker();
+    point = { ...poi, mode: 'existing', saved: true };
+    name.value = poi.name || 'Marcador';
+    configureMode('existing');
+    showSheet();
+    updateMetrics();
+  }
 
-    updateFromCenter();
+  function clearMarker() {
+    if (marker) map.removeLayer(marker);
+    marker = null;
   }
 
   function clear() {
-    if (marker) map.removeLayer(marker);
-    marker = null;
+    clearMarker();
     point = null;
     sheet.classList.remove('is-open');
     sheet.hidden = true;
     ctx.remove?.('map.selectedPoint');
   }
 
-  name.addEventListener('input', updateFromCenter);
+  name.addEventListener('input', () => { if (point?.mode === 'new') updateMetrics(); });
   sheet.querySelector('#map-point-close').addEventListener('click', clear);
-  map.on('move zoom', updateFromCenter);
+  map.on('move zoom', () => { if (point?.mode === 'new') updateMetrics(); });
   window.addEventListener('wander:open-waypoint-center', openAtCenter);
+  window.addEventListener('wander:personal-poi-selected', (event) => openPOI(event.detail?.poi));
 
-  sheet.querySelector('#map-point-save').addEventListener('click', () => {
-    if (!point) return;
+  centerButton.addEventListener('click', () => {
+    if (!point || point.mode !== 'existing') return;
+    map.setView([point.lat, point.lng], Math.max(map.getZoom(), 16), { animate: true });
+  });
+
+  propertiesButton.addEventListener('click', () => {
+    if (!point?.id) return;
+    window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id: point.id } }));
+  });
+
+  saveButton.addEventListener('click', () => {
+    if (!point || point.mode !== 'new') return;
     const pois = window.WanderPersonalPOIs;
-    if (!pois?.createAt || !pois?.list) {
-      window.WanderUI?.showWander('Todavía no disponible', 'El sistema de puntos personales aún se está iniciando.');
-      return;
-    }
+    if (!pois?.createAt || !pois?.list) return;
     const before = new Set(pois.list().map((poi) => poi.id));
     if (!pois.createAt({ lat: point.lat, lng: point.lng })) return;
     const added = pois.list().find((poi) => !before.has(poi.id));
@@ -107,14 +142,9 @@
   });
 
   ctx.subscribe((key) => {
-    if (point && (key === 'location.effective' || key.startsWith('location.effective.'))) updateFromCenter();
+    if (point && (key === 'location.effective' || key.startsWith('location.effective.'))) updateMetrics();
   });
 
-  window.WanderMapSelectedPoint = Object.freeze({
-    getCurrent: () => point ? { ...point } : null,
-    openAtCenter,
-    clear,
-  });
-
+  window.WanderMapSelectedPoint = Object.freeze({ getCurrent: () => point ? { ...point } : null, openAtCenter, openPOI, clear });
   window.dispatchEvent(new CustomEvent('wander:waypoint-selector-ready'));
 })();
