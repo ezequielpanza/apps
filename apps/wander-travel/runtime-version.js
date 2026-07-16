@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.92.47';
+  const VERSION = 'v0.92.48';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -66,6 +66,12 @@
       ready: () => Boolean(window.WanderBase?.map && window.WanderContext),
       loaded: () => Boolean(window.WanderPersonalPOIs),
       src: 'runtime-personal-poi-core.js?v=20260716-31',
+    });
+
+    loadWhenReady({
+      ready: () => Boolean(window.WanderPersonalPOIs?.ready && window.WanderSituationEngine?.evaluate && window.WanderContext),
+      loaded: () => Boolean(window.WanderPersonalPOISituation),
+      src: 'runtime-personal-poi-situation.js?v=20260716-35',
     });
 
     loadWhenReady({
