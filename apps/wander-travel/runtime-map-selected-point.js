@@ -159,10 +159,11 @@
     return created;
   }
 
-  function openProperties(id) {
+  function openProperties(id, attempt = 0) {
     if (!id) return false;
     if (window.WanderPersonalPOISheet?.showById?.(id)) return true;
     window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id } }));
+    if (attempt < 20) setTimeout(() => openProperties(id, attempt + 1), 100);
     return true;
   }
 
