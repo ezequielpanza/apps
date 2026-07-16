@@ -9,6 +9,7 @@
   let centerButton = null;
   let centerMode = loadCenterMode();
   let followSuspendedByDrag = false;
+  let zoomAnchorFrame = 0;
 
   function loadCenterMode() {
     try {
@@ -52,7 +53,8 @@
   }
 
   function syncZoomAnchorMode() {
-    const mode = position.isFollowingPosition() ? 'center' : true;
+    const following = position.isFollowingPosition();
+    const mode = following && centerMode === 'middle' ? 'center' : true;
     map.options.scrollWheelZoom = mode;
     map.options.doubleClickZoom = mode;
     map.options.touchZoom = mode;
@@ -69,12 +71,20 @@
     if (Math.abs(delta.x) > 1 || Math.abs(delta.y) > 1) map.panBy(delta, { animate: false });
   }
 
+  function scheduleCenterAnchor() {
+    if (zoomAnchorFrame) cancelAnimationFrame(zoomAnchorFrame);
+    zoomAnchorFrame = requestAnimationFrame(() => {
+      zoomAnchorFrame = 0;
+      applyCenterAnchor();
+    });
+  }
+
   function setFollowMode(next, options = {}) {
     const result = position.setFollowMode(next, options);
     if (next) followSuspendedByDrag = false;
     syncZoomAnchorMode();
     syncFollowButton();
-    requestAnimationFrame(applyCenterAnchor);
+    scheduleCenterAnchor();
     return result;
   }
 
@@ -95,7 +105,7 @@
       return false;
     }
     position.centerOnPosition?.();
-    requestAnimationFrame(applyCenterAnchor);
+    scheduleCenterAnchor();
     return true;
   }
 
@@ -115,8 +125,9 @@
     if (centerMode === 'middle') {
       centerMode = 'lower';
       persistCenterMode();
+      syncZoomAnchorMode();
       position.centerOnPosition?.();
-      requestAnimationFrame(applyCenterAnchor);
+      scheduleCenterAnchor();
       syncFollowButton();
       return;
     }
@@ -158,9 +169,10 @@
     syncZoomAnchorMode();
     syncFollowButton();
   });
+  map.on('zoom zoomend resize', scheduleCenterAnchor);
 
   context?.subscribe?.((key) => {
-    if (key === 'location.effective' || key.startsWith('location.effective.')) requestAnimationFrame(applyCenterAnchor);
+    if (key === 'location.effective' || key.startsWith('location.effective.')) scheduleCenterAnchor();
   });
 
   window.WanderMapControls = {
@@ -171,7 +183,8 @@
     setCenterMode(mode) {
       centerMode = mode === 'lower' ? 'lower' : 'middle';
       persistCenterMode();
-      requestAnimationFrame(applyCenterAnchor);
+      syncZoomAnchorMode();
+      scheduleCenterAnchor();
       syncFollowButton();
       return centerMode;
     },
