@@ -11,7 +11,7 @@
   sheet.className = 'map-point-sheet';
   sheet.setAttribute('aria-label', 'Punto seleccionado');
   sheet.hidden = true;
-  sheet.innerHTML = '<div class="map-point-head"><input id="map-point-name" value="Punto seleccionado" aria-label="Nombre del punto" placeholder="Nombre del punto"><button id="map-point-close" type="button" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div></div><button id="map-point-save" class="map-point-save" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg>Guardar punto</button>';
+  sheet.innerHTML = '<div class="map-point-head"><input id="map-point-name" aria-label="Nombre del punto" placeholder="Nombre del punto"><button id="map-point-close" type="button" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div></div><button id="map-point-save" class="map-point-save" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg><span>Guardar</span></button>';
   document.body.appendChild(sheet);
 
   const name = sheet.querySelector('#map-point-name');
@@ -19,7 +19,26 @@
   const bearing = sheet.querySelector('#map-point-bearing');
   const coordinates = sheet.querySelector('#map-point-coordinates');
   const current = () => base.getPosition?.() || window.WanderMapPosition?.getPosition?.() || null;
-  const distanceLabel = (m) => !Number.isFinite(m) ? '—' : m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
+  const distanceLabel = (m) => !Number.isFinite(m) ? '—' : m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
+
+  function nextMarkerName() {
+    const items = window.WanderPersonalPOIs?.list?.() || [];
+    const highest = items.reduce((max, poi) => {
+      const match = String(poi?.name || '').match(/^Marcador\s+(\d+)$/i);
+      return match ? Math.max(max, Number(match[1]) || 0) : max;
+    }, 0);
+    return 'Marcador ' + String(highest + 1).padStart(2, '0');
+  }
+
+  function syncSelectorButtonIcon() {
+    const button = document.querySelector('.wander-personal-map-actions .wander-map-action:first-child');
+    const use = button?.querySelector('use');
+    if (use) use.setAttribute('href', 'wander-icons.svg#target');
+    if (button) {
+      button.setAttribute('aria-label', 'Selector de posición');
+      button.title = 'Selector de posición';
+    }
+  }
 
   function bearingTo(a, b) {
     const p1 = a.lat * Math.PI / 180;
@@ -35,7 +54,7 @@
     const center = map.getCenter();
     point.lat = center.lat;
     point.lng = center.lng;
-    point.name = name.value.trim() || 'Punto seleccionado';
+    point.name = name.value.trim() || nextMarkerName();
     const here = current();
     point.distanceM = here ? map.distance(here, center) : null;
     point.bearingDeg = here ? bearingTo(here, center) : null;
@@ -57,8 +76,9 @@
 
   function openAtCenter() {
     const center = map.getCenter();
-    point = { lat: center.lat, lng: center.lng, name: 'Punto seleccionado', selectedAt: Date.now(), saved: false };
-    name.value = point.name;
+    const defaultName = nextMarkerName();
+    point = { lat: center.lat, lng: center.lng, name: defaultName, selectedAt: Date.now(), saved: false };
+    name.value = defaultName;
     showSheet();
 
     if (!marker) marker = L.marker(center, { icon: icon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
@@ -92,13 +112,19 @@
     if (!pois.createAt({ lat: point.lat, lng: point.lng })) return;
     const added = pois.list().find((poi) => !before.has(poi.id));
     const custom = name.value.trim();
-    if (added && custom && custom !== 'Punto seleccionado') pois.update?.(added.id, { name: custom });
+    if (added && custom) pois.update?.(added.id, { name: custom });
     clear();
   });
 
   ctx.subscribe((key) => {
     if (point && (key === 'location.effective' || key.startsWith('location.effective.'))) updateFromCenter();
   });
+
+  syncSelectorButtonIcon();
+  const iconTimer = setInterval(() => {
+    syncSelectorButtonIcon();
+    if (document.querySelector('.wander-personal-map-actions .wander-map-action:first-child')) clearInterval(iconTimer);
+  }, 250);
 
   window.WanderMapSelectedPoint = Object.freeze({
     getCurrent: () => point ? { ...point } : null,
