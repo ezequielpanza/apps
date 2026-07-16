@@ -50,6 +50,13 @@
 
   const items = load();
 
+  function nextUniqueId() {
+    const usedIds = new Set(items.map((poi) => poi.id));
+    let id = createId();
+    while (usedIds.has(id)) id = createId();
+    return id;
+  }
+
   function publish() {
     const snapshot = items.map((poi) => ({ ...poi }));
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot)); } catch {}
@@ -116,7 +123,7 @@
 
     const now = Date.now();
     const poi = normalize({
-      id: createId(),
+      id: nextUniqueId(),
       name: typeof values.name === 'string' && values.name.trim() ? values.name.trim() : nextDefaultName(),
       type: values.type || 'personal',
       radiusM: values.radiusM || 35,
@@ -126,7 +133,7 @@
       createdAt: now,
       updatedAt: now,
       source: 'user',
-    });
+    }, new Set(items.map((item) => item.id)));
 
     items.push(poi);
     publish();
