@@ -25,6 +25,7 @@
     lastSampleAt: null,
     evidence: ['waiting_for_location_samples'],
   };
+  let calibrationTimer = null;
 
   function finite(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -59,6 +60,14 @@
     return radius * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   }
 
+  function scheduleCalibrationCheck() {
+    if (calibrationTimer) clearTimeout(calibrationTimer);
+    calibrationTimer = setTimeout(() => {
+      calibrationTimer = null;
+      window.WanderEngine?.run?.('pedestrian-motion-calibration-timeout');
+    }, STARTUP_WAIT_MS + 100);
+  }
+
   function reset(at = Date.now(), reason = 'startup_calibration') {
     state.samples = [];
     state.status = 'pending';
@@ -67,6 +76,7 @@
     state.calibrationStartedAt = at;
     state.lastSampleAt = null;
     state.evidence = [reason];
+    scheduleCalibrationCheck();
   }
 
   function segmentMetrics(samples) {
@@ -108,7 +118,7 @@
       .map((sample) => sample.rawSpeedKmh)
       .filter((speed) => Number.isFinite(speed) && speed >= 0 && speed <= 220);
     const segments = segmentMetrics(state.samples);
-    const calibrationElapsedMs = Math.max(0, latest.at - Number(state.calibrationStartedAt || latest.at));
+    const calibrationElapsedMs = Math.max(0, Date.now() - Number(state.calibrationStartedAt || Date.now()));
     return {
       sampleAt: latest.at,
       sampleCount: state.samples.length,
@@ -135,7 +145,10 @@
     if (lat === null || lng === null) return { isNew: false, metrics: null };
     let at = sampleTime(effective?.updatedAt);
     if (state.lastSampleAt && at - state.lastSampleAt > RESUME_RESET_MS) reset(at, 'resumed_after_background');
-    if (!state.calibrationStartedAt) state.calibrationStartedAt = at;
+    if (!state.calibrationStartedAt) {
+      state.calibrationStartedAt = Date.now();
+      scheduleCalibrationCheck();
+    }
     const last = state.samples[state.samples.length - 1];
     if (last && at < last.at) at = Date.now();
     const key = `${lat.toFixed(7)}|${lng.toFixed(7)}|${at}`;
@@ -165,7 +178,11 @@
     const providerMoving = providerMode && !['stationary', 'unknown', ''].includes(providerMode);
     const providerTrusted = providerMoving && providerConfidence !== null && providerConfidence >= .7;
     const ready = currentMetrics.elapsedMs >= MIN_INTERVAL_MS;
-    const positionStationary = ready && derived <= .35 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 4;
+    const timedOut = currentMetrics.calibrationElapsedMs >= STARTUP_WAIT_MS;
+    const reportedLow = (rawMedian === null || rawMedian <= .45) &&
+      (providerSpeed === null || providerSpeed <= .45 || providerMode === 'stationary');
+    const positionStationary = (ready && derived <= .35 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 4) ||
+      (timedOut && currentMetrics.sampleCount >= 1 && reportedLow);
     const positionMoving = ready && currentMetrics.adjustedDistanceM >= 3.5 && derived >= .55;
     const fastPositionConfirmed = currentMetrics.segmentCount >= 2 && currentMetrics.fastSegmentCount >= 2 && currentMetrics.fastSegmentRatio >= .66 && finite(currentMetrics.segmentMedianSpeedKmh) >= 12;
 
@@ -207,8 +224,14 @@
       (currentMetrics.elapsedMs >= MIN_INTERVAL_MS && currentMetrics.adjustedDistanceM >= 3.5 && derived >= .55 && derived <= HIGH_SPEED_KMH);
     const stationaryEvidence = Boolean(filtered.positionStationary) ||
       ((speed === null || speed <= .45) && derived <= .35 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 4);
+    const timedStationary = state.status === 'pending' && stationaryEvidence && currentMetrics.calibrationElapsedMs >= STARTUP_WAIT_MS;
 
-    if (isNew) {
+    if (timedStationary) {
+      state.status = 'stationary';
+      state.movingCandidateAt = null;
+      state.stationaryCandidateAt = null;
+      state.evidence = [...filtered.evidence, 'startup_wait_completed', 'stationary_confirmed'];
+    } else if (isNew) {
       if (movementEvidence) {
         state.stationaryCandidateAt = null;
         if (state.status === 'moving' || strongMovement) {
