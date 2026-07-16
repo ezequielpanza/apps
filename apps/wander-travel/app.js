@@ -1,5 +1,5 @@
 (() => {
-  const APP_BUILD = 'v0.93.0';
+  const APP_BUILD = 'v0.93.1';
   const MAP_RUNTIME_VERSION = '20260716-38';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -51,7 +51,7 @@
     } catch {}
 
     try {
-      await loadRuntime('runtime-provider-current-poi.js?v=20260713-03');
+      await loadRuntime('runtime-provider-current-poi.js?v=20260716-40');
       await loadRuntime('runtime-provider-current-container-bridge.js?v=20260714-01');
       await loadRuntime('runtime-current-poi-motion-guard.js?v=20260714-06');
     } catch {}
