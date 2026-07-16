@@ -27,6 +27,11 @@
         <label><span>Nombre</span><input id="personal-poi-name" type="text"></label>
         <label><span>Tipo</span><input id="personal-poi-type" type="text" placeholder="personal"></label>
         <label><span>Radio de detección</span><div class="input-suffix"><input id="personal-poi-radius" type="number" min="5" max="500" step="1"><b>m</b></div></label>
+        <div class="personal-poi-attributes">
+          <label class="personal-poi-check"><input id="personal-poi-overnight" type="checkbox"><span><strong>Lugar para pasar la noche</strong><small>Puede marcar el inicio o cierre nocturno de una sesión.</small></span></label>
+          <label class="personal-poi-check"><input id="personal-poi-vehicle" type="checkbox"><span><strong>Vehículo o punto móvil</strong><small>Se mueve con vos mientras Wander detecta que estás usándolo.</small></span></label>
+          <div id="personal-poi-vehicle-state" class="personal-poi-vehicle-state" hidden><span>Estado del vehículo</span><strong>Estacionado</strong></div>
+        </div>
         <label><span>Notas</span><textarea id="personal-poi-notes" rows="5"></textarea></label>
         <div class="personal-poi-coordinates"><span>Coordenadas</span><strong id="personal-poi-coordinates">—</strong></div>
         <button id="personal-poi-delete" class="personal-poi-delete" type="button"><svg class="button-icon"><use href="wander-icons.svg#clear"></use></svg><span>Eliminar POI</span></button>
@@ -40,7 +45,22 @@
   const type = screen.querySelector('#personal-poi-type');
   const radius = screen.querySelector('#personal-poi-radius');
   const notes = screen.querySelector('#personal-poi-notes');
+  const overnight = screen.querySelector('#personal-poi-overnight');
+  const vehicle = screen.querySelector('#personal-poi-vehicle');
+  const vehicleState = screen.querySelector('#personal-poi-vehicle-state');
   const coordinates = screen.querySelector('#personal-poi-coordinates');
+
+  function vehicleStateLabel(value) {
+    if (value === 'with-user') return 'Con vos';
+    if (value === 'parked-candidate') return 'Confirmando dónde quedó';
+    if (value === 'uncertain') return 'Ubicación incierta';
+    return 'Estacionado';
+  }
+
+  function syncVehicleState(poi) {
+    vehicleState.hidden = !poi?.vehicle;
+    vehicleState.querySelector('strong').textContent = vehicleStateLabel(poi?.vehicleState);
+  }
 
   function hide() {
     screen.hidden = true;
@@ -56,18 +76,34 @@
     type.value = poi.type || 'personal';
     radius.value = Math.round(Number(poi.radiusM) || 35);
     notes.value = poi.notes || '';
+    overnight.checked = poi.overnight === true;
+    vehicle.checked = poi.vehicle === true;
     coordinates.textContent = `${Number(poi.lat).toFixed(6)}, ${Number(poi.lng).toFixed(6)}`;
+    syncVehicleState(poi);
     screen.hidden = false;
     requestAnimationFrame(() => name.focus({ preventScroll: true }));
     return true;
   }
 
+  vehicle.addEventListener('change', () => {
+    vehicleState.hidden = !vehicle.checked;
+    if (vehicle.checked) vehicleState.querySelector('strong').textContent = 'Estacionado';
+  });
+
   screen.querySelector('#personal-poi-sheet-close').addEventListener('click', hide);
   screen.querySelector('#personal-poi-sheet-save').addEventListener('click', () => {
     if (!selectedId || !name.value.trim()) return;
-    const updated = api.update?.(selectedId, { name: name.value, type: type.value, radiusM: radius.value, notes: notes.value });
+    const updated = api.update?.(selectedId, {
+      name: name.value,
+      type: type.value,
+      radiusM: radius.value,
+      notes: notes.value,
+      overnight: overnight.checked,
+      vehicle: vehicle.checked,
+    });
     if (!updated) return;
     title.textContent = updated.name;
+    syncVehicleState(updated);
     window.WanderUI?.showWander('POI actualizado', updated.name + ' quedó guardado.');
   });
   screen.querySelector('#personal-poi-delete').addEventListener('click', () => {
@@ -78,6 +114,15 @@
   });
 
   window.addEventListener('wander:personal-poi-properties', (event) => showById(event.detail?.id));
+  window.addEventListener('wander:personal-poi-updated', (event) => {
+    if (event.detail?.poi?.id === selectedId) syncVehicleState(event.detail.poi);
+  });
+  window.addEventListener('wander:personal-poi-moved', (event) => {
+    if (event.detail?.poi?.id !== selectedId) return;
+    const poi = event.detail.poi;
+    coordinates.textContent = `${Number(poi.lat).toFixed(6)}, ${Number(poi.lng).toFixed(6)}`;
+    syncVehicleState(poi);
+  });
   window.addEventListener('wander:personal-poi-removed', (event) => { if (event.detail?.id === selectedId) hide(); });
   window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !screen.hidden) hide(); });
 
