@@ -11,7 +11,7 @@
   sheet.className = 'map-point-sheet';
   sheet.setAttribute('aria-label', 'Punto seleccionado');
   sheet.hidden = true;
-  sheet.innerHTML = '<div class="map-point-head"><input id="map-point-name" aria-label="Nombre del punto" placeholder="Nombre del punto"><button id="map-point-close" type="button" aria-label="Cerrar" title="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div></div><div class="map-point-actions"><button id="map-point-center" type="button" aria-label="Centrar POI" title="Centrar POI"><svg class="button-icon"><use href="wander-icons.svg#center"></use></svg></button><button id="map-point-properties" type="button" aria-label="Propiedades" title="Propiedades"><svg class="button-icon"><use href="wander-icons.svg#settings"></use></svg></button><button id="map-point-save" class="primary" type="button" aria-label="Guardar punto" title="Guardar punto"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg></button></div>';
+  sheet.innerHTML = '<div class="map-point-head"><input id="map-point-name" aria-label="Nombre del punto" placeholder="Nombre del punto"><button id="map-point-close" type="button" aria-label="Cerrar" title="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div></div><div class="map-point-actions"><button id="map-point-center" type="button" aria-label="Centrar POI" title="Centrar POI"><svg class="button-icon"><use href="wander-icons.svg#center"></use></svg></button><button id="map-point-properties" type="button" aria-label="Propiedades" title="Propiedades"><svg class="button-icon"><use href="wander-icons.svg#settings"></use></svg></button><button id="map-point-delete" class="danger" type="button" aria-label="Eliminar POI" title="Eliminar POI"><svg class="button-icon"><use href="wander-icons.svg#clear"></use></svg></button><button id="map-point-save" class="primary" type="button" aria-label="Guardar punto" title="Guardar punto"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg></button><button id="map-point-cancel" type="button" aria-label="Cancelar" title="Cancelar"><svg class="button-icon"><use href="wander-icons.svg#close"></use></svg></button></div>';
   document.body.appendChild(sheet);
 
   const name = sheet.querySelector('#map-point-name');
@@ -20,7 +20,9 @@
   const coordinates = sheet.querySelector('#map-point-coordinates');
   const centerButton = sheet.querySelector('#map-point-center');
   const propertiesButton = sheet.querySelector('#map-point-properties');
+  const deleteButton = sheet.querySelector('#map-point-delete');
   const saveButton = sheet.querySelector('#map-point-save');
+  const cancelButton = sheet.querySelector('#map-point-cancel');
   const current = () => base.getPosition?.() || window.WanderMapPosition?.getPosition?.() || null;
   const distanceLabel = (m) => !Number.isFinite(m) ? '—' : m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
 
@@ -70,7 +72,9 @@
     name.readOnly = existing;
     centerButton.hidden = !existing;
     propertiesButton.hidden = !existing;
+    deleteButton.hidden = !existing;
     saveButton.hidden = existing;
+    cancelButton.hidden = existing;
   }
 
   function showSheet() {
@@ -115,6 +119,7 @@
 
   name.addEventListener('input', () => { if (point?.mode === 'new') updateMetrics(); });
   sheet.querySelector('#map-point-close').addEventListener('click', clear);
+  cancelButton.addEventListener('click', clear);
   map.on('move zoom', () => { if (point?.mode === 'new') updateMetrics(); });
   window.addEventListener('wander:open-waypoint-center', openAtCenter);
   window.addEventListener('wander:personal-poi-selected', (event) => openPOI(event.detail?.poi));
@@ -129,10 +134,21 @@
     window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id: point.id } }));
   });
 
+  deleteButton.addEventListener('click', () => {
+    if (!point?.id) return;
+    const pois = window.WanderPersonalPOIs;
+    const currentPOI = pois?.get?.(point.id);
+    if (!currentPOI || !window.confirm(`¿Eliminar ${currentPOI.name}?`)) return;
+    if (pois.remove?.(point.id)) clear();
+  });
+
   saveButton.addEventListener('click', () => {
     if (!point || point.mode !== 'new') return;
     const pois = window.WanderPersonalPOIs;
-    if (!pois?.createAt || !pois?.list) return;
+    if (!pois?.createAt || !pois?.list) {
+      window.WanderUI?.showWander('Todavía no disponible', 'El sistema de puntos personales aún se está iniciando.');
+      return;
+    }
     const before = new Set(pois.list().map((poi) => poi.id));
     if (!pois.createAt({ lat: point.lat, lng: point.lng })) return;
     const added = pois.list().find((poi) => !before.has(poi.id));
