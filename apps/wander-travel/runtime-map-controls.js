@@ -60,25 +60,58 @@
 
   function syncZoomAnchorMode() {
     const following = position.isFollowingPosition();
-    const mode = following ? 'center' : true;
-    map.options.scrollWheelZoom = mode;
-    map.options.doubleClickZoom = mode;
+    const mode = following ? true : true;
+    map.options.scrollWheelZoom = following && centerMode === 'middle' ? 'center' : mode;
+    map.options.doubleClickZoom = following && centerMode === 'middle' ? 'center' : mode;
     map.options.touchZoom = mode;
   }
 
   function installLockedTouchZoomPivot() {
     const handler = map.touchZoom;
-    if (!handler || handler._wanderPivotLocked || typeof handler._onTouchStart !== 'function') return;
+    if (!handler || handler._wanderPivotLocked || typeof handler._onTouchStart !== 'function' || typeof handler._onTouchMove !== 'function') return;
 
     const wasEnabled = handler.enabled?.() === true;
     if (wasEnabled) handler.disable();
 
     const originalTouchStart = handler._onTouchStart;
+    const originalTouchMove = handler._onTouchMove;
+
+    function lockTouchesToPivot(event) {
+      if (!position.isFollowingPosition() || !event?.touches || event.touches.length !== 2) return event;
+      const rect = map.getContainer().getBoundingClientRect();
+      const pivot = zoomPivotPoint();
+      const targetX = rect.left + pivot.x;
+      const targetY = rect.top + pivot.y;
+      const a = event.touches[0];
+      const b = event.touches[1];
+      const midX = (a.clientX + b.clientX) / 2;
+      const midY = (a.clientY + b.clientY) / 2;
+      const dx = targetX - midX;
+      const dy = targetY - midY;
+      const shifted = [a, b].map((touch) => ({
+        clientX: touch.clientX + dx,
+        clientY: touch.clientY + dy,
+        pageX: (touch.pageX ?? touch.clientX) + dx,
+        pageY: (touch.pageY ?? touch.clientY) + dy,
+        screenX: (touch.screenX ?? touch.clientX) + dx,
+        screenY: (touch.screenY ?? touch.clientY) + dy,
+        identifier: touch.identifier,
+        target: touch.target,
+      }));
+      return {
+        ...event,
+        touches: shifted,
+        changedTouches: shifted,
+        preventDefault: () => event.preventDefault(),
+        stopPropagation: () => event.stopPropagation(),
+      };
+    }
+
     handler._onTouchStart = function (event) {
-      originalTouchStart.call(this, event);
-      if (!position.isFollowingPosition()) return;
-      this._centerPoint = zoomPivotPoint();
-      this._startLatLng = null;
+      return originalTouchStart.call(this, lockTouchesToPivot(event));
+    };
+    handler._onTouchMove = function (event) {
+      return originalTouchMove.call(this, lockTouchesToPivot(event));
     };
 
     handler._wanderPivotLocked = true;
