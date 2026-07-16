@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.92.34';
+  const VERSION = 'v0.92.35';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -49,7 +49,7 @@
     loadStyle('wander-top-dashboard-search.css?v=20260715-21');
     loadScript('runtime-top-dashboard-search.js?v=20260715-21');
     loadWhenReady({ ready: () => Boolean(window.WanderSituationEngine?.subscribe), loaded: () => Boolean(window.WanderMovementMethodRefinement), src: 'runtime-movement-method-refinement.js?v=20260714-09' });
-    loadWhenReady({ ready: () => Boolean(window.WanderBase?.map && window.WanderTracks && window.WanderMapControls), loaded: () => Boolean(window.WanderPersonalPOIs), src: 'runtime-personal-map-tools.js?v=20260715-07' });
+    loadWhenReady({ ready: () => Boolean(window.WanderBase?.map && window.WanderTracks && window.WanderMapControls), loaded: () => Boolean(window.WanderPersonalPOIs), src: 'runtime-personal-map-tools.js?v=20260716-22' });
     loadWhenReady({ ready: () => Boolean(window.WanderBase?.map && window.WanderContext), loaded: () => Boolean(window.WanderMapSelectedPoint), src: 'runtime-map-selected-point.js?v=20260716-21' });
     loadWhenReady({ ready: () => Boolean(window.WanderPersonalPOIs?.get && document.querySelector('.map-stage')), loaded: () => Boolean(window.WanderPersonalPOISheet), src: 'runtime-personal-poi-sheet.js?v=20260716-18' });
     loadWhenReady({ ready: () => Boolean(window.WanderUI?.getMessageTimeoutMs && document.querySelector('#settings-panel')), loaded: () => Boolean(window.WanderMessageTimeoutSettings), src: 'runtime-message-timeout-settings.js?v=20260714-22' });
