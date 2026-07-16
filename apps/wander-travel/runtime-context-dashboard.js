@@ -5,11 +5,28 @@
   const STORAGE_KEY = 'wander.contextDashboard.config.v1';
   const COORDINATE_FORMAT_KEY = 'wander.coordinates.format.v1';
   const DEFAULT_VISIBLE_FIELDS = Object.freeze(['summary', 'speed', 'heading']);
+  const ACTIVITY_LABELS = Object.freeze({
+    moving: 'En movimiento',
+    paused: 'En pausa',
+    stationary: 'En pausa',
+    pending: 'Preparando contexto',
+  });
+  const MOTION_LABELS = Object.freeze({
+    moving: 'En movimiento',
+    stationary: 'Detenido',
+    pending: 'Preparando contexto',
+  });
 
   function textValue(value, fallback) {
     if (value == null || value === '') return fallback;
     if (typeof value === 'object') return value.name || value.label || value.displayName || fallback;
     return String(value);
+  }
+
+  function translatedValue(key, labels, fallback) {
+    const value = context.value(key);
+    const normalized = String(value ?? '').trim().toLowerCase();
+    return labels[normalized] || textValue(value, fallback);
   }
 
   function numberValue(key, suffix, digits = 0, fallback = '—') {
@@ -102,14 +119,14 @@
 
   const FIELDS = Object.freeze([
     { id: 'summary', label: 'Estado actual', icon: 'target', metricId: 'metric-status', value: () => textValue(context.value('context.status'), 'Preparando contexto') },
-    { id: 'activity', label: 'Actividad', icon: 'route', metricId: 'metric-activity', value: () => textValue(context.value('context.activity'), 'Pendiente') },
+    { id: 'activity', label: 'Actividad', icon: 'route', metricId: 'metric-activity', value: () => translatedValue('context.activity', ACTIVITY_LABELS, 'Preparando contexto') },
     { id: 'time', label: 'Hora', icon: 'clock', metricId: 'metric-time', value: () => textValue(context.value('time.now'), 'Pendiente') },
     { id: 'dayPeriod', label: 'Momento del día', icon: 'day', metricId: 'metric-day-period', value: () => textValue(context.value('time.dayPeriod'), 'Pendiente') },
     { id: 'locationStatus', label: 'Ubicación', icon: 'pin', metricId: 'metric-location-status', value: () => textValue(context.value('location.effective.status'), 'Pendiente') },
     { id: 'coordinates', label: 'Coordenadas', icon: 'pin', metricId: 'metric-coordinates', value: coordinatesValue },
     { id: 'locationSource', label: 'Fuente de ubicación', icon: 'target', metricId: 'metric-location-source', value: () => textValue(context.value('location.effective.source'), 'Pendiente') },
     { id: 'accuracy', label: 'Precisión', icon: 'target', metricId: 'metric-accuracy', value: () => numberValue('location.effective.accuracy', ' m') },
-    { id: 'motionStatus', label: 'Movimiento físico', icon: 'route', metricId: 'metric-motion-status', value: () => textValue(context.value('motion.status'), 'Pendiente') },
+    { id: 'motionStatus', label: 'Movimiento físico', icon: 'route', metricId: 'metric-motion-status', value: () => translatedValue('motion.status', MOTION_LABELS, 'Preparando contexto') },
     { id: 'mobility', label: 'Método de desplazamiento', icon: 'compass', metricId: 'metric-mobility', value: movementMethodValue },
     { id: 'speed', label: 'Velocidad', icon: 'speed', metricId: 'metric-speed', value: () => numberValue('motion.speedKmh', ' km/h', 1) },
     { id: 'heading', label: 'Rumbo', icon: 'heading', metricId: 'metric-heading', value: () => numberValue('motion.heading', '°') },
@@ -164,7 +181,12 @@
   function render() {
     ensureDashboardItems(); let shown = 0;
     document.querySelectorAll('[data-dashboard-field]').forEach((element) => { const visible = isVisible(element.dataset.dashboardField); element.hidden = !visible; if (visible) shown += 1; });
-    FIELDS.forEach((field) => { const element = document.querySelector('#' + field.metricId); if (element) element.textContent = field.value(); });
+    FIELDS.forEach((field) => {
+      const element = document.querySelector('#' + field.metricId);
+      if (!element) return;
+      const value = field.value();
+      if (element.textContent !== value) element.textContent = value;
+    });
     const empty = document.querySelector('[data-dashboard-empty]'); if (empty) empty.hidden = shown > 0;
   }
   context.subscribe(render);
