@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.92.45';
+  const VERSION = 'v0.92.46';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -51,6 +51,11 @@
     loadStyle('wander-points-screen.css?v=20260716-31');
 
     loadScript('runtime-top-dashboard-search.js?v=20260715-21');
+    loadWhenReady({
+      ready: () => Boolean(window.WanderContextDashboard && document.querySelector('#metric-activity')),
+      loaded: () => Boolean(window.WanderDashboardStatusLabels),
+      src: 'runtime-dashboard-status-labels.js?v=20260716-33',
+    });
     loadWhenReady({
       ready: () => Boolean(window.WanderEngineInference?.inferSituation && window.WanderEngine?.run),
       loaded: () => Boolean(window.WanderPedestrianMotion),
