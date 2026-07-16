@@ -1,8 +1,10 @@
 (() => {
+  if (window.WanderPointsScreen) return;
+
   const api = window.WanderPersonalPOIs;
   const list = document.querySelector('#points-list');
   const summary = document.querySelector('#points-summary');
-  if (!api || !list || !summary) return;
+  if (!api?.ready || !list || !summary) return;
 
   const card = list.closest('.screen-card');
   let toolbar = card?.querySelector('.points-toolbar');
@@ -13,7 +15,7 @@
       <button id="points-new" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg><span>Nuevo</span></button>
       <button id="points-select" type="button" aria-pressed="false"><svg class="button-icon"><use href="wander-icons.svg#target"></use></svg><span>Seleccionar</span></button>
       <button id="points-delete" class="danger" type="button" disabled><svg class="button-icon"><use href="wander-icons.svg#clear"></use></svg><span>Borrar</span></button>`;
-    card?.insertBefore(toolbar, summary.nextSibling);
+    card?.insertBefore(toolbar, list);
   }
 
   const newButton = toolbar.querySelector('#points-new');
@@ -39,10 +41,18 @@
     render();
   }
 
+  function openProperties(id) {
+    if (window.WanderPersonalPOISheet?.showById?.(id)) return;
+    window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id } }));
+  }
+
   function render() {
-    const items = api.list?.() || [];
+    const items = api.list();
     const validIds = new Set(items.map((poi) => poi.id));
-    selectedIds.forEach((id) => { if (!validIds.has(id)) selectedIds.delete(id); });
+    selectedIds.forEach((id) => {
+      if (!validIds.has(id)) selectedIds.delete(id);
+    });
+
     summary.textContent = `${items.length} ${items.length === 1 ? 'punto guardado' : 'puntos guardados'}`;
     list.innerHTML = '';
 
@@ -65,7 +75,7 @@
       row.classList.toggle('is-selecting', selecting);
       row.classList.toggle('is-selected', selectedIds.has(poi.id));
       row.setAttribute('aria-pressed', selecting ? String(selectedIds.has(poi.id)) : 'false');
-      row.innerHTML = `<span class="point-row-select" aria-hidden="true"><span></span></span><span class="point-row-icon"><svg class="ui-icon"><use href="wander-icons.svg#pin"></use></svg></span><span class="point-row-copy"><strong></strong><small></small></span><svg class="ui-icon point-row-open"><use href="wander-icons.svg#settings"></use></svg>`;
+      row.innerHTML = '<span class="point-row-select" aria-hidden="true"><span></span></span><span class="point-row-icon"><svg class="ui-icon"><use href="wander-icons.svg#pin"></use></svg></span><span class="point-row-copy"><strong></strong><small></small></span><svg class="ui-icon point-row-open"><use href="wander-icons.svg#settings"></use></svg>';
       row.querySelector('strong').textContent = poi.name || 'Marcador';
       row.querySelector('small').textContent = `${Number(poi.lat).toFixed(6)}, ${Number(poi.lng).toFixed(6)}`;
       row.addEventListener('click', () => {
@@ -77,17 +87,27 @@
           updateToolbar();
           return;
         }
-        window.WanderPersonalPOISheet?.showById?.(poi.id);
+        openProperties(poi.id);
       });
       list.appendChild(row);
     });
     updateToolbar();
   }
 
+  function openNewPoint(attempt = 0) {
+    const selector = window.WanderMapSelectedPoint;
+    if (selector?.openAtCenter) {
+      selector.openAtCenter();
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('wander:open-waypoint-center'));
+    if (attempt < 20) setTimeout(() => openNewPoint(attempt + 1), 100);
+  }
+
   newButton.addEventListener('click', () => {
     setSelecting(false);
     window.WanderScreen?.open?.('map');
-    setTimeout(() => window.WanderMapSelectedPoint?.openAtCenter?.(), 120);
+    setTimeout(() => openNewPoint(), 100);
   });
 
   selectButton.addEventListener('click', () => setSelecting(!selecting));
@@ -96,12 +116,11 @@
     if (!selectedIds.size) return;
     const count = selectedIds.size;
     if (!window.confirm(`¿Eliminar ${count} ${count === 1 ? 'punto seleccionado' : 'puntos seleccionados'}?`)) return;
-    [...selectedIds].forEach((id) => api.remove?.(id));
+    [...selectedIds].forEach((id) => api.remove(id));
     setSelecting(false);
   });
 
   window.addEventListener('wander:personal-poi-created', render);
-  window.addEventListener('wander:personal-poi-selected', render);
   window.addEventListener('wander:personal-poi-removed', render);
   window.addEventListener('wander:personal-poi-updated', render);
   document.addEventListener('click', (event) => {
@@ -110,4 +129,5 @@
 
   render();
   window.WanderPointsScreen = Object.freeze({ render, setSelecting });
+  window.dispatchEvent(new CustomEvent('wander:points-screen-ready'));
 })();
