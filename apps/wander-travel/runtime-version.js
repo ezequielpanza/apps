@@ -54,7 +54,7 @@
     loadWhenReady({
       ready: () => Boolean(window.WanderEngineInference?.inferSituation && window.WanderEngine?.run),
       loaded: () => Boolean(window.WanderPedestrianMotion),
-      src: 'runtime-pedestrian-motion.js?v=20260716-38',
+      src: 'runtime-pedestrian-motion.js?v=20260716-39',
     });
     loadWhenReady({
       ready: () => Boolean(window.WanderContext && window.WanderEngine?.run),
