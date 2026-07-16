@@ -365,13 +365,18 @@
 
   function attachVehicleFromPOI(position, at) {
     const poi = currentPOI();
-    if (!poi?.vehicle || !poi.id) return;
+    if (!poi?.vehicle || !poi.id) return false;
+    const mode = mobilityMode();
+    const speedKmh = Number(position?.speedKmh || 0);
+    if (isWalkingMode(mode)) return false;
+    if (!isVehicleMode(mode) && speedKmh < 10) return false;
     attachedVehicleId = poi.id;
     parkedCandidate = null;
     window.WanderPersonalPOIs?.update?.(poi.id, {
       vehicleState: 'with-user', lat: position.lat, lng: position.lng, vehicleUpdatedAt: at,
     }, { silent: true });
     if (active) active.attachedVehicleId = attachedVehicleId;
+    return true;
   }
 
   function updateAttachedVehicle(position, motion, at) {
@@ -432,12 +437,9 @@
       if (!active) startSession(position, at);
       const stay = openStay(active);
       if (stay) closeStay(at);
-      if (!openMovement(active)) {
-        if (lastMotion !== 'moving') attachVehicleFromPOI(position, at);
-        createMovement(position, at);
-      } else {
-        addMovementPoint(openMovement(active), position, at);
-      }
+      if (!attachedVehicleId) attachVehicleFromPOI(position, at);
+      if (!openMovement(active)) createMovement(position, at);
+      else addMovementPoint(openMovement(active), position, at);
       updateAttachedVehicle(position, motion, at);
       phase = 'moving';
     } else if (motion === 'stationary') {
