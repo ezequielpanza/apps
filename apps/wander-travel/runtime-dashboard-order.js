@@ -54,6 +54,14 @@
     return [...config.fieldOrder];
   }
 
+  function notifyLayout() {
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new CustomEvent('wander:dashboard-layout-change', {
+        detail: { visibleFields: getVisibleFields(), fieldOrder: getFieldOrder() },
+      }));
+    });
+  }
+
   function renderDashboard() {
     base.render();
     const empty = dashboardElement.querySelector('[data-dashboard-empty]');
@@ -64,6 +72,7 @@
       dashboardElement.insertBefore(item, empty || null);
     }
     if (empty) empty.hidden = getVisibleFields().length > 0;
+    notifyLayout();
   }
 
   function setFieldVisible(fieldId, visible) {
