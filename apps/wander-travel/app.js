@@ -1,6 +1,6 @@
 (() => {
-  const APP_BUILD = 'v0.92.49';
-  const MAP_RUNTIME_VERSION = '20260708-03';
+  const APP_BUILD = 'v0.93.0';
+  const MAP_RUNTIME_VERSION = '20260716-37';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
   document.write('<script src="runtime-map-position.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -70,6 +70,7 @@
         window.WanderDashboardViewport?.mount?.();
         window.WanderContextDashboard?.restore?.();
         window.WanderSituationEngine?.evaluate?.();
+        window.WanderSessionEngine?.observe?.('app-ready');
         window.WanderAppReady = true;
         window.dispatchEvent(new CustomEvent('wander:app-ready', { detail: { at: Date.now() } }));
       });
