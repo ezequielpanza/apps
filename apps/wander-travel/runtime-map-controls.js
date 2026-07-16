@@ -52,21 +52,45 @@
     centerButton.style.boxShadow = following ? '0 0 0 3px var(--accent-ring), var(--shadow)' : 'var(--shadow)';
   }
 
+  function zoomPivotPoint() {
+    const size = map.getSize();
+    const y = position.isFollowingPosition() && centerMode === 'lower' ? size.y * 0.72 : size.y / 2;
+    return L.point(size.x / 2, y);
+  }
+
   function syncZoomAnchorMode() {
     const following = position.isFollowingPosition();
-    const mode = following && centerMode === 'middle' ? 'center' : true;
+    const mode = following ? 'center' : true;
     map.options.scrollWheelZoom = mode;
     map.options.doubleClickZoom = mode;
     map.options.touchZoom = mode;
+  }
+
+  function installLockedTouchZoomPivot() {
+    const handler = map.touchZoom;
+    if (!handler || handler._wanderPivotLocked || typeof handler._onTouchStart !== 'function') return;
+
+    const wasEnabled = handler.enabled?.() === true;
+    if (wasEnabled) handler.disable();
+
+    const originalTouchStart = handler._onTouchStart;
+    handler._onTouchStart = function (event) {
+      originalTouchStart.call(this, event);
+      if (!position.isFollowingPosition()) return;
+      this._centerPoint = zoomPivotPoint();
+      this._startLatLng = null;
+    };
+
+    handler._wanderPivotLocked = true;
+    if (wasEnabled || map.options.touchZoom) handler.enable();
   }
 
   function applyCenterAnchor() {
     if (!position.isFollowingPosition() || centerMode !== 'lower') return;
     const point = position.getPosition?.();
     if (!point) return;
-    const size = map.getSize();
     const target = map.latLngToContainerPoint(point);
-    const desired = L.point(size.x / 2, size.y * 0.72);
+    const desired = zoomPivotPoint();
     const delta = target.subtract(desired);
     if (Math.abs(delta.x) > 1 || Math.abs(delta.y) > 1) map.panBy(delta, { animate: false });
   }
@@ -162,6 +186,8 @@
   });
 
   map.addControl(new MapActions());
+  installLockedTouchZoomPivot();
+
   map.on('dragstart', () => {
     if (!position.isFollowingPosition()) return;
     followSuspendedByDrag = true;
