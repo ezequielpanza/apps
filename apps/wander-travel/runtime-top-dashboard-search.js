@@ -6,12 +6,25 @@
   if (!header || !dashboard || !search || !brand) return;
 
   const FIELD_SPANS = Object.freeze({
+    appVersion: 1,
+    version: 1,
     summary: 2,
-    coordinates: 3,
-    placeMemory: 3,
-    lastSuggestion: 3,
+    coordinates: 2,
+    speed: 1,
+    heading: 1,
+    time: 1,
+    period: 1,
+    dayPeriod: 1,
+    mobility: 1,
+    activity: 1,
+    accuracy: 1,
+    simulation: 1,
+    nearby: 1,
+    place: 2,
     currentPOI: 2,
     journey: 2,
+    placeMemory: 3,
+    lastSuggestion: 3,
   });
 
   header.classList.add('wander-top-status-bar');
