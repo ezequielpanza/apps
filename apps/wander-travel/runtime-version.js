@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.92.49';
+  const VERSION = 'v0.93.0';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -38,7 +38,6 @@
 
   function bootstrap() {
     loadStyle('wander-message-top.css?v=20260716-12');
-    loadStyle('wander-record-button.css?v=20260714-12');
     loadStyle('wander-simulator-dashboard-offset.css?v=20260714-13');
     loadStyle('wander-message-actions.css?v=20260714-14');
     loadStyle('wander-personal-poi-sheet.css?v=20260716-31');
@@ -49,12 +48,18 @@
     loadStyle('wander-map-selected-point.css?v=20260716-31');
     loadStyle('wander-top-dashboard-search.css?v=20260715-21');
     loadStyle('wander-points-screen.css?v=20260716-31');
+    loadStyle('wander-sessions.css?v=20260716-37');
 
     loadScript('runtime-top-dashboard-search.js?v=20260715-21');
     loadWhenReady({
       ready: () => Boolean(window.WanderEngineInference?.inferSituation && window.WanderEngine?.run),
       loaded: () => Boolean(window.WanderPedestrianMotion),
-      src: 'runtime-pedestrian-motion.js?v=20260716-36',
+      src: 'runtime-pedestrian-motion.js?v=20260716-37',
+    });
+    loadWhenReady({
+      ready: () => Boolean(window.WanderContext && window.WanderEngine?.run),
+      loaded: () => Boolean(window.WanderSessionEngine),
+      src: 'runtime-session-engine.js?v=20260716-37',
     });
     loadWhenReady({
       ready: () => Boolean(window.WanderSituationEngine?.subscribe),
@@ -65,7 +70,7 @@
     loadWhenReady({
       ready: () => Boolean(window.WanderBase?.map && window.WanderContext),
       loaded: () => Boolean(window.WanderPersonalPOIs),
-      src: 'runtime-personal-poi-core.js?v=20260716-31',
+      src: 'runtime-personal-poi-core.js?v=20260716-37',
     });
 
     loadWhenReady({
@@ -77,13 +82,13 @@
     loadWhenReady({
       ready: () => Boolean(window.WanderBase?.map),
       loaded: () => Boolean(window.WanderPersonalMapTools),
-      src: 'runtime-personal-map-tools.js?v=20260716-31',
+      src: 'runtime-personal-map-tools.js?v=20260716-37',
     });
 
     loadWhenReady({
       ready: () => Boolean(window.WanderPersonalPOIs?.ready && document.querySelector('.map-stage')),
       loaded: () => Boolean(window.WanderPersonalPOISheet),
-      src: 'runtime-personal-poi-sheet.js?v=20260716-31',
+      src: 'runtime-personal-poi-sheet.js?v=20260716-37',
     });
 
     loadWhenReady({
