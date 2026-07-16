@@ -1,13 +1,19 @@
 .wander-card{
-  top:calc(68px + env(safe-area-inset-top,0px));
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
   bottom:auto;
-  max-height:calc(100dvh - 154px - env(safe-area-inset-top,0px));
+  z-index:2147483647;
+  max-height:calc(100dvh - env(safe-area-inset-bottom,0px));
+  padding-top:calc(16px + env(safe-area-inset-top,0px));
+  border-radius:0 0 22px 22px;
 }
 
 @media (min-width:700px){
   .wander-card{
-    left:72px;
+    left:0;
     right:auto;
-    width:min(430px,calc(100vw - 96px));
+    width:min(430px,calc(100vw - 24px));
   }
 }
