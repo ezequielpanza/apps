@@ -131,22 +131,23 @@
     if (!buildScreen()) return;
     const state = engine()?.snapshot?.() || { autoEnabled: true, phase: 'preparing', active: null, sessions: [] };
     const active = state.active;
+    const live = window.WanderContext?.value?.('sessions.active') || active;
     const history = Array.isArray(state.sessions) ? state.sessions : [];
     const toggle = $('#session-auto-toggle');
     if (toggle) toggle.checked = Boolean(state.autoEnabled);
     const finish = $('#session-finish-button');
     if (finish) finish.disabled = !active;
     window.WanderUI?.setText('#session-phase', phaseLabel(state));
-    window.WanderUI?.setText('#track-summary', activeSummary(active));
-    window.WanderUI?.setText('#session-distance', distanceLabel(active?.distanceM || 0));
-    window.WanderUI?.setText('#session-moving-time', durationLabel(active?.movingDurationMs || 0));
-    window.WanderUI?.setText('#session-stay-time', durationLabel(active?.stationaryDurationMs || 0));
+    window.WanderUI?.setText('#track-summary', activeSummary(live));
+    window.WanderUI?.setText('#session-distance', distanceLabel(live?.distanceM || 0));
+    window.WanderUI?.setText('#session-moving-time', durationLabel(live?.movingDurationMs || 0));
+    window.WanderUI?.setText('#session-stay-time', durationLabel(live?.stationaryDurationMs || 0));
     window.WanderUI?.setText('#session-history-count', `${history.length} ${history.length === 1 ? 'sesión' : 'sesiones'}`);
 
     const list = $('#track-list');
     if (!list) return;
     const rows = [];
-    if (active) rows.push(rowMarkup(active, true));
+    if (active) rows.push(rowMarkup({ ...active, ...live }, true));
     history.slice().reverse().slice(0, 20).forEach((session) => rows.push(rowMarkup(session)));
     legacyTracks.slice().reverse().slice(0, 10).forEach((track) => rows.push(legacyRowMarkup(track)));
     list.innerHTML = rows.length ? rows.join('') : '<div class="track-row"><div><strong>Sin sesiones</strong><span>El registro automático comenzará cuando Wander confirme movimiento.</span></div></div>';
@@ -169,7 +170,8 @@
     const latLngs = points.map((point) => [point.lat, point.lng]);
     line.setLatLngs(latLngs);
     map.fitBounds(latLngs, { padding: [40, 40], maxZoom: 16 });
-    window.WanderUI?.showWander('Sesión', `${session.name} · ${distanceLabel(session.distanceM)}.`);
+    const distance = session.distanceM || window.WanderContext?.value?.('sessions.active')?.distanceM || 0;
+    window.WanderUI?.showWander('Sesión', `${session.name} · ${distanceLabel(distance)}.`);
   }
 
   function showLegacy(id) {
