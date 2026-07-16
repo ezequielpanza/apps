@@ -8,22 +8,58 @@
   const POI_STORAGE_KEY = 'wander.personalPOIs.v1';
   const AUTO_TRACK_KEY = 'wander.tracks.autoEnabled.v1';
   const HOLD_MS = 650;
-  const personalPOIs = loadPOIs();
   const poiLayers = new Map();
   let suppressTrackClick = false;
   let trackButton = null;
   let currentPersonalPOIId = null;
 
+  function newPOIId() {
+    if (globalThis.crypto?.randomUUID) return `personal-poi-${crypto.randomUUID()}`;
+    const random = Math.random().toString(36).slice(2, 12);
+    return `personal-poi-${Date.now().toString(36)}-${random}`;
+  }
+
+  function normalizePOI(raw = {}, usedIds = new Set()) {
+    let id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : newPOIId();
+    while (usedIds.has(id)) id = newPOIId();
+    usedIds.add(id);
+    const now = Date.now();
+    return {
+      id,
+      name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Marcador',
+      type: typeof raw.type === 'string' && raw.type.trim() ? raw.type.trim() : 'personal',
+      radiusM: Math.max(5, Math.min(500, Number(raw.radiusM) || 35)),
+      notes: typeof raw.notes === 'string' ? raw.notes.trim() : '',
+      lat: Number(raw.lat),
+      lng: Number(raw.lng),
+      createdAt: Number(raw.createdAt) || now,
+      updatedAt: Number(raw.updatedAt) || now,
+      source: raw.source || 'user',
+    };
+  }
+
   function loadPOIs() {
     try {
       const stored = JSON.parse(localStorage.getItem(POI_STORAGE_KEY) || '[]');
-      return Array.isArray(stored) ? stored : [];
+      if (!Array.isArray(stored)) return [];
+      const usedIds = new Set();
+      return stored
+        .filter((poi) => Number.isFinite(Number(poi?.lat)) && Number.isFinite(Number(poi?.lng)))
+        .map((poi) => normalizePOI(poi, usedIds));
     } catch { return []; }
   }
 
+  const personalPOIs = loadPOIs();
+
   function savePOIs() {
     try { localStorage.setItem(POI_STORAGE_KEY, JSON.stringify(personalPOIs)); } catch {}
-    context.set('personalPOI.items', personalPOIs, { source: 'personal-poi', kind: 'confirmed', confidence: 1 });
+    context.set('personalPOI.enabled', true, { source: 'personal-poi', kind: 'confirmed', confidence: 1 });
+    context.set('personalPOI.ready', true, { source: 'personal-poi', kind: 'confirmed', confidence: 1 });
+    context.set('personalPOI.items', personalPOIs.map((poi) => ({ ...poi })), { source: 'personal-poi', kind: 'confirmed', confidence: 1 });
+  }
+
+  function effectivePosition() {
+    return base.getPosition?.() || window.WanderMapPosition?.getPosition?.() || null;
   }
 
   function autoTrackEnabled() {
@@ -38,16 +74,12 @@
     context.set('tracks.autoRecording', Boolean(enabled), { source: 'track-control', kind: 'confirmed', confidence: 1 });
   }
 
-  function effectivePosition() {
-    return base.getPosition?.() || window.WanderMapPosition?.getPosition?.() || null;
-  }
-
   function makeButton(iconName, label) {
     const button = L.DomUtil.create('button', 'wander-map-action wander-personal-map-action');
     button.type = 'button';
     button.setAttribute('aria-label', label);
     button.title = label;
-    button.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="wander-icons.svg#' + iconName + '"></use></svg>';
+    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="wander-icons.svg#${iconName}"></use></svg>`;
     L.DomEvent.disableClickPropagation(button);
     L.DomEvent.disableScrollPropagation(button);
     return button;
@@ -78,9 +110,9 @@
 
   function syncTrackButton() {
     if (!trackButton) return;
-    const recording = tracks.isRecording?.();
-    trackButton.classList.toggle('is-recording', Boolean(recording));
-    trackButton.setAttribute('aria-pressed', String(Boolean(recording)));
+    const recording = Boolean(tracks.isRecording?.());
+    trackButton.classList.toggle('is-recording', recording);
+    trackButton.setAttribute('aria-pressed', String(recording));
     trackButton.title = recording ? 'Pausar grabación automática' : 'Reanudar grabación automática';
     trackButton.setAttribute('aria-label', trackButton.title);
     trackButton.style.color = recording ? '#d84848' : 'var(--green)';
@@ -146,25 +178,16 @@
         marker = L.marker([poi.lat, poi.lng], { icon: poiMarkerIcon(), title: poi.name }).addTo(map);
         marker.on('click', (event) => {
           event?.originalEvent?.stopPropagation?.();
-          selectPOI(poi);
+          const current = personalPOIs.find((item) => item.id === poi.id);
+          if (current) selectPOI(current);
         });
         poiLayers.set(poi.id, marker);
-      } else marker.setLatLng([poi.lat, poi.lng]);
+      } else {
+        marker.setLatLng([poi.lat, poi.lng]);
+        marker.options.title = poi.name;
+      }
       marker.bindTooltip(poi.name, { direction: 'top', offset: [0, -30] });
     });
-  }
-
-  function askPOIData(existing = {}) {
-    const name = window.prompt('Nombre del POI', existing.name || '');
-    if (!name?.trim()) return null;
-    const type = window.prompt('Tipo de lugar (hotel, habitación, casa, muelle, etc.)', existing.type || 'personal');
-    if (type === null) return null;
-    const radiusInput = window.prompt('Radio de detección en metros', String(existing.radiusM || 35));
-    if (radiusInput === null) return null;
-    const radiusM = Math.max(5, Math.min(500, Number(radiusInput) || 35));
-    const notes = window.prompt('Notas opcionales', existing.notes || '');
-    if (notes === null) return null;
-    return { name: name.trim(), type: String(type || 'personal').trim(), radiusM, notes: String(notes || '').trim() };
   }
 
   function nextMarkerName() {
@@ -172,14 +195,14 @@
       const match = String(poi?.name || '').match(/^Marcador\s+(\d+)$/i);
       return match ? Math.max(max, Number(match[1]) || 0) : max;
     }, 0);
-    return 'Marcador ' + String(highest + 1).padStart(2, '0');
+    return `Marcador ${String(highest + 1).padStart(2, '0')}`;
   }
 
   function createPOIAt(latLng) {
-    if (!latLng) return false;
+    if (!latLng || !Number.isFinite(Number(latLng.lat)) || !Number.isFinite(Number(latLng.lng))) return false;
     const now = Date.now();
     const poi = {
-      id: 'personal-poi-' + now,
+      id: newPOIId(),
       name: nextMarkerName(),
       type: 'personal',
       radiusM: 35,
@@ -194,20 +217,9 @@
     savePOIs();
     renderPOIs();
     evaluateCurrentPersonalPOI();
-    window.WanderUI?.showWander('POI guardado', poi.name + ' quedó guardado.');
+    window.dispatchEvent(new CustomEvent('wander:personal-poi-created', { detail: { poi: { ...poi } } }));
+    window.WanderUI?.showWander('POI guardado', `${poi.name} quedó guardado.`);
     return true;
-  }
-
-  function editPOI(id) {
-    const poi = personalPOIs.find((item) => item.id === id);
-    if (!poi) return;
-    const data = askPOIData(poi);
-    if (!data) return;
-    Object.assign(poi, data, { updatedAt: Date.now() });
-    savePOIs();
-    renderPOIs();
-    evaluateCurrentPersonalPOI();
-    selectPOI(poi);
   }
 
   function updatePOI(id, changes = {}) {
@@ -217,10 +229,13 @@
     if (typeof changes.type === 'string') poi.type = changes.type.trim() || 'personal';
     if (typeof changes.notes === 'string') poi.notes = changes.notes.trim();
     if (Number.isFinite(Number(changes.radiusM))) poi.radiusM = Math.max(5, Math.min(500, Number(changes.radiusM)));
+    if (Number.isFinite(Number(changes.lat))) poi.lat = Number(changes.lat);
+    if (Number.isFinite(Number(changes.lng))) poi.lng = Number(changes.lng);
     poi.updatedAt = Date.now();
     savePOIs();
     renderPOIs();
     evaluateCurrentPersonalPOI();
+    window.dispatchEvent(new CustomEvent('wander:personal-poi-updated', { detail: { poi: { ...poi } } }));
     return { ...poi };
   }
 
@@ -235,29 +250,25 @@
     return true;
   }
 
-  function openPOIManager() {
-    if (!personalPOIs.length) {
-      window.WanderUI?.showWander('Mis POIs', 'Todavía no guardaste lugares personales.');
-      return;
-    }
-    selectPOI(personalPOIs[personalPOIs.length - 1]);
-  }
-
   function evaluateCurrentPersonalPOI() {
     const position = effectivePosition();
-    if (!position || !personalPOIs.length) { currentPersonalPOIId = null; return; }
+    if (!position || !personalPOIs.length) {
+      currentPersonalPOIId = null;
+      context.remove?.('personalPOI.current');
+      return;
+    }
     const nearest = personalPOIs
       .map((poi) => ({ poi, distance: map.distance(position, [poi.lat, poi.lng]) }))
       .filter((item) => item.distance <= item.poi.radiusM)
-      .sort((left, right) => left.distance - right.distance)[0];
+      .sort((a, b) => a.distance - b.distance)[0];
     if (!nearest) {
-      if (currentPersonalPOIId) { currentPersonalPOIId = null; context.remove?.('personalPOI.current'); }
+      currentPersonalPOIId = null;
+      context.remove?.('personalPOI.current');
       return;
     }
     currentPersonalPOIId = nearest.poi.id;
     const current = {
       ...nearest.poi,
-      name: nearest.poi.name,
       label: nearest.poi.name,
       primaryType: nearest.poi.type,
       distanceM: Math.round(nearest.distance),
@@ -308,11 +319,6 @@
     evaluateCurrentPersonalPOI();
   }, 15000);
 
-  savePOIs();
-  renderPOIs();
-  ensureAutoRecording();
-  evaluateCurrentPersonalPOI();
-
   window.WanderPersonalPOIs = Object.freeze({
     list: () => personalPOIs.map((poi) => ({ ...poi })),
     get: (id) => {
@@ -320,7 +326,6 @@
       return poi ? { ...poi } : null;
     },
     createAt: createPOIAt,
-    edit: editPOI,
     update: updatePOI,
     remove: removePOI,
     select(id) {
@@ -329,6 +334,18 @@
       selectPOI(poi);
       return true;
     },
-    manage: openPOIManager,
+    manage() {
+      if (!personalPOIs.length) {
+        window.WanderUI?.showWander('Mis POIs', 'Todavía no guardaste lugares personales.');
+        return;
+      }
+      selectPOI(personalPOIs[personalPOIs.length - 1]);
+    },
   });
+
+  savePOIs();
+  renderPOIs();
+  ensureAutoRecording();
+  evaluateCurrentPersonalPOI();
+  window.dispatchEvent(new CustomEvent('wander:personal-poi-ready', { detail: { count: personalPOIs.length } }));
 })();
