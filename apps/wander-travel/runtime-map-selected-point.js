@@ -8,10 +8,11 @@
   let marker = null;
   let point = null;
 
-  const sheet = document.createElement('dialog');
+  const sheet = document.createElement('section');
   sheet.className = 'map-point-sheet';
   sheet.setAttribute('aria-label', 'Punto seleccionado');
-  sheet.innerHTML = '<div class="map-point-handle"></div><div class="map-point-head"><div><span>PUNTO SELECCIONADO</span><input id="map-point-name" value="Punto seleccionado" aria-label="Nombre del punto"></div><button id="map-point-close" type="button" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div></div><div class="map-point-actions"><button id="map-point-route" type="button"><svg class="button-icon"><use href="wander-icons.svg#route"></use></svg>Ruta hasta</button><button id="map-point-save" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg>Guardar</button></div>';
+  sheet.hidden = true;
+  sheet.innerHTML = '<div class="map-point-head"><input id="map-point-name" value="Punto seleccionado" aria-label="Nombre del punto" placeholder="Nombre del punto"><button id="map-point-close" type="button" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div></div><button id="map-point-save" class="map-point-save" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg>Guardar punto</button>';
   document.documentElement.appendChild(sheet);
 
   const name = sheet.querySelector('#map-point-name');
@@ -51,30 +52,14 @@
   }
 
   function showSheet() {
-    if (sheet.open) return true;
-    try {
-      sheet.showModal();
-      return true;
-    } catch (error) {
-      console.error('[Wander] No se pudo abrir la ficha de Waypoint como modal.', error);
-      try {
-        sheet.show();
-        return true;
-      } catch {
-        sheet.setAttribute('open', '');
-        sheet.style.setProperty('display', 'block', 'important');
-        sheet.style.setProperty('position', 'fixed', 'important');
-        sheet.style.setProperty('z-index', '2147483647', 'important');
-        return false;
-      }
-    }
+    sheet.hidden = false;
+    sheet.classList.add('is-open');
   }
 
   function openAtCenter() {
     const center = map.getCenter();
     point = { lat: center.lat, lng: center.lng, name: 'Punto seleccionado', selectedAt: Date.now(), saved: false };
     name.value = point.name;
-
     showSheet();
     updateFromCenter();
 
@@ -90,28 +75,15 @@
     if (marker) map.removeLayer(marker);
     marker = null;
     point = null;
-    if (sheet.open) sheet.close();
-    else sheet.removeAttribute('open');
+    sheet.classList.remove('is-open');
+    sheet.hidden = true;
     ctx.remove?.('map.selectedPoint');
   }
 
   name.addEventListener('input', updateFromCenter);
   sheet.querySelector('#map-point-close').addEventListener('click', clear);
-  sheet.addEventListener('cancel', (event) => {
-    event.preventDefault();
-    clear();
-  });
   map.on('move zoom', updateFromCenter);
   window.addEventListener('wander:open-waypoint-center', openAtCenter);
-
-  sheet.querySelector('#map-point-route').addEventListener('click', () => {
-    if (!point) return;
-    const here = current();
-    if (!here) return window.WanderUI?.showWander('Sin ubicación', 'Wander necesita tu posición para calcular la ruta.');
-    const line = [[here.lat, here.lng], [point.lat, point.lng]];
-    base.route?.setLatLngs?.(line);
-    ctx.set('navigation.destination', { ...point }, { source: 'selected-point', kind: 'selected', confidence: 1 });
-  });
 
   sheet.querySelector('#map-point-save').addEventListener('click', () => {
     if (!point) return;
