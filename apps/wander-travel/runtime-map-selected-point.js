@@ -70,7 +70,7 @@
     sheet.dataset.mode = mode;
     name.readOnly = existing;
     centerButton.hidden = !existing;
-    propertiesButton.hidden = !existing;
+    propertiesButton.hidden = false;
     deleteButton.hidden = !existing;
     saveButton.hidden = existing;
   }
@@ -119,6 +119,20 @@
     ctx.remove?.('map.selectedPoint');
   }
 
+  function createSelectedPOI() {
+    if (!point || point.mode !== 'new') return null;
+    const pois = window.WanderPersonalPOIs;
+    if (!pois?.createAt || !pois?.list) {
+      window.WanderUI?.showWander('Todavía no disponible', 'El sistema de puntos personales aún se está iniciando.');
+      return null;
+    }
+    const before = new Set(pois.list().map((poi) => poi.id));
+    if (!pois.createAt({ lat: point.lat, lng: point.lng })) return null;
+    const added = pois.list().find((poi) => !before.has(poi.id));
+    const selectedName = name.value.trim() || point.name || nextMarkerName();
+    return added ? (pois.update?.(added.id, { name: selectedName }) || added) : null;
+  }
+
   name.addEventListener('input', () => { if (point?.mode === 'new') updateMetrics(); });
   map.on('move zoom', () => { if (point?.mode === 'new') updateMetrics(); });
   window.addEventListener('wander:open-waypoint-center', openAtCenter);
@@ -130,6 +144,13 @@
   });
 
   propertiesButton.addEventListener('click', () => {
+    if (point?.mode === 'new') {
+      const created = createSelectedPOI();
+      if (!created?.id) return;
+      clear();
+      window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id: created.id } }));
+      return;
+    }
     if (!point?.id) return;
     window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id: point.id } }));
   });
@@ -143,18 +164,8 @@
   });
 
   saveButton.addEventListener('click', () => {
-    if (!point || point.mode !== 'new') return;
-    const pois = window.WanderPersonalPOIs;
-    if (!pois?.createAt || !pois?.list) {
-      window.WanderUI?.showWander('Todavía no disponible', 'El sistema de puntos personales aún se está iniciando.');
-      return;
-    }
-    const before = new Set(pois.list().map((poi) => poi.id));
-    if (!pois.createAt({ lat: point.lat, lng: point.lng })) return;
-    const added = pois.list().find((poi) => !before.has(poi.id));
-    const custom = name.value.trim();
-    if (added && custom) pois.update?.(added.id, { name: custom });
-    clear();
+    const created = createSelectedPOI();
+    if (created) clear();
   });
 
   ctx.subscribe((key) => {
