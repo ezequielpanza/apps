@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.92.37';
+  const VERSION = 'v0.92.38';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -47,11 +47,13 @@
     loadStyle('wander-message-timeout-settings.css?v=20260714-22');
     loadStyle('wander-map-selected-point.css?v=20260716-20');
     loadStyle('wander-top-dashboard-search.css?v=20260715-21');
+    loadStyle('wander-points-screen.css?v=20260716-25');
     loadScript('runtime-top-dashboard-search.js?v=20260715-21');
     loadWhenReady({ ready: () => Boolean(window.WanderSituationEngine?.subscribe), loaded: () => Boolean(window.WanderMovementMethodRefinement), src: 'runtime-movement-method-refinement.js?v=20260714-09' });
     loadWhenReady({ ready: () => Boolean(window.WanderBase?.map && window.WanderTracks), loaded: () => Boolean(window.WanderPersonalPOIs), src: 'runtime-personal-map-tools.js?v=20260716-22' });
     loadWhenReady({ ready: () => Boolean(window.WanderPersonalPOIs?.get && document.querySelector('.map-stage')), loaded: () => Boolean(window.WanderPersonalPOISheet), src: 'runtime-personal-poi-sheet.js?v=20260716-24' });
     loadWhenReady({ ready: () => Boolean(window.WanderBase?.map && window.WanderContext && window.WanderPersonalPOISheet), loaded: () => Boolean(window.WanderMapSelectedPoint), src: 'runtime-map-selected-point.js?v=20260716-23' });
+    loadWhenReady({ ready: () => Boolean(window.WanderPersonalPOIs?.list && document.querySelector('#points-list')), loaded: () => Boolean(window.WanderPointsScreen), src: 'runtime-points-screen.js?v=20260716-25' });
     loadWhenReady({ ready: () => Boolean(window.WanderUI?.getMessageTimeoutMs && document.querySelector('#settings-panel')), loaded: () => Boolean(window.WanderMessageTimeoutSettings), src: 'runtime-message-timeout-settings.js?v=20260714-22' });
     loadWhenReady({ ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('.wander-app')), loaded: () => Boolean(window.WanderDashboardVisibilityGuard), src: 'runtime-dashboard-visibility-guard.js?v=20260715-07' });
     loadWhenReady({ ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('#simulation-map-controls')), loaded: () => Boolean(window.WanderSimulatorDashboardOffset), src: 'runtime-simulator-dashboard-offset.js?v=20260714-13' });
