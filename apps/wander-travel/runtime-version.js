@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.92.28';
+  const VERSION = 'v0.92.29';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -45,7 +45,7 @@
     loadStyle('wander-track-delete.css?v=20260714-19');
     loadStyle('wander-dashboard-visibility.css?v=20260714-20');
     loadStyle('wander-message-timeout-settings.css?v=20260714-22');
-    loadStyle('wander-map-selected-point.css?v=20260716-08');
+    loadStyle('wander-map-selected-point.css?v=20260716-09');
     loadStyle('wander-top-dashboard-search.css?v=20260715-21');
     loadScript('runtime-top-dashboard-search.js?v=20260715-21');
     loadWhenReady({ ready: () => Boolean(window.WanderSituationEngine?.subscribe), loaded: () => Boolean(window.WanderMovementMethodRefinement), src: 'runtime-movement-method-refinement.js?v=20260714-09' });
