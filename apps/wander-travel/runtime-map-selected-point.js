@@ -30,16 +30,6 @@
     return 'Marcador ' + String(highest + 1).padStart(2, '0');
   }
 
-  function syncSelectorButtonIcon() {
-    const button = document.querySelector('.wander-personal-map-actions .wander-map-action:first-child');
-    const use = button?.querySelector('use');
-    if (use) use.setAttribute('href', 'wander-icons.svg#target');
-    if (button) {
-      button.setAttribute('aria-label', 'Selector de posición');
-      button.title = 'Selector de posición';
-    }
-  }
-
   function bearingTo(a, b) {
     const p1 = a.lat * Math.PI / 180;
     const p2 = b.lat * Math.PI / 180;
@@ -66,7 +56,7 @@
   }
 
   function icon() {
-    return L.divIcon({ className: '', html: '<div class="map-point-marker"><span></span></div>', iconSize: [34, 42], iconAnchor: [17, 21] });
+    return L.divIcon({ className: '', html: '<div class="map-point-marker" aria-hidden="true"><span></span></div>', iconSize: [42, 42], iconAnchor: [21, 21] });
   }
 
   function showSheet() {
@@ -119,12 +109,6 @@
   ctx.subscribe((key) => {
     if (point && (key === 'location.effective' || key.startsWith('location.effective.'))) updateFromCenter();
   });
-
-  syncSelectorButtonIcon();
-  const iconTimer = setInterval(() => {
-    syncSelectorButtonIcon();
-    if (document.querySelector('.wander-personal-map-actions .wander-map-action:first-child')) clearInterval(iconTimer);
-  }, 250);
 
   window.WanderMapSelectedPoint = Object.freeze({
     getCurrent: () => point ? { ...point } : null,
