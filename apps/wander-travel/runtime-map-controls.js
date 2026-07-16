@@ -6,10 +6,9 @@
 
   const map = core.map;
   const CENTER_MODE_KEY = 'wander.map.centerMode.v1';
-  const HOLD_MS = 650;
   let centerButton = null;
-  let suppressCenterClick = false;
   let centerMode = loadCenterMode();
+  let followSuspendedByDrag = false;
 
   function loadCenterMode() {
     try {
@@ -26,21 +25,30 @@
   function centerIconMarkup(active = false) {
     const dotFill = active ? '#01E0CB' : 'none';
     const dotStroke = active ? '#01E0CB' : 'currentColor';
+    const lowerMark = active && centerMode === 'lower'
+      ? '<path d="M8.5 16.5h7" stroke-width="1.7"></path>'
+      : '';
     return '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
       '<circle cx="12" cy="12" r="5" fill="' + dotFill + '" stroke="' + dotStroke + '"></circle>' +
-      '<path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path>' +
+      '<path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path>' + lowerMark +
       '</svg>';
   }
 
   function syncFollowButton() {
     if (!centerButton) return;
-    const followMode = position.isFollowingPosition();
-    centerButton.setAttribute('aria-pressed', String(followMode));
-    centerButton.setAttribute('aria-label', followMode ? 'Desactivar seguimiento centrado' : 'Centrar y seguir mi posición');
-    centerButton.title = followMode ? 'Desactivar seguimiento centrado' : 'Centrar y seguir mi posición';
-    centerButton.innerHTML = centerIconMarkup(followMode);
-    centerButton.style.color = followMode ? 'var(--accent)' : 'var(--green)';
-    centerButton.style.boxShadow = followMode ? '0 0 0 3px var(--accent-ring), var(--shadow)' : 'var(--shadow)';
+    const following = position.isFollowingPosition();
+    let label = 'Centrar mi posición';
+    if (following && centerMode === 'middle') label = 'Centrado normal. Tocar para centrar abajo';
+    if (following && centerMode === 'lower') label = 'Centrado inferior. Tocar para desactivar';
+    if (!following && followSuspendedByDrag) label = 'Recuperar el centrado anterior';
+
+    centerButton.setAttribute('aria-pressed', String(following));
+    centerButton.setAttribute('aria-label', label);
+    centerButton.title = label;
+    centerButton.dataset.centerMode = following ? centerMode : (followSuspendedByDrag ? 'suspended' : 'off');
+    centerButton.innerHTML = centerIconMarkup(following);
+    centerButton.style.color = following ? 'var(--accent)' : 'var(--green)';
+    centerButton.style.boxShadow = following ? '0 0 0 3px var(--accent-ring), var(--shadow)' : 'var(--shadow)';
   }
 
   function syncZoomAnchorMode() {
@@ -63,6 +71,7 @@
 
   function setFollowMode(next, options = {}) {
     const result = position.setFollowMode(next, options);
+    if (next) followSuspendedByDrag = false;
     syncZoomAnchorMode();
     syncFollowButton();
     requestAnimationFrame(applyCenterAnchor);
@@ -80,45 +89,43 @@
     return button;
   }
 
-  function openCenterSettings() {
-    suppressCenterClick = true;
-    navigator.vibrate?.(35);
-    const selected = window.prompt(
-      'Configuración de centrado:\n\n1. Medio de la pantalla\n2. Parte inferior para ver hacia adelante\n\nEscribí 1 o 2.',
-      centerMode === 'lower' ? '2' : '1'
-    );
-    if (selected === null) return;
-    centerMode = String(selected).trim() === '2' ? 'lower' : 'middle';
-    persistCenterMode();
-    if (position.isFollowingPosition()) {
-      position.centerOnPosition?.();
-      requestAnimationFrame(applyCenterAnchor);
+  function activateCurrentCenterMode() {
+    if (!setFollowMode(true)) {
+      window.WanderUI?.showWander('Sin ubicación', 'Todavía no hay una ubicación efectiva válida para activar el seguimiento.');
+      return false;
     }
-    window.WanderUI?.showWander(
-      'Centrado actualizado',
-      centerMode === 'lower' ? 'Tu posición quedará en la parte inferior para mostrar más mapa hacia adelante.' : 'Tu posición quedará en el centro del mapa.'
-    );
+    position.centerOnPosition?.();
+    requestAnimationFrame(applyCenterAnchor);
+    return true;
   }
 
-  function bindCenterHold(button) {
-    let timer = null;
-    let held = false;
-    const cancel = () => { if (timer) clearTimeout(timer); timer = null; };
-    button.addEventListener('pointerdown', () => {
-      held = false;
-      cancel();
-      timer = setTimeout(() => { held = true; openCenterSettings(); }, HOLD_MS);
-    });
-    button.addEventListener('pointerup', cancel);
-    button.addEventListener('pointercancel', cancel);
-    button.addEventListener('pointerleave', cancel);
-    button.addEventListener('click', () => {
-      if (held || suppressCenterClick) { suppressCenterClick = false; return; }
-      if (position.isFollowingPosition()) return void setFollowMode(false, { centerNow: false });
-      if (!setFollowMode(true)) {
-        window.WanderUI?.showWander('Sin ubicación', 'Todavía no hay una ubicación efectiva válida para activar el seguimiento.');
-      }
-    });
+  function cycleCenterMode() {
+    if (followSuspendedByDrag) {
+      activateCurrentCenterMode();
+      return;
+    }
+
+    if (!position.isFollowingPosition()) {
+      centerMode = 'middle';
+      persistCenterMode();
+      activateCurrentCenterMode();
+      return;
+    }
+
+    if (centerMode === 'middle') {
+      centerMode = 'lower';
+      persistCenterMode();
+      position.centerOnPosition?.();
+      requestAnimationFrame(applyCenterAnchor);
+      syncFollowButton();
+      return;
+    }
+
+    setFollowMode(false, { centerNow: false });
+  }
+
+  function openCenterSettings() {
+    cycleCenterMode();
   }
 
   const MapActions = L.Control.extend({
@@ -126,7 +133,7 @@
     onAdd() {
       const wrap = L.DomUtil.create('div', 'wander-map-actions wander-standard-map-actions');
       const layerButton = mapButton('layers', 'Cambiar a mapa satélite');
-      centerButton = mapButton('center', 'Centrar y seguir mi posición');
+      centerButton = mapButton('center', 'Centrar mi posición');
       centerButton.setAttribute('aria-pressed', 'false');
 
       layerButton.addEventListener('click', () => {
@@ -136,7 +143,7 @@
         layerButton.title = nextLabel;
       });
 
-      bindCenterHold(centerButton);
+      centerButton.addEventListener('click', cycleCenterMode);
       wrap.append(layerButton, centerButton);
       syncFollowButton();
       return wrap;
@@ -145,7 +152,11 @@
 
   map.addControl(new MapActions());
   map.on('dragstart', () => {
-    if (position.isFollowingPosition()) setFollowMode(false, { centerNow: false });
+    if (!position.isFollowingPosition()) return;
+    followSuspendedByDrag = true;
+    position.setFollowMode(false, { centerNow: false });
+    syncZoomAnchorMode();
+    syncFollowButton();
   });
 
   context?.subscribe?.((key) => {
@@ -161,8 +172,10 @@
       centerMode = mode === 'lower' ? 'lower' : 'middle';
       persistCenterMode();
       requestAnimationFrame(applyCenterAnchor);
+      syncFollowButton();
       return centerMode;
     },
+    cycleCenterMode,
     openCenterSettings,
   };
 
