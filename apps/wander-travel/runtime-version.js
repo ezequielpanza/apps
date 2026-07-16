@@ -48,18 +48,18 @@
     loadStyle('wander-map-selected-point.css?v=20260716-31');
     loadStyle('wander-top-dashboard-search.css?v=20260715-21');
     loadStyle('wander-points-screen.css?v=20260716-31');
-    loadStyle('wander-sessions.css?v=20260716-37');
+    loadStyle('wander-sessions.css?v=20260716-38');
 
     loadScript('runtime-top-dashboard-search.js?v=20260715-21');
     loadWhenReady({
       ready: () => Boolean(window.WanderEngineInference?.inferSituation && window.WanderEngine?.run),
       loaded: () => Boolean(window.WanderPedestrianMotion),
-      src: 'runtime-pedestrian-motion.js?v=20260716-37',
+      src: 'runtime-pedestrian-motion.js?v=20260716-38',
     });
     loadWhenReady({
       ready: () => Boolean(window.WanderContext && window.WanderEngine?.run),
       loaded: () => Boolean(window.WanderSessionEngine),
-      src: 'runtime-session-engine.js?v=20260716-37',
+      src: 'runtime-session-engine.js?v=20260716-38',
     });
     loadWhenReady({
       ready: () => Boolean(window.WanderSituationEngine?.subscribe),
@@ -70,7 +70,7 @@
     loadWhenReady({
       ready: () => Boolean(window.WanderBase?.map && window.WanderContext),
       loaded: () => Boolean(window.WanderPersonalPOIs),
-      src: 'runtime-personal-poi-core.js?v=20260716-37',
+      src: 'runtime-personal-poi-core.js?v=20260716-38',
     });
 
     loadWhenReady({
@@ -82,13 +82,13 @@
     loadWhenReady({
       ready: () => Boolean(window.WanderBase?.map),
       loaded: () => Boolean(window.WanderPersonalMapTools),
-      src: 'runtime-personal-map-tools.js?v=20260716-37',
+      src: 'runtime-personal-map-tools.js?v=20260716-38',
     });
 
     loadWhenReady({
       ready: () => Boolean(window.WanderPersonalPOIs?.ready && document.querySelector('.map-stage')),
       loaded: () => Boolean(window.WanderPersonalPOISheet),
-      src: 'runtime-personal-poi-sheet.js?v=20260716-37',
+      src: 'runtime-personal-poi-sheet.js?v=20260716-38',
     });
 
     loadWhenReady({
