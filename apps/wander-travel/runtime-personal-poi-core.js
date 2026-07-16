@@ -21,12 +21,17 @@
     usedIds.add(id);
 
     const now = Date.now();
+    const vehicle = raw.vehicle === true;
     return {
       id,
       name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Marcador',
       type: typeof raw.type === 'string' && raw.type.trim() ? raw.type.trim() : 'personal',
       radiusM: Math.max(5, Math.min(500, Number(raw.radiusM) || 35)),
       notes: typeof raw.notes === 'string' ? raw.notes.trim() : '',
+      overnight: raw.overnight === true,
+      vehicle,
+      vehicleState: vehicle ? String(raw.vehicleState || 'parked') : null,
+      vehicleUpdatedAt: vehicle ? Number(raw.vehicleUpdatedAt) || Number(raw.updatedAt) || now : null,
       lat: Number(raw.lat),
       lng: Number(raw.lng),
       createdAt: Number(raw.createdAt) || now,
@@ -43,9 +48,7 @@
       return stored
         .filter((poi) => Number.isFinite(Number(poi?.lat)) && Number.isFinite(Number(poi?.lng)))
         .map((poi) => normalize(poi, usedIds));
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   }
 
   const items = load();
@@ -65,10 +68,11 @@
     context.set('personalPOI.items', snapshot, { source: 'personal-poi', kind: 'confirmed', confidence: 1 });
   }
 
-  function markerIcon() {
+  function markerIcon(poi) {
+    const flags = [poi?.overnight ? 'is-overnight' : '', poi?.vehicle ? 'is-vehicle' : ''].filter(Boolean).join(' ');
     return L.divIcon({
       className: '',
-      html: '<div class="wander-personal-poi-marker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"></path><circle cx="12" cy="10" r="2"></circle></svg></div>',
+      html: `<div class="wander-personal-poi-marker ${flags}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"></path><circle cx="12" cy="10" r="2"></circle></svg></div>`,
       iconSize: [30, 36],
       iconAnchor: [15, 36],
     });
@@ -91,8 +95,10 @@
 
     items.forEach((poi) => {
       let marker = layers.get(poi.id);
+      const signature = `${poi.overnight}|${poi.vehicle}`;
       if (!marker) {
-        marker = L.marker([poi.lat, poi.lng], { icon: markerIcon(), title: poi.name }).addTo(map);
+        marker = L.marker([poi.lat, poi.lng], { icon: markerIcon(poi), title: poi.name }).addTo(map);
+        marker.__wanderSignature = signature;
         marker.on('click', (event) => {
           event?.originalEvent?.stopPropagation?.();
           const current = items.find((candidate) => candidate.id === poi.id);
@@ -102,9 +108,14 @@
       } else {
         marker.setLatLng([poi.lat, poi.lng]);
         marker.options.title = poi.name;
+        if (marker.__wanderSignature !== signature) {
+          marker.setIcon(markerIcon(poi));
+          marker.__wanderSignature = signature;
+        }
       }
       marker.unbindTooltip();
-      marker.bindTooltip(poi.name, { direction: 'top', offset: [0, -30] });
+      const suffix = poi.vehicle ? (poi.vehicleState === 'with-user' ? ' · Con vos' : ' · Estacionado') : '';
+      marker.bindTooltip(`${poi.name}${suffix}`, { direction: 'top', offset: [0, -30] });
     });
   }
 
@@ -128,6 +139,9 @@
       type: values.type || 'personal',
       radiusM: values.radiusM || 35,
       notes: values.notes || '',
+      overnight: values.overnight === true,
+      vehicle: values.vehicle === true,
+      vehicleState: values.vehicle === true ? 'parked' : null,
       lat,
       lng,
       createdAt: now,
@@ -144,7 +158,7 @@
     return { ...poi };
   }
 
-  function update(id, changes = {}) {
+  function update(id, changes = {}, options = {}) {
     const poi = items.find((candidate) => candidate.id === id);
     if (!poi) return null;
 
@@ -152,6 +166,14 @@
     if (typeof changes.type === 'string') poi.type = changes.type.trim() || 'personal';
     if (typeof changes.notes === 'string') poi.notes = changes.notes.trim();
     if (Number.isFinite(Number(changes.radiusM))) poi.radiusM = Math.max(5, Math.min(500, Number(changes.radiusM)));
+    if (Object.prototype.hasOwnProperty.call(changes, 'overnight')) poi.overnight = changes.overnight === true;
+    if (Object.prototype.hasOwnProperty.call(changes, 'vehicle')) {
+      poi.vehicle = changes.vehicle === true;
+      poi.vehicleState = poi.vehicle ? (poi.vehicleState || 'parked') : null;
+      poi.vehicleUpdatedAt = poi.vehicle ? Date.now() : null;
+    }
+    if (poi.vehicle && typeof changes.vehicleState === 'string') poi.vehicleState = changes.vehicleState;
+    if (poi.vehicle && Number.isFinite(Number(changes.vehicleUpdatedAt))) poi.vehicleUpdatedAt = Number(changes.vehicleUpdatedAt);
     if (Number.isFinite(Number(changes.lat))) poi.lat = Number(changes.lat);
     if (Number.isFinite(Number(changes.lng))) poi.lng = Number(changes.lng);
     poi.updatedAt = Date.now();
@@ -159,7 +181,8 @@
     publish();
     render();
     evaluateCurrent();
-    window.dispatchEvent(new CustomEvent('wander:personal-poi-updated', { detail: { poi: { ...poi } } }));
+    if (!options.silent) window.dispatchEvent(new CustomEvent('wander:personal-poi-updated', { detail: { poi: { ...poi } } }));
+    else window.dispatchEvent(new CustomEvent('wander:personal-poi-moved', { detail: { poi: { ...poi } } }));
     return { ...poi };
   }
 
@@ -230,6 +253,10 @@
     render,
     evaluate: evaluateCurrent,
     nextDefaultName,
+    getCurrent: () => {
+      const poi = items.find((candidate) => candidate.id === currentId);
+      return poi ? { ...poi } : null;
+    },
   });
 
   context.subscribe?.((key) => {
