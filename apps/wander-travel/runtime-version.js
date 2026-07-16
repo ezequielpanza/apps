@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.92.29';
+  const VERSION = 'v0.92.30';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -37,7 +37,7 @@
   }
 
   function bootstrap() {
-    loadStyle('wander-message-top.css?v=20260714-11');
+    loadStyle('wander-message-top.css?v=20260716-12');
     loadStyle('wander-record-button.css?v=20260714-12');
     loadStyle('wander-simulator-dashboard-offset.css?v=20260714-13');
     loadStyle('wander-message-actions.css?v=20260714-14');
