@@ -1,7 +1,10 @@
 (() => {
+  if (window.WanderMapSelectedPoint) return;
+
   const base = window.WanderBase;
   const ctx = window.WanderContext;
-  if (!base?.map || !ctx) return;
+  const poiApi = window.WanderPersonalPOIs;
+  if (!base?.map || !ctx || !poiApi) return;
 
   const map = base.map;
   let marker = null;
@@ -22,37 +25,39 @@
   const propertiesButton = sheet.querySelector('#map-point-properties');
   const deleteButton = sheet.querySelector('#map-point-delete');
   const saveButton = sheet.querySelector('#map-point-save');
-  const current = () => base.getPosition?.() || window.WanderMapPosition?.getPosition?.() || null;
-  const distanceLabel = (m) => !Number.isFinite(m) ? '—' : m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
+
+  const currentPosition = () => base.getPosition?.() || window.WanderMapPosition?.getPosition?.() || null;
+  const distanceLabel = (meters) => !Number.isFinite(meters)
+    ? '—'
+    : meters >= 1000
+      ? `${(meters / 1000).toFixed(2)} km`
+      : `${Math.round(meters)} m`;
 
   function nextMarkerName() {
-    const items = window.WanderPersonalPOIs?.list?.() || [];
-    const highest = items.reduce((max, poi) => {
-      const match = String(poi?.name || '').match(/^Marcador\s+(\d+)$/i);
-      return match ? Math.max(max, Number(match[1]) || 0) : max;
-    }, 0);
-    return 'Marcador ' + String(highest + 1).padStart(2, '0');
+    return poiApi.nextDefaultName?.() || 'Marcador';
   }
 
-  function bearingTo(a, b) {
-    const p1 = a.lat * Math.PI / 180;
-    const p2 = b.lat * Math.PI / 180;
-    const d = (b.lng - a.lng) * Math.PI / 180;
-    const y = Math.sin(d) * Math.cos(p2);
-    const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(d);
+  function bearingTo(from, to) {
+    const p1 = from.lat * Math.PI / 180;
+    const p2 = to.lat * Math.PI / 180;
+    const delta = (to.lng - from.lng) * Math.PI / 180;
+    const y = Math.sin(delta) * Math.cos(p2);
+    const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(delta);
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   }
 
   function updateMetrics() {
     if (!point) return;
     const target = point.mode === 'new' ? map.getCenter() : { lat: point.lat, lng: point.lng };
+
     if (point.mode === 'new') {
-      point.lat = target.lat;
-      point.lng = target.lng;
+      point.lat = Number(target.lat);
+      point.lng = Number(target.lng);
       point.name = name.value.trim() || nextMarkerName();
       marker?.setLatLng(target);
     }
-    const here = current();
+
+    const here = currentPosition();
     point.distanceM = here ? map.distance(here, target) : null;
     point.bearingDeg = here ? bearingTo(here, target) : null;
     distance.textContent = distanceLabel(point.distanceM);
@@ -61,8 +66,13 @@
     ctx.set('map.selectedPoint', { ...point }, { source: 'waypoint-selector', kind: 'selected', confidence: 1 });
   }
 
-  function icon() {
-    return L.divIcon({ className: '', html: '<div class="map-point-marker" aria-hidden="true"><span></span></div>', iconSize: [42, 42], iconAnchor: [21, 21] });
+  function markerIcon() {
+    return L.divIcon({
+      className: '',
+      html: '<div class="map-point-marker" aria-hidden="true"><span></span></div>',
+      iconSize: [42, 42],
+      iconAnchor: [21, 21],
+    });
   }
 
   function configureMode(mode) {
@@ -80,32 +90,6 @@
     sheet.classList.add('is-open');
   }
 
-  function openAtCenter() {
-    if (point?.mode === 'new' && !sheet.hidden) {
-      clear();
-      return;
-    }
-    clearMarker();
-    const center = map.getCenter();
-    const defaultName = nextMarkerName();
-    point = { mode: 'new', lat: center.lat, lng: center.lng, name: defaultName, selectedAt: Date.now(), saved: false };
-    name.value = defaultName;
-    configureMode('new');
-    showSheet();
-    marker = L.marker(center, { icon: icon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
-    updateMetrics();
-  }
-
-  function openPOI(poi) {
-    if (!poi) return;
-    clearMarker();
-    point = { ...poi, mode: 'existing', saved: true };
-    name.value = poi.name || 'Marcador';
-    configureMode('existing');
-    showSheet();
-    updateMetrics();
-  }
-
   function clearMarker() {
     if (marker) map.removeLayer(marker);
     marker = null;
@@ -116,57 +100,78 @@
     point = null;
     sheet.classList.remove('is-open');
     sheet.hidden = true;
+    sheet.removeAttribute('aria-busy');
+    saveButton.disabled = false;
+    propertiesButton.disabled = false;
     ctx.remove?.('map.selectedPoint');
   }
 
-  function waitForPOIs(timeoutMs = 6000) {
-    const startedAt = Date.now();
-    return new Promise((resolve) => {
-      const check = () => {
-        const pois = window.WanderPersonalPOIs;
-        if (pois?.createAt && pois?.list && pois?.update) {
-          resolve(pois);
-          return;
-        }
-        if (Date.now() - startedAt >= timeoutMs) {
-          resolve(null);
-          return;
-        }
-        setTimeout(check, 80);
-      };
-      check();
-    });
+  function openAtCenter() {
+    if (point?.mode === 'new' && !sheet.hidden) {
+      clear();
+      return;
+    }
+
+    clearMarker();
+    const center = map.getCenter();
+    const defaultName = nextMarkerName();
+    point = {
+      mode: 'new',
+      lat: Number(center.lat),
+      lng: Number(center.lng),
+      name: defaultName,
+      selectedAt: Date.now(),
+      saved: false,
+    };
+    name.value = defaultName;
+    configureMode('new');
+    showSheet();
+    marker = L.marker(center, { icon: markerIcon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
+    updateMetrics();
   }
 
-  function setSavingState(saving) {
+  function openPOI(poi) {
+    if (!poi?.id) return false;
+    const stored = poiApi.get?.(poi.id) || poi;
+    clearMarker();
+    point = { ...stored, mode: 'existing', saved: true };
+    name.value = stored.name || 'Marcador';
+    configureMode('existing');
+    showSheet();
+    updateMetrics();
+    return true;
+  }
+
+  function setSaving(saving) {
     saveButton.disabled = saving;
     propertiesButton.disabled = saving;
     sheet.setAttribute('aria-busy', String(Boolean(saving)));
   }
 
-  async function createSelectedPOI() {
+  function createSelectedPOI() {
     if (!point || point.mode !== 'new') return null;
-    setSavingState(true);
-    const pois = await waitForPOIs();
-    if (!pois) {
-      setSavingState(false);
-      window.WanderUI?.showWander('No se pudo iniciar', 'El sistema de puntos personales no terminó de cargar. Cerrá y volvé a abrir Wander.');
-      return null;
-    }
-    const before = new Set(pois.list().map((poi) => poi.id));
-    if (!pois.createAt({ lat: point.lat, lng: point.lng })) {
-      setSavingState(false);
-      return null;
-    }
-    const added = pois.list().find((poi) => !before.has(poi.id));
-    const selectedName = name.value.trim() || point.name || nextMarkerName();
-    const created = added ? (pois.update?.(added.id, { name: selectedName }) || added) : null;
-    setSavingState(false);
+    setSaving(true);
+    const created = poiApi.createAt(
+      { lat: point.lat, lng: point.lng },
+      { name: name.value.trim() || point.name || nextMarkerName() },
+    );
+    setSaving(false);
     return created;
   }
 
-  name.addEventListener('input', () => { if (point?.mode === 'new') updateMetrics(); });
-  map.on('move zoom', () => { if (point?.mode === 'new') updateMetrics(); });
+  function openProperties(id) {
+    if (!id) return false;
+    if (window.WanderPersonalPOISheet?.showById?.(id)) return true;
+    window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id } }));
+    return true;
+  }
+
+  name.addEventListener('input', () => {
+    if (point?.mode === 'new') updateMetrics();
+  });
+  map.on('move zoom', () => {
+    if (point?.mode === 'new') updateMetrics();
+  });
   window.addEventListener('wander:open-waypoint-center', openAtCenter);
   window.addEventListener('wander:personal-poi-selected', (event) => openPOI(event.detail?.poi));
 
@@ -175,35 +180,39 @@
     map.setView([point.lat, point.lng], Math.max(map.getZoom(), 16), { animate: true });
   });
 
-  propertiesButton.addEventListener('click', async () => {
+  propertiesButton.addEventListener('click', () => {
     if (point?.mode === 'new') {
-      const created = await createSelectedPOI();
+      const created = createSelectedPOI();
       if (!created?.id) return;
       clear();
-      window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id: created.id } }));
+      openProperties(created.id);
       return;
     }
-    if (!point?.id) return;
-    window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id: point.id } }));
+    if (point?.id) openProperties(point.id);
   });
 
   deleteButton.addEventListener('click', () => {
     if (!point?.id) return;
-    const pois = window.WanderPersonalPOIs;
-    const currentPOI = pois?.get?.(point.id);
-    if (!currentPOI || !window.confirm(`¿Eliminar ${currentPOI.name}?`)) return;
-    if (pois.remove?.(point.id)) clear();
+    const current = poiApi.get?.(point.id);
+    if (!current || !window.confirm(`¿Eliminar ${current.name}?`)) return;
+    if (poiApi.remove?.(point.id)) clear();
   });
 
-  saveButton.addEventListener('click', async () => {
-    const created = await createSelectedPOI();
-    if (created) clear();
+  saveButton.addEventListener('click', () => {
+    const created = createSelectedPOI();
+    if (created?.id) clear();
   });
 
-  ctx.subscribe((key) => {
+  ctx.subscribe?.((key) => {
+    if (typeof key !== 'string') return;
     if (point && (key === 'location.effective' || key.startsWith('location.effective.'))) updateMetrics();
   });
 
-  window.WanderMapSelectedPoint = Object.freeze({ getCurrent: () => point ? { ...point } : null, openAtCenter, openPOI, clear });
+  window.WanderMapSelectedPoint = Object.freeze({
+    getCurrent: () => point ? { ...point } : null,
+    openAtCenter,
+    openPOI,
+    clear,
+  });
   window.dispatchEvent(new CustomEvent('wander:waypoint-selector-ready'));
 })();
