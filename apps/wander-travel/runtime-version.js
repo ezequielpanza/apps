@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.92.44';
+  const VERSION = 'v0.92.45';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -42,6 +42,7 @@
     loadStyle('wander-simulator-dashboard-offset.css?v=20260714-13');
     loadStyle('wander-message-actions.css?v=20260714-14');
     loadStyle('wander-personal-poi-sheet.css?v=20260716-31');
+    loadStyle('wander-personal-poi-marker.css?v=20260716-32');
     loadStyle('wander-track-delete.css?v=20260714-19');
     loadStyle('wander-dashboard-visibility.css?v=20260714-20');
     loadStyle('wander-message-timeout-settings.css?v=20260714-22');
@@ -50,6 +51,11 @@
     loadStyle('wander-points-screen.css?v=20260716-31');
 
     loadScript('runtime-top-dashboard-search.js?v=20260715-21');
+    loadWhenReady({
+      ready: () => Boolean(window.WanderEngineInference?.inferSituation && window.WanderEngine?.run),
+      loaded: () => Boolean(window.WanderPedestrianMotion),
+      src: 'runtime-pedestrian-motion.js?v=20260716-32',
+    });
     loadWhenReady({
       ready: () => Boolean(window.WanderSituationEngine?.subscribe),
       loaded: () => Boolean(window.WanderMovementMethodRefinement),
