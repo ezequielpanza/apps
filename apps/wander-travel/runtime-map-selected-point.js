@@ -119,18 +119,50 @@
     ctx.remove?.('map.selectedPoint');
   }
 
-  function createSelectedPOI() {
+  function waitForPOIs(timeoutMs = 6000) {
+    const startedAt = Date.now();
+    return new Promise((resolve) => {
+      const check = () => {
+        const pois = window.WanderPersonalPOIs;
+        if (pois?.createAt && pois?.list && pois?.update) {
+          resolve(pois);
+          return;
+        }
+        if (Date.now() - startedAt >= timeoutMs) {
+          resolve(null);
+          return;
+        }
+        setTimeout(check, 80);
+      };
+      check();
+    });
+  }
+
+  function setSavingState(saving) {
+    saveButton.disabled = saving;
+    propertiesButton.disabled = saving;
+    sheet.setAttribute('aria-busy', String(Boolean(saving)));
+  }
+
+  async function createSelectedPOI() {
     if (!point || point.mode !== 'new') return null;
-    const pois = window.WanderPersonalPOIs;
-    if (!pois?.createAt || !pois?.list) {
-      window.WanderUI?.showWander('Todavía no disponible', 'El sistema de puntos personales aún se está iniciando.');
+    setSavingState(true);
+    const pois = await waitForPOIs();
+    if (!pois) {
+      setSavingState(false);
+      window.WanderUI?.showWander('No se pudo iniciar', 'El sistema de puntos personales no terminó de cargar. Cerrá y volvé a abrir Wander.');
       return null;
     }
     const before = new Set(pois.list().map((poi) => poi.id));
-    if (!pois.createAt({ lat: point.lat, lng: point.lng })) return null;
+    if (!pois.createAt({ lat: point.lat, lng: point.lng })) {
+      setSavingState(false);
+      return null;
+    }
     const added = pois.list().find((poi) => !before.has(poi.id));
     const selectedName = name.value.trim() || point.name || nextMarkerName();
-    return added ? (pois.update?.(added.id, { name: selectedName }) || added) : null;
+    const created = added ? (pois.update?.(added.id, { name: selectedName }) || added) : null;
+    setSavingState(false);
+    return created;
   }
 
   name.addEventListener('input', () => { if (point?.mode === 'new') updateMetrics(); });
@@ -143,9 +175,9 @@
     map.setView([point.lat, point.lng], Math.max(map.getZoom(), 16), { animate: true });
   });
 
-  propertiesButton.addEventListener('click', () => {
+  propertiesButton.addEventListener('click', async () => {
     if (point?.mode === 'new') {
-      const created = createSelectedPOI();
+      const created = await createSelectedPOI();
       if (!created?.id) return;
       clear();
       window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id: created.id } }));
@@ -163,8 +195,8 @@
     if (pois.remove?.(point.id)) clear();
   });
 
-  saveButton.addEventListener('click', () => {
-    const created = createSelectedPOI();
+  saveButton.addEventListener('click', async () => {
+    const created = await createSelectedPOI();
     if (created) clear();
   });
 
