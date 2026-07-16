@@ -180,9 +180,12 @@
 
     publish();
     render();
-    evaluateCurrent();
-    if (!options.silent) window.dispatchEvent(new CustomEvent('wander:personal-poi-updated', { detail: { poi: { ...poi } } }));
-    else window.dispatchEvent(new CustomEvent('wander:personal-poi-moved', { detail: { poi: { ...poi } } }));
+    if (!options.silent) {
+      evaluateCurrent();
+      window.dispatchEvent(new CustomEvent('wander:personal-poi-updated', { detail: { poi: { ...poi } } }));
+    } else {
+      window.dispatchEvent(new CustomEvent('wander:personal-poi-moved', { detail: { poi: { ...poi } } }));
+    }
     return { ...poi };
   }
 
