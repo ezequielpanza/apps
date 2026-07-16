@@ -9,7 +9,7 @@
   toolbar.className = 'points-toolbar';
   toolbar.innerHTML = `
     <button id="points-new" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg><span>Nuevo</span></button>
-    <button id="points-select" type="button" aria-pressed="false"><svg class="button-icon"><use href="wander-icons.svg#check"></use></svg><span>Seleccionar</span></button>
+    <button id="points-select" type="button" aria-pressed="false"><svg class="button-icon"><use href="wander-icons.svg#target"></use></svg><span>Seleccionar</span></button>
     <button id="points-delete" class="danger" type="button" disabled><svg class="button-icon"><use href="wander-icons.svg#clear"></use></svg><span>Borrar</span></button>`;
   card?.insertBefore(toolbar, list);
 
