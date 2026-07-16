@@ -9,11 +9,15 @@
   const RAW_SPEED_WINDOW_MS = 15 * 1000;
   const MIN_INTERVAL_MS = 4000;
   const STARTUP_WAIT_MS = 10000;
+  const STARTUP_MIN_DURATION_MS = 6000;
   const MIN_STARTUP_SAMPLES = 3;
   const RESUME_RESET_MS = 2 * 60 * 1000;
-  const START_MOVING_MS = 4000;
+  const START_MOVING_MS = 5000;
   const START_STATIONARY_MS = 6000;
-  const STOP_MOVING_MS = 25000;
+  const STOP_MOVING_MS = 12000;
+  const DECISIVE_STOP_MS = 7000;
+  const STATIONARY_WINDOW_MS = 12000;
+  const MIN_STATIONARY_SAMPLES = 3;
   const HIGH_SPEED_KMH = 25;
 
   const state = {
@@ -99,18 +103,46 @@
     };
   }
 
+  function stationaryWindowMetrics(latest) {
+    const samples = state.samples.filter((sample) => latest.at - sample.at <= STATIONARY_WINDOW_MS);
+    if (!samples.length) {
+      return { count: 0, elapsedMs: 0, spreadM: null, accuracyM: null, ready: false };
+    }
+
+    const anchor = samples[0];
+    const spreadM = samples.reduce((maximum, sample) => Math.max(maximum, distanceMeters(anchor, sample)), 0);
+    const accuracies = samples.map((sample) => sample.accuracy).filter(Number.isFinite);
+    const accuracyM = median(accuracies) ?? 8;
+    const elapsedMs = Math.max(0, latest.at - anchor.at);
+    const allowedSpreadM = clamp(accuracyM * .8, 5, 20) + 4;
+
+    return {
+      count: samples.length,
+      elapsedMs,
+      spreadM,
+      accuracyM,
+      allowedSpreadM,
+      ready: samples.length >= MIN_STATIONARY_SAMPLES && elapsedMs >= DECISIVE_STOP_MS && spreadM <= allowedSpreadM,
+    };
+  }
+
   function metrics() {
     const latest = state.samples[state.samples.length - 1];
     if (!latest) return null;
+
     let anchor = state.samples[0];
     for (const candidate of state.samples) {
-      if (latest.at - candidate.at >= MIN_INTERVAL_MS) { anchor = candidate; break; }
+      if (latest.at - candidate.at >= MIN_INTERVAL_MS) {
+        anchor = candidate;
+        break;
+      }
     }
+
     const elapsedMs = Math.max(0, latest.at - anchor.at);
     const netDistanceM = distanceMeters(anchor, latest);
     const accuracyValues = [anchor.accuracy, latest.accuracy].filter(Number.isFinite);
     const accuracyM = accuracyValues.length ? accuracyValues.reduce((sum, value) => sum + value, 0) / accuracyValues.length : 8;
-    const noiseAllowanceM = clamp(accuracyM * .45, 3, 15);
+    const noiseAllowanceM = clamp(accuracyM * .55, 4, 18);
     const adjustedDistanceM = Math.max(0, netDistanceM - noiseAllowanceM);
     const derivedSpeedKmh = elapsedMs >= MIN_INTERVAL_MS ? adjustedDistanceM / (elapsedMs / 3600000) : 0;
     const rawSpeeds = state.samples
@@ -118,7 +150,10 @@
       .map((sample) => sample.rawSpeedKmh)
       .filter((speed) => Number.isFinite(speed) && speed >= 0 && speed <= 220);
     const segments = segmentMetrics(state.samples);
+    const stationaryWindow = stationaryWindowMetrics(latest);
     const calibrationElapsedMs = Math.max(0, Date.now() - Number(state.calibrationStartedAt || Date.now()));
+    const enoughStartupHistory = state.samples.length >= MIN_STARTUP_SAMPLES && calibrationElapsedMs >= STARTUP_MIN_DURATION_MS;
+
     return {
       sampleAt: latest.at,
       sampleCount: state.samples.length,
@@ -134,8 +169,13 @@
       segmentMedianSpeedKmh: segments.medianSpeedKmh,
       fastSegmentCount: segments.fastCount,
       fastSegmentRatio: segments.fastRatio,
+      stationaryWindowCount: stationaryWindow.count,
+      stationaryWindowElapsedMs: stationaryWindow.elapsedMs,
+      stationaryWindowSpreadM: stationaryWindow.spreadM,
+      stationaryWindowAllowedSpreadM: stationaryWindow.allowedSpreadM,
+      stationaryWindowReady: stationaryWindow.ready,
       calibrationElapsedMs,
-      calibrationReady: state.samples.length >= MIN_STARTUP_SAMPLES || calibrationElapsedMs >= STARTUP_WAIT_MS,
+      calibrationReady: enoughStartupHistory || calibrationElapsedMs >= STARTUP_WAIT_MS,
     };
   }
 
@@ -143,16 +183,19 @@
     const lat = finite(effective?.lat);
     const lng = finite(effective?.lng);
     if (lat === null || lng === null) return { isNew: false, metrics: null };
+
     let at = sampleTime(effective?.updatedAt);
     if (state.lastSampleAt && at - state.lastSampleAt > RESUME_RESET_MS) reset(at, 'resumed_after_background');
     if (!state.calibrationStartedAt) {
       state.calibrationStartedAt = Date.now();
       scheduleCalibrationCheck();
     }
+
     const last = state.samples[state.samples.length - 1];
     if (last && at < last.at) at = Date.now();
     const key = `${lat.toFixed(7)}|${lng.toFixed(7)}|${at}`;
     if (last?.key === key) return { isNew: false, metrics: metrics() };
+
     const rawSpeedMps = finite(effective?.speedMps);
     state.samples.push({
       key,
@@ -163,6 +206,7 @@
       rawSpeedKmh: rawSpeedMps === null ? null : Math.max(0, rawSpeedMps * 3.6),
     });
     state.lastSampleAt = at;
+
     const cutoff = at - SAMPLE_WINDOW_MS;
     while (state.samples.length > 2 && state.samples[0].at < cutoff) state.samples.shift();
     return { isNew: true, metrics: metrics() };
@@ -170,8 +214,16 @@
 
   function filterSpeed(currentMetrics, providerSpeedKmh, providerMode, providerConfidence) {
     if (!currentMetrics?.calibrationReady) {
-      return { speedKmh: 0, positionStationary: false, fastPositionConfirmed: false, evidence: ['startup_calibration'] };
+      return {
+        speedKmh: 0,
+        positionStationary: false,
+        decisiveStationary: false,
+        positionMoving: false,
+        fastPositionConfirmed: false,
+        evidence: ['startup_calibration'],
+      };
     }
+
     const derived = finite(currentMetrics.derivedSpeedKmh) || 0;
     const rawMedian = finite(currentMetrics.rawSpeedMedianKmh);
     const providerSpeed = finite(providerSpeedKmh);
@@ -179,20 +231,31 @@
     const providerTrusted = providerMoving && providerConfidence !== null && providerConfidence >= .7;
     const ready = currentMetrics.elapsedMs >= MIN_INTERVAL_MS;
     const timedOut = currentMetrics.calibrationElapsedMs >= STARTUP_WAIT_MS;
-    const reportedLow = (rawMedian === null || rawMedian <= .45) &&
-      (providerSpeed === null || providerSpeed <= .45 || providerMode === 'stationary');
-    const positionStationary = (ready && derived <= .35 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 4) ||
-      (timedOut && currentMetrics.sampleCount >= 1 && reportedLow);
-    const positionMoving = ready && currentMetrics.adjustedDistanceM >= 3.5 && derived >= .55;
-    const fastPositionConfirmed = currentMetrics.segmentCount >= 2 && currentMetrics.fastSegmentCount >= 2 && currentMetrics.fastSegmentRatio >= .66 && finite(currentMetrics.segmentMedianSpeedKmh) >= 12;
+    const reportedLow = (rawMedian === null || rawMedian <= .7) &&
+      (providerSpeed === null || providerSpeed <= .7 || providerMode === 'stationary');
+    const providerStationary = providerMode === 'stationary' && providerConfidence !== null && providerConfidence >= .7;
 
-    if (positionStationary) {
+    const positionStationary = (ready && derived <= .6 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 6) ||
+      (timedOut && currentMetrics.sampleCount >= 1 && reportedLow);
+    const decisiveStationary = currentMetrics.stationaryWindowReady && reportedLow &&
+      derived <= .8 && !currentMetrics.fastSegmentCount;
+    const positionMoving = ready && currentMetrics.adjustedDistanceM >= 5 && derived >= .8;
+    const fastPositionConfirmed = currentMetrics.segmentCount >= 2 && currentMetrics.fastSegmentCount >= 2 &&
+      currentMetrics.fastSegmentRatio >= .66 && finite(currentMetrics.segmentMedianSpeedKmh) >= 12;
+
+    if (decisiveStationary || positionStationary || providerStationary && reportedLow) {
       const rejected = [rawMedian, providerSpeed].some((speed) => speed !== null && speed >= 1.4);
       return {
         speedKmh: 0,
         positionStationary: true,
+        decisiveStationary,
+        positionMoving: false,
         fastPositionConfirmed,
-        evidence: rejected ? ['position_stationary', 'uncorroborated_speed_rejected'] : ['position_stationary'],
+        evidence: decisiveStationary
+          ? ['stable_position_cluster', 'zero_speed_confirmed']
+          : rejected
+            ? ['position_stationary', 'uncorroborated_speed_rejected']
+            : ['position_stationary'],
       };
     }
 
@@ -200,12 +263,27 @@
     if (positionMoving && (derived <= HIGH_SPEED_KMH || fastPositionConfirmed)) candidates.push(derived);
     if (rawMedian !== null && currentMetrics.rawSpeedSampleCount >= 2 && positionMoving && (rawMedian <= 15 || fastPositionConfirmed)) candidates.push(rawMedian);
     if (providerTrusted && providerSpeed !== null && positionMoving && (providerSpeed <= 15 || fastPositionConfirmed)) candidates.push(providerSpeed);
-    if (!candidates.length) return { speedKmh: 0, positionStationary: false, fastPositionConfirmed, evidence: ['speed_unconfirmed', 'position_corroboration_required'] };
+
+    if (!candidates.length) {
+      return {
+        speedKmh: 0,
+        positionStationary: false,
+        decisiveStationary: false,
+        positionMoving: false,
+        fastPositionConfirmed,
+        evidence: ['speed_unconfirmed', 'position_corroboration_required'],
+      };
+    }
+
     return {
       speedKmh: Math.max(0, median(candidates)),
       positionStationary: false,
+      decisiveStationary: false,
+      positionMoving: true,
       fastPositionConfirmed,
-      evidence: fastPositionConfirmed ? ['consistent_multi_segment_movement', 'speed_confirmed'] : ['displacement_confirmed', 'speed_filtered'],
+      evidence: fastPositionConfirmed
+        ? ['consistent_multi_segment_movement', 'speed_confirmed']
+        : ['displacement_confirmed', 'speed_filtered'],
     };
   }
 
@@ -213,20 +291,28 @@
     if (!currentMetrics?.calibrationReady) {
       state.status = 'pending';
       state.evidence = ['startup_calibration', `${currentMetrics?.sampleCount || 0}_valid_samples`];
-      return { status: 'pending', activity: 'pending', label: 'Preparando contexto', confidence: .5, source: 'pedestrian-speed-and-displacement', evidence: [...state.evidence] };
+      return {
+        status: 'pending',
+        activity: 'pending',
+        label: 'Preparando contexto',
+        confidence: .5,
+        source: 'pedestrian-speed-and-displacement',
+        evidence: [...state.evidence],
+      };
     }
-    const speed = finite(speedKmh);
-    const derived = finite(currentMetrics.derivedSpeedKmh) || 0;
-    const strongMovement = (speed !== null && speed >= 1.4) ||
-      (currentMetrics.elapsedMs >= MIN_INTERVAL_MS && currentMetrics.adjustedDistanceM >= 5 && derived >= .8 && derived <= HIGH_SPEED_KMH) ||
-      Boolean(filtered.fastPositionConfirmed);
-    const movementEvidence = strongMovement || (speed !== null && speed >= .7) ||
-      (currentMetrics.elapsedMs >= MIN_INTERVAL_MS && currentMetrics.adjustedDistanceM >= 3.5 && derived >= .55 && derived <= HIGH_SPEED_KMH);
-    const stationaryEvidence = Boolean(filtered.positionStationary) ||
-      ((speed === null || speed <= .45) && derived <= .35 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 4);
-    const timedStationary = state.status === 'pending' && stationaryEvidence && currentMetrics.calibrationElapsedMs >= STARTUP_WAIT_MS;
 
-    if (timedStationary) {
+    const speed = finite(speedKmh);
+    const strongMovement = Boolean(filtered.fastPositionConfirmed) || (filtered.positionMoving && speed !== null && speed >= 1.4);
+    const movementEvidence = Boolean(filtered.positionMoving) && (strongMovement || (speed !== null && speed >= .7));
+    const stationaryEvidence = Boolean(filtered.positionStationary);
+    const timedStationary = state.status === 'pending' && stationaryEvidence && currentMetrics.calibrationElapsedMs >= STARTUP_MIN_DURATION_MS;
+
+    if (filtered.decisiveStationary) {
+      state.status = 'stationary';
+      state.movingCandidateAt = null;
+      state.stationaryCandidateAt = null;
+      state.evidence = [...filtered.evidence, 'stationary_confirmed'];
+    } else if (timedStationary) {
       state.status = 'stationary';
       state.movingCandidateAt = null;
       state.stationaryCandidateAt = null;
@@ -245,7 +331,7 @@
           }
         }
         state.evidence = [...filtered.evidence, 'movement_confirmed'];
-      } else if (stationaryEvidence) {
+      } else if (stationaryEvidence || speed === 0) {
         state.movingCandidateAt = null;
         if (!state.stationaryCandidateAt) state.stationaryCandidateAt = currentMetrics.sampleAt;
         const rejectedOutlier = filtered.evidence.includes('uncorroborated_speed_rejected');
@@ -254,20 +340,46 @@
           state.status = 'stationary';
           state.stationaryCandidateAt = null;
         }
-        state.evidence = [...filtered.evidence, 'low_speed', 'position_within_accuracy_noise'];
+        state.evidence = [...filtered.evidence, 'low_speed', 'stationary_candidate'];
       } else {
         state.evidence = [...filtered.evidence, 'ambiguous_gps_sample', 'previous_motion_state_preserved'];
       }
     }
 
-    if (state.status === 'moving') return { status: 'moving', activity: 'moving', label: 'En movimiento', confidence: strongMovement ? .94 : .84, source: 'pedestrian-speed-and-displacement', evidence: [...state.evidence] };
-    if (state.status === 'stationary') return { status: 'stationary', activity: 'paused', label: 'En pausa', confidence: .92, source: 'pedestrian-speed-and-displacement', evidence: [...state.evidence] };
-    return { status: 'pending', activity: 'pending', label: 'Preparando contexto', confidence: .55, source: 'pedestrian-speed-and-displacement', evidence: [...state.evidence] };
+    if (state.status === 'moving') {
+      return {
+        status: 'moving',
+        activity: 'moving',
+        label: 'En movimiento',
+        confidence: strongMovement ? .94 : .84,
+        source: 'pedestrian-speed-and-displacement',
+        evidence: [...state.evidence],
+      };
+    }
+    if (state.status === 'stationary') {
+      return {
+        status: 'stationary',
+        activity: 'paused',
+        label: 'En pausa',
+        confidence: .94,
+        source: 'pedestrian-speed-and-displacement',
+        evidence: [...state.evidence],
+      };
+    }
+    return {
+      status: 'pending',
+      activity: 'pending',
+      label: 'Preparando contexto',
+      confidence: .55,
+      source: 'pedestrian-speed-and-displacement',
+      evidence: [...state.evidence],
+    };
   }
 
   inference.inferSituation = (context) => {
     const original = originalInferSituation(context);
     if (!original?.locationAvailable) return original;
+
     const effective = context.getEffectiveLocation?.();
     const sample = addSample(effective);
     const providerSpeedKmh = finite(context.value?.('mobility.provider.speedKmh', null));
@@ -279,10 +391,15 @@
     let speedKmh = filtered.speedKmh;
     const motion = resolveMotion(speedKmh, sample.metrics, sample.isNew, filtered);
     if (motion.status !== 'moving') speedKmh = 0;
+
     let mobility = original.mobility;
-    if (motion.status === 'pending') mobility = { mode: 'unknown', confidence: .2, source: 'startup-calibration', evidence: ['waiting_for_stable_samples'] };
-    else if (motion.status === 'stationary') mobility = { mode: 'stationary', confidence: .96, source: 'filtered-motion', evidence: ['position_stationary'] };
-    else if (String(mobility?.mode || '').toLowerCase() === 'stationary') mobility = { mode: 'unknown', confidence: .35, source: 'engine', evidence: ['displacement_overrode_stationary_provider'] };
+    if (motion.status === 'pending') {
+      mobility = { mode: 'unknown', confidence: .2, source: 'startup-calibration', evidence: ['waiting_for_stable_samples'] };
+    } else if (motion.status === 'stationary') {
+      mobility = { mode: 'stationary', confidence: .96, source: 'filtered-motion', evidence: ['position_stationary'] };
+    } else if (String(mobility?.mode || '').toLowerCase() === 'stationary') {
+      mobility = { mode: 'unknown', confidence: .35, source: 'engine', evidence: ['displacement_overrode_stationary_provider'] };
+    }
 
     return {
       ...original,
@@ -299,6 +416,9 @@
         segmentCount: sample.metrics?.segmentCount || 0,
         fastSegmentCount: sample.metrics?.fastSegmentCount || 0,
         sampleCount: sample.metrics?.sampleCount || 0,
+        stationaryWindowCount: sample.metrics?.stationaryWindowCount || 0,
+        stationaryWindowElapsedMs: sample.metrics?.stationaryWindowElapsedMs || 0,
+        stationaryWindowSpreadM: sample.metrics?.stationaryWindowSpreadM ?? null,
         calibrationElapsedMs: sample.metrics?.calibrationElapsedMs || 0,
         calibrationReady: Boolean(sample.metrics?.calibrationReady),
         displacementM: sample.metrics ? Math.round(sample.metrics.netDistanceM * 10) / 10 : null,
@@ -313,14 +433,21 @@
     policy: {
       sampleWindowMs: SAMPLE_WINDOW_MS,
       startupWaitMs: STARTUP_WAIT_MS,
+      startupMinimumDurationMs: STARTUP_MIN_DURATION_MS,
       minimumStartupSamples: MIN_STARTUP_SAMPLES,
       resumeResetMs: RESUME_RESET_MS,
       movingConfirmMs: START_MOVING_MS,
       stoppedConfirmMs: STOP_MOVING_MS,
-      profile: 'pedestrian-first-calibrated',
+      decisiveStopMs: DECISIVE_STOP_MS,
+      profile: 'pedestrian-first-stationary-cluster',
     },
     reset: () => reset(Date.now(), 'manual_reset'),
-    getState: () => ({ status: state.status, evidence: [...state.evidence], sampleCount: state.samples.length, calibrationStartedAt: state.calibrationStartedAt }),
+    getState: () => ({
+      status: state.status,
+      evidence: [...state.evidence],
+      sampleCount: state.samples.length,
+      calibrationStartedAt: state.calibrationStartedAt,
+    }),
   });
 
   reset(Date.now());
