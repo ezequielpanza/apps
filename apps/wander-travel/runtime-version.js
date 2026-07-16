@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.93.0';
+  const VERSION = 'v0.93.1';
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
@@ -54,7 +54,7 @@
     loadWhenReady({
       ready: () => Boolean(window.WanderEngineInference?.inferSituation && window.WanderEngine?.run),
       loaded: () => Boolean(window.WanderPedestrianMotion),
-      src: 'runtime-pedestrian-motion.js?v=20260716-39',
+      src: 'runtime-pedestrian-motion.js?v=20260716-40',
     });
     loadWhenReady({
       ready: () => Boolean(window.WanderContext && window.WanderEngine?.run),
