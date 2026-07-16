@@ -16,6 +16,22 @@
 
   let sessions = loadArray(SESSIONS_KEY);
   let active = loadObject(ACTIVE_KEY);
+  if (!active?.id) {
+    active = null;
+  } else {
+    active.segments = Array.isArray(active.segments) ? active.segments : [];
+    active.stays = Array.isArray(active.stays) ? active.stays : [];
+    active.events = Array.isArray(active.events) ? active.events : [];
+    active.status = 'active';
+    active.endedAt = null;
+    const interruptedMovement = [...active.segments].reverse().find((segment) => segment?.type === 'movement' && !segment.endedAt);
+    if (interruptedMovement) {
+      const lastPoint = Array.isArray(interruptedMovement.points) ? interruptedMovement.points[interruptedMovement.points.length - 1] : null;
+      const recoveredEndAt = Number(lastPoint?.at || active.updatedAt || interruptedMovement.startedAt || Date.now());
+      interruptedMovement.endedAt = Math.max(Number(interruptedMovement.startedAt || recoveredEndAt), recoveredEndAt);
+      interruptedMovement.recoveredAfterInterruption = true;
+    }
+  }
   let settings = { autoEnabled: true, ...loadObject(SETTINGS_KEY) };
   let phase = settings.autoEnabled ? 'preparing' : 'disabled';
   let lastMotion = 'pending';
