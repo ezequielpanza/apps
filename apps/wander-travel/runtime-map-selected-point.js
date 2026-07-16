@@ -13,7 +13,7 @@
   sheet.setAttribute('aria-label', 'Punto seleccionado');
   sheet.hidden = true;
   sheet.innerHTML = '<div class="map-point-head"><input id="map-point-name" value="Punto seleccionado" aria-label="Nombre del punto" placeholder="Nombre del punto"><button id="map-point-close" type="button" aria-label="Cerrar"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><div class="map-point-data"><div class="wide"><span>Coordenadas</span><strong id="map-point-coordinates">—</strong></div><div><span>Distancia</span><strong id="map-point-distance">—</strong></div><div><span>Rumbo</span><strong id="map-point-bearing">—</strong></div></div><button id="map-point-save" class="map-point-save" type="button"><svg class="button-icon"><use href="wander-icons.svg#pin"></use></svg>Guardar punto</button>';
-  document.documentElement.appendChild(sheet);
+  (document.body || document.documentElement).appendChild(sheet);
 
   const name = sheet.querySelector('#map-point-name');
   const distance = sheet.querySelector('#map-point-distance');
@@ -54,6 +54,10 @@
   function showSheet() {
     sheet.hidden = false;
     sheet.classList.add('is-open');
+    sheet.style.setProperty('display', 'block', 'important');
+    sheet.style.setProperty('visibility', 'visible', 'important');
+    sheet.style.setProperty('opacity', '1', 'important');
+    sheet.style.setProperty('pointer-events', 'auto', 'important');
   }
 
   function openAtCenter() {
@@ -77,6 +81,10 @@
     point = null;
     sheet.classList.remove('is-open');
     sheet.hidden = true;
+    sheet.style.removeProperty('display');
+    sheet.style.removeProperty('visibility');
+    sheet.style.removeProperty('opacity');
+    sheet.style.removeProperty('pointer-events');
     ctx.remove?.('map.selectedPoint');
   }
 
@@ -84,6 +92,13 @@
   sheet.querySelector('#map-point-close').addEventListener('click', clear);
   map.on('move zoom', updateFromCenter);
   window.addEventListener('wander:open-waypoint-center', openAtCenter);
+
+  document.addEventListener('click', (event) => {
+    const button = event.target?.closest?.('.wander-personal-map-actions .wander-map-action');
+    if (!button || button !== button.parentElement?.firstElementChild) return;
+    event.preventDefault();
+    openAtCenter();
+  });
 
   sheet.querySelector('#map-point-save').addEventListener('click', () => {
     if (!point) return;
