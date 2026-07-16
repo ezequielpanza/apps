@@ -19,31 +19,51 @@
   search.classList.add('wander-bottom-search');
   search.hidden = true;
 
+  function visibleDashboardItems() {
+    const configured = window.WanderContextDashboard?.getVisibleFields?.();
+    if (Array.isArray(configured)) {
+      return configured
+        .map((fieldId) => dashboard.querySelector('[data-dashboard-field="' + fieldId + '"]'))
+        .filter(Boolean);
+    }
+    return Array.from(dashboard.querySelectorAll('.status-item:not([hidden])'));
+  }
+
   function rowsFor(items) {
-    let rows = 1;
-    let used = 0;
+    let rows = 0;
+    let remaining = 0;
     for (const item of items) {
       const span = Math.min(3, Math.max(1, FIELD_SPANS[item.dataset.dashboardField] || 1));
       item.dataset.dashboardSpan = String(span);
       item.style.setProperty('--dashboard-span', String(span));
-      if (used && used + span > 3) {
+
+      if (remaining === 0) {
         rows += 1;
-        used = 0;
+        remaining = 3;
       }
-      used += span;
-      if (used === 3) used = 0;
+      if (span > remaining) {
+        rows += 1;
+        remaining = 3;
+      }
+      remaining -= span;
     }
-    return rows;
+    return Math.max(1, rows);
   }
 
   function updateDashboardRows() {
-    const visibleItems = Array.from(dashboard.querySelectorAll('.status-item:not([hidden])'));
-    dashboard.querySelectorAll('.status-item[hidden]').forEach((item) => {
-      delete item.dataset.dashboardSpan;
-      item.style.removeProperty('--dashboard-span');
-    });
-    const rows = rowsFor(visibleItems);
+    const visibleItems = visibleDashboardItems();
+    const visibleSet = new Set(visibleItems);
 
+    dashboard.querySelectorAll('.status-item').forEach((item) => {
+      const visible = visibleSet.has(item);
+      item.hidden = !visible;
+      if (!visible) {
+        delete item.dataset.dashboardSpan;
+        item.style.removeProperty('--dashboard-span');
+      }
+    });
+
+    const rows = rowsFor(visibleItems);
     dashboard.dataset.dashboardRows = String(rows);
     header.dataset.dashboardRows = String(rows);
     dashboard.classList.toggle('wander-dashboard-expanded', rows > 1);
@@ -122,10 +142,11 @@
     if (tries > 160) clearInterval(timer);
   }, 250);
 
-  const observer = new MutationObserver(() => requestAnimationFrame(ensureTopbarPlacement));
-  observer.observe(document.querySelector('.wander-app'), { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'style', 'class'] });
+  const observer = new MutationObserver(() => requestAnimationFrame(updateDashboardRows));
+  observer.observe(dashboard, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
   window.addEventListener('pageshow', ensureTopbarPlacement);
   window.addEventListener('wander:dashboard-restored', ensureTopbarPlacement);
+  window.addEventListener('wander:dashboard-layout-change', ensureTopbarPlacement);
 
   window.WanderTopDashboardSearch = { openSearch, closeSearch, ensureTopbarPlacement, updateDashboardRows };
 })();
