@@ -5,16 +5,44 @@
   const brand = document.querySelector('#main-menu-button');
   if (!header || !dashboard || !search || !brand) return;
 
+  const FIELD_SPANS = Object.freeze({
+    summary: 2,
+    coordinates: 3,
+    placeMemory: 3,
+    lastSuggestion: 3,
+    currentPOI: 2,
+    journey: 2,
+  });
+
   header.classList.add('wander-top-status-bar');
   dashboard.classList.add('wander-dashboard-in-header');
   search.classList.add('wander-bottom-search');
   search.hidden = true;
 
+  function rowsFor(items) {
+    let rows = 1;
+    let used = 0;
+    for (const item of items) {
+      const span = Math.min(3, Math.max(1, FIELD_SPANS[item.dataset.dashboardField] || 1));
+      item.dataset.dashboardSpan = String(span);
+      item.style.setProperty('--dashboard-span', String(span));
+      if (used && used + span > 3) {
+        rows += 1;
+        used = 0;
+      }
+      used += span;
+      if (used === 3) used = 0;
+    }
+    return rows;
+  }
+
   function updateDashboardRows() {
     const visibleItems = Array.from(dashboard.querySelectorAll('.status-item:not([hidden])'));
-    const hasSummary = visibleItems.some((item) => item.dataset.dashboardField === 'summary');
-    const occupiedSlots = visibleItems.length + (hasSummary && visibleItems.length > 3 ? 1 : 0);
-    const rows = Math.max(1, Math.ceil(occupiedSlots / 3));
+    dashboard.querySelectorAll('.status-item[hidden]').forEach((item) => {
+      delete item.dataset.dashboardSpan;
+      item.style.removeProperty('--dashboard-span');
+    });
+    const rows = rowsFor(visibleItems);
 
     dashboard.dataset.dashboardRows = String(rows);
     header.dataset.dashboardRows = String(rows);
