@@ -4,6 +4,8 @@
   if (!context) return;
 
   let lastId = null;
+  let lastSignature = null;
+  let evaluationQueued = false;
 
   function finite(value) {
     const number = Number(value);
@@ -114,19 +116,53 @@
     return candidates[0] || null;
   }
 
+  function scheduleSituationEvaluation() {
+    if (evaluationQueued) return;
+    evaluationQueued = true;
+    queueMicrotask(() => {
+      evaluationQueued = false;
+      window.WanderSituationEngine?.evaluate?.();
+    });
+  }
+
   function clear() {
-    if (lastId === null && !context.value('currentPOI.current')) return;
+    const hadCurrent = lastId !== null || Boolean(context.value('currentPOI.current'));
+    if (!hadCurrent) return;
     context.remove('currentPOI.current');
     context.remove('currentPOI.value');
     context.remove('currentPOI.container');
     context.remove('currentPOI.distanceM');
     context.remove('currentPOI.status');
     lastId = null;
+    lastSignature = null;
+    scheduleSituationEvaluation();
+  }
+
+  function sourceIds(item) {
+    return (Array.isArray(item?.sources) ? item.sources : [])
+      .map((source) => typeof source === 'string' ? source : source?.id)
+      .filter(Boolean);
+  }
+
+  function allCandidateItems(activeItems = []) {
+    const items = new Map();
+    const add = (item) => {
+      if (!item?.id || !item?.location) return;
+      if (finite(item.location.lat) === null || finite(item.location.lng) === null) return;
+      const existing = items.get(String(item.id));
+      if (!existing || Number(item.confidence || 0) > Number(existing.confidence || 0)) items.set(String(item.id), item);
+    };
+
+    (Array.isArray(activeItems) ? activeItems : []).forEach(add);
+    if (store?.listConsolidated) {
+      for (const item of store.listConsolidated()) add(item);
+    }
+    return [...items.values()];
   }
 
   function detect() {
     const location = context.getEffectiveLocation?.();
-    const items = context.value('nearby.items');
+    const activeItems = context.value('nearby.items');
     if (!location) {
       clear();
       return null;
@@ -140,7 +176,8 @@
     }
 
     const point = { lat, lng };
-    const containerMatch = containingArea(point, items);
+    const containerMatch = containingArea(point, activeItems);
+    const containerSources = sourceIds(containerMatch?.poi);
     const container = containerMatch ? {
       id: containerMatch.poi.id,
       name: containerMatch.poi.name || 'Establecimiento',
@@ -148,22 +185,22 @@
       location: containerMatch.poi.location || null,
       address: containerMatch.poi.address || null,
       detectionMode: 'inside_area',
-      source: 'openstreetmap',
+      sources: containerSources,
+      source: containerSources[0] || 'openstreetmap',
     } : null;
 
     const accuracy = Math.max(5, finite(location.accuracy) ?? 50);
     const speedKmh = Math.max(0, finite(context.value('motion.speedKmh')) ?? 0);
     const moving = context.value('motion.status') === 'moving';
-    const enterRadius = Math.min(moving ? 75 : 120, Math.max(moving ? 28 : 35, accuracy * (moving ? 1.15 : 1.5)));
+    const enterRadius = Math.min(moving ? 75 : 140, Math.max(moving ? 28 : 40, accuracy * (moving ? 1.15 : 1.65)));
     const exitRadius = enterRadius * 1.45;
 
-    const candidates = (Array.isArray(items) ? items : [])
-      .filter((item) => item?.location && finite(item.location.lat) !== null && finite(item.location.lng) !== null)
+    const candidates = allCandidateItems(activeItems)
       .map((item) => ({
         item,
         distanceM: distanceMeters(point, { lat: Number(item.location.lat), lng: Number(item.location.lng) }),
       }))
-      .sort((a, b) => a.distanceM - b.distanceM);
+      .sort((a, b) => a.distanceM - b.distanceM || Number(b.item.confidence || 0) - Number(a.item.confidence || 0));
 
     const nearest = candidates[0] || null;
     let specific = null;
@@ -184,19 +221,26 @@
       ? Math.max(0.35, Math.min(0.98, 1 - specific.nearest.distanceM / Math.max(specific.threshold, 1)))
       : 0.96;
 
+    const specificSources = sourceIds(specific?.nearest?.item);
     const value = specific ? {
       id: specific.nearest.item.id,
       name: specific.nearest.item.name || 'POI actual',
+      label: specific.nearest.item.name || 'POI actual',
       categories: specific.nearest.item.categories || [],
+      primaryType: specific.nearest.item.categories?.[0]?.id || specific.nearest.item.categories?.[0]?.label || null,
       location: specific.nearest.item.location,
       address: specific.nearest.item.address || null,
       distanceM: Math.round(specific.nearest.distanceM),
       accuracyM: Math.round(accuracy),
       detectionMode: 'near_point',
+      sources: specificSources,
+      source: specificSources[0] || 'nearby',
       container,
       detectedAt: new Date().toISOString(),
     } : {
       ...container,
+      label: container.name,
+      primaryType: container.categories?.[0]?.id || container.categories?.[0]?.label || null,
       distanceM: 0,
       accuracyM: Math.round(accuracy),
       container,
@@ -215,13 +259,20 @@
     else context.remove('currentPOI.container');
     context.set('currentPOI.distanceM', value.distanceM, options);
     context.set('currentPOI.status', container && !specific ? 'inside_container' : 'detected', options);
+
     lastId = value.id;
+    const signature = `${value.id}|${value.name}|${value.distanceM}|${container?.id || ''}|${context.value('motion.status') || ''}`;
+    if (signature !== lastSignature) {
+      lastSignature = signature;
+      scheduleSituationEvaluation();
+    }
     return value;
   }
 
   context.subscribe((key) => {
     if (
       key === 'nearby.items' ||
+      key === 'nearby.status' ||
       key === 'location.effective' ||
       key.startsWith('location.effective.') ||
       key === 'motion.status' ||
