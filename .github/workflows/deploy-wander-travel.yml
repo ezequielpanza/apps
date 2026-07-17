@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: deploy-wander-travel
@@ -29,31 +29,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Verify app shell and local script references
-        run: |
-          test -s apps/wander-travel/index.html
-          test -s apps/wander-travel/wander-ui.css
-          test -s apps/wander-travel/wander-icons.svg
-          test -s apps/wander-travel/wander-app-icon.svg
-          test -s apps/wander-travel/manifest.webmanifest
-          test -s apps/wander-travel/sw.js
-          test -s apps/wander-travel/app.js
-          test -s apps/wander-travel/runtime-version.js
-          node <<'NODE'
-          const fs = require('fs');
-          const path = require('path');
-          const root = 'apps/wander-travel';
-          const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-          const scripts = [...html.matchAll(/<script\s+[^>]*src=["']([^"']+)["']/g)]
-            .map((match) => match[1].split('?')[0])
-            .filter((src) => !/^https?:\/\//.test(src));
-          const missing = scripts.filter((src) => !fs.existsSync(path.join(root, src)));
-          if (missing.length) {
-            console.error('Missing local scripts referenced by index.html:', missing);
-            process.exit(1);
-          }
-          console.log(`Verified ${scripts.length} local script references.`);
-          NODE
+      - name: Verify app shell
+        run: node apps/wander-travel/tests/app-shell.mjs
 
       - name: Check JavaScript syntax
         run: find apps/wander-travel -maxdepth 1 -type f -name '*.js' -print0 | xargs -0 -n1 node --check
@@ -67,28 +44,21 @@ jobs:
 
       - name: Test Google Places API through Wander
         run: |
-          mkdir -p debug-results
+          result_file="${RUNNER_TEMP}/google-places-test.json"
           endpoint='https://wander-travel.pages.dev/api/places/nearby?lat=19.372667&lng=-69.852783&radius=300'
           for attempt in 1 2 3 4 5 6; do
-            status=$(curl --silent --show-error --location --output debug-results/google-places-test.json --write-out '%{http_code}' "$endpoint" || true)
+            status=$(curl --silent --show-error --location --output "${result_file}" --write-out '%{http_code}' "$endpoint" || true)
             if [ "$status" = "200" ]; then
               break
             fi
             echo "Attempt $attempt returned HTTP $status"
             sleep 10
           done
-          node <<'NODE'
+          RESULT_FILE="${result_file}" node <<'NODE'
           const fs = require('fs');
-          const payload = JSON.parse(fs.readFileSync('debug-results/google-places-test.json', 'utf8'));
+          const payload = JSON.parse(fs.readFileSync(process.env.RESULT_FILE, 'utf8'));
           if (!payload.ok) {
             throw new Error(`Google Places test failed: ${JSON.stringify(payload)}`);
           }
           console.log(`Google Places test returned ${payload.count || 0} places`);
           NODE
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add debug-results/google-places-test.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Record Google Places API test result"
-            git push
-          fi

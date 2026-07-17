@@ -55,6 +55,28 @@ body.drawer-open #context-dashboard {
   white-space: nowrap;
 }
 
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-auto-rows: 38px !important;
+  align-items: center !important;
+  column-gap: 4px !important;
+  row-gap: 4px !important;
+  height: calc(8px + (var(--dashboard-rows, 1) * 42px)) !important;
+  min-height: calc(8px + (var(--dashboard-rows, 1) * 42px)) !important;
+  padding: 4px 10px !important;
+  border-radius: 28px !important;
+}
+
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item:not([hidden]) {
+  display: flex !important;
+  grid-column: span var(--dashboard-span, 1) !important;
+  width: auto !important;
+  max-width: none !important;
+  height: 38px !important;
+  padding: 5px 4px !important;
+}
+
 .status-rail#context-dashboard .status-item[data-dashboard-field="summary"] {
   flex: 1 1 auto;
   overflow: hidden;
@@ -106,6 +128,25 @@ body.drawer-open #context-dashboard {
     width: auto !important;
     max-width: none !important;
   }
-  .status-rail#context-dashboard .status-item:nth-of-type(n+4) { display: none !important; }
   .status-rail#context-dashboard .status-item strong { font-size: .74rem; }
+}
+
+@media (max-width: 380px) {
+  .status-rail#context-dashboard {
+    left: 60px !important;
+    right: 8px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+  }
+}
+
+@media (min-width: 821px) {
+  .status-rail#context-dashboard {
+    top: calc(14px + env(safe-area-inset-top, 0px)) !important;
+    left: 64px !important;
+    right: 16px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    border-radius: 20px !important;
+  }
 }

@@ -6,6 +6,14 @@
 
   const STORAGE_KEY = base.storageKey || 'wander.contextDashboard.config.v1';
   const canonicalOrder = base.fields.map((field) => field.id);
+  const FIELD_SPANS = Object.freeze({
+    summary: 2,
+    coordinates: 2,
+    place: 2,
+    currentPOI: 2,
+    journey: 2,
+    placeMemory: 3,
+  });
   let decorating = false;
   let observer = null;
 
@@ -62,6 +70,34 @@
     });
   }
 
+  function updateDashboardLayout() {
+    const visibleItems = getVisibleFields()
+      .map((fieldId) => dashboardElement.querySelector('[data-dashboard-field="' + fieldId + '"]'))
+      .filter(Boolean);
+    let rows = 0;
+    let remaining = 0;
+
+    for (const item of visibleItems) {
+      const span = Math.min(3, Math.max(1, FIELD_SPANS[item.dataset.dashboardField] || 1));
+      item.style.setProperty('--dashboard-span', String(span));
+      if (remaining === 0) {
+        rows += 1;
+        remaining = 3;
+      }
+      if (span > remaining) {
+        rows += 1;
+        remaining = 3;
+      }
+      remaining -= span;
+    }
+
+    dashboardElement.querySelectorAll('.status-item[hidden]').forEach((item) => {
+      item.style.removeProperty('--dashboard-span');
+    });
+    dashboardElement.dataset.dashboardRows = String(Math.max(1, rows));
+    dashboardElement.style.setProperty('--dashboard-rows', String(Math.max(1, rows)));
+  }
+
   function renderDashboard() {
     base.render();
     const empty = dashboardElement.querySelector('[data-dashboard-empty]');
@@ -72,6 +108,7 @@
       dashboardElement.insertBefore(item, empty || null);
     }
     if (empty) empty.hidden = getVisibleFields().length > 0;
+    updateDashboardLayout();
     notifyLayout();
   }
 

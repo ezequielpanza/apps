@@ -55,7 +55,7 @@ function createRuntime(sharedStorage = new Map()) {
     subscribe(listener) { subscribers.add(listener); return () => subscribers.delete(listener); },
   };
 
-  const staticFields = ['summary', 'speed', 'heading', 'currentPOI', 'place', 'mobility', 'accuracy', 'nearby', 'lastSuggestion', 'simulation'];
+  const staticFields = ['summary', 'speed', 'heading', 'currentPOI', 'place', 'mobility', 'accuracy', 'nearby', 'simulation'];
   const dashboard = new MockElement({ id: 'context-dashboard' });
   for (const field of staticFields) dashboard.children.push(new MockElement({ field }));
   const empty = new MockElement({ empty: true });
@@ -70,8 +70,19 @@ function createRuntime(sharedStorage = new Map()) {
     ['metric-mobility', new MockElement({ id: 'metric-mobility' })],
     ['metric-accuracy', new MockElement({ id: 'metric-accuracy' })],
     ['metric-nearby', new MockElement({ id: 'metric-nearby' })],
-    ['metric-last-suggestion', new MockElement({ id: 'metric-last-suggestion' })],
     ['metric-simulation', new MockElement({ id: 'metric-simulation' })],
+    ['metric-activity', new MockElement({ id: 'metric-activity' })],
+    ['metric-time', new MockElement({ id: 'metric-time' })],
+    ['metric-day-period', new MockElement({ id: 'metric-day-period' })],
+    ['metric-location-status', new MockElement({ id: 'metric-location-status' })],
+    ['metric-coordinates', new MockElement({ id: 'metric-coordinates' })],
+    ['metric-location-source', new MockElement({ id: 'metric-location-source' })],
+    ['metric-motion-status', new MockElement({ id: 'metric-motion-status' })],
+    ['metric-journey', new MockElement({ id: 'metric-journey' })],
+    ['metric-country', new MockElement({ id: 'metric-country' })],
+    ['metric-zone', new MockElement({ id: 'metric-zone' })],
+    ['metric-place-memory', new MockElement({ id: 'metric-place-memory' })],
+    ['metric-app-version', new MockElement({ id: 'metric-app-version' })],
   ]);
 
   const document = {
@@ -94,6 +105,7 @@ function createRuntime(sharedStorage = new Map()) {
     localStorage: new MemoryStorage(sharedStorage),
     document,
     WanderContext: context,
+    addEventListener() {},
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
@@ -122,7 +134,7 @@ assert.ok(first.dashboard.querySelector('[data-dashboard-field="placeMemory"]'))
 first.api.setFieldVisible('coordinates', true);
 assert.equal(first.api.isVisible('coordinates'), true);
 assert.equal(first.dashboard.querySelector('[data-dashboard-field="coordinates"]').hidden, false);
-assert.equal(first.dashboard.querySelector('#metric-coordinates')?.textContent || first.dashboard.children.find((child) => child.id === 'metric-coordinates')?.textContent, '19.123456, -70.654321');
+assert.equal(first.metrics.get('metric-coordinates').textContent, '19.123456, -70.654321');
 
 first.api.setFieldVisible('place', true);
 assert.equal(first.api.isVisible('place'), true);

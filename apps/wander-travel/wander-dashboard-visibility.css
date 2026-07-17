@@ -1,9 +1,0 @@
-#context-dashboard[hidden],
-.wander-app:not([data-screen="map"]) #context-dashboard,
-.wander-app[data-menu="open"] #context-dashboard,
-body.drawer-open #context-dashboard {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}

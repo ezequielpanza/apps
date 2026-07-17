@@ -153,7 +153,6 @@
     { id: 'placeMemory', label: 'Memoria del lugar', icon: 'brain', metricId: 'metric-place-memory', value: placeMemoryValue },
     { id: 'currentPOI', label: 'POI actual', icon: 'pin', metricId: 'metric-current-poi', value: currentPOIValue },
     { id: 'nearby', label: 'Estado Nearby', icon: 'pin', metricId: 'metric-nearby', value: nearbyValue },
-    { id: 'lastSuggestion', label: 'Última sugerencia', icon: 'chat', metricId: 'metric-last-suggestion', value: () => textValue(context.value('fieldGuide.lastSuggestion'), 'Sin sugerencia') },
     { id: 'simulation', label: 'Simulación', icon: 'flask', metricId: 'metric-simulation', value: simulationValue },
     { id: 'appVersion', label: 'Versión de la app', icon: 'info', metricId: 'metric-app-version', value: appVersionValue },
   ].map(Object.freeze));

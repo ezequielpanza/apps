@@ -33,8 +33,6 @@ function runtime(storage = new MemoryStorage()) {
     'runtime-poi-consolidated.js',
     'runtime-poi-store.js',
     'runtime-poi-engine.js',
-    'runtime-external-source-google-maps.js',
-    'runtime-external-source-tripadvisor.js',
   ].forEach((file) => load(context, file));
   return {
     policy: context.WanderSourcePolicy,
@@ -42,8 +40,6 @@ function runtime(storage = new MemoryStorage()) {
     consolidated: context.WanderConsolidatedPOI,
     store: context.WanderPOIStore,
     engine: context.WanderPOIEngine,
-    maps: context.WanderExternalSourceGoogleMaps,
-    tripadvisor: context.WanderExternalSourceTripadvisor,
   };
 }
 
@@ -85,15 +81,15 @@ test('Stable source ref keeps POI identity stable', () => {
   assert.equal(first.id, second.id);
 });
 
-test('External-only sources are not POI connectors', () => {
+test('External-only source policies cannot enter the POI pipeline', () => {
   const rt = runtime();
   for (const id of ['google-maps', 'tripadvisor']) {
     assert.equal(rt.policy.get(id).mode, 'external_only');
     assert.equal(rt.policy.get(id).storePOIs, false);
   }
   assert.equal(rt.engine.listConnectors().length, 0);
-  assert.equal(typeof rt.maps.buildExternalIntent, 'function');
-  assert.equal(typeof rt.tripadvisor.buildExternalIntent, 'function');
+  assert.throws(() => rt.policy.assertCapability('google-maps', 'storePOIs'), /blocks storePOIs/);
+  assert.throws(() => rt.policy.assertCapability('tripadvisor', 'automatedAcquisition'), /blocks automatedAcquisition/);
 });
 
 test('Engine rejects raw non-normalized connector output', async () => {

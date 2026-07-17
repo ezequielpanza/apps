@@ -106,41 +106,17 @@
     syncRuntimeMetrics();
   }
 
-  function updateClock() {
-    const value = window.WanderContext?.value('time.now') || new Date().toLocaleTimeString('es-AR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    setText('#context-time', value);
-  }
-
-  const messages = {
-    details: ['Wander', 'Soy tu compañero de viaje. El estado principal resume qué está pasando ahora en la sesión y puede combinar movimiento, actividad, lugar e intención.'],
-    route: ['Ruta', 'La ruta viva vuelve después de consolidar ubicación y contexto. Primero necesito saber dónde estás y qué está pasando alrededor.'],
-    food: ['Comer', 'La recomendación gastronómica usará el contexto: hora, ubicación, clima, actividad e intereses. Todavía no está conectada a lugares reales.'],
-    ask: ['Preguntar', 'La IA contextual será la próxima capa. Va a leer WanderContext en vez de datos sueltos de la pantalla.'],
-  };
-
   $('#close-wander')?.addEventListener('click', hideWander);
-
-  document.querySelectorAll('[data-message]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const payload = messages[button.dataset.message] || ['Wander', 'Función preparada para la siguiente etapa.'];
-      showWander(payload[0], payload[1]);
-    });
-  });
 
   window.addEventListener('wander:screen-will-change', hideWander);
   window.addEventListener('wander:personal-poi-editor-open', hideWander);
 
   window.WanderContext?.subscribe((key) => {
     if (key === 'context.status' || key.startsWith('motion.')) syncRuntimeMetrics();
-    if (key === 'time.now') updateClock();
   });
 
   window.WanderContext?.set?.('settings.messageTimeoutMs', getMessageTimeoutMs(), { source: 'settings', kind: 'confirmed', confidence: 1 });
   syncRuntimeMetrics();
-  updateClock();
 
   window.WanderUI = {
     setText,

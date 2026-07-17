@@ -8,6 +8,11 @@ node apps/wander-travel/tests/poi-source-foundation.mjs
 node apps/wander-travel/tests/wikidata-connector.mjs
 node apps/wander-travel/tests/openstreetmap-connector.mjs
 node apps/wander-travel/tests/poi-consolidation.mjs
+node apps/wander-travel/tests/nearby-provider.mjs
+node apps/wander-travel/tests/context-dashboard.mjs
+node apps/wander-travel/tests/context-dashboard-config.mjs
+node apps/wander-travel/tests/movement-method.mjs
+node apps/wander-travel/tests/app-shell.mjs
 ```
 
 The runners have no external dependencies. They load the real production runtime modules in isolated Node `vm` contexts with controlled storage and simulated source responses.
@@ -109,3 +114,7 @@ The tests use simulated Overpass elements so CI remains deterministic.
 The matcher is deterministic and does not require AI. AI can be added later for interpretation, summarization, or user interaction without becoming a dependency of POI discovery or basic consolidation.
 
 A failing assertion exits with a non-zero status so all runners can execute in CI and before Cloudflare Pages deployment.
+
+## App shell
+
+`app-shell.mjs` verifies that every active script and stylesheet is declared in `index.html`, exists on disk, is present in the offline shell, and that retired staging directories do not regain source fragments. It also enforces `runtime-version.js` as the single app-version source.

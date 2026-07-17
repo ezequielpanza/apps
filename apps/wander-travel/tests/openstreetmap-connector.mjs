@@ -71,10 +71,10 @@ const AT = '2026-07-09T12:00:00.000Z';
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
 
-test('OpenStreetMap registers as normalized connector v0.3.0', () => {
+test('OpenStreetMap registers as normalized connector v0.4.0', () => {
   const rt = runtime(elements);
   assert.equal(rt.policy.get('openstreetmap').storePOIs, true);
-  assert.equal(rt.engine.getConnector('openstreetmap')?.version, '0.3.0');
+  assert.equal(rt.engine.getConnector('openstreetmap')?.version, '0.4.0');
 });
 
 test('OSM profiles build source-specific Overpass queries', () => {
@@ -116,7 +116,7 @@ test('OSM normalization preserves source identity tags and evidence', async () =
   const rt = runtime(elements);
   const result = await rt.engine.search('openstreetmap', { lat: 19.89, lng: -70.96, profile: 'discovery', observedAt: AT });
   const poi = result.pois[0];
-  assert.equal(poi.source.version, '0.3.0');
+  assert.equal(poi.source.version, '0.4.0');
   assert.equal(poi.source.url, 'https://www.openstreetmap.org/node/1001');
   assert.equal(poi.tags.cuisine, 'caribbean');
   assert.equal(poi.evidence.some((item) => item.type === 'osm_tags'), true);

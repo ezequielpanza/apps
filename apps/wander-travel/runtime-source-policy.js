@@ -157,15 +157,6 @@
     ],
   });
 
-  register({
-    id: 'generic-web',
-    mode: POLICY_MODES.DENY_BY_DEFAULT,
-    automatedAcquisition: false,
-    storePOIs: false,
-    externalDiscovery: false,
-    reason: 'Automated acquisition requires an explicit per-source policy review and a connector that returns normalized POIs.',
-  });
-
   window.WanderSourcePolicy = Object.freeze({
     modes: POLICY_MODES,
     register,

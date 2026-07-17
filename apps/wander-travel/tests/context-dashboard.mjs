@@ -52,7 +52,6 @@ const menu = new MockElement({ hidden: true });
 const menuButton = new MockElement();
 const contextDashboard = new MockElement();
 const screens = [
-  new MockElement({ dataset: { appScreen: 'travel' }, hidden: true }),
   new MockElement({ dataset: { appScreen: 'context' }, hidden: true }),
   new MockElement({ dataset: { appScreen: 'simulator' }, hidden: true }),
   new MockElement({ dataset: { appScreen: 'settings' }, hidden: true }),
@@ -81,8 +80,13 @@ const document = {
 const sandbox = {
   console,
   document,
+  CustomEvent: class CustomEvent {
+    constructor(type, options = {}) { this.type = type; this.detail = options.detail; }
+  },
   setTimeout: () => 1,
   clearTimeout: () => {},
+  addEventListener() {},
+  dispatchEvent() {},
 };
 sandbox.window = sandbox;
 sandbox.globalThis = sandbox;
@@ -98,7 +102,6 @@ contextDashboard.dispatch('click');
 
 assert.equal(app.dataset.screen, 'context');
 assert.equal(screens.find((screen) => screen.dataset.appScreen === 'context').hidden, false);
-assert.equal(screens.find((screen) => screen.dataset.appScreen === 'travel').hidden, true);
 assert.equal(menu.attributes.get('aria-hidden'), 'true');
 
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

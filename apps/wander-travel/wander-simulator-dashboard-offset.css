@@ -1,4 +1,0 @@
-.simulation-map-controls{
-  bottom:calc(var(--simulator-dashboard-offset,72px) + env(safe-area-inset-bottom,0px))!important;
-  transition:bottom .18s ease;
-}

@@ -3,12 +3,14 @@
   const engine = window.WanderEngine;
   if (!context || !engine?.subscribeEvaluation) return;
 
-  const RULE_SET_VERSION = '1.5.0';
+  const RULE_SET_VERSION = '1.6.0';
   const HISTORY_WINDOW_MS = 10 * 60 * 1000;
+  const INITIAL_METHOD_DETECTION_MS = 60 * 1000;
   const listeners = new Set();
   const motionHistory = [];
   let lastResult = null;
   let stationarySince = null;
+  let movingSince = null;
 
   function number(value) {
     const parsed = Number(value);
@@ -51,7 +53,7 @@
   }
 
   function motionMetrics() {
-    if (!motionHistory.length) return { sampleCount: 0, averageSpeedKmh: null, maxSpeedKmh: null, speedVariance: null, stopCount: 0, stopRatio: null, accelerationMean: null, accelerationVariance: null };
+    if (!motionHistory.length) return { sampleCount: 0, durationMs: 0, averageSpeedKmh: null, maxSpeedKmh: null, speedVariance: null, stopCount: 0, stopRatio: null, accelerationMean: null, accelerationVariance: null };
     const speeds = motionHistory.map((sample) => sample.speed);
     const average = speeds.reduce((sum, value) => sum + value, 0) / speeds.length;
     const variance = speeds.reduce((sum, value) => sum + (value - average) ** 2, 0) / speeds.length;
@@ -73,6 +75,7 @@
       : 0;
     return {
       sampleCount: speeds.length,
+      durationMs: Math.max(0, motionHistory[motionHistory.length - 1].at - motionHistory[0].at),
       averageSpeedKmh: Math.round(average * 10) / 10,
       maxSpeedKmh: Math.round(Math.max(...speeds) * 10) / 10,
       speedVariance: Math.round(variance * 10) / 10,
@@ -108,15 +111,15 @@
 
   function inferMovementMethod({ rawMobility, speed, motion, routeType, metrics }) {
     if (motion === 'pending') {
-      return { id: 'unknown', label: 'Desconocido', confidence: 0.25, source: 'motion-pending', evidence: ['motion_pending'], candidates: [] };
+      return { id: 'unknown', label: 'Desconocido', confidence: 0.25, phase: 'preliminary', detectionReady: false, observedDurationMs: 0, source: 'motion-pending', evidence: ['motion_pending'], candidates: [] };
     }
     if (motion === 'stationary') {
-      return { id: 'stationary', label: 'Detenido', confidence: 0.96, source: 'motion-state', evidence: ['motion_stationary'], candidates: [{ id: 'stationary', score: 0.96 }] };
+      return { id: 'stationary', label: 'Detenido', confidence: 0.96, phase: 'stable', detectionReady: true, observedDurationMs: 0, source: 'motion-state', evidence: ['motion_stationary'], candidates: [{ id: 'stationary', label: 'Detenido', score: 0.96 }] };
     }
 
     const providerMethod = normalizeProviderMethod(rawMobility);
     if (providerMethod) {
-      return { id: providerMethod, label: methodLabel(providerMethod), confidence: 0.94, source: 'mobility-provider', evidence: [`provider_${providerMethod}`], candidates: [{ id: providerMethod, score: 0.94 }] };
+      return { id: providerMethod, label: methodLabel(providerMethod), confidence: 0.94, phase: 'stable', detectionReady: true, observedDurationMs: metrics.durationMs, source: 'mobility-provider', evidence: [`provider_${providerMethod}`], candidates: [{ id: providerMethod, label: methodLabel(providerMethod), score: 0.94 }] };
     }
 
     const currentSpeed = speed ?? metrics.averageSpeedKmh ?? 0;
@@ -155,15 +158,23 @@
     const selected = candidates[0] || { id: 'unknown', score: 0.35, evidence: ['insufficient_evidence'] };
     const runnerUp = candidates[1] || null;
     const ambiguity = runnerUp ? Math.max(0, selected.score - runnerUp.score) : 1;
+    const detectionReady = metrics.durationMs >= INITIAL_METHOD_DETECTION_MS;
+    const progress = Math.min(1, metrics.durationMs / HISTORY_WINDOW_MS);
+    const confidence = detectionReady
+      ? Math.min(0.95, Math.max(0.35, selected.score * 0.9 + progress * 0.14))
+      : 0.72;
     return {
-      id: selected.id,
-      label: methodLabel(selected.id),
-      confidence: selected.score,
+      id: detectionReady ? selected.id : 'unknown',
+      label: detectionReady ? methodLabel(selected.id) : 'Desconocido',
+      confidence,
+      phase: detectionReady ? (progress >= 1 ? 'stable' : 'refining') : 'preliminary',
+      detectionReady,
+      observedDurationMs: metrics.durationMs,
       source: 'movement-pattern-inference',
-      evidence: selected.evidence || [],
+      evidence: [...(selected.evidence || []), detectionReady ? 'one_minute_observation_complete' : 'collecting_first_minute'],
       candidates: candidates.slice(0, 4).map((item) => ({ id: item.id, label: methodLabel(item.id), score: item.score })),
       ambiguity,
-      needsClarification: selected.id === 'unknown' || ambiguity < 0.08,
+      needsClarification: detectionReady && (selected.id === 'unknown' || ambiguity < 0.08),
     };
   }
 
@@ -189,8 +200,20 @@
     const type = placeType();
     const now = Date.now();
 
-    recordMotionSample(speed, motion, now);
-    const metrics = motionMetrics();
+    if (motion === 'moving') {
+      if (!movingSince) {
+        movingSince = now;
+        motionHistory.length = 0;
+      }
+      recordMotionSample(speed, motion, now);
+    } else {
+      movingSince = null;
+      motionHistory.length = 0;
+    }
+    const metrics = {
+      ...motionMetrics(),
+      durationMs: movingSince ? Math.max(0, now - movingSince) : 0,
+    };
     const method = inferMovementMethod({ rawMobility, speed, motion, routeType: type, metrics });
 
     if (motion === 'stationary') {
@@ -225,10 +248,16 @@
       }
     } else {
       candidates.push(candidate(
-        method.id === 'unknown' ? 'moving' : method.id,
-        method.source === 'mobility-provider' ? 'provider_movement_method_inside_area' : 'inferred_movement_method_inside_area',
+        method.detectionReady === false || method.id === 'unknown' ? 'moving' : method.id,
+        method.detectionReady === false
+          ? 'movement_method_collecting'
+          : method.source === 'mobility-provider'
+            ? 'provider_movement_method_inside_area'
+            : 'inferred_movement_method_inside_area',
         method.confidence,
-        movementLabel(method.id, movementName),
+        method.detectionReady === false
+          ? (movementName ? `En movimiento por ${movementName}` : 'En movimiento')
+          : movementLabel(method.id, movementName),
         [...method.evidence, movementName ? 'movement_area_context' : 'movement_area_unknown', 'poi_suppressed_while_moving']
       ));
     }
@@ -253,7 +282,6 @@
         placeType: motion === 'stationary' ? type : null,
         movementArea: motion === 'moving' ? movementName : null,
         currentPOIAllowed: motion === 'stationary',
-        unavailableSignals: ['accelerometer', 'gyroscope', 'step_counter', 'map_matched_route_type', 'vertical_speed'],
         dayOfWeek: new Date(now).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase(),
         hour: new Date(now).getHours(),
       },
@@ -271,6 +299,9 @@
     context.set?.('mobility.methodConfidence', method.confidence, { source: method.source, kind: 'derived', confidence: 1 });
     context.set?.('mobility.methodEvidence', method.evidence || [], { source: method.source, kind: 'derived', confidence: method.confidence });
     context.set?.('mobility.methodCandidates', method.candidates || [], { source: method.source, kind: 'derived', confidence: method.confidence });
+    context.set?.('mobility.methodPhase', method.phase, { source: method.source, kind: 'derived', confidence: 1 });
+    context.set?.('mobility.methodObservedMs', method.observedDurationMs || 0, { source: method.source, kind: 'derived', confidence: 1 });
+    context.set?.('mobility.methodDetectionReady', Boolean(method.detectionReady), { source: method.source, kind: 'derived', confidence: 1 });
     context.setContext?.({ status: result.selectedState.label, source: 'situation-engine', confidence: result.selectedState.confidence });
     listeners.forEach((listener) => { try { listener(result); } catch {} });
     window.dispatchEvent(new CustomEvent('wander:situation', { detail: result }));

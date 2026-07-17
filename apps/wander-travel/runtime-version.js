@@ -1,125 +1,16 @@
 (() => {
-  const VERSION = 'v0.93.3';
+  const VERSION = 'v0.94.0';
+  const globalScope = typeof window !== 'undefined' ? window : self;
+  globalScope.WanderVersion = VERSION;
+
+  if (typeof document === 'undefined') return;
+
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = VERSION;
-  if (window.WanderContext) window.WanderContext.set('app.version', VERSION, { source: 'runtime-version', ttlMs: Infinity, confidence: 1 });
-  window.WanderVersion = VERSION;
-
-  function loadStyle(href) {
-    if (document.querySelector(`link[href="${href}"]`)) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    document.head.appendChild(link);
-  }
-
-  function loadScript(src) {
-    if (document.querySelector(`script[src="${src}"]`)) return;
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = false;
-    document.body.appendChild(script);
-  }
-
-  function loadWhenReady({ ready, loaded, src }) {
-    let attempts = 0;
-    function tryLoad() {
-      if (loaded()) return;
-      if (!ready()) {
-        attempts += 1;
-        if (attempts < 240) setTimeout(tryLoad, 250);
-        return;
-      }
-      loadScript(src);
-    }
-    tryLoad();
-  }
-
-  function bootstrap() {
-    loadStyle('wander-message-top.css?v=20260716-41');
-    loadStyle('wander-simulator-dashboard-offset.css?v=20260714-13');
-    loadStyle('wander-message-actions.css?v=20260714-14');
-    loadStyle('wander-personal-poi-sheet.css?v=20260716-41');
-    loadStyle('wander-personal-poi-marker.css?v=20260716-32');
-    loadStyle('wander-track-delete.css?v=20260714-19');
-    loadStyle('wander-dashboard-visibility.css?v=20260714-20');
-    loadStyle('wander-message-timeout-settings.css?v=20260714-22');
-    loadStyle('wander-map-selected-point.css?v=20260716-41');
-    loadStyle('wander-top-dashboard-search.css?v=20260715-21');
-    loadStyle('wander-points-screen.css?v=20260716-31');
-    loadStyle('wander-sessions.css?v=20260716-38');
-
-    loadScript('runtime-top-dashboard-search.js?v=20260715-21');
-    loadWhenReady({
-      ready: () => Boolean(window.WanderEngineInference?.inferSituation && window.WanderEngine?.run),
-      loaded: () => Boolean(window.WanderPedestrianMotion),
-      src: 'runtime-pedestrian-motion.js?v=20260716-42',
-    });
-    loadWhenReady({
-      ready: () => Boolean(window.WanderContext && window.WanderEngine?.run),
-      loaded: () => Boolean(window.WanderSessionEngine),
-      src: 'runtime-session-engine.js?v=20260716-38',
-    });
-    loadWhenReady({
-      ready: () => Boolean(window.WanderSituationEngine?.subscribe),
-      loaded: () => Boolean(window.WanderMovementMethodRefinement),
-      src: 'runtime-movement-method-refinement.js?v=20260714-09',
-    });
-
-    loadWhenReady({
-      ready: () => Boolean(window.WanderBase?.map && window.WanderContext),
-      loaded: () => Boolean(window.WanderPersonalPOIs),
-      src: 'runtime-personal-poi-core.js?v=20260716-38',
-    });
-
-    loadWhenReady({
-      ready: () => Boolean(window.WanderPersonalPOIs?.ready && window.WanderSituationEngine?.evaluate && window.WanderContext),
-      loaded: () => Boolean(window.WanderPersonalPOISituation),
-      src: 'runtime-personal-poi-situation.js?v=20260716-35',
-    });
-
-    loadWhenReady({
-      ready: () => Boolean(window.WanderBase?.map),
-      loaded: () => Boolean(window.WanderPersonalMapTools),
-      src: 'runtime-personal-map-tools.js?v=20260716-38',
-    });
-
-    loadWhenReady({
-      ready: () => Boolean(window.WanderPersonalPOIs?.ready && document.querySelector('.map-stage')),
-      loaded: () => Boolean(window.WanderPersonalPOISheet),
-      src: 'runtime-personal-poi-sheet.js?v=20260716-41',
-    });
-
-    loadWhenReady({
-      ready: () => Boolean(window.WanderBase?.map && window.WanderContext && window.WanderPersonalPOIs?.ready),
-      loaded: () => Boolean(window.WanderMapSelectedPoint),
-      src: 'runtime-map-selected-point.js?v=20260716-42',
-    });
-
-    loadWhenReady({
-      ready: () => Boolean(window.WanderPersonalPOIs?.ready && document.querySelector('#points-list')),
-      loaded: () => Boolean(window.WanderPointsScreen),
-      src: 'runtime-points-screen.js?v=20260716-31',
-    });
-
-    loadWhenReady({
-      ready: () => Boolean(window.WanderUI?.getMessageTimeoutMs && document.querySelector('#settings-panel')),
-      loaded: () => Boolean(window.WanderMessageTimeoutSettings),
-      src: 'runtime-message-timeout-settings.js?v=20260714-22',
-    });
-    loadWhenReady({
-      ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('.wander-app')),
-      loaded: () => Boolean(window.WanderDashboardVisibilityGuard),
-      src: 'runtime-dashboard-visibility-guard.js?v=20260715-07',
-    });
-    loadWhenReady({
-      ready: () => Boolean(document.querySelector('#context-dashboard') && document.querySelector('#simulation-map-controls')),
-      loaded: () => Boolean(window.WanderSimulatorDashboardOffset),
-      src: 'runtime-simulator-dashboard-offset.js?v=20260714-13',
-    });
-  }
-
-  if (document.readyState === 'complete') bootstrap();
-  else window.addEventListener('load', bootstrap, { once: true });
+  window.WanderContext?.set?.('app.version', VERSION, {
+    source: 'runtime-version',
+    ttlMs: Infinity,
+    confidence: 1,
+  });
 })();

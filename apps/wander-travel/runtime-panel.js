@@ -56,7 +56,6 @@
     if (normalized === 'map') {
       setTimeout(() => {
         window.WanderBase?.map?.invalidateSize();
-        window.WanderDashboardViewport?.mount?.();
         window.WanderContextDashboard?.restore?.();
         setDashboardVisibility();
       }, 80);
