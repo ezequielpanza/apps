@@ -9,6 +9,8 @@
   const map = base.map;
   let marker = null;
   let point = null;
+  let visualFrame = 0;
+  let lastPublishedSignature = '';
 
   const sheet = document.createElement('section');
   sheet.className = 'map-point-sheet';
@@ -46,9 +48,46 @@
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   }
 
-  function updateMetrics() {
+  function selectedTarget() {
+    if (!point) return null;
+    return point.mode === 'new' ? map.getCenter() : L.latLng(point.lat, point.lng);
+  }
+
+  function syncVisualToCenter() {
+    visualFrame = 0;
+    if (!point || point.mode !== 'new') return;
+    const target = map.getCenter();
+    point.lat = Number(target.lat);
+    point.lng = Number(target.lng);
+    marker?.setLatLng(target);
+  }
+
+  function scheduleVisualSync() {
+    if (!point || point.mode !== 'new' || visualFrame) return;
+    visualFrame = requestAnimationFrame(syncVisualToCenter);
+  }
+
+  function publishSelectedPoint() {
     if (!point) return;
-    const target = point.mode === 'new' ? map.getCenter() : { lat: point.lat, lng: point.lng };
+    const payload = { ...point };
+    const signature = [
+      payload.mode,
+      payload.id || '',
+      Number(payload.lat).toFixed(6),
+      Number(payload.lng).toFixed(6),
+      Math.round(Number(payload.distanceM) || 0),
+      Math.round(Number(payload.bearingDeg) || 0),
+      payload.name || '',
+    ].join('|');
+    if (signature === lastPublishedSignature) return;
+    lastPublishedSignature = signature;
+    ctx.set('map.selectedPoint', payload, { source: 'waypoint-selector', kind: 'selected', confidence: 1 });
+  }
+
+  function updateMetrics({ publish = true } = {}) {
+    if (!point) return;
+    const target = selectedTarget();
+    if (!target) return;
 
     if (point.mode === 'new') {
       point.lat = Number(target.lat);
@@ -63,7 +102,7 @@
     distance.textContent = distanceLabel(point.distanceM);
     bearing.textContent = Number.isFinite(point.bearingDeg) ? `${Math.round(point.bearingDeg)}°` : '—';
     coordinates.textContent = `${Number(point.lat).toFixed(6)}, ${Number(point.lng).toFixed(6)}`;
-    ctx.set('map.selectedPoint', { ...point }, { source: 'waypoint-selector', kind: 'selected', confidence: 1 });
+    if (publish) publishSelectedPoint();
   }
 
   function markerIcon() {
@@ -97,8 +136,11 @@
   }
 
   function clear() {
+    if (visualFrame) cancelAnimationFrame(visualFrame);
+    visualFrame = 0;
     clearMarker();
     point = null;
+    lastPublishedSignature = '';
     sheet.classList.remove('is-open');
     sheet.hidden = true;
     sheet.removeAttribute('aria-busy');
@@ -115,6 +157,7 @@
     }
 
     clearMarker();
+    lastPublishedSignature = '';
     const center = map.getCenter();
     const defaultName = nextMarkerName();
     point = {
@@ -129,18 +172,19 @@
     configureMode('new');
     showSheet();
     marker = L.marker(center, { icon: markerIcon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
-    updateMetrics();
+    updateMetrics({ publish: true });
   }
 
   function openPOI(poi) {
     if (!poi?.id || window.WanderScreen?.current?.() !== 'map') return false;
     const stored = poiApi.get?.(poi.id) || poi;
     clearMarker();
+    lastPublishedSignature = '';
     point = { ...stored, mode: 'existing', saved: true };
     name.value = stored.name || 'Marcador';
     configureMode('existing');
     showSheet();
-    updateMetrics();
+    updateMetrics({ publish: true });
     return true;
   }
 
@@ -152,6 +196,7 @@
 
   function createSelectedPOI() {
     if (!point || point.mode !== 'new') return null;
+    updateMetrics({ publish: false });
     setSaving(true);
     const created = poiApi.createAt(
       { lat: point.lat, lng: point.lng },
@@ -175,11 +220,14 @@
   }
 
   name.addEventListener('input', () => {
-    if (point?.mode === 'new') updateMetrics();
+    if (point?.mode === 'new') updateMetrics({ publish: false });
   });
-  map.on('move zoom', () => {
-    if (point?.mode === 'new') updateMetrics();
+
+  map.on('move', scheduleVisualSync);
+  map.on('moveend zoomend', () => {
+    if (point) updateMetrics({ publish: true });
   });
+
   window.addEventListener('wander:open-waypoint-center', openAtCenter);
   window.addEventListener('wander:personal-poi-selected', (event) => openPOI(event.detail?.poi));
   window.addEventListener('wander:screen-will-change', (event) => {
@@ -188,11 +236,12 @@
 
   centerButton.addEventListener('click', () => {
     if (!point || point.mode !== 'existing') return;
-    map.setView([point.lat, point.lng], Math.max(map.getZoom(), 16), { animate: true });
+    map.panTo([point.lat, point.lng], { animate: true });
   });
 
   propertiesButton.addEventListener('click', () => {
     if (!point) return;
+    updateMetrics({ publish: false });
     if (point.mode === 'new') {
       const draft = {
         name: name.value.trim() || point.name || nextMarkerName(),
@@ -227,7 +276,9 @@
 
   ctx.subscribe?.((key) => {
     if (typeof key !== 'string') return;
-    if (point && (key === 'location.effective' || key.startsWith('location.effective.'))) updateMetrics();
+    if (point && (key === 'location.effective' || key.startsWith('location.effective.'))) {
+      updateMetrics({ publish: true });
+    }
   });
 
   window.WanderMapSelectedPoint = Object.freeze({
