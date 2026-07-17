@@ -166,9 +166,10 @@
       return;
     }
 
+    const saveMode = mode;
     saveButton.disabled = true;
     let saved = null;
-    if (mode === 'draft' && draft) {
+    if (saveMode === 'draft' && draft) {
       saved = api.createAt?.({ lat: draft.lat, lng: draft.lng }, values);
     } else if (selectedId) {
       saved = api.update?.(selectedId, values);
@@ -177,7 +178,7 @@
     if (!saved) return;
 
     hide();
-    window.WanderUI?.showToast?.(mode === 'draft' ? 'POI guardado' : 'POI actualizado', saved.name);
+    if (saveMode === 'existing') window.WanderUI?.showToast?.('POI actualizado', saved.name);
   });
 
   deleteButton.addEventListener('click', () => {
