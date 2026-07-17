@@ -1,6 +1,6 @@
 (() => {
-  const APP_BUILD = 'v0.93.2';
-  const MAP_RUNTIME_VERSION = '20260716-38';
+  const APP_BUILD = 'v0.93.3';
+  const MAP_RUNTIME_VERSION = '20260716-42';
 
   document.write('<script src="runtime-map-core.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
   document.write('<script src="runtime-map-position.js?v=' + MAP_RUNTIME_VERSION + '"><\/script>');
@@ -34,7 +34,7 @@
 
     try {
       loadStyle('wander-rule-checker.css?v=20260714-05');
-      await loadRuntime('runtime-situation-engine.js?v=20260716-35');
+      await loadRuntime('runtime-situation-engine.js?v=20260716-42');
       await loadRuntime('runtime-rule-checker.js?v=20260714-05');
     } catch {}
 
