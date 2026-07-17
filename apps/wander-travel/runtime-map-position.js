@@ -126,6 +126,13 @@
     });
   }
 
+  function followPosition(next) {
+    if (!followMode || !next) return false;
+    if (window.WanderMapControls?.followPosition?.(next)) return true;
+    if (map.distance(map.getCenter(), next) >= .25) map.panTo(next, { animate: false, noMoveStart: true });
+    return true;
+  }
+
   function syncEffectiveMarker() {
     const next = effectivePosition();
     if (!next) {
@@ -148,7 +155,7 @@
     }
 
     syncMarkerDraggable();
-    if (followMode) map.panTo(next, { animate: false });
+    followPosition(next);
     return next;
   }
 
@@ -158,7 +165,8 @@
     if (!position) return false;
     initialRealLocationCentered = true;
     hideRememberedPosition();
-    map.setView(position, Math.max(map.getZoom(), 15));
+    const zoom = remembered ? map.getZoom() : Math.max(map.getZoom(), 15);
+    map.setView(position, zoom, { animate: false });
     saveRememberedPosition(position);
     return true;
   }
@@ -166,7 +174,8 @@
   function centerOnPosition() {
     const position = effectivePosition();
     if (!position) return false;
-    map.panTo(position, { animate: false });
+    if (followMode && window.WanderMapControls?.followPosition?.(position)) return true;
+    if (map.distance(map.getCenter(), position) >= .25) map.panTo(position, { animate: false, noMoveStart: true });
     return true;
   }
 
