@@ -86,6 +86,7 @@
   }
 
   function showSheet() {
+    window.WanderUI?.hideWander?.();
     sheet.hidden = false;
     sheet.classList.add('is-open');
   }
@@ -107,6 +108,7 @@
   }
 
   function openAtCenter() {
+    if (window.WanderScreen?.current?.() !== 'map') window.WanderScreen?.open?.('map');
     if (point?.mode === 'new' && !sheet.hidden) {
       clear();
       return;
@@ -131,7 +133,7 @@
   }
 
   function openPOI(poi) {
-    if (!poi?.id) return false;
+    if (!poi?.id || window.WanderScreen?.current?.() !== 'map') return false;
     const stored = poiApi.get?.(poi.id) || poi;
     clearMarker();
     point = { ...stored, mode: 'existing', saved: true };
@@ -159,11 +161,16 @@
     return created;
   }
 
-  function openProperties(id, attempt = 0) {
+  function openExistingProperties(id) {
     if (!id) return false;
     if (window.WanderPersonalPOISheet?.showById?.(id)) return true;
     window.dispatchEvent(new CustomEvent('wander:personal-poi-properties', { detail: { id } }));
-    if (attempt < 20) setTimeout(() => openProperties(id, attempt + 1), 100);
+    return true;
+  }
+
+  function openDraftProperties(draft) {
+    if (window.WanderPersonalPOISheet?.showDraft?.(draft)) return true;
+    window.dispatchEvent(new CustomEvent('wander:personal-poi-draft', { detail: { draft } }));
     return true;
   }
 
@@ -175,6 +182,9 @@
   });
   window.addEventListener('wander:open-waypoint-center', openAtCenter);
   window.addEventListener('wander:personal-poi-selected', (event) => openPOI(event.detail?.poi));
+  window.addEventListener('wander:screen-will-change', (event) => {
+    if (event.detail?.to !== 'map') clear();
+  });
 
   centerButton.addEventListener('click', () => {
     if (!point || point.mode !== 'existing') return;
@@ -182,14 +192,25 @@
   });
 
   propertiesButton.addEventListener('click', () => {
-    if (point?.mode === 'new') {
-      const created = createSelectedPOI();
-      if (!created?.id) return;
+    if (!point) return;
+    if (point.mode === 'new') {
+      const draft = {
+        name: name.value.trim() || point.name || nextMarkerName(),
+        type: 'personal',
+        radiusM: 35,
+        notes: '',
+        overnight: false,
+        vehicle: false,
+        lat: Number(point.lat),
+        lng: Number(point.lng),
+      };
       clear();
-      openProperties(created.id);
+      openDraftProperties(draft);
       return;
     }
-    if (point?.id) openProperties(point.id);
+    const id = point.id;
+    clear();
+    openExistingProperties(id);
   });
 
   deleteButton.addEventListener('click', () => {
@@ -201,7 +222,9 @@
 
   saveButton.addEventListener('click', () => {
     const created = createSelectedPOI();
-    if (created?.id) clear();
+    if (!created?.id) return;
+    clear();
+    window.WanderUI?.showToast?.('POI guardado', created.name);
   });
 
   ctx.subscribe?.((key) => {
@@ -214,6 +237,7 @@
     openAtCenter,
     openPOI,
     clear,
+    isOpen: () => Boolean(point && !sheet.hidden),
   });
   window.dispatchEvent(new CustomEvent('wander:waypoint-selector-ready'));
 })();
