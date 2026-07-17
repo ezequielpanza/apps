@@ -3,7 +3,7 @@
   const engine = window.WanderEngine;
   if (!context || !engine?.subscribeEvaluation) return;
 
-  const RULE_SET_VERSION = '1.4.0';
+  const RULE_SET_VERSION = '1.5.0';
   const HISTORY_WINDOW_MS = 10 * 60 * 1000;
   const listeners = new Set();
   const motionHistory = [];
@@ -107,7 +107,10 @@
   }
 
   function inferMovementMethod({ rawMobility, speed, motion, routeType, metrics }) {
-    if (motion === 'stationary' || (speed !== null && speed <= 0.3)) {
+    if (motion === 'pending') {
+      return { id: 'unknown', label: 'Desconocido', confidence: 0.25, source: 'motion-pending', evidence: ['motion_pending'], candidates: [] };
+    }
+    if (motion === 'stationary') {
       return { id: 'stationary', label: 'Detenido', confidence: 0.96, source: 'motion-state', evidence: ['motion_stationary'], candidates: [{ id: 'stationary', score: 0.96 }] };
     }
 
@@ -199,6 +202,15 @@
 
     if (!situation.locationAvailable) {
       candidates.push(candidate('context_pending', 'location_required', 0.98, 'Preparando contexto', ['location_unavailable']));
+    } else if (motion === 'pending') {
+      const pendingLabel = situation.motion?.label || 'Preparando contexto';
+      candidates.push(candidate(
+        pendingLabel === 'Confirmando detención' ? 'confirming_stop' : 'context_pending',
+        pendingLabel === 'Confirmando detención' ? 'stationary_confirmation_pending' : 'motion_calibration_pending',
+        0.94,
+        pendingLabel,
+        situation.motion?.evidence || ['motion_pending']
+      ));
     } else if (motion === 'stationary') {
       candidates.push(candidate(
         stationaryName ? 'stationary_at_place' : 'stationary',
