@@ -1,6 +1,6 @@
 # Wander Travel
 
-Versión: **v0.99.1**
+Versión: **v0.100.0**
 
 Wander Travel combina una base técnica estable para observar el viaje con el primer ciclo funcional del compañero: interpreta la llegada a un lugar aparentemente nuevo, espera un momento apropiado, da una bienvenida contextual, acepta una corrección del usuario y recuerda lo presentado.
 
@@ -12,11 +12,16 @@ La versión v0.98.0 incorpora un presupuesto persistente de intervenciones: sepa
 
 La versión v0.99.1 corrige la integridad del contexto observado en uso real: el simulador ya no hereda el estado estacionario del GPS, las permanencias abiertas se reconcilian al reaparecer lejos de su centro y Contexto presenta valores humanos en español.
 
+La versión v0.99.2 separa el proveedor de contexto del origen de ubicación. La web continúa usando Geolocation y una futura aplicación móvil puede conectar un origen nativo sin duplicar el motor ni alterar el simulador. El contrato establece que Wander acompaña en primer y segundo plano, y se detiene cuando el usuario cierra explícitamente la aplicación.
+
+La versión v0.100.0 incorpora el contenedor Android de Wander. Un servicio de ubicación visible mantiene el contexto mientras la aplicación está en primer o segundo plano, las intervenciones del compañero pueden aparecer como notificaciones del sistema y quitar Wander de las aplicaciones recientes detiene el acompañamiento. La aplicación no solicita ubicación permanente ni se reinicia después de un cierre explícito.
+
 ## Arquitectura activa
 
 - **WanderContext** mantiene las señales observadas e inferidas del entorno.
 - **WanderEngine** interpreta ubicación, movimiento, transiciones, memoria geográfica y continuidad del viaje.
 - **Providers** obtienen ubicación, lugar, POIs, contenedores geográficos y simulación.
+- **LocationSources** selecciona la captura web actual o un origen nativo compatible con segundo plano.
 - **UI** representa únicamente funciones conectadas a datos o acciones reales.
 
 El orden de carga está declarado de forma determinista en `index.html`. `app.js` inicializa los providers, publica `wander:app-ready` y registra el service worker; no carga módulos adicionales de forma dinámica.
@@ -57,6 +62,18 @@ python -m http.server 8000 --directory apps/wander-travel
 ```
 
 Abrir `http://localhost:8000`.
+
+## Android
+
+La aplicación móvil usa Capacitor y conserva el runtime web como única implementación de la interfaz y del motor contextual.
+
+```bash
+cd apps/wander-travel
+npm ci
+npm run android:apk
+```
+
+El APK de depuración queda en `android/app/build/outputs/apk/debug/app-debug.apk`. El workflow `Build Wander Android` ejecuta el mismo proceso y publica el APK como artefacto descargable.
 
 ## Pruebas
 

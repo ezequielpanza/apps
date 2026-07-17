@@ -1,0 +1,18 @@
+{
+  "appId": "app.wandertravel.mobile",
+  "appName": "Wander Travel",
+  "webDir": "mobile-dist",
+  "backgroundColor": "#01E0CB",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#01E0CB"
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

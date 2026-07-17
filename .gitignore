@@ -1,0 +1,8 @@
+apps/wander-travel/node_modules/
+apps/wander-travel/mobile-dist/
+apps/wander-travel/android/.gradle/
+apps/wander-travel/android/.idea/
+apps/wander-travel/android/build/
+apps/wander-travel/android/app/build/
+apps/wander-travel/android/local.properties
+

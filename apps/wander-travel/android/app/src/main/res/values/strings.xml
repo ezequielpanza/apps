@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Wander Travel</string>
+    <string name="title_activity_main">Wander Travel</string>
+    <string name="package_name">app.wandertravel.mobile</string>
+    <string name="custom_url_scheme">app.wandertravel.mobile</string>
+    <string name="companion_channel_name">Acompañamiento de viaje</string>
+    <string name="companion_channel_description">Mantiene a Wander activo durante el viaje.</string>
+    <string name="companion_message_channel_name">Mensajes de Wander</string>
+    <string name="companion_notification_title">Wander te acompaña</string>
+    <string name="companion_notification_text">Observando el viaje en segundo plano</string>
+    <string name="companion_notification_stop">Detener</string>
+</resources>

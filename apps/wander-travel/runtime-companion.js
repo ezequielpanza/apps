@@ -118,6 +118,16 @@
     if (shown === false) return false;
 
     activeIntervention = intervention;
+    return rememberPresentation(intervention, reason, 'in_app');
+  }
+
+  function notify(intervention, reason) {
+    if (!window.WanderPlatform?.notifyCompanion?.(intervention)) return false;
+    activeIntervention = null;
+    return rememberPresentation(intervention, reason, 'notification');
+  }
+
+  function rememberPresentation(intervention, reason, channel) {
     lastInterventionAt = Date.now();
     pendingEvaluation = null;
     clearRetry();
@@ -146,6 +156,7 @@
       kind: intervention.kind,
       placeId: intervention.placeId,
       presentedAt: new Date(lastInterventionAt).toISOString(),
+      channel,
     }, {
       source: 'companion',
       kind: 'derived',
@@ -167,12 +178,14 @@
       lastInterventionAt,
       contentAlreadyTold: Boolean(contentId && engine.hasToldContent?.(contentId)),
       documentVisible: document.visibilityState !== 'hidden',
+      backgroundNotificationsAvailable: window.WanderPlatform?.canNotifyInBackground?.() === true,
       mapAvailable: mapAvailable(),
       recentInterventions: interventionHistory(),
       navigationActive: context.value?.('navigation.current')?.status === 'active',
     });
 
     if (result.disposition === 'present') present(result.intervention, reason);
+    if (result.disposition === 'notify') notify(result.intervention, reason);
     if (result.disposition === 'ignore') pendingEvaluation = null;
     if (result.disposition === 'defer') scheduleRetry(result.retryAt);
     return result;

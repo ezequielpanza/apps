@@ -13,6 +13,14 @@ Este documento define el comportamiento observable de Wander. Cada regla debe po
 7. La orientación usa referencias humanas: tiempo, distancia, derecha, izquierda y dirección de avance.
 8. Al recomendar un destino, la única acción principal es `Llévame`.
 
+## Ciclo de vida
+
+- Mientras Wander está visible, el compañero observa y actúa.
+- Cuando Wander pasa a segundo plano, el compañero continúa observando y puede comunicar una intervención apropiada mediante una notificación del sistema.
+- Cuando el usuario cierra o detiene explícitamente la aplicación, el acompañamiento y la captura de ubicación finalizan.
+- Wander no se inicia sola después de un cierre explícito ni funciona permanentemente desde el arranque del teléfono.
+- Una interrupción involuntaria del sistema conserva el último estado local confirmado para permitir una reanudación coherente, pero no se interpreta como permiso para ignorar un cierre del usuario.
+
 ## Ciclo de una intervención
 
 ```text

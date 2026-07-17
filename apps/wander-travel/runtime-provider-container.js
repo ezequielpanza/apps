@@ -95,7 +95,8 @@
       confidence: 0.7,
     });
 
-    const endpoint = `/api/osm/container?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`;
+    const path = `/api/osm/container?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`;
+    const endpoint = window.WanderPlatform?.apiUrl?.(path) || path;
     activePromise = fetch(endpoint, { headers: { accept: 'application/json' }, cache: 'no-store' })
       .then(async (response) => {
         const payload = await response.json().catch(() => ({}));

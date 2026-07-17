@@ -82,6 +82,7 @@
     lastInterventionAt = null,
     contentAlreadyTold = false,
     documentVisible = true,
+    backgroundNotificationsAvailable = false,
     mapAvailable = true,
     recentInterventions = [],
     navigationActive = false,
@@ -95,8 +96,10 @@
       : discoveryIntervention(evaluation);
     if (!intervention) return { disposition: 'ignore', reason: 'unsupported_place' };
     if (contentAlreadyTold) return { disposition: 'ignore', reason: 'content_already_told', intervention };
-    if (!documentVisible) return { disposition: 'defer', reason: 'document_hidden', intervention };
-    if (!mapAvailable) return { disposition: 'defer', reason: 'map_unavailable', intervention };
+    if (!documentVisible && !backgroundNotificationsAvailable) {
+      return { disposition: 'defer', reason: 'document_hidden', intervention };
+    }
+    if (documentVisible && !mapAvailable) return { disposition: 'defer', reason: 'map_unavailable', intervention };
     if (evaluation.type === 'discover_poi' && navigationActive) {
       return { disposition: 'defer', reason: 'navigation_active', intervention };
     }
@@ -132,7 +135,11 @@
       }
     }
 
-    return { disposition: 'present', reason: evaluation.reason || 'place_assumed_new', intervention };
+    return {
+      disposition: documentVisible ? 'present' : 'notify',
+      reason: evaluation.reason || 'place_assumed_new',
+      intervention,
+    };
   }
 
   window.WanderCompanionPolicy = {

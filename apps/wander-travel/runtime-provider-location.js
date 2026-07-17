@@ -1,21 +1,14 @@
 (() => {
   const context = window.WanderContext;
-  if (!context) return;
+  const locationSources = window.WanderLocationSources;
+  if (!context || !locationSources) return;
 
   const providers = window.WanderProviders || (window.WanderProviders = {});
-  let watchId = null;
+  let activeSource = null;
   const samples = [];
   let stableMode = 'unknown';
   let candidateMode = 'unknown';
   let candidateSince = 0;
-
-  function mapError(error) {
-    if (!error) return 'unavailable';
-    if (error.code === 1) return 'denied';
-    if (error.code === 2) return 'unavailable';
-    if (error.code === 3) return 'timeout';
-    return 'unavailable';
-  }
 
   function finite(value) {
     const number = Number(value);
@@ -128,47 +121,52 @@
     publishMobility(position.timestamp || Date.now());
   }
 
-  function onError(error) {
-    context.setRealLocationStatus(mapError(error), { source: 'geolocation' });
+  function onError(status) {
+    context.setRealLocationStatus(status || 'unavailable', { source: activeSource?.id || 'location-source' });
   }
 
   function start() {
-    if (!('geolocation' in navigator) || watchId != null) {
-      if (!('geolocation' in navigator)) context.setRealLocationStatus('unsupported', { source: 'geolocation' });
+    const source = activeSource || locationSources.resolve();
+    if (!source || source.isSupported?.() === false || source.isWatching?.()) {
+      if (!source || source.isSupported?.() === false) {
+        context.setRealLocationStatus('unsupported', { source: source?.id || 'location-source' });
+      }
       return false;
     }
 
-    context.setRealLocationStatus('pending', { source: 'geolocation' });
-    watchId = navigator.geolocation.watchPosition(onPosition, onError, {
-      enableHighAccuracy: true,
-      maximumAge: 2000,
-      timeout: 15000,
+    activeSource = source;
+    context.setRealLocationStatus('pending', { source: source.id || 'location-source' });
+    return source.start({
+      onPosition,
+      onError,
+      options: {
+        enableHighAccuracy: true,
+        maximumAge: 2000,
+        timeout: 15000,
+      },
     });
-    return true;
   }
 
   function stop() {
-    if (watchId == null || !('geolocation' in navigator)) return;
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
+    activeSource?.stop();
   }
 
   async function inspectPermission() {
-    if (!navigator.permissions?.query) return;
-    try {
-      const permission = await navigator.permissions.query({ name: 'geolocation' });
-      if (permission.state === 'denied') context.setRealLocationStatus('denied', { source: 'permissions' });
-      permission.addEventListener?.('change', () => {
-        if (permission.state === 'denied') context.setRealLocationStatus('denied', { source: 'permissions' });
-        else if (watchId == null) start();
-      });
-    } catch {}
+    const source = activeSource || locationSources.resolve();
+    await source?.inspectPermission?.((state) => {
+      if (state === 'denied') context.setRealLocationStatus('denied', { source: 'permissions' });
+      else if (!source.isWatching?.()) start();
+    });
   }
 
   providers.location = {
     start,
     stop,
-    isWatching: () => watchId != null,
+    isWatching: () => Boolean(activeSource?.isWatching?.()),
+    getSourceInfo: () => activeSource ? {
+      id: activeSource.id || 'location-source',
+      capabilities: { ...(activeSource.capabilities || {}) },
+    } : null,
     getMobilitySamples: () => samples.map((sample) => ({ ...sample })),
   };
 

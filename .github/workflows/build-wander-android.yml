@@ -1,0 +1,46 @@
+name: Build Wander Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/wander-travel/**'
+      - '.github/workflows/build-wander-android.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/wander-travel
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/wander-travel/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - run: npm ci
+      - run: npm run android:sync
+      - run: ./gradlew assembleDebug
+        working-directory: apps/wander-travel/android
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wander-travel-debug-apk
+          path: apps/wander-travel/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

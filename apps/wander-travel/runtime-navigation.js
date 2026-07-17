@@ -151,7 +151,8 @@
     const target = { id: destination.id || null, name: destination.name || 'el destino', lat, lng };
     ui.showWander('Preparando la ruta', `Buscando el mejor recorrido a pie hasta ${target.name}.`, { persistent: true });
     try {
-      const response = await fetch('/api/routes/walking', {
+      const endpoint = window.WanderPlatform?.apiUrl?.('/api/routes/walking') || '/api/routes/walking';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ origin, destination: target }),

@@ -104,7 +104,7 @@
     if (lat === null || lng === null) throw new Error('Google Places requires valid coordinates');
 
     const radiusM = Math.max(25, Math.min(50000, finite(request.radiusM) || 300));
-    const url = new URL('/api/places/nearby', window.location.origin);
+    const url = new URL(window.WanderPlatform?.apiUrl?.('/api/places/nearby') || '/api/places/nearby', window.location.origin);
     url.searchParams.set('lat', String(lat));
     url.searchParams.set('lng', String(lng));
     url.searchParams.set('radius', String(radiusM));

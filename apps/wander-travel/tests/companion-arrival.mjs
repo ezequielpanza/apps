@@ -60,6 +60,16 @@ const at = new Date('2026-07-17T10:00:00-04:00').getTime();
 }
 
 {
+  const withoutNative = policy.decide({ evaluation: evaluation(), at, documentVisible: false });
+  assert.equal(withoutNative.disposition, 'defer');
+  const withNative = policy.decide({
+    evaluation: evaluation(), at, documentVisible: false, backgroundNotificationsAvailable: true,
+  });
+  assert.equal(withNative.disposition, 'notify');
+  console.log('PASS a hidden native app uses a system notification while the web app defers');
+}
+
+{
   const shown = [];
   const remembered = [];
   const observed = [];
@@ -121,4 +131,4 @@ const at = new Date('2026-07-17T10:00:00-04:00').getTime();
   console.log('PASS arrival is presented, remembered, and accepts a contextual correction');
 }
 
-console.log('\n5/5 companion arrival tests passed');
+console.log('\n6/6 companion arrival tests passed');
