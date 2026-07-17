@@ -58,3 +58,9 @@ Wander puede mencionar un POI cuando está suficientemente cerca, es turístico 
 La intervención usa metros o minutos a pie y, cuando existe un rumbo confiable, `más adelante`, `a tu derecha` o `a tu izquierda`. Los datos descriptivos proceden exclusivamente de notas normalizadas de las fuentes. Si no existe una nota, Wander solo comunica la existencia y posición del lugar.
 
 Si el POI tiene coordenadas confiables, la intervención puede ofrecer una única acción: `Llévame`. La acción solicita una ruta peatonal, la dibuja, comunica distancia y duración y transforma las maniobras en instrucciones humanas. Toda ruta peatonal presenta la advertencia de que puede no reflejar todas las condiciones de aceras o senderos.
+
+## Presupuesto de interrupciones
+
+Las intervenciones no solicitadas deben estar separadas por al menos dos minutos. Wander puede presentar como máximo tres descubrimientos de POIs en una ventana de treinta minutos. La bienvenida a una ciudad no consume ese presupuesto específico. Durante una navegación activa, los descubrimientos quedan aplazados para que las indicaciones de ruta tengan prioridad. Cerrar una intervención se registra como feedback, sin volver a mostrar el mismo contenido.
+
+Aceptar `Llévame` también se registra como feedback positivo del contenido y del destino propuesto.

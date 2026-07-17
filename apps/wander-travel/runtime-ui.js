@@ -7,6 +7,7 @@
   let toast = null;
   let replyForm = null;
   let actionRow = null;
+  let dismissHandler = null;
 
   function getMessageTimeoutMs() {
     try {
@@ -39,6 +40,7 @@
     clearMessageTimer();
     clearReply();
     clearAction();
+    dismissHandler = null;
     const card = $('#wander-card');
     if (card) card.hidden = true;
   }
@@ -164,6 +166,7 @@
     setText('#wander-message', message);
     configureReply(options.reply);
     configureAction(options.action);
+    dismissHandler = typeof options.onDismiss === 'function' ? options.onDismiss : null;
 
     if (options.persistent === true) return true;
     const timeoutMs = Number.isFinite(Number(options.timeoutMs))
@@ -171,6 +174,12 @@
       : getMessageTimeoutMs();
     if (timeoutMs > 0) messageTimer = setTimeout(hideWander, timeoutMs);
     return true;
+  }
+
+  function dismissWander() {
+    const onDismiss = dismissHandler;
+    hideWander();
+    try { onDismiss?.(); } catch {}
   }
 
   function syncRuntimeMetrics() {
@@ -189,7 +198,7 @@
     syncRuntimeMetrics();
   }
 
-  $('#close-wander')?.addEventListener('click', hideWander);
+  $('#close-wander')?.addEventListener('click', dismissWander);
 
   window.addEventListener('wander:screen-will-change', hideWander);
   window.addEventListener('wander:personal-poi-editor-open', hideWander);

@@ -66,3 +66,6 @@ jobs:
 
       - name: Run walking route API tests
         run: node apps/wander-travel/tests/routes-api.mjs
+
+      - name: Run companion interruption budget tests
+        run: node apps/wander-travel/tests/companion-budget.mjs

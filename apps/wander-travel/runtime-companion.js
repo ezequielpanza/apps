@@ -6,9 +6,21 @@
   if (!context || !engine?.subscribeEvaluation || !policy || !ui) return;
 
   let pendingEvaluation = null;
-  let lastInterventionAt = null;
+  let lastInterventionAt = latestInterventionAt();
   let retryTimer = null;
   let activeIntervention = null;
+
+  function interventionHistory() {
+    return (engine.getState?.()?.memory?.interactions || [])
+      .filter((entry) => entry?.type === 'companion_intervention');
+  }
+
+  function latestInterventionAt() {
+    return interventionHistory().reduce((latest, entry) => {
+      const at = Date.parse(entry?.at || '');
+      return Number.isFinite(at) ? Math.max(latest || 0, at) : latest;
+    }, null);
+  }
 
   function mapAvailable() {
     const app = document.querySelector('.wander-app');
@@ -48,9 +60,29 @@
           ui.showWander('La navegación aún no está disponible', 'Probá de nuevo en unos segundos.', { timeoutMs: 6000 });
           return null;
         }
-        return navigation.start(intervention.action.destination);
+        return Promise.resolve(navigation.start(intervention.action.destination)).then((route) => {
+          if (!route) return null;
+          engine.observe?.({
+            type: 'companion_feedback',
+            interventionId: intervention.id,
+            feedbackType: 'accepted',
+            contentId: intervention.contentId,
+          });
+          engine.updateContentFeedback?.(intervention.contentId, { interest: 'accepted' });
+          return route;
+        });
       },
     };
+  }
+
+  function recordDismissal(intervention) {
+    engine.observe?.({
+      type: 'companion_feedback',
+      interventionId: intervention.id,
+      feedbackType: 'dismissed',
+      contentId: intervention.contentId,
+    });
+    engine.updateContentFeedback?.(intervention.contentId, { interest: 'dismissed' });
   }
 
   function present(intervention, reason) {
@@ -58,6 +90,7 @@
       timeoutMs: 14000,
       reply: replyOptions(intervention),
       action: actionOptions(intervention),
+      onDismiss: () => recordDismissal(intervention),
     });
     if (shown === false) return false;
 
@@ -81,6 +114,7 @@
     engine.observe?.({
       type: 'companion_intervention',
       interventionId: intervention.id,
+      kind: intervention.kind,
       contentId: intervention.contentId,
       reason,
     });
@@ -111,6 +145,8 @@
       contentAlreadyTold: Boolean(contentId && engine.hasToldContent?.(contentId)),
       documentVisible: document.visibilityState !== 'hidden',
       mapAvailable: mapAvailable(),
+      recentInterventions: interventionHistory(),
+      navigationActive: context.value?.('navigation.current')?.status === 'active',
     });
 
     if (result.disposition === 'present') present(result.intervention, reason);

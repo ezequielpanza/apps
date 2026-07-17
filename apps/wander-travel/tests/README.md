@@ -17,6 +17,7 @@ node apps/wander-travel/tests/companion-arrival.mjs
 node apps/wander-travel/tests/companion-discovery.mjs
 node apps/wander-travel/tests/navigation.mjs
 node apps/wander-travel/tests/routes-api.mjs
+node apps/wander-travel/tests/companion-budget.mjs
 ```
 
 The runners have no external dependencies. They load the real production runtime modules in isolated Node `vm` contexts with controlled storage and simulated source responses.
@@ -129,6 +130,8 @@ A failing assertion exits with a non-zero status so all runners can execute in C
 `navigation.mjs` verifies polyline decoding, human maneuver language, route drawing, route state, and the required walking-route warning.
 
 `routes-api.mjs` verifies coordinate validation, the server-side Google Routes request, response normalization, and that the API key is never exposed to the client.
+
+`companion-budget.mjs` verifies the global cooldown, the rolling discovery limit, new-city priority, and silence during active navigation.
 
 ## App shell
 

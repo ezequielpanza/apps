@@ -1,6 +1,8 @@
 (() => {
   const GLOBAL_COOLDOWN_MS = 120000;
   const FAST_MOVEMENT_KMH = 6;
+  const DISCOVERY_WINDOW_MS = 30 * 60 * 1000;
+  const MAX_DISCOVERIES_PER_WINDOW = 3;
 
   function finite(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -81,6 +83,8 @@
     contentAlreadyTold = false,
     documentVisible = true,
     mapAvailable = true,
+    recentInterventions = [],
+    navigationActive = false,
   } = {}) {
     if (!['introduce_place', 'discover_poi'].includes(evaluation?.type)) {
       return { disposition: 'ignore', reason: 'unsupported_action' };
@@ -93,6 +97,9 @@
     if (contentAlreadyTold) return { disposition: 'ignore', reason: 'content_already_told', intervention };
     if (!documentVisible) return { disposition: 'defer', reason: 'document_hidden', intervention };
     if (!mapAvailable) return { disposition: 'defer', reason: 'map_unavailable', intervention };
+    if (evaluation.type === 'discover_poi' && navigationActive) {
+      return { disposition: 'defer', reason: 'navigation_active', intervention };
+    }
 
     const speedKmh = finite(evaluation?.situation?.speedKmh);
     const moving = evaluation?.situation?.motion?.status === 'moving';
@@ -110,12 +117,27 @@
       };
     }
 
+    if (evaluation.type === 'discover_poi') {
+      const recentDiscoveries = (Array.isArray(recentInterventions) ? recentInterventions : [])
+        .map((entry) => ({ ...entry, at: Date.parse(entry?.at) || finite(entry?.at) }))
+        .filter((entry) => entry.kind === 'poi_discovery' && Number.isFinite(entry.at) && at - entry.at < DISCOVERY_WINDOW_MS)
+        .sort((left, right) => left.at - right.at);
+      if (recentDiscoveries.length >= MAX_DISCOVERIES_PER_WINDOW) {
+        return {
+          disposition: 'defer',
+          reason: 'discovery_budget_exhausted',
+          retryAt: recentDiscoveries[0].at + DISCOVERY_WINDOW_MS,
+          intervention,
+        };
+      }
+    }
+
     return { disposition: 'present', reason: evaluation.reason || 'place_assumed_new', intervention };
   }
 
   window.WanderCompanionPolicy = {
     decide,
     greeting,
-    constants: { GLOBAL_COOLDOWN_MS, FAST_MOVEMENT_KMH },
+    constants: { GLOBAL_COOLDOWN_MS, FAST_MOVEMENT_KMH, DISCOVERY_WINDOW_MS, MAX_DISCOVERIES_PER_WINDOW },
   };
 })();
