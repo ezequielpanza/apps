@@ -6,6 +6,7 @@
   let toastTimer = null;
   let toast = null;
   let replyForm = null;
+  let actionRow = null;
 
   function getMessageTimeoutMs() {
     try {
@@ -37,6 +38,7 @@
   function hideWander() {
     clearMessageTimer();
     clearReply();
+    clearAction();
     const card = $('#wander-card');
     if (card) card.hidden = true;
   }
@@ -76,6 +78,43 @@
       reply.onSubmit(value);
     };
     form.hidden = false;
+  }
+
+  function ensureActionRow() {
+    if (actionRow?.isConnected) return actionRow;
+    const card = $('#wander-card');
+    if (!card) return null;
+    actionRow = document.createElement('div');
+    actionRow.className = 'wander-card-action';
+    actionRow.hidden = true;
+    actionRow.innerHTML = '<button type="button"></button>';
+    card.appendChild(actionRow);
+    return actionRow;
+  }
+
+  function clearAction() {
+    if (!actionRow) return;
+    actionRow.hidden = true;
+    const button = actionRow.querySelector('button');
+    if (button) {
+      button.onclick = null;
+      button.disabled = false;
+    }
+  }
+
+  function configureAction(action) {
+    clearAction();
+    if (!action || typeof action.onInvoke !== 'function') return;
+    const row = ensureActionRow();
+    const button = row?.querySelector('button');
+    if (!row || !button) return;
+    button.textContent = action.label || 'Continuar';
+    button.onclick = async () => {
+      button.disabled = true;
+      try { await action.onInvoke(); }
+      finally { button.disabled = false; }
+    };
+    row.hidden = false;
   }
 
   function ensureToast() {
@@ -118,11 +157,13 @@
     const card = $('#wander-card');
     clearMessageTimer();
     clearReply();
+    clearAction();
     if (document.body.classList.contains('poi-editor-open') || !card) return false;
     card.hidden = false;
     setText('#wander-title', title);
     setText('#wander-message', message);
     configureReply(options.reply);
+    configureAction(options.action);
 
     if (options.persistent === true) return true;
     const timeoutMs = Number.isFinite(Number(options.timeoutMs))

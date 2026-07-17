@@ -66,6 +66,25 @@ body.poi-editor-open .wander-card{
   text-align:right;
 }
 
+.wander-card-action{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:14px;
+}
+.wander-card-action[hidden]{display:none!important}
+.wander-card-action button{
+  min-height:42px;
+  border:0;
+  border-radius:13px;
+  padding:0 18px;
+  background:var(--green);
+  color:#fff;
+  font:inherit;
+  font-size:.84rem;
+  font-weight:850;
+}
+.wander-card-action button:disabled{opacity:.55}
+
 @media (min-width:700px){
   .wander-card{
     left:12px;

@@ -54,6 +54,8 @@
     if (!poi?.id || !poi?.name) return null;
     const lead = `${humanDistance(poi.distanceM)}${directionText(poi.direction)} está ${poi.name}.`;
     const fact = poi.note ? ` ${String(poi.note).replace(/\s+/g, ' ').trim().slice(0, 240)}` : '';
+    const lat = finite(poi.location?.lat);
+    const lng = finite(poi.location?.lng);
     return {
       id: `discovery:${poi.id}`,
       kind: 'poi_discovery',
@@ -63,6 +65,11 @@
       topic: 'poi_discovery',
       placeId: poi.id,
       poi,
+      action: lat !== null && lng !== null ? {
+        id: 'take-me',
+        label: 'Llévame',
+        destination: { id: poi.id, name: poi.name, lat, lng },
+      } : null,
       allowsFamiliarityCorrection: false,
     };
   }

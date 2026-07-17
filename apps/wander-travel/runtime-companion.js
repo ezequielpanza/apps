@@ -38,10 +38,26 @@
     };
   }
 
+  function actionOptions(intervention) {
+    if (!intervention.action) return null;
+    return {
+      label: intervention.action.label,
+      onInvoke: () => {
+        const navigation = window.WanderNavigation;
+        if (!navigation?.start) {
+          ui.showWander('La navegación aún no está disponible', 'Probá de nuevo en unos segundos.', { timeoutMs: 6000 });
+          return null;
+        }
+        return navigation.start(intervention.action.destination);
+      },
+    };
+  }
+
   function present(intervention, reason) {
     const shown = ui.showWander(intervention.title, intervention.message, {
       timeoutMs: 14000,
       reply: replyOptions(intervention),
+      action: actionOptions(intervention),
     });
     if (shown === false) return false;
 

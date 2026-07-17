@@ -1,10 +1,12 @@
 # Wander Travel
 
-Versión: **v0.96.0**
+Versión: **v0.97.0**
 
 Wander Travel combina una base técnica estable para observar el viaje con el primer ciclo funcional del compañero: interpreta la llegada a un lugar aparentemente nuevo, espera un momento apropiado, da una bienvenida contextual, acepta una corrección del usuario y recuerda lo presentado.
 
 La versión v0.96.0 añade el primer descubrimiento contextual: durante una caminata o permanencia, Wander puede seleccionar un POI turístico cercano, describir su posición con lenguaje humano y aportar únicamente información respaldada por los datos normalizados disponibles.
+
+La versión v0.97.0 conecta la acción `Llévame` con rutas peatonales reales. La clave permanece en Cloudflare, la ruta se representa sobre el mapa y Wander ofrece instrucciones de maniobra sin referencias a la posición visual del mapa.
 
 ## Arquitectura activa
 
@@ -29,6 +31,7 @@ El orden de carga está declarado de forma determinista en `index.html`. `app.js
 - Política de intervenciones y bienvenida a ciudades o países aparentemente nuevos.
 - Corrección contextual de familiaridad y memoria del contenido presentado.
 - Descubrimiento silencioso de POIs relevantes, con distancia y dirección humanas.
+- Rutas peatonales mediante Google Routes y seguimiento básico de pasos.
 - Simulador de ubicación y movimiento.
 - PWA con caché offline versionado.
 

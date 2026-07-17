@@ -132,6 +132,7 @@
         score: poi.priority,
         poiId: poi.id,
         poiName: poi.name,
+        poiLocation: poi.location,
         distanceM: poi.distanceM,
         bearingDeg: poi.bearingDeg,
         direction: poi.direction,

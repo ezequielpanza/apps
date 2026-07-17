@@ -31,6 +31,7 @@ function monument(overrides = {}) {
   return {
     id: 'poi:fortaleza-ozama',
     name: 'Fortaleza Ozama',
+    location: { lat: 18.472, lng: -69.884 },
     distanceM: 90,
     bearingDeg: 20,
     relevanceScore: 0.88,
@@ -63,6 +64,7 @@ const runtime = load([
   assert.match(intervention.intervention.message, /90 metros/);
   assert.match(intervention.intervention.message, /más adelante/);
   assert.match(intervention.intervention.message, /siglo XVI/);
+  assert.equal(intervention.intervention.action.label, 'Llévame');
   console.log('PASS a nearby landmark becomes a grounded human-direction discovery');
 }
 

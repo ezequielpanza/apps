@@ -60,3 +60,9 @@ jobs:
 
       - name: Run companion discovery tests
         run: node apps/wander-travel/tests/companion-discovery.mjs
+
+      - name: Run navigation tests
+        run: node apps/wander-travel/tests/navigation.mjs
+
+      - name: Run walking route API tests
+        run: node apps/wander-travel/tests/routes-api.mjs

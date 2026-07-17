@@ -15,6 +15,7 @@
         poi: {
           id: signal.poiId || null,
           name: signal.poiName || null,
+          location: signal.poiLocation || null,
           distanceM: signal.distanceM ?? null,
           bearingDeg: signal.bearingDeg ?? null,
           direction: signal.direction || null,

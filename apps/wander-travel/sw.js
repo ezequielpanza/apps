@@ -75,6 +75,7 @@ const APP_SHELL = [
   './runtime-points-screen.js',
   './runtime-message-timeout-settings.js',
   './runtime-companion.js',
+  './runtime-navigation.js',
   './app.js',
 ];
 

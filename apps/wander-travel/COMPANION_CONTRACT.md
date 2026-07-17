@@ -56,3 +56,5 @@ La escena se considera completa cuando una prueba puede demostrar que Wander det
 Wander puede mencionar un POI cuando está suficientemente cerca, es turístico o posee una nota informativa, supera el umbral de relevancia y todavía no fue presentado. Si el usuario camina, el lugar debe encontrarse delante o a uno de sus lados; un lugar ya dejado atrás no provoca una interrupción.
 
 La intervención usa metros o minutos a pie y, cuando existe un rumbo confiable, `más adelante`, `a tu derecha` o `a tu izquierda`. Los datos descriptivos proceden exclusivamente de notas normalizadas de las fuentes. Si no existe una nota, Wander solo comunica la existencia y posición del lugar.
+
+Si el POI tiene coordenadas confiables, la intervención puede ofrecer una única acción: `Llévame`. La acción solicita una ruta peatonal, la dibuja, comunica distancia y duración y transforma las maniobras en instrucciones humanas. Toda ruta peatonal presenta la advertencia de que puede no reflejar todas las condiciones de aceras o senderos.

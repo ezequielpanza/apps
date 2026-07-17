@@ -63,6 +63,7 @@
     return {
       id: poi.id,
       name: poi.name,
+      location: poi.location || null,
       distanceM: Math.round(distanceM),
       bearingDeg: finite(poi.bearingDeg),
       direction,
