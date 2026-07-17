@@ -11,6 +11,8 @@ const serviceWorker = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
 const versionRuntime = fs.readFileSync(path.join(ROOT, 'runtime-version.js'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
 const mapControls = fs.readFileSync(path.join(ROOT, 'runtime-map-controls.js'), 'utf8');
+const messageCss = fs.readFileSync(path.join(ROOT, 'wander-message-top.css'), 'utf8');
+const uiRuntime = fs.readFileSync(path.join(ROOT, 'runtime-ui.js'), 'utf8');
 
 function localReferences(source) {
   return [...source.matchAll(/(?:src|href)=["']([^"']+)["']/g)]
@@ -51,6 +53,9 @@ assert.doesNotMatch(html, /v\d+\.\d+\.\d+/, 'index.html must not duplicate the a
 assert.doesNotMatch(serviceWorker, /wander-travel-v\d+/, 'sw.js must derive its cache name from runtime-version.js');
 assert.match(mapControls, /restoreFollowAfterPinch/, 'Pinch zoom must preserve active map following');
 assert.match(mapControls, /position\.setFollowMode\(true, \{ centerNow: false \}\)/, 'Pinch zoom must restore the selected center anchor');
+assert.match(messageCss, /\.wander-card\s*\{[\s\S]*?top:\s*0;/, 'Wander messages must open from the top edge');
+assert.match(messageCss, /z-index:\s*115;/, 'Wander messages must cover the map header');
+assert.match(uiRuntime, /configureChoices\(options\.choices\)/, 'Wander messages must support explicit choices');
 
 for (const retiredPath of [
   'imports/wander',

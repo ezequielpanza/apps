@@ -1,6 +1,6 @@
 # Wander Travel
 
-Versión: **v0.100.1**
+Versión: **v0.100.2**
 
 Wander Travel combina una base técnica estable para observar el viaje con el primer ciclo funcional del compañero: interpreta la llegada a un lugar aparentemente nuevo, espera un momento apropiado, da una bienvenida contextual, acepta una corrección del usuario y recuerda lo presentado.
 
@@ -15,6 +15,8 @@ La versión v0.99.1 corrige la integridad del contexto observado en uso real: el
 La versión v0.99.2 separa el proveedor de contexto del origen de ubicación. La web continúa usando Geolocation y una futura aplicación móvil puede conectar un origen nativo sin duplicar el motor ni alterar el simulador. El contrato establece que Wander acompaña en primer y segundo plano, y se detiene cuando el usuario cierra explícitamente la aplicación.
 
 La versión v0.100.1 alinea el ícono y la pantalla de inicio de Android con la identidad visual de Wander y conserva el centrado seleccionado durante el zoom con dos dedos. Mantiene además el contenedor Android incorporado en v0.100.0: un servicio de ubicación visible conserva el contexto mientras la aplicación está en primer o segundo plano, y quitar Wander de las aplicaciones recientes detiene el acompañamiento.
+
+La versión v0.100.2 reemplaza la respuesta escrita de familiaridad por decisiones explícitas y presenta todas las intervenciones del compañero desde el borde superior, cubriendo por completo la W y el dashboard mientras están activas.
 
 ## Arquitectura activa
 

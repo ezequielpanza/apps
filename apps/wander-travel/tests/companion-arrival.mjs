@@ -123,8 +123,13 @@ const at = new Date('2026-07-17T10:00:00-04:00').getTime();
   assert.equal(remembered[0].contentId, 'place-intro:city:santo-domingo');
   assert.equal(correctionTarget.placeId, 'city:santo-domingo');
   assert.equal(observed[0].type, 'companion_intervention');
+  assert.equal(shown[0].options.persistent, true);
+  assert.deepEqual(Array.from(shown[0].options.choices, (choice) => choice.label), [
+    'Sí, la conozco',
+    'No, es nueva para mí',
+  ]);
 
-  const correction = sandbox.window.WanderCompanion.receive('Ya conozco Santo Domingo');
+  const correction = shown[0].options.choices[0].onInvoke();
   assert.equal(correction.handled, true);
   assert.equal(shown.at(-1).title, 'Entendido');
   assert.equal(observed.at(-1).type, 'companion_feedback');
