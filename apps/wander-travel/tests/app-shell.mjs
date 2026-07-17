@@ -9,6 +9,8 @@ const REPOSITORY_ROOT = path.resolve(ROOT, '..', '..');
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const serviceWorker = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
 const versionRuntime = fs.readFileSync(path.join(ROOT, 'runtime-version.js'), 'utf8');
+const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
+const mapControls = fs.readFileSync(path.join(ROOT, 'runtime-map-controls.js'), 'utf8');
 
 function localReferences(source) {
   return [...source.matchAll(/(?:src|href)=["']([^"']+)["']/g)]
@@ -44,8 +46,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define the app version');
+assert.equal(manifest.start_url, `./?app=${versionMatch[1]}`, 'Manifest start URL must follow the app version');
 assert.doesNotMatch(html, /v\d+\.\d+\.\d+/, 'index.html must not duplicate the app version');
 assert.doesNotMatch(serviceWorker, /wander-travel-v\d+/, 'sw.js must derive its cache name from runtime-version.js');
+assert.match(mapControls, /restoreFollowAfterPinch/, 'Pinch zoom must preserve active map following');
+assert.match(mapControls, /position\.setFollowMode\(true, \{ centerNow: false \}\)/, 'Pinch zoom must restore the selected center anchor');
 
 for (const retiredPath of [
   'imports/wander',
