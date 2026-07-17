@@ -20,6 +20,17 @@
     return note ? String(note.text).replace(/\s+/g, ' ').trim().slice(0, 240) : null;
   }
 
+  function preferenceFor(poi, categoryPreferences = {}) {
+    const values = (Array.isArray(poi?.categories) ? poi.categories : []).flatMap((category) => {
+      const keys = [category?.id, category?.label]
+        .map((value) => String(value || '').trim().toLowerCase())
+        .filter(Boolean);
+      return keys.map((key) => finite(categoryPreferences?.[key])).filter((value) => value !== null);
+    });
+    if (!values.length) return 0;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
   function relativeDirection(heading, bearing) {
     const currentHeading = finite(heading);
     const targetBearing = finite(bearing);
@@ -39,7 +50,7 @@
     return 150;
   }
 
-  function candidateFor(poi, situation, hasToldContent) {
+  function candidateFor(poi, situation, hasToldContent, categoryPreferences) {
     if (!poi?.id || !poi?.name) return null;
     const distanceM = finite(poi.distanceM);
     if (distanceM === null || distanceM < 15 || distanceM > distanceLimit(situation)) return null;
@@ -48,6 +59,8 @@
     const note = noteText(poi);
     const touristInterest = TOURISM_PATTERN.test(categories);
     if (UTILITY_PATTERN.test(categories) || (!touristInterest && !note)) return null;
+    const preference = preferenceFor(poi, categoryPreferences);
+    if (preference <= -2.5) return null;
 
     const contentId = `poi-discovery:${poi.id}`;
     if (hasToldContent?.(contentId)) return null;
@@ -58,7 +71,8 @@
     const relevance = Math.max(0, Math.min(1, finite(poi.relevanceScore) ?? 0));
     if (relevance < 0.52) return null;
     const distanceScore = 1 - Math.min(1, distanceM / distanceLimit(situation));
-    const priority = Math.min(0.84, 0.48 + relevance * 0.22 + distanceScore * 0.1 + (note ? 0.04 : 0));
+    const preferenceAdjustment = Math.max(-0.1, Math.min(0.1, preference * 0.03));
+    const priority = Math.min(0.84, 0.48 + relevance * 0.22 + distanceScore * 0.1 + (note ? 0.04 : 0) + preferenceAdjustment);
 
     return {
       id: poi.id,
@@ -71,12 +85,13 @@
       categories: Array.isArray(poi.categories) ? poi.categories : [],
       sources: Array.isArray(poi.sources) ? poi.sources : [],
       relevanceScore: relevance,
+      preference,
       priority: Math.round(priority * 1000) / 1000,
       contentId,
     };
   }
 
-  function evaluate({ situation, items = [], hasToldContent = null } = {}) {
+  function evaluate({ situation, items = [], hasToldContent = null, categoryPreferences = {} } = {}) {
     const speedKmh = finite(situation?.speedKmh);
     if (!situation?.locationAvailable) return { candidate: null, reason: 'location_unavailable' };
     if (situation?.motion?.status === 'moving' && speedKmh !== null && speedKmh > 8) {
@@ -84,7 +99,7 @@
     }
 
     const candidates = (Array.isArray(items) ? items : [])
-      .map((poi) => candidateFor(poi, situation, hasToldContent))
+      .map((poi) => candidateFor(poi, situation, hasToldContent, categoryPreferences))
       .filter(Boolean)
       .sort((left, right) => right.priority - left.priority || left.distanceM - right.distanceM);
 

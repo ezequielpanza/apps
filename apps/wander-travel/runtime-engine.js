@@ -241,6 +241,7 @@
       situation,
       items: context.value('nearby.items') || [],
       hasToldContent: placeEngine.hasToldContent,
+      categoryPreferences: state.getState()?.profile?.interests || {},
     });
     const relevance = relevanceEngine.evaluate({
       situation,
@@ -302,6 +303,7 @@
       situation,
       items: context.value('nearby.items') || [],
       hasToldContent: placeEngine.hasToldContent,
+      categoryPreferences: state.getState()?.profile?.interests || {},
     });
     const relevance = relevanceEngine.evaluate({
       situation,

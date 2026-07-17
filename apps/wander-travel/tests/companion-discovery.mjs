@@ -111,4 +111,28 @@ const runtime = load([
   console.log('PASS generic utilities do not create unsolicited discoveries');
 }
 
-console.log('\n5/5 companion discovery tests passed');
+{
+  const museum = monument({
+    id: 'poi:museum',
+    name: 'Museo de la Ciudad',
+    distanceM: 150,
+    bearingDeg: 30,
+    categories: [{ id: 'museum', label: 'Museo' }],
+  });
+  const preferred = runtime.WanderEngineDiscovery.evaluate({
+    situation: situation(),
+    items: [monument(), museum],
+    categoryPreferences: { museum: 5 },
+  });
+  assert.equal(preferred.candidate.id, 'poi:museum');
+
+  const rejected = runtime.WanderEngineDiscovery.evaluate({
+    situation: situation(),
+    items: [museum],
+    categoryPreferences: { museum: -3 },
+  });
+  assert.equal(rejected.candidate, null);
+  console.log('PASS learned category preferences change future discovery relevance');
+}
+
+console.log('\n6/6 companion discovery tests passed');

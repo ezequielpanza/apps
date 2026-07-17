@@ -69,10 +69,32 @@
             contentId: intervention.contentId,
           });
           engine.updateContentFeedback?.(intervention.contentId, { interest: 'accepted' });
+          learnCategories(intervention, 1, 'accepted');
           return route;
         });
       },
     };
+  }
+
+  function categoryKeys(intervention) {
+    return (Array.isArray(intervention?.poi?.categories) ? intervention.poi.categories : [])
+      .flatMap((category) => [category?.id, category?.label])
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  function learnCategories(intervention, delta, reason) {
+    const keys = [...new Set(categoryKeys(intervention))];
+    if (!keys.length || !engine.update) return;
+    engine.update((draft) => {
+      draft.profile ||= {};
+      draft.profile.interests ||= {};
+      keys.forEach((key) => {
+        const current = Number(draft.profile.interests[key]) || 0;
+        draft.profile.interests[key] = Math.max(-3, Math.min(5, Math.round((current + delta) * 10) / 10));
+      });
+      return draft;
+    }, `companion-preference:${reason}`);
   }
 
   function recordDismissal(intervention) {
@@ -83,6 +105,7 @@
       contentId: intervention.contentId,
     });
     engine.updateContentFeedback?.(intervention.contentId, { interest: 'dismissed' });
+    learnCategories(intervention, -0.5, 'dismissed');
   }
 
   function present(intervention, reason) {

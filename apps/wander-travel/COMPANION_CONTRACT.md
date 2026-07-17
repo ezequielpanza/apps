@@ -64,3 +64,7 @@ Si el POI tiene coordenadas confiables, la intervención puede ofrecer una únic
 Las intervenciones no solicitadas deben estar separadas por al menos dos minutos. Wander puede presentar como máximo tres descubrimientos de POIs en una ventana de treinta minutos. La bienvenida a una ciudad no consume ese presupuesto específico. Durante una navegación activa, los descubrimientos quedan aplazados para que las indicaciones de ruta tengan prioridad. Cerrar una intervención se registra como feedback, sin volver a mostrar el mismo contenido.
 
 Aceptar `Llévame` también se registra como feedback positivo del contenido y del destino propuesto.
+
+## Aprendizaje inicial
+
+Las categorías de un destino aceptado reciben una señal positiva. Las categorías de una intervención cerrada reciben una señal negativa menor. La preferencia acumulada modifica la prioridad de futuros candidatos y puede silenciar una categoría reiteradamente descartada. El aprendizaje se conserva en el perfil local y nunca sustituye los filtros de distancia, seguridad contextual o contenido ya presentado.

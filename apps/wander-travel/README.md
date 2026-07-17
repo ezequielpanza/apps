@@ -1,6 +1,6 @@
 # Wander Travel
 
-Versión: **v0.98.0**
+Versión: **v0.99.0**
 
 Wander Travel combina una base técnica estable para observar el viaje con el primer ciclo funcional del compañero: interpreta la llegada a un lugar aparentemente nuevo, espera un momento apropiado, da una bienvenida contextual, acepta una corrección del usuario y recuerda lo presentado.
 
@@ -9,6 +9,8 @@ La versión v0.96.0 añade el primer descubrimiento contextual: durante una cami
 La versión v0.97.0 conecta la acción `Llévame` con rutas peatonales reales. La clave permanece en Cloudflare, la ruta se representa sobre el mapa y Wander ofrece instrucciones de maniobra sin referencias a la posición visual del mapa.
 
 La versión v0.98.0 incorpora un presupuesto persistente de intervenciones: separa mensajes consecutivos, limita descubrimientos no solicitados, guarda los descartes y suspende nuevas sugerencias mientras existe una navegación activa.
+
+La versión v0.99.0 cierra el primer ciclo de aprendizaje: aceptar `Llévame` aumenta la relevancia de categorías similares y descartar propuestas la reduce. Las preferencias quedan en el perfil local y participan en decisiones posteriores.
 
 ## Arquitectura activa
 
