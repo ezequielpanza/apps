@@ -76,7 +76,7 @@
         <button id="export-track-button" type="button">${icon('export')}<span>Exportar</span></button>
         <button id="clear-panel-button" type="button">${icon('clear')}<span>Limpiar mapa</span></button>
       </div>
-      <div class="session-history-heading"><strong>Historial</strong><span id="session-history-count">0 sesiones</span></div>
+      <div class="session-history-heading"><strong>Historial</strong><span id="session-history-count">0 finalizadas</span></div>
       <div id="track-list" class="track-list session-list"></div>`;
 
     $('#session-auto-toggle')?.addEventListener('change', (event) => {
@@ -85,13 +85,13 @@
     });
     $('#session-finish-button')?.addEventListener('click', () => {
       const completed = engine()?.finishSession?.('manual');
-      if (completed) window.WanderUI?.showWander('Sesión finalizada', 'El registro automático sigue activo y esperando el próximo movimiento.');
+      if (completed) window.WanderUI?.showToast?.('Sesión finalizada', 'Esperando el próximo movimiento');
       render();
     });
     $('#export-track-button')?.addEventListener('click', exportLast);
     $('#clear-panel-button')?.addEventListener('click', () => {
       line.setLatLngs([]);
-      window.WanderUI?.showWander('Vista limpia', 'Se limpió el recorrido visible. Las sesiones guardadas siguen disponibles.');
+      window.WanderUI?.showToast?.('Vista limpia', 'Las sesiones siguen guardadas');
     });
     $('#track-list')?.addEventListener('click', handleListClick);
     return true;
@@ -105,6 +105,12 @@
       return `En permanencia${place} desde ${new Date(stay.startedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
     }
     return `Sesión activa desde ${new Date(active.startedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  function historyCountLabel(active, history) {
+    const finished = history.length;
+    const finishedLabel = `${finished} ${finished === 1 ? 'finalizada' : 'finalizadas'}`;
+    return active ? `1 activa · ${finishedLabel}` : finishedLabel;
   }
 
   function rowMarkup(session, active = false) {
@@ -142,7 +148,7 @@
     window.WanderUI?.setText('#session-distance', distanceLabel(live?.distanceM || 0));
     window.WanderUI?.setText('#session-moving-time', durationLabel(live?.movingDurationMs || 0));
     window.WanderUI?.setText('#session-stay-time', durationLabel(live?.stationaryDurationMs || 0));
-    window.WanderUI?.setText('#session-history-count', `${history.length} ${history.length === 1 ? 'sesión' : 'sesiones'}`);
+    window.WanderUI?.setText('#session-history-count', historyCountLabel(active, history));
 
     const list = $('#track-list');
     if (!list) return;
@@ -166,12 +172,12 @@
   function showSession(id) {
     const session = sessionById(id);
     const points = sessionPoints(session);
-    if (!session || !points.length) return window.WanderUI?.showWander('Sesión', 'Esta sesión todavía no tiene un recorrido visible.');
+    if (!session || !points.length) return window.WanderUI?.showToast?.('Sesión', 'Todavía no tiene recorrido visible');
     const latLngs = points.map((point) => [point.lat, point.lng]);
     line.setLatLngs(latLngs);
     map.fitBounds(latLngs, { padding: [40, 40], maxZoom: 16 });
     const distance = session.distanceM || window.WanderContext?.value?.('sessions.active')?.distanceM || 0;
-    window.WanderUI?.showWander('Sesión', `${session.name} · ${distanceLabel(distance)}.`);
+    window.WanderUI?.showToast?.('Sesión', distanceLabel(distance));
   }
 
   function showLegacy(id) {
@@ -213,7 +219,7 @@
   function exportLast() {
     const state = engine()?.snapshot?.();
     const session = state?.active || state?.sessions?.[state.sessions.length - 1];
-    if (!session) return window.WanderUI?.showWander('Exportar', 'Todavía no hay sesiones para exportar.');
+    if (!session) return window.WanderUI?.showToast?.('Exportar', 'Todavía no hay sesiones');
     exportSession(session);
   }
 
