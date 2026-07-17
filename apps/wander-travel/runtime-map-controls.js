@@ -9,11 +9,7 @@
   let centerButton = null;
   let centerMode = loadCenterMode();
   let followSuspendedByDrag = false;
-  let zoomAnchorFrame = 0;
-  let pinchActive = false;
-  let pinchStartDistance = 0;
-  let pinchStartZoom = 0;
-  let pinchAnchor = null;
+  let anchorFrame = 0;
 
   function loadCenterMode() {
     try {
@@ -53,106 +49,54 @@
     centerButton.style.boxShadow = following ? '0 0 0 3px var(--accent-ring), var(--shadow)' : 'var(--shadow)';
   }
 
-  function zoomPivotPoint() {
+  function lowerPivotPoint() {
     const size = map.getSize();
-    const y = position.isFollowingPosition() && centerMode === 'lower' ? size.y * 0.72 : size.y / 2;
-    return L.point(size.x / 2, y);
+    return L.point(size.x / 2, size.y * 0.72);
   }
 
-  function centerForAnchor(anchor, zoom) {
+  function centerForAnchor(anchor, zoom = map.getZoom()) {
+    if (centerMode !== 'lower') return L.latLng(anchor);
     const size = map.getSize();
-    const pivot = zoomPivotPoint();
     const projectedAnchor = map.project(anchor, zoom);
-    return map.unproject(projectedAnchor.add(size.divideBy(2)).subtract(pivot), zoom);
+    return map.unproject(projectedAnchor.add(size.divideBy(2)).subtract(lowerPivotPoint()), zoom);
   }
 
-  function syncZoomAnchorMode() {
-    const following = position.isFollowingPosition();
-    map.options.scrollWheelZoom = following && centerMode === 'middle' ? 'center' : true;
-    map.options.doubleClickZoom = following && centerMode === 'middle' ? 'center' : true;
-    map.options.touchZoom = true;
+  function centersMatch(left, right) {
+    if (!left || !right) return false;
+    try { return map.distance(left, right) < 0.25; } catch { return false; }
   }
 
-  function applyCenterAnchor() {
-    if (pinchActive || !position.isFollowingPosition() || centerMode !== 'lower') return;
-    const point = position.getPosition?.();
-    if (!point) return;
-    const exactCenter = centerForAnchor(point, map.getZoom());
-    if (!map.getCenter().equals(exactCenter, 1e-9)) map.panTo(exactCenter, { animate: false, noMoveStart: true });
+  function followPosition(anchor = position.getPosition?.()) {
+    if (!position.isFollowingPosition() || !anchor) return false;
+    const target = centerForAnchor(anchor, map.getZoom());
+    if (!centersMatch(map.getCenter(), target)) {
+      map.panTo(target, { animate: false, noMoveStart: true });
+    }
+    return true;
   }
 
-  function scheduleCenterAnchor() {
-    if (pinchActive) return;
-    if (zoomAnchorFrame) cancelAnimationFrame(zoomAnchorFrame);
-    zoomAnchorFrame = requestAnimationFrame(() => {
-      zoomAnchorFrame = 0;
-      applyCenterAnchor();
+  function scheduleFollowPosition() {
+    if (!position.isFollowingPosition()) return;
+    if (anchorFrame) cancelAnimationFrame(anchorFrame);
+    anchorFrame = requestAnimationFrame(() => {
+      anchorFrame = 0;
+      followPosition();
     });
   }
 
-  function touchDistance(touches) {
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.hypot(dx, dy);
-  }
-
-  function stopTouch(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation?.();
-  }
-
-  function installLockedPinchZoom() {
-    const container = map.getContainer();
-    if (container.dataset.wanderLockedPinch === 'true') return;
-    container.dataset.wanderLockedPinch = 'true';
-
-    container.addEventListener('touchstart', (event) => {
-      if (!position.isFollowingPosition() || event.touches.length !== 2) return;
-      const anchor = position.getPosition?.();
-      if (!anchor) return;
-      pinchActive = true;
-      pinchStartDistance = Math.max(1, touchDistance(event.touches));
-      pinchStartZoom = map.getZoom();
-      pinchAnchor = L.latLng(anchor);
-      map._stop?.();
-      map.fire('zoomstart');
-      stopTouch(event);
-    }, { capture: true, passive: false });
-
-    container.addEventListener('touchmove', (event) => {
-      if (!pinchActive || event.touches.length !== 2 || !pinchAnchor) return;
-      const scale = touchDistance(event.touches) / pinchStartDistance;
-      const rawZoom = pinchStartZoom + Math.log2(Math.max(0.01, scale));
-      const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), rawZoom));
-      const center = centerForAnchor(pinchAnchor, zoom);
-      map._move(center, zoom, { pinch: true, round: false });
-      stopTouch(event);
-    }, { capture: true, passive: false });
-
-    const finishPinch = (event) => {
-      if (!pinchActive) return;
-      if (event.touches && event.touches.length >= 2) return;
-      stopTouch(event);
-      const snap = Number(map.options.zoomSnap) || 1;
-      const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), Math.round(map.getZoom() / snap) * snap));
-      const center = pinchAnchor ? centerForAnchor(pinchAnchor, zoom) : map.getCenter();
-      pinchActive = false;
-      pinchAnchor = null;
-      map.setView(center, zoom, { animate: false, reset: false });
-      map.fire('zoomend');
-    };
-
-    container.addEventListener('touchend', finishPinch, { capture: true, passive: false });
-    container.addEventListener('touchcancel', finishPinch, { capture: true, passive: false });
+  function syncZoomAnchorMode() {
+    map.options.scrollWheelZoom = true;
+    map.options.doubleClickZoom = true;
+    map.options.touchZoom = true;
   }
 
   function setFollowMode(next, options = {}) {
-    const result = position.setFollowMode(next, options);
-    if (next) followSuspendedByDrag = false;
+    const centerNow = options.centerNow !== false;
+    const result = position.setFollowMode(next, { centerNow: false });
+    if (next && result) followSuspendedByDrag = false;
     syncZoomAnchorMode();
     syncFollowButton();
-    scheduleCenterAnchor();
+    if (result && centerNow) scheduleFollowPosition();
     return result;
   }
 
@@ -168,12 +112,11 @@
   }
 
   function activateCurrentCenterMode() {
-    if (!setFollowMode(true)) {
-      window.WanderUI?.showWander('Sin ubicación', 'Todavía no hay una ubicación efectiva válida para activar el seguimiento.');
+    if (!setFollowMode(true, { centerNow: false })) {
+      window.WanderUI?.showToast?.('Sin ubicación', 'Todavía no hay una posición válida');
       return false;
     }
-    position.centerOnPosition?.();
-    scheduleCenterAnchor();
+    scheduleFollowPosition();
     return true;
   }
 
@@ -189,8 +132,7 @@
       centerMode = 'lower';
       persistCenterMode();
       syncZoomAnchorMode();
-      position.centerOnPosition?.();
-      scheduleCenterAnchor();
+      scheduleFollowPosition();
       syncFollowButton();
       return;
     }
@@ -220,23 +162,24 @@
   });
 
   map.addControl(new MapActions());
-  installLockedPinchZoom();
 
   map.on('dragstart', () => {
-    if (pinchActive || !position.isFollowingPosition()) return;
+    if (!position.isFollowingPosition()) return;
     followSuspendedByDrag = true;
     position.setFollowMode(false, { centerNow: false });
     syncZoomAnchorMode();
     syncFollowButton();
   });
-  map.on('zoomend resize', scheduleCenterAnchor);
+
+  map.on('zoomend resize', scheduleFollowPosition);
 
   context?.subscribe?.((key) => {
-    if (key === 'location.effective' || key.startsWith('location.effective.')) scheduleCenterAnchor();
+    if (key === 'location.effective' || key.startsWith('location.effective.')) scheduleFollowPosition();
   });
 
   window.WanderMapControls = {
     setFollowMode,
+    followPosition,
     syncFollowButton,
     syncZoomAnchorMode,
     getCenterMode: () => centerMode,
@@ -244,7 +187,7 @@
       centerMode = mode === 'lower' ? 'lower' : 'middle';
       persistCenterMode();
       syncZoomAnchorMode();
-      scheduleCenterAnchor();
+      scheduleFollowPosition();
       syncFollowButton();
       return centerMode;
     },
