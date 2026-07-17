@@ -58,11 +58,11 @@ body.drawer-open #context-dashboard {
 .status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) {
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  grid-auto-rows: 38px !important;
+  grid-auto-rows: minmax(38px, auto) !important;
   align-items: center !important;
   column-gap: 4px !important;
   row-gap: 4px !important;
-  height: calc(8px + (var(--dashboard-rows, 1) * 42px)) !important;
+  height: auto !important;
   min-height: calc(8px + (var(--dashboard-rows, 1) * 42px)) !important;
   padding: 4px 10px !important;
   border-radius: 28px !important;
@@ -73,7 +73,8 @@ body.drawer-open #context-dashboard {
   grid-column: span var(--dashboard-span, 1) !important;
   width: auto !important;
   max-width: none !important;
-  height: 38px !important;
+  min-height: 38px !important;
+  height: auto !important;
   padding: 5px 4px !important;
 }
 
@@ -90,6 +91,17 @@ body.drawer-open #context-dashboard {
   text-overflow: ellipsis;
   overflow-wrap: normal;
   font-size: .76rem;
+}
+
+.status-rail#context-dashboard .status-item[data-dashboard-field="summary"] strong,
+.status-rail#context-dashboard .status-item[data-dashboard-field="currentPOI"] strong,
+.status-rail#context-dashboard .status-item[data-dashboard-field="place"] strong {
+  display: -webkit-box;
+  white-space: normal;
+  line-height: 1.08;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
 }
 
 .status-rail#context-dashboard .status-icon {
