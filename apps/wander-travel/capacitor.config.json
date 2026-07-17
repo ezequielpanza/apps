@@ -8,7 +8,10 @@
     "backgroundColor": "#01E0CB"
   },
   "server": {
-    "androidScheme": "https"
+    "url": "https://wander-travel.pages.dev",
+    "errorPath": "index.html",
+    "androidScheme": "https",
+    "allowNavigation": ["wander-travel.pages.dev"]
   },
   "plugins": {
     "CapacitorHttp": {

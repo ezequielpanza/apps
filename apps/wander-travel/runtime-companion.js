@@ -41,13 +41,19 @@
     }, Math.max(50, retryAt - Date.now()));
   }
 
-  function replyOptions(intervention) {
+  function familiarityChoices(intervention) {
     if (!intervention.allowsFamiliarityCorrection) return null;
-    return {
-      placeholder: `Por ejemplo: ya conozco ${intervention.placeName}`,
-      ariaLabel: `Corregir lo que Wander sabe de ${intervention.placeName}`,
-      onSubmit: receive,
-    };
+    return [
+      {
+        label: 'Sí, la conozco',
+        onInvoke: () => receive(`Ya conozco ${intervention.placeName}`),
+      },
+      {
+        label: 'No, es nueva para mí',
+        emphasis: 'primary',
+        onInvoke: () => receive('Es mi primera vez'),
+      },
+    ];
   }
 
   function actionOptions(intervention) {
@@ -111,7 +117,8 @@
   function present(intervention, reason) {
     const shown = ui.showWander(intervention.title, intervention.message, {
       timeoutMs: 14000,
-      reply: replyOptions(intervention),
+      persistent: intervention.allowsFamiliarityCorrection,
+      choices: familiarityChoices(intervention),
       action: actionOptions(intervention),
       onDismiss: () => recordDismissal(intervention),
     });
@@ -227,8 +234,8 @@
     if (activeIntervention?.allowsFamiliarityCorrection) {
       ui.showWander(
         'Quiero entenderte bien',
-        `Podés decirme “ya conozco ${activeIntervention.placeName}” o “es mi primera vez”.`,
-        { timeoutMs: 14000, reply: replyOptions(activeIntervention) },
+        `¿Ya conocías ${activeIntervention.placeName}?`,
+        { persistent: true, choices: familiarityChoices(activeIntervention) },
       );
     }
     return result;

@@ -1,6 +1,6 @@
 importScripts('./runtime-version.js');
 
-const SHELL_REVISION = '20260717-02';
+const SHELL_REVISION = '20260718-04';
 const CACHE_NAME = 'wander-travel-' + self.WanderVersion + '-' + SHELL_REVISION;
 const APP_SHELL = [
   './index.html',
@@ -39,6 +39,7 @@ const APP_SHELL = [
   './runtime-poi-connector-openstreetmap.js',
   './runtime-poi-connector-google-places.js',
   './runtime-native-location-source.js',
+  './runtime-native-motion.js',
   './runtime-location-source.js',
   './runtime-provider-location.js',
   './runtime-provider-place.js',
@@ -108,6 +109,10 @@ self.addEventListener('fetch', (event) => {
   if (preferNetwork) {
     event.respondWith(
       fetch(new Request(event.request, { cache: 'no-store' }))
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response;
+        })
         .catch(() => caches.match(event.request, { ignoreSearch: true }))
     );
     return;

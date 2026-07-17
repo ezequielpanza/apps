@@ -7,6 +7,7 @@
   let toast = null;
   let replyForm = null;
   let actionRow = null;
+  let choiceRow = null;
   let dismissHandler = null;
 
   function getMessageTimeoutMs() {
@@ -40,6 +41,7 @@
     clearMessageTimer();
     clearReply();
     clearAction();
+    clearChoices();
     dismissHandler = null;
     const card = $('#wander-card');
     if (card) card.hidden = true;
@@ -119,6 +121,47 @@
     row.hidden = false;
   }
 
+  function ensureChoiceRow() {
+    if (choiceRow?.isConnected) return choiceRow;
+    const card = $('#wander-card');
+    if (!card) return null;
+    choiceRow = document.createElement('div');
+    choiceRow.className = 'wander-card-choices';
+    choiceRow.hidden = true;
+    card.appendChild(choiceRow);
+    return choiceRow;
+  }
+
+  function clearChoices() {
+    if (!choiceRow) return;
+    choiceRow.hidden = true;
+    choiceRow.replaceChildren();
+  }
+
+  function configureChoices(choices) {
+    clearChoices();
+    const valid = (Array.isArray(choices) ? choices : [])
+      .filter((choice) => choice?.label && typeof choice.onInvoke === 'function');
+    if (!valid.length) return;
+    const row = ensureChoiceRow();
+    if (!row) return;
+    valid.forEach((choice) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = choice.label;
+      button.className = choice.emphasis === 'primary' ? 'primary' : 'secondary';
+      button.onclick = async () => {
+        row.querySelectorAll('button').forEach((item) => { item.disabled = true; });
+        try { await choice.onInvoke(); }
+        finally {
+          if (row.isConnected) row.querySelectorAll('button').forEach((item) => { item.disabled = false; });
+        }
+      };
+      row.appendChild(button);
+    });
+    row.hidden = false;
+  }
+
   function ensureToast() {
     if (toast?.isConnected) return toast;
     toast = document.createElement('div');
@@ -160,12 +203,14 @@
     clearMessageTimer();
     clearReply();
     clearAction();
+    clearChoices();
     if (document.body.classList.contains('poi-editor-open') || !card) return false;
     card.hidden = false;
     setText('#wander-title', title);
     setText('#wander-message', message);
     configureReply(options.reply);
     configureAction(options.action);
+    configureChoices(options.choices);
     dismissHandler = typeof options.onDismiss === 'function' ? options.onDismiss : null;
 
     if (options.persistent === true) return true;

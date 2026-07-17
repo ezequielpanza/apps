@@ -10,6 +10,10 @@
   let centerMode = loadCenterMode();
   let followSuspendedByDrag = false;
   let anchorFrame = 0;
+  const activeTouchPointers = new Set();
+  let followedAtTouchStart = false;
+  let restoreFollowAfterPinch = false;
+  let pinchZoomActive = false;
 
   function loadCenterMode() {
     try {
@@ -163,7 +167,29 @@
 
   map.addControl(new MapActions());
 
+  const mapContainer = map.getContainer();
+
+  mapContainer.addEventListener('pointerdown', (event) => {
+    if (event.pointerType !== 'touch') return;
+    if (activeTouchPointers.size === 0) followedAtTouchStart = position.isFollowingPosition();
+    activeTouchPointers.add(event.pointerId);
+    if (activeTouchPointers.size >= 2 && followedAtTouchStart) restoreFollowAfterPinch = true;
+  });
+
+  function releaseTouchPointer(event) {
+    if (event.pointerType !== 'touch') return;
+    activeTouchPointers.delete(event.pointerId);
+    if (activeTouchPointers.size === 0) {
+      followedAtTouchStart = false;
+      if (!pinchZoomActive) restoreFollowAfterPinch = false;
+    }
+  }
+
+  window.addEventListener('pointerup', releaseTouchPointer);
+  window.addEventListener('pointercancel', releaseTouchPointer);
+
   map.on('dragstart', () => {
+    if (activeTouchPointers.size >= 2 || restoreFollowAfterPinch) return;
     if (!position.isFollowingPosition()) return;
     followSuspendedByDrag = true;
     position.setFollowMode(false, { centerNow: false });
@@ -171,7 +197,21 @@
     syncFollowButton();
   });
 
-  map.on('zoomend resize', scheduleFollowPosition);
+  map.on('zoomstart', () => {
+    pinchZoomActive = restoreFollowAfterPinch;
+  });
+
+  map.on('zoomend', () => {
+    if (restoreFollowAfterPinch) {
+      position.setFollowMode(true, { centerNow: false });
+      followSuspendedByDrag = false;
+      restoreFollowAfterPinch = false;
+      syncFollowButton();
+    }
+    pinchZoomActive = false;
+    scheduleFollowPosition();
+  });
+  map.on('resize', scheduleFollowPosition);
 
   context?.subscribe?.((key) => {
     if (key === 'location.effective' || key.startsWith('location.effective.')) scheduleFollowPosition();

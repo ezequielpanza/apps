@@ -420,6 +420,7 @@
     const providerConfidence = finite(context.value?.('mobility.provider.confidence', null));
     const rawSpeedMps = finite(effective?.speedMps);
     const rawSpeedKmh = rawSpeedMps === null ? null : Math.max(0, rawSpeedMps * 3.6);
+    const accelerometer = context.value?.('motion.sensor.summary', null);
     const filtered = filterSpeed(sample.metrics, providerSpeedKmh, providerMode, providerConfidence);
     let speedKmh = filtered.speedKmh;
     const motion = resolveMotion(speedKmh, sample.metrics, sample.isNew, filtered);
@@ -448,6 +449,7 @@
         segmentMedianSpeedKmh: sample.metrics?.segmentMedianSpeedKmh ?? null,
         segmentCount: sample.metrics?.segmentCount || 0,
         fastSegmentCount: sample.metrics?.fastSegmentCount || 0,
+        accelerometer,
         sampleCount: sample.metrics?.sampleCount || 0,
         stationaryWindowCount: sample.metrics?.stationaryWindowCount || 0,
         stationaryWindowElapsedMs: sample.metrics?.stationaryWindowElapsedMs || 0,

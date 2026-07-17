@@ -140,4 +140,26 @@ public class WanderLocationPlugin extends Plugin {
         payload.put("status", status);
         plugin.notifyListeners("locationError", payload, true);
     }
+
+    static void publishMotion(float x, float y, float z, float magnitude, float activity, boolean linear, long timestamp) {
+        WanderLocationPlugin plugin = activePlugin.get();
+        if (plugin == null) return;
+        JSObject payload = new JSObject();
+        payload.put("x", x);
+        payload.put("y", y);
+        payload.put("z", z);
+        payload.put("magnitude", magnitude);
+        payload.put("activity", activity);
+        payload.put("linear", linear);
+        payload.put("timestamp", timestamp);
+        plugin.notifyListeners("motionSensor", payload, true);
+    }
+
+    static void publishMotionUnavailable() {
+        WanderLocationPlugin plugin = activePlugin.get();
+        if (plugin == null) return;
+        JSObject payload = new JSObject();
+        payload.put("status", "unavailable");
+        plugin.notifyListeners("motionSensorError", payload, true);
+    }
 }
