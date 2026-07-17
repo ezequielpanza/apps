@@ -26,9 +26,23 @@
     });
   }
 
+  function dispatchScreenEvent(name, from, to) {
+    window.dispatchEvent(new CustomEvent(name, { detail: { from, to } }));
+  }
+
+  function closeTransientLayers(nextScreen) {
+    window.WanderUI?.hideWander?.();
+    if (nextScreen !== 'map') window.WanderMapSelectedPoint?.clear?.();
+    if (window.WanderPersonalPOISheet?.isOpen?.()) window.WanderPersonalPOISheet.hide?.();
+  }
+
   function openScreen(name) {
     const target = screens().find((screen) => screen.dataset.appScreen === name);
     const normalized = target ? name : 'map';
+    const previous = app?.dataset.screen || 'map';
+
+    dispatchScreenEvent('wander:screen-will-change', previous, normalized);
+    closeTransientLayers(normalized);
 
     screens().forEach((screen) => {
       screen.hidden = screen.dataset.appScreen !== normalized;
@@ -47,6 +61,8 @@
         setDashboardVisibility();
       }, 80);
     }
+
+    dispatchScreenEvent('wander:screen-change', previous, normalized);
   }
 
   function setMenuOpen(open) {
@@ -98,6 +114,10 @@
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    if (window.WanderPersonalPOISheet?.isOpen?.()) {
+      window.WanderPersonalPOISheet.hide?.();
+      return;
+    }
     if (app?.dataset.menu === 'open') {
       setMenuOpen(false);
       return;
