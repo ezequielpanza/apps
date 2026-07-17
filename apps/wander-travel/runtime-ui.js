@@ -3,6 +3,8 @@
   const MESSAGE_TIMEOUT_KEY = 'wander.settings.messageTimeoutMs';
   const DEFAULT_MESSAGE_TIMEOUT_MS = 5000;
   let messageTimer = null;
+  let toastTimer = null;
+  let toast = null;
 
   function getMessageTimeoutMs() {
     try {
@@ -37,9 +39,41 @@
     if (card) card.hidden = true;
   }
 
+  function ensureToast() {
+    if (toast?.isConnected) return toast;
+    toast = document.createElement('div');
+    toast.id = 'wander-toast';
+    toast.className = 'wander-toast';
+    toast.hidden = true;
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.innerHTML = '<strong></strong><span></span>';
+    document.body.appendChild(toast);
+    return toast;
+  }
+
+  function hideToast() {
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = null;
+    if (toast) toast.hidden = true;
+  }
+
+  function showToast(title, message = '', options = {}) {
+    const item = ensureToast();
+    if (toastTimer) clearTimeout(toastTimer);
+    item.querySelector('strong').textContent = title || 'Wander';
+    const copy = item.querySelector('span');
+    copy.textContent = message || '';
+    copy.hidden = !message;
+    item.hidden = false;
+    const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Math.max(500, Number(options.timeoutMs)) : 2400;
+    toastTimer = setTimeout(hideToast, timeoutMs);
+  }
+
   function showWander(title, message, options = {}) {
     const card = $('#wander-card');
     clearMessageTimer();
+    if (document.body.classList.contains('poi-editor-open')) return showToast(title, message, options);
     if (card) card.hidden = false;
     setText('#wander-title', title);
     setText('#wander-message', message);
@@ -91,6 +125,9 @@
     });
   });
 
+  window.addEventListener('wander:screen-will-change', hideWander);
+  window.addEventListener('wander:personal-poi-editor-open', hideWander);
+
   window.WanderContext?.subscribe((key) => {
     if (key === 'context.status' || key.startsWith('motion.')) syncRuntimeMetrics();
     if (key === 'time.now') updateClock();
@@ -104,6 +141,8 @@
     setText,
     showWander,
     hideWander,
+    showToast,
+    hideToast,
     syncRuntimeMetrics,
     setLocationPending,
     getMessageTimeoutMs,
