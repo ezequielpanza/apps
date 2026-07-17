@@ -2,7 +2,7 @@
   const context = window.WanderContext;
   if (!context) return;
 
-  const MOVING_SPEED_KMH = 0.8;
+  const SUPPRESS_POI_SPEED_KMH = 45;
   let enforcing = false;
 
   function finite(value) {
@@ -10,23 +10,23 @@
     return Number.isFinite(number) ? number : null;
   }
 
-  function isMoving() {
+  function shouldSuppressPOI() {
     const speed = finite(context.value?.('motion.speedKmh'));
-    return context.value?.('motion.status') === 'moving' || (speed !== null && speed > MOVING_SPEED_KMH);
+    return speed !== null && speed > SUPPRESS_POI_SPEED_KMH;
   }
 
   function enforce() {
-    if (enforcing || !isMoving()) return false;
+    if (enforcing || !shouldSuppressPOI()) return false;
     const current = context.value?.('currentPOI.current');
     const value = context.value?.('currentPOI.value');
-    if (!current && !value && context.value?.('currentPOI.status') === 'moving') return false;
+    if (!current && !value && context.value?.('currentPOI.status') === 'fast_moving') return false;
 
     enforcing = true;
     try {
       context.remove?.('currentPOI.current');
       context.remove?.('currentPOI.value');
       context.remove?.('currentPOI.distanceM');
-      context.set?.('currentPOI.status', 'moving', {
+      context.set?.('currentPOI.status', 'fast_moving', {
         source: 'current-poi-motion-guard',
         kind: 'derived',
         ttlMs: 60000,
@@ -56,8 +56,8 @@
 
   window.WanderCurrentPOIMotionGuard = Object.freeze({
     enforce,
-    isMoving,
-    thresholdKmh: MOVING_SPEED_KMH,
+    shouldSuppressPOI,
+    thresholdKmh: SUPPRESS_POI_SPEED_KMH,
   });
 
   enforce();
