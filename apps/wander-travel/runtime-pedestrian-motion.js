@@ -8,13 +8,13 @@
   const SAMPLE_WINDOW_MS = 45 * 1000;
   const RAW_SPEED_WINDOW_MS = 15 * 1000;
   const MIN_INTERVAL_MS = 4000;
-  const STARTUP_WAIT_MS = 10000;
-  const STARTUP_MIN_DURATION_MS = 6000;
+  const STARTUP_MIN_DURATION_MS = 8000;
+  const STARTUP_WAIT_MS = 12000;
   const MIN_STARTUP_SAMPLES = 3;
   const RESUME_RESET_MS = 2 * 60 * 1000;
   const START_MOVING_MS = 5000;
   const START_STATIONARY_MS = 6000;
-  const STOP_MOVING_MS = 12000;
+  const STOP_MOVING_MS = 10000;
   const DECISIVE_STOP_MS = 7000;
   const STATIONARY_WINDOW_MS = 12000;
   const MIN_STATIONARY_SAMPLES = 3;
@@ -105,9 +105,7 @@
 
   function stationaryWindowMetrics(latest) {
     const samples = state.samples.filter((sample) => latest.at - sample.at <= STATIONARY_WINDOW_MS);
-    if (!samples.length) {
-      return { count: 0, elapsedMs: 0, spreadM: null, accuracyM: null, ready: false };
-    }
+    if (!samples.length) return { count: 0, elapsedMs: 0, spreadM: null, accuracyM: null, ready: false };
 
     const anchor = samples[0];
     const spreadM = samples.reduce((maximum, sample) => Math.max(maximum, distanceMeters(anchor, sample)), 0);
@@ -153,6 +151,7 @@
     const stationaryWindow = stationaryWindowMetrics(latest);
     const calibrationElapsedMs = Math.max(0, Date.now() - Number(state.calibrationStartedAt || Date.now()));
     const enoughStartupHistory = state.samples.length >= MIN_STARTUP_SAMPLES && calibrationElapsedMs >= STARTUP_MIN_DURATION_MS;
+    const timedFallback = state.samples.length >= 1 && calibrationElapsedMs >= STARTUP_WAIT_MS;
 
     return {
       sampleAt: latest.at,
@@ -175,7 +174,7 @@
       stationaryWindowAllowedSpreadM: stationaryWindow.allowedSpreadM,
       stationaryWindowReady: stationaryWindow.ready,
       calibrationElapsedMs,
-      calibrationReady: enoughStartupHistory || calibrationElapsedMs >= STARTUP_WAIT_MS,
+      calibrationReady: enoughStartupHistory || timedFallback,
     };
   }
 
@@ -230,20 +229,17 @@
     const providerMoving = providerMode && !['stationary', 'unknown', ''].includes(providerMode);
     const providerTrusted = providerMoving && providerConfidence !== null && providerConfidence >= .7;
     const ready = currentMetrics.elapsedMs >= MIN_INTERVAL_MS;
-    const timedOut = currentMetrics.calibrationElapsedMs >= STARTUP_WAIT_MS;
     const reportedLow = (rawMedian === null || rawMedian <= .7) &&
       (providerSpeed === null || providerSpeed <= .7 || providerMode === 'stationary');
     const providerStationary = providerMode === 'stationary' && providerConfidence !== null && providerConfidence >= .7;
 
-    const positionStationary = (ready && derived <= .6 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 6) ||
-      (timedOut && currentMetrics.sampleCount >= 1 && reportedLow);
-    const decisiveStationary = currentMetrics.stationaryWindowReady && reportedLow &&
-      derived <= .8 && !currentMetrics.fastSegmentCount;
+    const positionStationary = ready && derived <= .6 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 6;
+    const decisiveStationary = currentMetrics.stationaryWindowReady && reportedLow && derived <= .8 && !currentMetrics.fastSegmentCount;
     const positionMoving = ready && currentMetrics.adjustedDistanceM >= 5 && derived >= .8;
     const fastPositionConfirmed = currentMetrics.segmentCount >= 2 && currentMetrics.fastSegmentCount >= 2 &&
       currentMetrics.fastSegmentRatio >= .66 && finite(currentMetrics.segmentMedianSpeedKmh) >= 12;
 
-    if (decisiveStationary || positionStationary || providerStationary && reportedLow) {
+    if (decisiveStationary || positionStationary || (providerStationary && reportedLow)) {
       const rejected = [rawMedian, providerSpeed].some((speed) => speed !== null && speed >= 1.4);
       return {
         speedKmh: 0,
@@ -287,65 +283,98 @@
     };
   }
 
+  function pendingMotion(label, evidence, confidence = .55) {
+    return {
+      status: 'pending',
+      activity: 'pending',
+      label,
+      confidence,
+      source: 'pedestrian-speed-and-displacement',
+      evidence: [...evidence],
+    };
+  }
+
   function resolveMotion(speedKmh, currentMetrics, isNew, filtered) {
     if (!currentMetrics?.calibrationReady) {
       state.status = 'pending';
+      state.movingCandidateAt = null;
+      state.stationaryCandidateAt = null;
       state.evidence = ['startup_calibration', `${currentMetrics?.sampleCount || 0}_valid_samples`];
-      return {
-        status: 'pending',
-        activity: 'pending',
-        label: 'Preparando contexto',
-        confidence: .5,
-        source: 'pedestrian-speed-and-displacement',
-        evidence: [...state.evidence],
-      };
+      return pendingMotion('Preparando contexto', state.evidence, .5);
     }
 
     const speed = finite(speedKmh);
     const strongMovement = Boolean(filtered.fastPositionConfirmed) || (filtered.positionMoving && speed !== null && speed >= 1.4);
     const movementEvidence = Boolean(filtered.positionMoving) && (strongMovement || (speed !== null && speed >= .7));
-    const stationaryEvidence = Boolean(filtered.positionStationary);
-    const timedStationary = state.status === 'pending' && stationaryEvidence && currentMetrics.calibrationElapsedMs >= STARTUP_MIN_DURATION_MS;
+    const stationaryEvidence = Boolean(filtered.positionStationary) || speed === 0;
+    let confirmingStop = false;
 
     if (filtered.decisiveStationary) {
       state.status = 'stationary';
       state.movingCandidateAt = null;
       state.stationaryCandidateAt = null;
       state.evidence = [...filtered.evidence, 'stationary_confirmed'];
-    } else if (timedStationary) {
-      state.status = 'stationary';
-      state.movingCandidateAt = null;
-      state.stationaryCandidateAt = null;
-      state.evidence = [...filtered.evidence, 'startup_wait_completed', 'stationary_confirmed'];
-    } else if (isNew) {
-      if (movementEvidence) {
-        state.stationaryCandidateAt = null;
-        if (state.status === 'moving' || strongMovement) {
-          state.status = 'moving';
-          state.movingCandidateAt = null;
-        } else {
-          if (!state.movingCandidateAt) state.movingCandidateAt = currentMetrics.sampleAt;
-          if (currentMetrics.sampleAt - state.movingCandidateAt >= START_MOVING_MS) {
-            state.status = 'moving';
-            state.movingCandidateAt = null;
-          }
-        }
-        state.evidence = [...filtered.evidence, 'movement_confirmed'];
-      } else if (stationaryEvidence || speed === 0) {
+    } else if (state.status === 'pending') {
+      if (stationaryEvidence) {
         state.movingCandidateAt = null;
         if (!state.stationaryCandidateAt) state.stationaryCandidateAt = currentMetrics.sampleAt;
-        const rejectedOutlier = filtered.evidence.includes('uncorroborated_speed_rejected');
-        const requiredMs = state.status === 'moving' && !rejectedOutlier ? STOP_MOVING_MS : START_STATIONARY_MS;
-        if (currentMetrics.sampleAt - state.stationaryCandidateAt >= requiredMs) {
+        if (currentMetrics.sampleAt - state.stationaryCandidateAt >= START_STATIONARY_MS || currentMetrics.calibrationElapsedMs >= STARTUP_WAIT_MS) {
           state.status = 'stationary';
           state.stationaryCandidateAt = null;
+          state.evidence = [...filtered.evidence, 'startup_stationary_confirmed'];
+        } else {
+          state.evidence = [...filtered.evidence, 'startup_stationary_candidate'];
         }
-        state.evidence = [...filtered.evidence, 'low_speed', 'stationary_candidate'];
-      } else {
-        state.evidence = [...filtered.evidence, 'ambiguous_gps_sample', 'previous_motion_state_preserved'];
+      } else if (movementEvidence && isNew) {
+        state.stationaryCandidateAt = null;
+        if (!state.movingCandidateAt) state.movingCandidateAt = currentMetrics.sampleAt;
+        if (currentMetrics.sampleAt - state.movingCandidateAt >= START_MOVING_MS) {
+          state.status = 'moving';
+          state.movingCandidateAt = null;
+          state.evidence = [...filtered.evidence, 'sustained_movement_confirmed'];
+        } else {
+          state.evidence = [...filtered.evidence, 'movement_candidate'];
+        }
+      } else if (isNew) {
+        state.movingCandidateAt = null;
+        state.evidence = [...filtered.evidence, 'startup_ambiguous'];
+      }
+    } else if (state.status === 'stationary') {
+      if (movementEvidence && isNew) {
+        state.stationaryCandidateAt = null;
+        if (!state.movingCandidateAt) state.movingCandidateAt = currentMetrics.sampleAt;
+        if (currentMetrics.sampleAt - state.movingCandidateAt >= START_MOVING_MS) {
+          state.status = 'moving';
+          state.movingCandidateAt = null;
+          state.evidence = [...filtered.evidence, 'sustained_movement_confirmed'];
+        } else {
+          state.evidence = [...filtered.evidence, 'movement_candidate'];
+        }
+      } else if (stationaryEvidence) {
+        state.movingCandidateAt = null;
+        state.evidence = [...filtered.evidence, 'stationary_maintained'];
+      }
+    } else if (state.status === 'moving') {
+      if (movementEvidence) {
+        state.stationaryCandidateAt = null;
+        state.evidence = [...filtered.evidence, 'movement_maintained'];
+      } else if (stationaryEvidence) {
+        if (!state.stationaryCandidateAt) state.stationaryCandidateAt = currentMetrics.sampleAt;
+        const elapsed = currentMetrics.sampleAt - state.stationaryCandidateAt;
+        if (elapsed >= STOP_MOVING_MS) {
+          state.status = 'stationary';
+          state.stationaryCandidateAt = null;
+          state.evidence = [...filtered.evidence, 'stop_confirmed'];
+        } else {
+          confirmingStop = true;
+          state.evidence = [...filtered.evidence, 'stop_candidate'];
+        }
+      } else if (isNew) {
+        state.evidence = [...filtered.evidence, 'ambiguous_sample', 'previous_motion_preserved'];
       }
     }
 
+    if (confirmingStop) return pendingMotion('Confirmando detención', state.evidence, .72);
     if (state.status === 'moving') {
       return {
         status: 'moving',
@@ -366,14 +395,7 @@
         evidence: [...state.evidence],
       };
     }
-    return {
-      status: 'pending',
-      activity: 'pending',
-      label: 'Preparando contexto',
-      confidence: .55,
-      source: 'pedestrian-speed-and-displacement',
-      evidence: [...state.evidence],
-    };
+    return pendingMotion('Preparando contexto', state.evidence);
   }
 
   inference.inferSituation = (context) => {
@@ -394,7 +416,7 @@
 
     let mobility = original.mobility;
     if (motion.status === 'pending') {
-      mobility = { mode: 'unknown', confidence: .2, source: 'startup-calibration', evidence: ['waiting_for_stable_samples'] };
+      mobility = { mode: 'unknown', confidence: .2, source: 'motion-transition', evidence: motion.evidence || [] };
     } else if (motion.status === 'stationary') {
       mobility = { mode: 'stationary', confidence: .96, source: 'filtered-motion', evidence: ['position_stationary'] };
     } else if (String(mobility?.mode || '').toLowerCase() === 'stationary') {
@@ -439,7 +461,7 @@
       movingConfirmMs: START_MOVING_MS,
       stoppedConfirmMs: STOP_MOVING_MS,
       decisiveStopMs: DECISIVE_STOP_MS,
-      profile: 'pedestrian-first-stationary-cluster',
+      profile: 'pedestrian-first-sustained-confirmation',
     },
     reset: () => reset(Date.now(), 'manual_reset'),
     getState: () => ({
