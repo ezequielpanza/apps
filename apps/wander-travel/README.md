@@ -1,8 +1,10 @@
 # Wander Travel
 
-Versión: **v0.95.0**
+Versión: **v0.96.0**
 
 Wander Travel combina una base técnica estable para observar el viaje con el primer ciclo funcional del compañero: interpreta la llegada a un lugar aparentemente nuevo, espera un momento apropiado, da una bienvenida contextual, acepta una corrección del usuario y recuerda lo presentado.
+
+La versión v0.96.0 añade el primer descubrimiento contextual: durante una caminata o permanencia, Wander puede seleccionar un POI turístico cercano, describir su posición con lenguaje humano y aportar únicamente información respaldada por los datos normalizados disponibles.
 
 ## Arquitectura activa
 
@@ -26,6 +28,7 @@ El orden de carga está declarado de forma determinista en `index.html`. `app.js
 - Memoria geográfica y continuidad de Journey.
 - Política de intervenciones y bienvenida a ciudades o países aparentemente nuevos.
 - Corrección contextual de familiaridad y memoria del contenido presentado.
+- Descubrimiento silencioso de POIs relevantes, con distancia y dirección humanas.
 - Simulador de ubicación y movimiento.
 - PWA con caché offline versionado.
 

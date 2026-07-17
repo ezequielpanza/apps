@@ -57,3 +57,6 @@ jobs:
 
       - name: Run companion arrival tests
         run: node apps/wander-travel/tests/companion-arrival.mjs
+
+      - name: Run companion discovery tests
+        run: node apps/wander-travel/tests/companion-discovery.mjs

@@ -35,6 +35,38 @@
     };
   }
 
+  function humanDistance(distanceM) {
+    const distance = Math.max(0, Math.round(Number(distanceM) || 0));
+    if (distance < 100) return `A unos ${Math.max(20, Math.round(distance / 10) * 10)} metros`;
+    const minutes = Math.max(2, Math.ceil(distance / 75));
+    return `A unos ${minutes} minutos a pie`;
+  }
+
+  function directionText(direction) {
+    if (direction === 'ahead') return ', un poco más adelante,';
+    if (direction === 'right') return ', hacia tu derecha,';
+    if (direction === 'left') return ', hacia tu izquierda,';
+    return ' de tu posición';
+  }
+
+  function discoveryIntervention(evaluation) {
+    const poi = evaluation?.poi;
+    if (!poi?.id || !poi?.name) return null;
+    const lead = `${humanDistance(poi.distanceM)}${directionText(poi.direction)} está ${poi.name}.`;
+    const fact = poi.note ? ` ${String(poi.note).replace(/\s+/g, ' ').trim().slice(0, 240)}` : '';
+    return {
+      id: `discovery:${poi.id}`,
+      kind: 'poi_discovery',
+      title: 'Algo interesante cerca',
+      message: lead + fact,
+      contentId: poi.contentId || `poi-discovery:${poi.id}`,
+      topic: 'poi_discovery',
+      placeId: poi.id,
+      poi,
+      allowsFamiliarityCorrection: false,
+    };
+  }
+
   function decide({
     evaluation,
     at = Date.now(),
@@ -43,9 +75,13 @@
     documentVisible = true,
     mapAvailable = true,
   } = {}) {
-    if (evaluation?.type !== 'introduce_place') return { disposition: 'ignore', reason: 'unsupported_action' };
+    if (!['introduce_place', 'discover_poi'].includes(evaluation?.type)) {
+      return { disposition: 'ignore', reason: 'unsupported_action' };
+    }
 
-    const intervention = placeIntro(evaluation, at);
+    const intervention = evaluation.type === 'introduce_place'
+      ? placeIntro(evaluation, at)
+      : discoveryIntervention(evaluation);
     if (!intervention) return { disposition: 'ignore', reason: 'unsupported_place' };
     if (contentAlreadyTold) return { disposition: 'ignore', reason: 'content_already_told', intervention };
     if (!documentVisible) return { disposition: 'defer', reason: 'document_hidden', intervention };

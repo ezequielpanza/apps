@@ -49,6 +49,7 @@ const APP_SHELL = [
   './runtime-engine-journey.js',
   './runtime-engine-memory.js',
   './runtime-engine-place.js',
+  './runtime-engine-discovery.js',
   './runtime-engine-relevance.js',
   './runtime-engine-decision.js',
   './runtime-companion-policy.js',

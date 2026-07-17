@@ -121,13 +121,39 @@
     return best;
   }
 
-  function evaluate({ situation, transitions = [], place = {} } = {}) {
+  function discoveryCandidate(discovery) {
+    const poi = discovery?.candidate;
+    if (!poi) return null;
+    return {
+      score: poi.priority,
+      reason: 'relevant_poi_nearby',
+      signal: {
+        type: 'poi.discovery',
+        score: poi.priority,
+        poiId: poi.id,
+        poiName: poi.name,
+        distanceM: poi.distanceM,
+        bearingDeg: poi.bearingDeg,
+        direction: poi.direction,
+        note: poi.note,
+        categories: poi.categories,
+        sources: poi.sources,
+        contentId: poi.contentId,
+      },
+      transition: null,
+      placeEvent: null,
+      currentPlace: null,
+    };
+  }
+
+  function evaluate({ situation, transitions = [], place = {}, discovery = {} } = {}) {
     const currentPlace = place?.current || null;
     const placeEvents = Array.isArray(place?.events) ? place.events : [];
     const candidates = [
       placeCandidate(placeEvents, currentPlace, situation),
       arrivalCandidate(transitions, currentPlace),
       transitionCandidate(transitions),
+      discoveryCandidate(discovery),
     ].filter(Boolean);
 
     const best = candidates.reduce((selected, candidate) => {

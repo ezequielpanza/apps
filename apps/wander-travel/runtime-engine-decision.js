@@ -8,6 +8,25 @@
       name: signal.placeName || null,
     };
 
+    if (signalType === 'poi.discovery') {
+      return {
+        type: 'discover_poi',
+        reason: 'relevant_poi_nearby',
+        poi: {
+          id: signal.poiId || null,
+          name: signal.poiName || null,
+          distanceM: signal.distanceM ?? null,
+          bearingDeg: signal.bearingDeg ?? null,
+          direction: signal.direction || null,
+          note: signal.note || null,
+          categories: signal.categories || [],
+          sources: signal.sources || [],
+          contentId: signal.contentId || null,
+        },
+        contentMode: signal.note ? 'grounded_fact' : 'nearby_orientation',
+      };
+    }
+
     if (/^(country|city|zone)\.(assumed_new|new_confirmed)$/.test(signalType)) {
       return {
         type: 'introduce_place',

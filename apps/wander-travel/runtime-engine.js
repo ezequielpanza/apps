@@ -8,7 +8,8 @@
   const placeEngine = window.WanderEnginePlace;
   const relevanceEngine = window.WanderEngineRelevance;
   const decision = window.WanderEngineDecision;
-  if (!context || !state || !inference || !transition || !journey || !memory || !placeEngine || !relevanceEngine || !decision) return;
+  const discoveryEngine = window.WanderEngineDiscovery;
+  if (!context || !state || !inference || !transition || !journey || !memory || !placeEngine || !relevanceEngine || !decision || !discoveryEngine) return;
 
   const evaluationListeners = new Set();
   let lastEvaluation = null;
@@ -236,12 +237,18 @@
   }
 
   function buildEvaluation(situation, transitionResult, journeyResult, memoryResult, placeResult) {
+    const discovery = discoveryEngine.evaluate({
+      situation,
+      items: context.value('nearby.items') || [],
+      hasToldContent: placeEngine.hasToldContent,
+    });
     const relevance = relevanceEngine.evaluate({
       situation,
       transitions: transitionResult.events,
       memory: memoryResult,
       journey: journeyResult,
       place: placeResult,
+      discovery,
     });
     const action = decision.decideAction({
       situation,
@@ -249,6 +256,7 @@
       memory: memoryResult,
       journey: journeyResult,
       place: placeResult,
+      discovery,
     });
 
     return {
@@ -274,6 +282,7 @@
         pendingClarification: placeResult.pendingClarification,
         nextCheckAt: placeResult.nextCheckAt,
       },
+      discovery,
       relevance,
     };
   }
@@ -289,12 +298,18 @@
       pendingClarification: context.value('conversation.pendingClarification'),
       nextCheckAt: null,
     };
+    const discovery = discoveryEngine.evaluate({
+      situation,
+      items: context.value('nearby.items') || [],
+      hasToldContent: placeEngine.hasToldContent,
+    });
     const relevance = relevanceEngine.evaluate({
       situation,
       transitions: [],
       memory: memorySnapshot,
       journey: journeySnapshot,
       place: placeSnapshot,
+      discovery,
     });
     const action = decision.decideAction({
       situation,
@@ -302,6 +317,7 @@
       memory: memorySnapshot,
       journey: journeySnapshot,
       place: placeSnapshot,
+      discovery,
     });
     return {
       ...action,
@@ -312,6 +328,7 @@
       journey: journeySnapshot,
       memory: memorySnapshot,
       place: placeSnapshot,
+      discovery,
       relevance,
     };
   }
@@ -372,7 +389,8 @@
       key.startsWith('mobility.override.') ||
       key.startsWith('mobility.provider.') ||
       key === 'place.current' ||
-      key === 'place.status'
+      key === 'place.status' ||
+      key === 'nearby.items'
     ) {
       run('context:' + key);
     }

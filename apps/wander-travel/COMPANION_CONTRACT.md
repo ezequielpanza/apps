@@ -50,3 +50,9 @@ La bienvenida:
 ## Criterio de finalización de la escena
 
 La escena se considera completa cuando una prueba puede demostrar que Wander detecta una ciudad nueva, muestra una sola bienvenida en un momento adecuado, acepta una corrección contextual y conserva esa corrección y el contenido presentado.
+
+## Segunda escena: descubrimiento durante el recorrido
+
+Wander puede mencionar un POI cuando está suficientemente cerca, es turístico o posee una nota informativa, supera el umbral de relevancia y todavía no fue presentado. Si el usuario camina, el lugar debe encontrarse delante o a uno de sus lados; un lugar ya dejado atrás no provoca una interrupción.
+
+La intervención usa metros o minutos a pie y, cuando existe un rumbo confiable, `más adelante`, `a tu derecha` o `a tu izquierda`. Los datos descriptivos proceden exclusivamente de notas normalizadas de las fuentes. Si no existe una nota, Wander solo comunica la existencia y posición del lugar.

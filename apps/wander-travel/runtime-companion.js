@@ -50,11 +50,13 @@
     pendingEvaluation = null;
     clearRetry();
 
-    engine.requestPlaceClarification?.({
-      level: intervention.placeLevel,
-      placeId: intervention.placeId,
-      name: intervention.placeName,
-    });
+    if (intervention.allowsFamiliarityCorrection) {
+      engine.requestPlaceClarification?.({
+        level: intervention.placeLevel,
+        placeId: intervention.placeId,
+        name: intervention.placeName,
+      });
+    }
     engine.rememberContent?.({
       contentId: intervention.contentId,
       placeId: intervention.placeId,
@@ -83,7 +85,9 @@
   function attempt(reason = 'manual') {
     if (!pendingEvaluation) return { disposition: 'ignore', reason: 'nothing_pending' };
     const placeId = pendingEvaluation.semanticPlace?.id;
-    const contentId = placeId ? `place-intro:${placeId}` : null;
+    const contentId = pendingEvaluation.type === 'discover_poi'
+      ? pendingEvaluation.poi?.contentId || (pendingEvaluation.poi?.id ? `poi-discovery:${pendingEvaluation.poi.id}` : null)
+      : (placeId ? `place-intro:${placeId}` : null);
     const result = policy.decide({
       evaluation: pendingEvaluation,
       at: Date.now(),
@@ -100,7 +104,7 @@
   }
 
   function handleEvaluation(evaluation, reason = 'engine') {
-    if (evaluation?.type === 'introduce_place') pendingEvaluation = evaluation;
+    if (evaluation?.type === 'introduce_place' || evaluation?.type === 'discover_poi') pendingEvaluation = evaluation;
     return attempt(reason);
   }
 

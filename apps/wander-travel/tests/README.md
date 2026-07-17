@@ -14,6 +14,7 @@ node apps/wander-travel/tests/context-dashboard-config.mjs
 node apps/wander-travel/tests/movement-method.mjs
 node apps/wander-travel/tests/app-shell.mjs
 node apps/wander-travel/tests/companion-arrival.mjs
+node apps/wander-travel/tests/companion-discovery.mjs
 ```
 
 The runners have no external dependencies. They load the real production runtime modules in isolated Node `vm` contexts with controlled storage and simulated source responses.
@@ -120,6 +121,8 @@ A failing assertion exits with a non-zero status so all runners can execute in C
 ## Companion arrival
 
 `companion-arrival.mjs` verifies the first complete companion scene: a new city produces a contextual introduction, fast movement defers it, remembered content is not repeated, irrelevant evaluations remain silent, and a user correction is handled and recorded.
+
+`companion-discovery.mjs` verifies that a nearby landmark can become a grounded intervention with human distance and direction, while repeated content, fast movement, passed POIs, and generic utilities remain silent.
 
 ## App shell
 
