@@ -42,9 +42,9 @@
       "types": [
         "resort_hotel",
         "massage_spa",
-        "massage",
-        "spa",
         "hotel",
+        "spa",
+        "massage",
         "lodging",
         "point_of_interest",
         "service",
@@ -77,8 +77,8 @@
         "coffee_shop",
         "cafe",
         "food_store",
-        "point_of_interest",
         "food",
+        "point_of_interest",
         "store",
         "establishment"
       ],
@@ -164,9 +164,9 @@
     {
       "id": "ChIJJa1eQ3Fbro4R3o2dIfHSH9M",
       "types": [
+        "point_of_interest",
         "lawyer",
         "consultant",
-        "point_of_interest",
         "service",
         "establishment"
       ],
@@ -196,8 +196,8 @@
       "types": [
         "grocery_store",
         "food_store",
-        "point_of_interest",
         "food",
+        "point_of_interest",
         "store",
         "establishment"
       ],
@@ -283,8 +283,8 @@
     {
       "id": "ChIJV4FJLQBbro4Roekh4qM_wSk",
       "types": [
-        "association_or_organization",
         "point_of_interest",
+        "association_or_organization",
         "establishment"
       ],
       "formattedAddress": "C. Jorge Awad 13, Nagua 33000, Dominican Republic",
@@ -313,8 +313,8 @@
       "types": [
         "courthouse",
         "local_government_office",
-        "point_of_interest",
         "government_office",
+        "point_of_interest",
         "service",
         "establishment"
       ],
@@ -344,9 +344,9 @@
       "types": [
         "barber_shop",
         "hair_care",
-        "health",
         "point_of_interest",
         "service",
+        "health",
         "establishment"
       ],
       "formattedAddress": "C7, C. Jorge Awad 51, Nagua 33000, Dominican Republic",
@@ -374,8 +374,8 @@
       "id": "ChIJH9wqOABbro4RoKEL-jZsjRk",
       "types": [
         "food_store",
-        "point_of_interest",
         "food",
+        "point_of_interest",
         "store",
         "establishment"
       ],
@@ -430,9 +430,9 @@
     {
       "id": "ChIJ-TUA4LFaro4RXYKenl8tff0",
       "types": [
+        "point_of_interest",
         "lawyer",
         "consultant",
-        "point_of_interest",
         "service",
         "establishment"
       ],
@@ -460,8 +460,8 @@
     {
       "id": "ChIJYwr8tkRbro4R2DuGUNCwxxE",
       "types": [
-        "wholesaler",
         "point_of_interest",
+        "wholesaler",
         "service",
         "establishment"
       ],
@@ -518,9 +518,9 @@
     {
       "id": "ChIJe57RsMJbro4RQMHaG9wkjTY",
       "types": [
-        "point_of_interest",
-        "home_goods_store",
         "building_materials_store",
+        "home_goods_store",
+        "point_of_interest",
         "store",
         "establishment"
       ],
@@ -579,8 +579,8 @@
       "types": [
         "general_store",
         "food_store",
-        "point_of_interest",
         "food",
+        "point_of_interest",
         "store",
         "establishment"
       ],
