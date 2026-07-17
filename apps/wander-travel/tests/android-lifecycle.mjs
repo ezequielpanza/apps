@@ -23,6 +23,8 @@ assert.match(service, /startForeground\(/);
 assert.match(service, /START_NOT_STICKY/);
 assert.match(service, /onTaskRemoved/);
 assert.match(service, /stopSelf\(\)/);
+assert.match(service, /ACTION_STOP/);
+assert.match(service, /addAction\(/);
 assert.match(plugin, /notifyCompanion/);
 assert.match(plugin, /BigTextStyle/);
 
