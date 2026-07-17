@@ -144,6 +144,7 @@
 
   const fieldIds = new Set(FIELDS.map((field) => field.id));
   let visibleFields = loadVisibleFields();
+
   function loadVisibleFields() {
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -151,6 +152,7 @@
     } catch {}
     return [...DEFAULT_VISIBLE_FIELDS];
   }
+
   function persist() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ visibleFields })); } catch {} }
   function isVisible(fieldId) { return visibleFields.includes(fieldId); }
   function setFieldVisible(fieldId, visible) {
@@ -161,10 +163,30 @@
       next.push(fieldId);
       next.sort((left, right) => order.indexOf(left) - order.indexOf(right));
     }
-    visibleFields = next; persist(); render(); return getVisibleFields();
+    visibleFields = next;
+    persist();
+    render();
+    return getVisibleFields();
   }
   function getVisibleFields() { return [...visibleFields]; }
   function reset() { visibleFields = [...DEFAULT_VISIBLE_FIELDS]; persist(); render(); return getVisibleFields(); }
+
+  function normalizeComparable(value) {
+    return String(value || '').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function isRedundantCurrentPOI() {
+    const poi = normalizeComparable(currentPOIValue());
+    const summary = normalizeComparable(textValue(context.value('context.status'), ''));
+    return poi && poi !== 'sin poi actual' && summary.includes(poi);
+  }
+
+  function shouldShow(fieldId) {
+    if (!isVisible(fieldId)) return false;
+    if (fieldId === 'currentPOI' && isRedundantCurrentPOI()) return false;
+    return true;
+  }
+
   function ensureDashboardItems() {
     const dashboard = document.querySelector('#context-dashboard');
     const empty = dashboard?.querySelector('[data-dashboard-empty]');
@@ -172,23 +194,33 @@
     FIELDS.forEach((field) => {
       let item = dashboard.querySelector('[data-dashboard-field="' + field.id + '"]');
       if (!item) {
-        item = document.createElement('span'); item.className = 'status-item'; item.dataset.dashboardField = field.id;
+        item = document.createElement('span');
+        item.className = 'status-item';
+        item.dataset.dashboardField = field.id;
         item.innerHTML = '<svg class="status-icon"><use href="wander-icons.svg#' + field.icon + '"></use></svg><strong id="' + field.metricId + '">—</strong>';
         dashboard.insertBefore(item, empty || null);
       }
     });
   }
+
   function render() {
-    ensureDashboardItems(); let shown = 0;
-    document.querySelectorAll('[data-dashboard-field]').forEach((element) => { const visible = isVisible(element.dataset.dashboardField); element.hidden = !visible; if (visible) shown += 1; });
+    ensureDashboardItems();
+    let shown = 0;
+    document.querySelectorAll('[data-dashboard-field]').forEach((element) => {
+      const visible = shouldShow(element.dataset.dashboardField);
+      element.hidden = !visible;
+      if (visible) shown += 1;
+    });
     FIELDS.forEach((field) => {
       const element = document.querySelector('#' + field.metricId);
       if (!element) return;
       const value = field.value();
       if (element.textContent !== value) element.textContent = value;
     });
-    const empty = document.querySelector('[data-dashboard-empty]'); if (empty) empty.hidden = shown > 0;
+    const empty = document.querySelector('[data-dashboard-empty]');
+    if (empty) empty.hidden = shown > 0;
   }
+
   context.subscribe(render);
   window.addEventListener('wander:coordinate-format-change', render);
   render();
