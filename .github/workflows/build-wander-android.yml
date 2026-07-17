@@ -9,7 +9,7 @@ on:
       - '.github/workflows/build-wander-android.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-debug-apk:
@@ -44,3 +44,18 @@ jobs:
           name: wander-travel-debug-apk
           path: apps/wander-travel/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish installable Android test release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="wander-android-v${VERSION}"
+          APK="wander-travel-v${VERSION}-debug.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --prerelease --title "Wander Travel Android v${VERSION}" --notes "APK de prueba para instalación directa en Android."
+          fi
