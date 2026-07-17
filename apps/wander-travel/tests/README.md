@@ -11,7 +11,10 @@ node apps/wander-travel/tests/poi-consolidation.mjs
 node apps/wander-travel/tests/nearby-provider.mjs
 node apps/wander-travel/tests/context-dashboard.mjs
 node apps/wander-travel/tests/context-dashboard-config.mjs
+node apps/wander-travel/tests/context-panel-values.mjs
 node apps/wander-travel/tests/movement-method.mjs
+node apps/wander-travel/tests/simulator-motion.mjs
+node apps/wander-travel/tests/session-reconciliation.mjs
 node apps/wander-travel/tests/app-shell.mjs
 node apps/wander-travel/tests/companion-arrival.mjs
 node apps/wander-travel/tests/companion-discovery.mjs
@@ -132,6 +135,12 @@ A failing assertion exits with a non-zero status so all runners can execute in C
 `routes-api.mjs` verifies coordinate validation, the server-side Google Routes request, response normalization, and that the API key is never exposed to the client.
 
 `companion-budget.mjs` verifies the global cooldown, the rolling discovery limit, new-city priority, and silence during active navigation.
+
+`simulator-motion.mjs` verifies that simulated speed remains authoritative even when the real GPS mobility provider is stationary.
+
+`session-reconciliation.mjs` verifies that a stale open stay is closed and replaced when Wander resumes at a clearly distant location.
+
+`context-panel-values.mjs` verifies that Contexto presents translated human values instead of internal state identifiers.
 
 ## App shell
 

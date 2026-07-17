@@ -307,6 +307,30 @@
     }
   }
 
+  function stayAllowance(stay, position) {
+    const accuracy = finite(position?.accuracy);
+    return Math.max(20, Number(stay?.radiusM || 10) * 2, (accuracy || 0) * 1.5);
+  }
+
+  function reconcileStay(position, at) {
+    const stay = openStay(active);
+    if (!stay) return createStay(position, at);
+    const accuracy = finite(position?.accuracy);
+    if (accuracy !== null && accuracy > MAX_ACCURACY_M) return stay;
+
+    const distance = distanceMeters(stay.center, position);
+    if (distance <= stayAllowance(stay, position)) return stay;
+
+    closeStay(at);
+    active.events.push({
+      type: 'stay.relocated',
+      at,
+      fromStayId: stay.id,
+      distanceM: Math.round(distance),
+    });
+    return createStay(position, at);
+  }
+
   function closeStay(at) {
     const stay = openStay(active);
     if (!stay) return null;
@@ -448,7 +472,7 @@
         updateAttachedVehicle(position, motion, at);
       } else {
         if (openMovement(active)) closeMovement(at);
-        const stay = openStay(active) || createStay(position, at);
+        const stay = reconcileStay(position, at);
         updateStay(stay, position);
         updateAttachedVehicle(position, motion, at);
         if (shouldCloseOvernight(stay, Date.now())) {

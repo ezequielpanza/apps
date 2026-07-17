@@ -16,6 +16,19 @@
     stationary: 'Detenido',
     pending: 'Preparando contexto',
   });
+  const LOCATION_STATUS_LABELS = Object.freeze({
+    available: 'Disponible',
+    pending: 'Preparando ubicación',
+    denied: 'Permiso denegado',
+    unavailable: 'No disponible',
+    timeout: 'Sin respuesta',
+    unsupported: 'No compatible',
+  });
+  const LOCATION_SOURCE_LABELS = Object.freeze({
+    gps: 'GPS',
+    geolocation: 'GPS',
+    simulator: 'Simulador',
+  });
 
   function textValue(value, fallback) {
     if (value == null || value === '') return fallback;
@@ -138,9 +151,9 @@
     { id: 'activity', label: 'Actividad', icon: 'route', metricId: 'metric-activity', value: activityValue },
     { id: 'time', label: 'Hora', icon: 'clock', metricId: 'metric-time', value: () => textValue(context.value('time.now'), 'Pendiente') },
     { id: 'dayPeriod', label: 'Momento del día', icon: 'day', metricId: 'metric-day-period', value: () => textValue(context.value('time.dayPeriod'), 'Pendiente') },
-    { id: 'locationStatus', label: 'Ubicación', icon: 'pin', metricId: 'metric-location-status', value: () => textValue(context.value('location.effective.status'), 'Pendiente') },
+    { id: 'locationStatus', label: 'Ubicación', icon: 'pin', metricId: 'metric-location-status', value: () => translatedValue('location.effective.status', LOCATION_STATUS_LABELS, 'Pendiente') },
     { id: 'coordinates', label: 'Coordenadas', icon: 'pin', metricId: 'metric-coordinates', value: coordinatesValue },
-    { id: 'locationSource', label: 'Fuente de ubicación', icon: 'target', metricId: 'metric-location-source', value: () => textValue(context.value('location.effective.source'), 'Pendiente') },
+    { id: 'locationSource', label: 'Fuente de ubicación', icon: 'target', metricId: 'metric-location-source', value: () => translatedValue('location.effective.source', LOCATION_SOURCE_LABELS, 'Pendiente') },
     { id: 'accuracy', label: 'Precisión', icon: 'target', metricId: 'metric-accuracy', value: () => numberValue('location.effective.accuracy', ' m') },
     { id: 'motionStatus', label: 'Movimiento físico', icon: 'route', metricId: 'metric-motion-status', value: motionStatusValue },
     { id: 'mobility', label: 'Método de desplazamiento', icon: 'compass', metricId: 'metric-mobility', value: movementMethodValue },

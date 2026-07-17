@@ -45,6 +45,9 @@ function createRuntime(sharedStorage = new Map()) {
     ['motion.speedKmh', 4.2],
     ['motion.heading', 90],
     ['motion.status', 'moving'],
+    ['context.activity', 'paused'],
+    ['location.effective.status', 'available'],
+    ['location.effective.source', 'gps'],
     ['location.effective.lat', 19.123456],
     ['location.effective.lng', -70.654321],
     ['place.city', 'Luperón'],
@@ -126,6 +129,9 @@ assert.equal(first.dashboard.querySelector('[data-dashboard-field="place"]').hid
 assert.equal(first.metrics.get('metric-status').textContent, 'Listo para explorar');
 assert.equal(first.metrics.get('metric-speed').textContent, '4.2 km/h');
 assert.equal(first.metrics.get('metric-heading').textContent, '90°');
+assert.equal(first.metrics.get('metric-activity').textContent, 'En movimiento');
+assert.equal(first.metrics.get('metric-location-status').textContent, 'Disponible');
+assert.equal(first.metrics.get('metric-location-source').textContent, 'GPS');
 assert.equal(first.api.fields.length, 21);
 assert.ok(first.dashboard.querySelector('[data-dashboard-field="activity"]'));
 assert.ok(first.dashboard.querySelector('[data-dashboard-field="coordinates"]'));

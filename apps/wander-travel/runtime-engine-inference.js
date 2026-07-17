@@ -33,7 +33,7 @@
     };
   }
 
-  function inferMobility(context, motion) {
+  function inferMobility(context, motion, options = {}) {
     const explicitMode = context.value?.('mobility.override.mode', null);
     if (explicitMode) {
       return {
@@ -46,7 +46,7 @@
 
     const providerMode = context.value?.('mobility.provider.mode', null);
     const providerConfidence = finiteNumber(context.value?.('mobility.provider.confidence', null));
-    if (providerMode && providerConfidence !== null && providerConfidence >= 0.6) {
+    if (!options.ignoreProvider && providerMode && providerConfidence !== null && providerConfidence >= 0.6) {
       return {
         mode: String(providerMode),
         confidence: Math.min(1, Math.max(0, providerConfidence)),
@@ -80,14 +80,16 @@
       };
     }
 
+    const effectiveSource = String(effective.source || '').toLowerCase();
+    const simulatorActive = effectiveSource === 'simulator';
     const rawSpeedMps = finiteNumber(effective.speedMps);
     const rawSpeedKmh = rawSpeedMps === null ? null : Math.max(0, rawSpeedMps * 3.6);
     const providerSpeedKmh = finiteNumber(context.value?.('mobility.provider.speedKmh', null));
     const providerMode = context.value?.('mobility.provider.mode', null);
     const providerConfidence = finiteNumber(context.value?.('mobility.provider.confidence', null));
 
-    let speedKmh = providerSpeedKmh !== null ? Math.max(0, providerSpeedKmh) : rawSpeedKmh;
-    if (providerMode === 'stationary' && providerConfidence !== null && providerConfidence >= 0.6) speedKmh = 0;
+    let speedKmh = !simulatorActive && providerSpeedKmh !== null ? Math.max(0, providerSpeedKmh) : rawSpeedKmh;
+    if (!simulatorActive && providerMode === 'stationary' && providerConfidence !== null && providerConfidence >= 0.6) speedKmh = 0;
 
     const heading = finiteNumber(effective.heading);
     const motion = inferMotionState(speedKmh);
@@ -101,7 +103,7 @@
       speedKmh,
       heading,
       motion,
-      mobility: inferMobility(context, motion),
+      mobility: inferMobility(context, motion, { ignoreProvider: simulatorActive }),
     };
   }
 

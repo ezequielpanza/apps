@@ -49,8 +49,17 @@ jobs:
       - name: Run context dashboard configuration tests
         run: node apps/wander-travel/tests/context-dashboard-config.mjs
 
+      - name: Run human-readable context panel tests
+        run: node apps/wander-travel/tests/context-panel-values.mjs
+
       - name: Run movement method tests
         run: node apps/wander-travel/tests/movement-method.mjs
+
+      - name: Run simulator motion isolation tests
+        run: node apps/wander-travel/tests/simulator-motion.mjs
+
+      - name: Run session reconciliation tests
+        run: node apps/wander-travel/tests/session-reconciliation.mjs
 
       - name: Verify app shell consistency
         run: node apps/wander-travel/tests/app-shell.mjs

@@ -403,6 +403,17 @@
     if (!original?.locationAvailable) return original;
 
     const effective = context.getEffectiveLocation?.();
+    if (String(effective?.source || '').toLowerCase() === 'simulator') {
+      return {
+        ...original,
+        motionEvidence: {
+          source: 'simulator',
+          rawSpeedKmh: original.speedKmh,
+          providerSpeedKmh: null,
+          filterEvidence: ['simulator_override_authoritative'],
+        },
+      };
+    }
     const sample = addSample(effective);
     const providerSpeedKmh = finite(context.value?.('mobility.provider.speedKmh', null));
     const providerMode = String(context.value?.('mobility.provider.mode', '') || '').toLowerCase();

@@ -143,7 +143,8 @@
 
   function humanRow(key, label, iconName, fieldId) {
     const entry = context.get(key);
-    const value = readableValue(key, entry);
+    const field = dashboardField(fieldId);
+    const value = field?.value ? field.value() : readableValue(key, entry);
     const valueHtml = fieldId === 'coordinates' ? '<button type="button" class="coordinate-format-button" data-coordinate-format-button title="Tocar para cambiar el formato" aria-label="Cambiar formato de coordenadas"><b>' + value + '</b></button>' : '<b>' + value + '</b>';
     return '<div class="context-row has-dashboard-toggle"' + (fieldId === 'coordinates' ? ' data-coordinate-format-row' : '') + '><div class="context-label">' + dashboardToggle(fieldId, label) + icon(iconName) + '<strong>' + label + '</strong></div><div class="context-row-value">' + valueHtml + '</div></div>';
   }

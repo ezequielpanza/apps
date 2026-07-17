@@ -1,6 +1,6 @@
 # Wander Travel
 
-Versión: **v0.99.0**
+Versión: **v0.99.1**
 
 Wander Travel combina una base técnica estable para observar el viaje con el primer ciclo funcional del compañero: interpreta la llegada a un lugar aparentemente nuevo, espera un momento apropiado, da una bienvenida contextual, acepta una corrección del usuario y recuerda lo presentado.
 
@@ -10,7 +10,7 @@ La versión v0.97.0 conecta la acción `Llévame` con rutas peatonales reales. L
 
 La versión v0.98.0 incorpora un presupuesto persistente de intervenciones: separa mensajes consecutivos, limita descubrimientos no solicitados, guarda los descartes y suspende nuevas sugerencias mientras existe una navegación activa.
 
-La versión v0.99.0 cierra el primer ciclo de aprendizaje: aceptar `Llévame` aumenta la relevancia de categorías similares y descartar propuestas la reduce. Las preferencias quedan en el perfil local y participan en decisiones posteriores.
+La versión v0.99.1 corrige la integridad del contexto observado en uso real: el simulador ya no hereda el estado estacionario del GPS, las permanencias abiertas se reconcilian al reaparecer lejos de su centro y Contexto presenta valores humanos en español.
 
 ## Arquitectura activa
 
