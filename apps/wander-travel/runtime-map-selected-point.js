@@ -222,9 +222,7 @@
 
   saveButton.addEventListener('click', () => {
     const created = createSelectedPOI();
-    if (!created?.id) return;
-    clear();
-    window.WanderUI?.showToast?.('POI guardado', created.name);
+    if (created?.id) clear();
   });
 
   ctx.subscribe?.((key) => {
