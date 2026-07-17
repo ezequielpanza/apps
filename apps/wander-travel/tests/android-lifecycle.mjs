@@ -25,7 +25,12 @@ assert.match(service, /onTaskRemoved/);
 assert.match(service, /stopSelf\(\)/);
 assert.match(service, /ACTION_STOP/);
 assert.match(service, /addAction\(/);
+assert.match(service, /SensorEventListener/);
+assert.match(service, /TYPE_LINEAR_ACCELERATION/);
+assert.match(service, /registerListener\(/);
+assert.match(service, /unregisterListener\(/);
 assert.match(plugin, /notifyCompanion/);
 assert.match(plugin, /BigTextStyle/);
+assert.match(plugin, /motionSensor/);
 
 console.log('PASS Android accompanies in foreground/background and stops with the user task');

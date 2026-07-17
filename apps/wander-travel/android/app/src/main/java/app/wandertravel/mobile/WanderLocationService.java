@@ -11,13 +11,17 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
-public class WanderLocationService extends Service implements LocationListener {
+public class WanderLocationService extends Service implements LocationListener, SensorEventListener {
     static final String ACTION_START = "app.wandertravel.mobile.action.START_LOCATION";
     static final String ACTION_STOP = "app.wandertravel.mobile.action.STOP_LOCATION";
     private static final String CHANNEL_ID = "wander_companion";
@@ -25,6 +29,10 @@ public class WanderLocationService extends Service implements LocationListener {
     private static volatile boolean running = false;
 
     private LocationManager locationManager;
+    private SensorManager sensorManager;
+    private Sensor motionSensor;
+    private boolean linearAccelerationSensor = false;
+    private long lastSensorPublishAt = 0;
 
     static boolean isRunning() {
         return running;
@@ -34,6 +42,10 @@ public class WanderLocationService extends Service implements LocationListener {
     public void onCreate() {
         super.onCreate();
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+        linearAccelerationSensor = motionSensor != null;
+        if (motionSensor == null) motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         createNotificationChannel();
     }
 
@@ -71,6 +83,7 @@ public class WanderLocationService extends Service implements LocationListener {
                 locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, minimumIntervalMs, minimumDistanceM, this);
             }
             running = true;
+            startMotionSensor();
         } catch (RuntimeException error) {
             running = false;
             WanderLocationPlugin.publishError("unavailable");
@@ -80,9 +93,36 @@ public class WanderLocationService extends Service implements LocationListener {
 
     private void stopTracking() {
         if (locationManager != null) locationManager.removeUpdates(this);
+        if (sensorManager != null) sensorManager.unregisterListener(this);
         running = false;
         stopForeground(STOP_FOREGROUND_REMOVE);
     }
+
+    private void startMotionSensor() {
+        if (sensorManager == null || motionSensor == null) {
+            WanderLocationPlugin.publishMotionUnavailable();
+            return;
+        }
+        sensorManager.unregisterListener(this);
+        sensorManager.registerListener(this, motionSensor, SensorManager.SENSOR_DELAY_NORMAL);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event == null || event.sensor != motionSensor || event.values.length < 3) return;
+        long now = System.currentTimeMillis();
+        if (now - lastSensorPublishAt < 500) return;
+        lastSensorPublishAt = now;
+        float x = event.values[0];
+        float y = event.values[1];
+        float z = event.values[2];
+        float magnitude = (float) Math.sqrt(x * x + y * y + z * z);
+        float activity = linearAccelerationSensor ? magnitude : Math.abs(magnitude - SensorManager.GRAVITY_EARTH);
+        WanderLocationPlugin.publishMotion(x, y, z, magnitude, activity, linearAccelerationSensor, now);
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(

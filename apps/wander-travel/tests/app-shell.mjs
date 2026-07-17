@@ -13,6 +13,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifes
 const mapControls = fs.readFileSync(path.join(ROOT, 'runtime-map-controls.js'), 'utf8');
 const messageCss = fs.readFileSync(path.join(ROOT, 'wander-message-top.css'), 'utf8');
 const uiRuntime = fs.readFileSync(path.join(ROOT, 'runtime-ui.js'), 'utf8');
+const capacitorConfig = JSON.parse(fs.readFileSync(path.join(ROOT, 'capacitor.config.json'), 'utf8'));
 
 function localReferences(source) {
   return [...source.matchAll(/(?:src|href)=["']([^"']+)["']/g)]
@@ -56,6 +57,9 @@ assert.match(mapControls, /position\.setFollowMode\(true, \{ centerNow: false \}
 assert.match(messageCss, /\.wander-card\s*\{[\s\S]*?top:\s*0;/, 'Wander messages must open from the top edge');
 assert.match(messageCss, /z-index:\s*115;/, 'Wander messages must cover the map header');
 assert.match(uiRuntime, /configureChoices\(options\.choices\)/, 'Wander messages must support explicit choices');
+assert.equal(capacitorConfig.server.url, 'https://wander-travel.pages.dev', 'Android shell must load the deployed Wander web app');
+assert.equal(capacitorConfig.server.errorPath, 'index.html', 'Android shell must retain its bundled offline recovery');
+assert.match(serviceWorker, /if \(!response\.ok\) throw/, 'A broken network asset must fall back to the last complete cache');
 
 for (const retiredPath of [
   'imports/wander',
