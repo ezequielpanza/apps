@@ -13,6 +13,7 @@ node apps/wander-travel/tests/context-dashboard.mjs
 node apps/wander-travel/tests/context-dashboard-config.mjs
 node apps/wander-travel/tests/movement-method.mjs
 node apps/wander-travel/tests/app-shell.mjs
+node apps/wander-travel/tests/companion-arrival.mjs
 ```
 
 The runners have no external dependencies. They load the real production runtime modules in isolated Node `vm` contexts with controlled storage and simulated source responses.
@@ -22,12 +23,13 @@ The runners have no external dependencies. They load the real production runtime
 `wander-scenarios.mjs` covers:
 
 1. New city without memory → `introduce_place`
-2. User correction (`ya conozco`) → `known`, persisted across reopen
-3. Previous-day presence → `recent_presence`
-4. Explicit negative correction (`es mi primera vez`) → `new_confirmed`
-5. Brief geocoder noise does not switch city; stable change does
-6. Multimodal Journey remains one continuous session
-7. Content Memory persists what Wander already told
+2. New country and new city → city introduction takes priority
+3. User correction (`ya conozco`) → `known`, persisted across reopen
+4. Previous-day presence → `recent_presence`
+5. Explicit negative correction (`es mi primera vez`) → `new_confirmed`
+6. Brief geocoder noise does not switch city; stable change does
+7. Multimodal Journey remains one continuous session
+8. Content Memory persists what Wander already told
 
 ## Unified POI engine
 
@@ -114,6 +116,10 @@ The tests use simulated Overpass elements so CI remains deterministic.
 The matcher is deterministic and does not require AI. AI can be added later for interpretation, summarization, or user interaction without becoming a dependency of POI discovery or basic consolidation.
 
 A failing assertion exits with a non-zero status so all runners can execute in CI and before Cloudflare Pages deployment.
+
+## Companion arrival
+
+`companion-arrival.mjs` verifies the first complete companion scene: a new city produces a contextual introduction, fast movement defers it, remembered content is not repeated, irrelevant evaluations remain silent, and a user correction is handled and recorded.
 
 ## App shell
 

@@ -10,15 +10,15 @@
 
   const PLACE_EVENT_SCORES = {
     'country.entered': 0.18,
-    'country.assumed_new': 0.98,
-    'country.new_confirmed': 0.99,
+    'country.assumed_new': 0.9,
+    'country.new_confirmed': 0.91,
     'country.recent_presence': 0.58,
     'country.known': 0.5,
     'country.exited': 0.08,
 
     'city.entered': 0.14,
-    'city.assumed_new': 0.94,
-    'city.new_confirmed': 0.98,
+    'city.assumed_new': 0.98,
+    'city.new_confirmed': 0.99,
     'city.recent_presence': 0.55,
     'city.known': 0.48,
     'city.exited': 0.06,

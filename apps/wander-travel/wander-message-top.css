@@ -38,6 +38,34 @@ body.poi-editor-open .wander-card{
 .wander-toast strong{font-size:.8rem;white-space:nowrap}
 .wander-toast span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.84);font-size:.76rem}
 
+.wander-reply{
+  display:grid;
+  gap:5px;
+  margin-top:14px;
+}
+.wander-reply[hidden]{display:none!important}
+.wander-reply input{
+  width:100%;
+  min-height:42px;
+  border:1px solid rgba(23,63,59,.16);
+  border-radius:13px;
+  padding:0 12px;
+  background:#f6f8f7;
+  color:var(--text);
+  font:inherit;
+  font-size:.84rem;
+}
+.wander-reply input:focus{
+  border-color:var(--accent);
+  outline:0;
+  box-shadow:0 0 0 3px var(--accent-ring);
+}
+.wander-reply span{
+  color:var(--muted);
+  font-size:.66rem;
+  text-align:right;
+}
+
 @media (min-width:700px){
   .wander-card{
     left:12px;

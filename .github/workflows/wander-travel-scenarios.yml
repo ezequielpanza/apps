@@ -54,3 +54,6 @@ jobs:
 
       - name: Verify app shell consistency
         run: node apps/wander-travel/tests/app-shell.mjs
+
+      - name: Run companion arrival tests
+        run: node apps/wander-travel/tests/companion-arrival.mjs

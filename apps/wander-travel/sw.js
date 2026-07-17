@@ -51,6 +51,7 @@ const APP_SHELL = [
   './runtime-engine-place.js',
   './runtime-engine-relevance.js',
   './runtime-engine-decision.js',
+  './runtime-companion-policy.js',
   './runtime-engine.js',
   './runtime-pedestrian-motion.js',
   './runtime-session-engine.js',
@@ -72,6 +73,7 @@ const APP_SHELL = [
   './runtime-map-selected-point.js',
   './runtime-points-screen.js',
   './runtime-message-timeout-settings.js',
+  './runtime-companion.js',
   './app.js',
 ];
 

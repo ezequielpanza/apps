@@ -5,6 +5,7 @@
   let messageTimer = null;
   let toastTimer = null;
   let toast = null;
+  let replyForm = null;
 
   function getMessageTimeoutMs() {
     try {
@@ -35,8 +36,46 @@
 
   function hideWander() {
     clearMessageTimer();
+    clearReply();
     const card = $('#wander-card');
     if (card) card.hidden = true;
+  }
+
+  function ensureReplyForm() {
+    if (replyForm?.isConnected) return replyForm;
+    const card = $('#wander-card');
+    if (!card) return null;
+    replyForm = document.createElement('form');
+    replyForm.className = 'wander-reply';
+    replyForm.hidden = true;
+    replyForm.innerHTML = '<input type="text" autocomplete="off"><span>Presioná Enter para responder</span>';
+    card.appendChild(replyForm);
+    return replyForm;
+  }
+
+  function clearReply() {
+    if (!replyForm) return;
+    replyForm.hidden = true;
+    replyForm.onsubmit = null;
+    const input = replyForm.querySelector('input');
+    if (input) input.value = '';
+  }
+
+  function configureReply(reply) {
+    clearReply();
+    if (!reply || typeof reply.onSubmit !== 'function') return;
+    const form = ensureReplyForm();
+    const input = form?.querySelector('input');
+    if (!form || !input) return;
+    input.placeholder = reply.placeholder || 'Responder a Wander';
+    input.setAttribute('aria-label', reply.ariaLabel || input.placeholder);
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      const value = input.value.trim();
+      if (!value) return;
+      reply.onSubmit(value);
+    };
+    form.hidden = false;
   }
 
   function ensureToast() {
@@ -78,16 +117,19 @@
     if (shouldUseToast(title, options)) return showToast(title, message, options);
     const card = $('#wander-card');
     clearMessageTimer();
-    if (document.body.classList.contains('poi-editor-open')) return;
-    if (card) card.hidden = false;
+    clearReply();
+    if (document.body.classList.contains('poi-editor-open') || !card) return false;
+    card.hidden = false;
     setText('#wander-title', title);
     setText('#wander-message', message);
+    configureReply(options.reply);
 
-    if (options.persistent === true) return;
+    if (options.persistent === true) return true;
     const timeoutMs = Number.isFinite(Number(options.timeoutMs))
       ? Math.max(0, Number(options.timeoutMs))
       : getMessageTimeoutMs();
     if (timeoutMs > 0) messageTimer = setTimeout(hideWander, timeoutMs);
+    return true;
   }
 
   function syncRuntimeMetrics() {

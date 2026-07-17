@@ -1,8 +1,8 @@
 # Wander Travel
 
-Versión base: **v0.94.0**
+Versión: **v0.95.0**
 
-Wander Travel queda en esta versión como una base técnica estable para observar ubicación, movimiento, lugares cercanos, sesiones y puntos personales. La definición del comportamiento del compañero de viaje se realizará después de esta limpieza; el código no incluye pantallas, mensajes ni integraciones simuladas para funciones todavía no decididas.
+Wander Travel combina una base técnica estable para observar el viaje con el primer ciclo funcional del compañero: interpreta la llegada a un lugar aparentemente nuevo, espera un momento apropiado, da una bienvenida contextual, acepta una corrección del usuario y recuerda lo presentado.
 
 ## Arquitectura activa
 
@@ -24,6 +24,8 @@ El orden de carga está declarado de forma determinista en `index.html`. `app.js
 - Puntos personales y selector de posición.
 - Sesiones automáticas con movimiento, permanencias, historial y exportación.
 - Memoria geográfica y continuidad de Journey.
+- Política de intervenciones y bienvenida a ciudades o países aparentemente nuevos.
+- Corrección contextual de familiaridad y memoria del contenido presentado.
 - Simulador de ubicación y movimiento.
 - PWA con caché offline versionado.
 

@@ -197,6 +197,16 @@ scenario('Nueva ciudad sin memoria → introduce_place', () => {
   assert.equal(action.canBeCorrectedByUser, true);
 });
 
+scenario('Nuevo país y nueva ciudad → prioriza la ciudad', () => {
+  const runtime = createRuntime('2026-07-08T10:00:00-04:00');
+  const { placeResult, action } = evaluatePlace(runtime, PLACE.Santiago);
+
+  assert.equal(placeResult.current.country.presenceStatus, 'assumed_new');
+  assert.equal(placeResult.current.city.presenceStatus, 'assumed_new');
+  assert.equal(action.type, 'introduce_place');
+  assert.equal(action.semanticPlace.id, PLACE.Santiago.cityId);
+});
+
 scenario('Corrección del usuario → known y persiste', () => {
   const storage = new MemoryStorage();
   const runtime = createRuntime('2026-07-08T10:00:00-04:00', storage);
