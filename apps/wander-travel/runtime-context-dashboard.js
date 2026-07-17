@@ -29,6 +29,22 @@
     return labels[normalized] || textValue(value, fallback);
   }
 
+  function activityValue() {
+    const motion = String(context.value('motion.status') || '').toLowerCase();
+    const summary = textValue(context.value('context.status'), 'Preparando contexto');
+    if (motion === 'moving') return 'En movimiento';
+    if (motion === 'stationary') return 'En pausa';
+    if (motion === 'pending') return summary === 'Confirmando detención' ? summary : 'Preparando contexto';
+    return translatedValue('context.activity', ACTIVITY_LABELS, 'Preparando contexto');
+  }
+
+  function motionStatusValue() {
+    const motion = String(context.value('motion.status') || '').toLowerCase();
+    const summary = textValue(context.value('context.status'), 'Preparando contexto');
+    if (motion === 'pending' && summary === 'Confirmando detención') return summary;
+    return MOTION_LABELS[motion] || translatedValue('motion.status', MOTION_LABELS, 'Preparando contexto');
+  }
+
   function numberValue(key, suffix, digits = 0, fallback = '—') {
     const value = Number(context.value(key));
     return Number.isFinite(value) ? value.toFixed(digits) + suffix : fallback;
@@ -119,14 +135,14 @@
 
   const FIELDS = Object.freeze([
     { id: 'summary', label: 'Estado actual', icon: 'target', metricId: 'metric-status', value: () => textValue(context.value('context.status'), 'Preparando contexto') },
-    { id: 'activity', label: 'Actividad', icon: 'route', metricId: 'metric-activity', value: () => translatedValue('context.activity', ACTIVITY_LABELS, 'Preparando contexto') },
+    { id: 'activity', label: 'Actividad', icon: 'route', metricId: 'metric-activity', value: activityValue },
     { id: 'time', label: 'Hora', icon: 'clock', metricId: 'metric-time', value: () => textValue(context.value('time.now'), 'Pendiente') },
     { id: 'dayPeriod', label: 'Momento del día', icon: 'day', metricId: 'metric-day-period', value: () => textValue(context.value('time.dayPeriod'), 'Pendiente') },
     { id: 'locationStatus', label: 'Ubicación', icon: 'pin', metricId: 'metric-location-status', value: () => textValue(context.value('location.effective.status'), 'Pendiente') },
     { id: 'coordinates', label: 'Coordenadas', icon: 'pin', metricId: 'metric-coordinates', value: coordinatesValue },
     { id: 'locationSource', label: 'Fuente de ubicación', icon: 'target', metricId: 'metric-location-source', value: () => textValue(context.value('location.effective.source'), 'Pendiente') },
     { id: 'accuracy', label: 'Precisión', icon: 'target', metricId: 'metric-accuracy', value: () => numberValue('location.effective.accuracy', ' m') },
-    { id: 'motionStatus', label: 'Movimiento físico', icon: 'route', metricId: 'metric-motion-status', value: () => translatedValue('motion.status', MOTION_LABELS, 'Preparando contexto') },
+    { id: 'motionStatus', label: 'Movimiento físico', icon: 'route', metricId: 'metric-motion-status', value: motionStatusValue },
     { id: 'mobility', label: 'Método de desplazamiento', icon: 'compass', metricId: 'metric-mobility', value: movementMethodValue },
     { id: 'speed', label: 'Velocidad', icon: 'speed', metricId: 'metric-speed', value: () => numberValue('motion.speedKmh', ' km/h', 1) },
     { id: 'heading', label: 'Rumbo', icon: 'heading', metricId: 'metric-heading', value: () => numberValue('motion.heading', '°') },
@@ -171,22 +187,6 @@
   function getVisibleFields() { return [...visibleFields]; }
   function reset() { visibleFields = [...DEFAULT_VISIBLE_FIELDS]; persist(); render(); return getVisibleFields(); }
 
-  function normalizeComparable(value) {
-    return String(value || '').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-  }
-
-  function isRedundantCurrentPOI() {
-    const poi = normalizeComparable(currentPOIValue());
-    const summary = normalizeComparable(textValue(context.value('context.status'), ''));
-    return poi && poi !== 'sin poi actual' && summary.includes(poi);
-  }
-
-  function shouldShow(fieldId) {
-    if (!isVisible(fieldId)) return false;
-    if (fieldId === 'currentPOI' && isRedundantCurrentPOI()) return false;
-    return true;
-  }
-
   function ensureDashboardItems() {
     const dashboard = document.querySelector('#context-dashboard');
     const empty = dashboard?.querySelector('[data-dashboard-empty]');
@@ -207,7 +207,7 @@
     ensureDashboardItems();
     let shown = 0;
     document.querySelectorAll('[data-dashboard-field]').forEach((element) => {
-      const visible = shouldShow(element.dataset.dashboardField);
+      const visible = isVisible(element.dataset.dashboardField);
       element.hidden = !visible;
       if (visible) shown += 1;
     });
