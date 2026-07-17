@@ -70,10 +70,15 @@
     toastTimer = setTimeout(hideToast, timeoutMs);
   }
 
+  function shouldUseToast(title, options) {
+    return options.compact === true || /^POI\s+(guardado|actualizado)$/i.test(String(title || ''));
+  }
+
   function showWander(title, message, options = {}) {
+    if (shouldUseToast(title, options)) return showToast(title, message, options);
     const card = $('#wander-card');
     clearMessageTimer();
-    if (document.body.classList.contains('poi-editor-open')) return showToast(title, message, options);
+    if (document.body.classList.contains('poi-editor-open')) return;
     if (card) card.hidden = false;
     setText('#wander-title', title);
     setText('#wander-message', message);
