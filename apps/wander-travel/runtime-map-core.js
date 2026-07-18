@@ -32,6 +32,15 @@
     lineJoin: 'round',
   }).addTo(map);
 
+  const currentTrack = L.polyline([], {
+    color: '#01E0CB',
+    weight: 5,
+    opacity: 0.95,
+    lineCap: 'round',
+    lineJoin: 'round',
+    interactive: false,
+  }).addTo(map);
+
   function setBaseLayer(name) {
     if (!baseLayers[name] || name === activeBaseLayer) return activeBaseLayer;
     map.removeLayer(baseLayers[activeBaseLayer]);
@@ -47,6 +56,7 @@
   window.WanderMapCore = {
     map,
     route,
+    currentTrack,
     setBaseLayer,
     toggleBaseLayer,
     getBaseLayer: () => activeBaseLayer,

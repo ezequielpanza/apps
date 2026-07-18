@@ -4,16 +4,36 @@
 
   const map = base.map;
   const line = base.route;
+  const currentLine = base.currentTrack || null;
   const LEGACY_KEY = 'wander.tracks';
+  const CURRENT_TRACK_VISIBLE_KEY = 'wander.tracks.current.visible.v1';
   const $ = (selector) => document.querySelector(selector);
   const icon = (name, className = 'button-icon') => `<svg class="${className}" aria-hidden="true"><use href="wander-icons.svg#${name}"></use></svg>`;
   let legacyTracks = [];
   let initialized = false;
+  let currentTrackVisible = loadCurrentTrackVisibility();
 
   try {
     const stored = JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]');
     legacyTracks = Array.isArray(stored) ? stored : [];
   } catch { legacyTracks = []; }
+
+  function loadCurrentTrackVisibility() {
+    try {
+      const stored = localStorage.getItem(CURRENT_TRACK_VISIBLE_KEY);
+      return stored == null ? true : stored === 'true';
+    } catch { return true; }
+  }
+
+  function persistCurrentTrackVisibility() {
+    try { localStorage.setItem(CURRENT_TRACK_VISIBLE_KEY, String(currentTrackVisible)); } catch {}
+    window.WanderContext?.set?.('sessions.currentTrackVisible', currentTrackVisible, {
+      source: 'tracks-ui',
+      kind: 'confirmed',
+      confidence: 1,
+      ttlMs: Infinity,
+    });
+  }
 
   function engine() {
     return window.WanderSessionEngine || null;
@@ -62,6 +82,10 @@
         <div><strong>Registro automático</strong><span>Wander registra movimiento y permanencias sin usar un botón de grabación.</span></div>
         <label class="switch-control"><input id="session-auto-toggle" type="checkbox" role="switch" aria-label="Registro automático"><span class="switch-track"><span class="switch-thumb"></span></span></label>
       </div>
+      <div class="session-auto-card">
+        <div><strong>Mostrar recorrido actual</strong><span>Dibuja en el mapa el trayecto acumulado de la sesión activa.</span></div>
+        <label class="switch-control"><input id="session-map-toggle" type="checkbox" role="switch" aria-label="Mostrar recorrido actual en el mapa"><span class="switch-track"><span class="switch-thumb"></span></span></label>
+      </div>
       <div class="session-current-card">
         <span id="session-phase">Preparando contexto</span>
         <strong id="track-summary">Sin sesión activa</strong>
@@ -83,6 +107,9 @@
       engine()?.setAutoEnabled?.(event.target.checked);
       render();
     });
+    $('#session-map-toggle')?.addEventListener('change', (event) => {
+      setCurrentTrackVisible(event.target.checked);
+    });
     $('#session-finish-button')?.addEventListener('click', () => {
       const completed = engine()?.finishSession?.('manual');
       if (completed) window.WanderUI?.showToast?.('Sesión finalizada', 'Esperando el próximo movimiento');
@@ -91,6 +118,7 @@
     $('#export-track-button')?.addEventListener('click', exportLast);
     $('#clear-panel-button')?.addEventListener('click', () => {
       line.setLatLngs([]);
+      setCurrentTrackVisible(false);
       window.WanderUI?.showToast?.('Vista limpia', 'Las sesiones siguen guardadas');
     });
     $('#track-list')?.addEventListener('click', handleListClick);
@@ -133,22 +161,52 @@
     </div>`;
   }
 
-  function render() {
+  function sessionPoints(session) {
+    return (session?.segments || []).filter((segment) => segment.type === 'movement').flatMap((segment) => segment.points || []);
+  }
+
+  function currentLatLngs(active) {
+    return sessionPoints(active)
+      .filter((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)))
+      .map((point) => [Number(point.lat), Number(point.lng)]);
+  }
+
+  function syncCurrentTrack(state = null) {
+    if (!currentLine) return [];
+    const snapshot = state || engine()?.snapshot?.() || null;
+    const latLngs = currentTrackVisible ? currentLatLngs(snapshot?.active) : [];
+    currentLine.setLatLngs(latLngs);
+    return latLngs;
+  }
+
+  function setCurrentTrackVisible(visible) {
+    currentTrackVisible = Boolean(visible);
+    persistCurrentTrackVisibility();
+    const toggle = $('#session-map-toggle');
+    if (toggle) toggle.checked = currentTrackVisible;
+    syncCurrentTrack();
+    return currentTrackVisible;
+  }
+
+  function render(state = null) {
     if (!buildScreen()) return;
-    const state = engine()?.snapshot?.() || { autoEnabled: true, phase: 'preparing', active: null, sessions: [] };
-    const active = state.active;
+    const snapshot = state || engine()?.snapshot?.() || { autoEnabled: true, phase: 'preparing', active: null, sessions: [] };
+    const active = snapshot.active;
     const live = window.WanderContext?.value?.('sessions.active') || active;
-    const history = Array.isArray(state.sessions) ? state.sessions : [];
+    const history = Array.isArray(snapshot.sessions) ? snapshot.sessions : [];
     const toggle = $('#session-auto-toggle');
-    if (toggle) toggle.checked = Boolean(state.autoEnabled);
+    if (toggle) toggle.checked = Boolean(snapshot.autoEnabled);
+    const mapToggle = $('#session-map-toggle');
+    if (mapToggle) mapToggle.checked = currentTrackVisible;
     const finish = $('#session-finish-button');
     if (finish) finish.disabled = !active;
-    window.WanderUI?.setText('#session-phase', phaseLabel(state));
+    window.WanderUI?.setText('#session-phase', phaseLabel(snapshot));
     window.WanderUI?.setText('#track-summary', activeSummary(live));
     window.WanderUI?.setText('#session-distance', distanceLabel(live?.distanceM || 0));
     window.WanderUI?.setText('#session-moving-time', durationLabel(live?.movingDurationMs || 0));
     window.WanderUI?.setText('#session-stay-time', durationLabel(live?.stationaryDurationMs || 0));
     window.WanderUI?.setText('#session-history-count', historyCountLabel(active, history));
+    syncCurrentTrack(snapshot);
 
     const list = $('#track-list');
     if (!list) return;
@@ -165,16 +223,13 @@
     return state?.sessions?.find((session) => session.id === id) || null;
   }
 
-  function sessionPoints(session) {
-    return (session?.segments || []).filter((segment) => segment.type === 'movement').flatMap((segment) => segment.points || []);
-  }
-
   function showSession(id) {
-    const session = sessionById(id);
+    const state = engine()?.snapshot?.();
+    const session = state?.active?.id === id ? state.active : state?.sessions?.find((item) => item.id === id);
     const points = sessionPoints(session);
     if (!session || !points.length) return window.WanderUI?.showToast?.('Sesión', 'Todavía no tiene recorrido visible');
     const latLngs = points.map((point) => [point.lat, point.lng]);
-    line.setLatLngs(latLngs);
+    if (!(state?.active?.id === id && currentTrackVisible)) line.setLatLngs(latLngs);
     map.fitBounds(latLngs, { padding: [40, 40], maxZoom: 16 });
     const distance = session.distanceM || window.WanderContext?.value?.('sessions.active')?.distanceM || 0;
     window.WanderUI?.showToast?.('Sesión', distanceLabel(distance));
@@ -226,6 +281,7 @@
   function initialize() {
     if (initialized || !engine()) return;
     initialized = true;
+    persistCurrentTrackVisibility();
     engine().subscribe?.(render);
     buildScreen();
     render();
@@ -246,6 +302,8 @@
     start: () => engine()?.setAutoEnabled?.(true),
     stop: () => engine()?.finishSession?.('manual'),
     addPoint: () => engine()?.observe?.('legacy-add-point'),
+    setCurrentTrackVisible,
+    isCurrentTrackVisible: () => currentTrackVisible,
   };
 
   initialize();
