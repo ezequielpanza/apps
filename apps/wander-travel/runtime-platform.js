@@ -134,6 +134,15 @@
     return true;
   }
 
+  function loadRoomCompanion() {
+    if (window.WanderRoomCompanion || document.querySelector('script[data-wander-room-companion]')) return;
+    const script = document.createElement('script');
+    script.src = './runtime-room-companion.js?v=20260718-01';
+    script.dataset.wanderRoomCompanion = 'true';
+    script.async = false;
+    document.head.appendChild(script);
+  }
+
   window.WanderPlatform = {
     isNative,
     apiUrl,
@@ -150,6 +159,7 @@
     productionOrigin: PRODUCTION_ORIGIN,
   };
 
+  loadRoomCompanion();
   refreshNotificationPermission();
   refreshNotificationSound();
 })();
