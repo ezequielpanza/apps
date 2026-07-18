@@ -7,6 +7,12 @@ on:
     paths:
       - 'apps/wander-travel/**'
       - '.github/workflows/wander-android-stable.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/wander-travel/**'
+      - '.github/workflows/wander-android-stable.yml'
   workflow_dispatch:
 
 permissions:
