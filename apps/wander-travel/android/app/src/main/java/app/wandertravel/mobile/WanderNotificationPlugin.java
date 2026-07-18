@@ -221,7 +221,7 @@ public class WanderNotificationPlugin extends Plugin {
     @PluginMethod
     public void notifyCompanion(PluginCall call) {
         JSObject result = permissionResult();
-        if (!result.getBool("granted", false)) {
+        if (!"granted".equals(permissionStatus())) {
             result.put("delivered", false);
             call.resolve(result);
             return;
