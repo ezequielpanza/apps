@@ -172,20 +172,21 @@
     const note = String(poi.note || poi.description || '').replace(/\s+/g, ' ').trim().slice(0, 220);
     const where = distanceM > 0 ? `a ${distanceM} metros` : 'muy cerca';
     const message = `${poi.name} está ${where}.${note ? ` ${note}` : ''} Puede ser una buena próxima parada desde donde estás.`;
+    const planNow = options.planNow === true;
 
     const result = companion.handleEvaluation({
       type: 'contextual_suggestion',
-      reason: options.userRequested ? 'user_requested_alternative' : 'nearby_contextual_option',
+      reason: planNow ? 'room_next_step' : options.userRequested ? 'user_requested_alternative' : 'nearby_contextual_option',
       semanticPlace: { id: snapshot.placeId, name: snapshot.placeName, level: 'place' },
       suggestion: {
         id: `nearby-suggestion:${poi.id}:${options.userRequested ? now : 'auto'}`,
         kind: 'contextual_suggestion',
         interactionType: 'suggest',
         priority: options.userRequested ? 'normal' : 'low',
-        title: options.userRequested ? 'Otra opción cerca' : 'Una opción cerca',
+        title: planNow ? 'Qué hacer ahora' : options.userRequested ? 'Otra opción cerca' : 'Una opción cerca',
         message,
         contentId: `nearby-suggestion:${poi.id}`,
-        topic: 'nearby_suggestion',
+        topic: planNow ? 'room_next_step' : 'nearby_suggestion',
         placeId: snapshot.placeId || poi.id,
         placeName: snapshot.placeName || poi.name,
         poi,
@@ -201,7 +202,7 @@
         } : null,
       },
       situation: { motion: { status: snapshot.motion }, speedKmh: snapshot.speedKmh },
-    }, options.userRequested ? 'proactive:alternative' : 'proactive:nearby');
+    }, planNow ? 'proactive:room-plan' : options.userRequested ? 'proactive:alternative' : 'proactive:nearby');
 
     if (accepted(result)) {
       state.lastSuggestionAt = now;
@@ -225,11 +226,25 @@
     return shown;
   }
 
+  function requestNowPlan() {
+    const snapshot = currentSnapshot();
+    lastSnapshot = snapshot;
+    return emitNearbySuggestion(snapshot, Date.now(), {
+      userRequested: true,
+      ignoreCooldown: true,
+      planNow: true,
+    });
+  }
+
   function evaluate() {
     timer = null;
     const snapshot = currentSnapshot();
     lastSnapshot = snapshot;
     if (!snapshot.placeId || !snapshot.placeName || snapshot.motion === 'pending') return;
+    if (window.WanderRoomCompanion?.isCurrentRoom?.()) {
+      schedule(PLACE_STABILITY_MS);
+      return;
+    }
 
     const now = Date.now();
     if (stablePlaceId !== snapshot.placeId) {
@@ -271,6 +286,7 @@
     evaluate,
     schedule,
     requestAlternative,
+    requestNowPlan,
     getSnapshot: () => lastSnapshot,
     rankNearby: (snapshot = currentSnapshot(), excludedIds = []) => snapshot.nearby
       .filter((item) => !excludedIds.map(String).includes(String(item?.id || '')))

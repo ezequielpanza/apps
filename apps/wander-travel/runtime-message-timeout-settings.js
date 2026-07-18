@@ -68,8 +68,10 @@
     <h3>Notificaciones de Wander</h3>
     <p class="panel-note">Permiten que Wander te avise sobre oportunidades, cambios y recordatorios aunque no estés mirando el mapa.</p>
     <div class="simulator-state-row"><span>Estado</span><strong id="notification-permission-status">Comprobando</strong></div>
+    <div class="simulator-state-row"><span>Sonido</span><strong id="notification-sound-status">Sonido predeterminado</strong></div>
     <div class="button-row compact-actions screen-card-actions">
       <button id="notification-enable-button" type="button">Activar notificaciones</button>
+      <button id="notification-sound-button" type="button">Elegir sonido</button>
       <button id="notification-test-button" type="button">Enviar prueba</button>
       <button id="notification-settings-button" type="button">Abrir ajustes</button>
     </div>
@@ -77,7 +79,9 @@
   settingsPanel.prepend(card);
 
   const statusElement = card.querySelector('#notification-permission-status');
+  const soundElement = card.querySelector('#notification-sound-status');
   const enableButton = card.querySelector('#notification-enable-button');
+  const soundButton = card.querySelector('#notification-sound-button');
   const testButton = card.querySelector('#notification-test-button');
   const settingsButton = card.querySelector('#notification-settings-button');
 
@@ -95,13 +99,24 @@
     enableButton.hidden = status === 'granted';
     enableButton.textContent = status === 'denied' || status === 'blocked' ? 'Revisar permiso' : 'Activar notificaciones';
     testButton.disabled = status !== 'granted';
+    soundButton.disabled = status === 'unavailable';
     settingsButton.hidden = status === 'not_requested';
     return state;
+  }
+
+  function renderSound(sound = platform.getNotificationSound?.() || {}) {
+    soundElement.textContent = sound.label || (sound.mode === 'silent' ? 'Silencioso' : 'Sonido predeterminado');
+    return sound;
   }
 
   async function refresh() {
     const state = await platform.refreshNotificationPermission();
     return render(state);
+  }
+
+  async function refreshSound() {
+    const sound = await platform.refreshNotificationSound();
+    return renderSound(sound);
   }
 
   async function activate() {
@@ -122,6 +137,18 @@
     return state;
   }
 
+  async function chooseSound() {
+    const sound = await platform.pickNotificationSound();
+    renderSound(sound);
+    if (sound.cancelled) return sound;
+    ui.showWander(
+      'Sonido actualizado',
+      sound.mode === 'silent' ? 'Las notificaciones de Wander serán silenciosas.' : `Wander usará “${sound.label}”. Podés comprobarlo con Enviar prueba.`,
+      { timeoutMs: 6500 }
+    );
+    return sound;
+  }
+
   async function sendTest() {
     const state = await refresh();
     if (!state.granted) {
@@ -134,6 +161,7 @@
       message: 'Esta es una notificación de prueba. Wander podrá avisarte cuando detecte algo útil.',
     });
     render(platform.getNotificationPermission());
+    renderSound(platform.getNotificationSound());
     ui.showWander(
       result.delivered ? 'Notificación enviada' : 'No se pudo enviar',
       result.delivered ? 'La prueba fue entregada a Android.' : 'Revisá el permiso de notificaciones en los ajustes del teléfono.',
@@ -168,6 +196,7 @@
   }
 
   enableButton.addEventListener('click', activate);
+  soundButton.addEventListener('click', chooseSound);
   testButton.addEventListener('click', sendTest);
   settingsButton.addEventListener('click', async () => {
     markExplainerSeen();
@@ -175,13 +204,27 @@
   });
 
   window.addEventListener('wander:notification-permission', (event) => render(event.detail));
+  window.addEventListener('wander:notification-sound', (event) => renderSound(event.detail));
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') refresh();
+    if (document.visibilityState === 'visible') {
+      refresh();
+      refreshSound();
+    }
   });
   window.addEventListener('wander:app-ready', () => setTimeout(showFirstRunExplainer, 1200), { once: true });
 
   render();
+  renderSound();
   refresh();
+  refreshSound();
 
-  window.WanderNotificationSettings = Object.freeze({ refresh, activate, sendTest, getState: platform.getNotificationPermission });
+  window.WanderNotificationSettings = Object.freeze({
+    refresh,
+    refreshSound,
+    activate,
+    chooseSound,
+    sendTest,
+    getState: platform.getNotificationPermission,
+    getSound: platform.getNotificationSound,
+  });
 })();

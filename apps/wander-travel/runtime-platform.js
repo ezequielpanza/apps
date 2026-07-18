@@ -1,6 +1,7 @@
 (() => {
   const PRODUCTION_ORIGIN = 'https://wander-travel.pages.dev';
   let notificationState = Object.freeze({ status: 'unknown', granted: false, enabled: false, canRequest: false });
+  let notificationSoundState = Object.freeze({ mode: 'default', label: 'Sonido predeterminado', uri: null, channelId: null });
 
   function isNative() {
     return window.Capacitor?.isNativePlatform?.() === true;
@@ -27,6 +28,21 @@
     });
     window.dispatchEvent(new CustomEvent('wander:notification-permission', { detail: notificationState }));
     return notificationState;
+  }
+
+  function publishNotificationSound(value = {}) {
+    notificationSoundState = Object.freeze({
+      mode: String(value.mode || 'default'),
+      label: String(value.label || 'Sonido predeterminado'),
+      uri: value.uri || null,
+      channelId: value.channelId || null,
+      cancelled: value.cancelled === true,
+    });
+    window.WanderContext?.set?.('notifications.sound', notificationSoundState, {
+      source: 'android-notifications', kind: 'confirmed', ttlMs: Infinity, confidence: 1,
+    });
+    window.dispatchEvent(new CustomEvent('wander:notification-sound', { detail: notificationSoundState }));
+    return notificationSoundState;
   }
 
   async function refreshNotificationPermission() {
@@ -59,6 +75,24 @@
     }
   }
 
+  async function refreshNotificationSound() {
+    if (!isNative() || typeof notificationPlugin()?.getSound !== 'function') return publishNotificationSound();
+    try {
+      return publishNotificationSound(await notificationPlugin().getSound());
+    } catch {
+      return publishNotificationSound();
+    }
+  }
+
+  async function pickNotificationSound() {
+    if (!isNative() || typeof notificationPlugin()?.pickSound !== 'function') return refreshNotificationSound();
+    try {
+      return publishNotificationSound(await notificationPlugin().pickSound());
+    } catch {
+      return refreshNotificationSound();
+    }
+  }
+
   function canNotifyInBackground() {
     return isNative() && notificationState.granted === true && notificationState.enabled === true
       && typeof notificationPlugin()?.notifyCompanion === 'function';
@@ -69,6 +103,13 @@
     try {
       const result = await notificationPlugin().notifyCompanion({ id, title, message });
       publishNotificationState(result);
+      if (result?.soundLabel || result?.soundMode) {
+        publishNotificationSound({
+          ...notificationSoundState,
+          mode: result.soundMode || notificationSoundState.mode,
+          label: result.soundLabel || notificationSoundState.label,
+        });
+      }
       const delivery = { ...result, delivered: result?.delivered === true };
       window.WanderContext?.set?.('notifications.lastDelivery', {
         ...delivery,
@@ -93,6 +134,15 @@
     return true;
   }
 
+  function loadRoomCompanion() {
+    if (window.WanderRoomCompanion || document.querySelector('script[data-wander-room-companion]')) return;
+    const script = document.createElement('script');
+    script.src = './runtime-room-companion.js?v=20260718-01';
+    script.dataset.wanderRoomCompanion = 'true';
+    script.async = false;
+    document.head.appendChild(script);
+  }
+
   window.WanderPlatform = {
     isNative,
     apiUrl,
@@ -102,9 +152,15 @@
     refreshNotificationPermission,
     requestNotificationPermission,
     openNotificationSettings,
+    refreshNotificationSound,
+    pickNotificationSound,
     getNotificationPermission: () => ({ ...notificationState }),
+    getNotificationSound: () => ({ ...notificationSoundState }),
     productionOrigin: PRODUCTION_ORIGIN,
   };
 
+  if (window.WanderAppReady) loadRoomCompanion();
+  else window.addEventListener('wander:app-ready', loadRoomCompanion, { once: true });
   refreshNotificationPermission();
+  refreshNotificationSound();
 })();
