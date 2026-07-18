@@ -6,29 +6,6 @@
 
   const STORAGE_KEY = base.storageKey || 'wander.contextDashboard.config.v1';
   const canonicalOrder = base.fields.map((field) => field.id);
-  const FIELD_SPANS = Object.freeze({
-    summary: 2,
-    activity: 2,
-    coordinates: 2,
-    locationStatus: 2,
-    locationSource: 2,
-    motionStatus: 2,
-    mobility: 2,
-    journey: 2,
-    country: 2,
-    place: 2,
-    zone: 2,
-    currentPOI: 2,
-    currentPlace: 2,
-    specificPlace: 2,
-    containerPlace: 2,
-    placeSource: 2,
-    placeMemory: 3,
-  });
-  const COMPACT_FIELDS = new Set([
-    'time', 'dayPeriod', 'accuracy', 'speed', 'heading', 'nearby', 'simulation',
-    'appVersion', 'apkVersion', 'placeConfidence',
-  ]);
   let decorating = false;
   let observer = null;
 
@@ -85,46 +62,20 @@
     });
   }
 
-  function measuredSpan(item) {
-    const fieldId = item.dataset.dashboardField;
-    let span = FIELD_SPANS[fieldId] || 1;
-    if (COMPACT_FIELDS.has(fieldId)) return 1;
-
-    const value = item.querySelector('strong')?.textContent?.trim() || '';
-    if (value.length > 34) span = 3;
-    else if (value.length > 15) span = Math.max(span, 2);
-
-    if (fieldId === 'coordinates' && value.length > 26) span = 3;
-    return Math.min(3, Math.max(1, span));
-  }
-
   function updateDashboardLayout() {
     const visibleItems = getVisibleFields()
       .map((fieldId) => dashboardElement.querySelector('[data-dashboard-field="' + fieldId + '"]'))
       .filter(Boolean);
-    let rows = 0;
-    let remaining = 0;
+    const columns = window.matchMedia?.('(max-width: 430px)')?.matches ? 2 : 3;
+    const rows = Math.max(1, Math.ceil(visibleItems.length / columns));
 
-    for (const item of visibleItems) {
-      const span = measuredSpan(item);
-      item.style.setProperty('--dashboard-span', String(span));
-      if (remaining === 0) {
-        rows += 1;
-        remaining = 3;
-      }
-      if (span > remaining) {
-        rows += 1;
-        remaining = 3;
-      }
-      remaining -= span;
-    }
-
-    dashboardElement.querySelectorAll('.status-item[hidden]').forEach((item) => {
-      item.style.removeProperty('--dashboard-span');
-    });
-    dashboardElement.dataset.dashboardRows = String(Math.max(1, rows));
+    for (const item of visibleItems) item.style.setProperty('--dashboard-span', '1');
+    dashboardElement.querySelectorAll('.status-item[hidden]').forEach((item) => item.style.removeProperty('--dashboard-span'));
+    dashboardElement.dataset.dashboardRows = String(rows);
+    dashboardElement.dataset.dashboardColumns = String(columns);
     dashboardElement.dataset.dashboardDense = visibleItems.length >= 13 ? 'true' : 'false';
-    dashboardElement.style.setProperty('--dashboard-rows', String(Math.max(1, rows)));
+    dashboardElement.style.setProperty('--dashboard-rows', String(rows));
+    dashboardElement.style.setProperty('--dashboard-columns', String(columns));
   }
 
   function renderDashboard() {
