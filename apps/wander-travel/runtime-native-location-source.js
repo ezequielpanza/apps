@@ -1,7 +1,6 @@
 (() => {
   const capacitor = window.Capacitor;
-  const plugin = capacitor?.Plugins?.WanderLocation;
-  if (!capacitor?.isNativePlatform?.() || !plugin) return;
+  if (!capacitor?.isNativePlatform?.()) return;
 
   const RECORDING_KEY = 'wander.recording.profile.v1';
   const PRESETS = Object.freeze({
@@ -15,6 +14,10 @@
   let errorListenerHandle = null;
   let activeOptions = null;
   let activeOnError = null;
+
+  function plugin() {
+    return window.Capacitor?.Plugins?.WanderLocation || null;
+  }
 
   function clampInteger(value, minimum, maximum, fallback) {
     const number = Number(value);
@@ -55,8 +58,10 @@
   }
 
   function applyTrackingConfig(config = storedRecordingConfig()) {
+    const nativePlugin = plugin();
+    if (typeof nativePlugin?.start !== 'function') return Promise.reject(Object.assign(new Error('Native location plugin unavailable'), { code: 'PLUGIN_UNAVAILABLE' }));
     const options = activeOptions || {};
-    return plugin.start({
+    return nativePlugin.start({
       minimumIntervalMs: clampInteger(config?.intervalSec, 2, 60, 5) * 1000,
       minimumDistanceM: clampInteger(config?.distanceM, 1, 100, 5),
       highAccuracy: options?.enableHighAccuracy !== false,
@@ -74,19 +79,20 @@
       configurableSampling: true,
     },
 
-    isSupported: () => true,
+    isSupported: () => typeof plugin()?.start === 'function',
 
     start({ onPosition, onError, options }) {
-      if (watching) return false;
+      const nativePlugin = plugin();
+      if (watching || typeof nativePlugin?.start !== 'function') return false;
       watching = true;
       activeOptions = options || {};
       activeOnError = onError;
 
-      Promise.resolve(plugin.addListener('location', (location) => {
+      Promise.resolve(nativePlugin.addListener('location', (location) => {
         onPosition(positionFromNative(location));
       })).then((handle) => { listenerHandle = handle; });
 
-      Promise.resolve(plugin.addListener('locationError', (event) => {
+      Promise.resolve(nativePlugin.addListener('locationError', (event) => {
         onError(event?.status || 'unavailable');
       })).then((handle) => { errorListenerHandle = handle; });
 
@@ -103,7 +109,7 @@
       errorListenerHandle = null;
       activeOptions = null;
       activeOnError = null;
-      plugin.stop().catch(() => {});
+      plugin()?.stop?.().catch(() => {});
     },
 
     isWatching: () => watching,
