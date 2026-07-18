@@ -8,12 +8,27 @@
   const canonicalOrder = base.fields.map((field) => field.id);
   const FIELD_SPANS = Object.freeze({
     summary: 2,
+    activity: 2,
     coordinates: 2,
-    place: 2,
-    currentPOI: 2,
+    locationStatus: 2,
+    locationSource: 2,
+    motionStatus: 2,
+    mobility: 2,
     journey: 2,
+    country: 2,
+    place: 2,
+    zone: 2,
+    currentPOI: 2,
+    currentPlace: 2,
+    specificPlace: 2,
+    containerPlace: 2,
+    placeSource: 2,
     placeMemory: 3,
   });
+  const COMPACT_FIELDS = new Set([
+    'time', 'dayPeriod', 'accuracy', 'speed', 'heading', 'nearby', 'simulation',
+    'appVersion', 'apkVersion', 'placeConfidence',
+  ]);
   let decorating = false;
   let observer = null;
 
@@ -70,6 +85,19 @@
     });
   }
 
+  function measuredSpan(item) {
+    const fieldId = item.dataset.dashboardField;
+    let span = FIELD_SPANS[fieldId] || 1;
+    if (COMPACT_FIELDS.has(fieldId)) return 1;
+
+    const value = item.querySelector('strong')?.textContent?.trim() || '';
+    if (value.length > 34) span = 3;
+    else if (value.length > 15) span = Math.max(span, 2);
+
+    if (fieldId === 'coordinates' && value.length > 26) span = 3;
+    return Math.min(3, Math.max(1, span));
+  }
+
   function updateDashboardLayout() {
     const visibleItems = getVisibleFields()
       .map((fieldId) => dashboardElement.querySelector('[data-dashboard-field="' + fieldId + '"]'))
@@ -78,7 +106,7 @@
     let remaining = 0;
 
     for (const item of visibleItems) {
-      const span = Math.min(3, Math.max(1, FIELD_SPANS[item.dataset.dashboardField] || 1));
+      const span = measuredSpan(item);
       item.style.setProperty('--dashboard-span', String(span));
       if (remaining === 0) {
         rows += 1;
@@ -95,6 +123,7 @@
       item.style.removeProperty('--dashboard-span');
     });
     dashboardElement.dataset.dashboardRows = String(Math.max(1, rows));
+    dashboardElement.dataset.dashboardDense = visibleItems.length >= 13 ? 'true' : 'false';
     dashboardElement.style.setProperty('--dashboard-rows', String(Math.max(1, rows)));
   }
 
@@ -216,6 +245,10 @@
     if (!decorating) queueMicrotask(decorateRows);
   });
   observeRows();
+
+  window.addEventListener('resize', renderDashboard);
+  window.addEventListener('orientationchange', renderDashboard);
+  window.addEventListener('wander:dashboard-values-change', renderDashboard);
 
   renderDashboard();
   decorateRows();

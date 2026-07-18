@@ -19,6 +19,9 @@
   const STATIONARY_WINDOW_MS = 12000;
   const MIN_STATIONARY_SAMPLES = 3;
   const HIGH_SPEED_KMH = 25;
+  const MAX_RAW_SPEED_KMH = 250;
+  const MAX_SEGMENT_SPEED_KMH = 250;
+  const TRANSITION_TICK_MS = 1000;
 
   const state = {
     samples: [],
@@ -28,8 +31,12 @@
     calibrationStartedAt: null,
     lastSampleAt: null,
     evidence: ['waiting_for_location_samples'],
+    rejectedSamples: 0,
+    lastRejectedReason: null,
   };
+
   let calibrationTimer = null;
+  let transitionTimer = null;
 
   function finite(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -64,12 +71,35 @@
     return radius * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   }
 
+  function speedKmh(distanceM, elapsedMs) {
+    if (!(elapsedMs > 0)) return null;
+    return (distanceM / 1000) / (elapsedMs / 3600000);
+  }
+
+  function runEngine(reason) {
+    window.WanderEngine?.run?.(reason);
+  }
+
   function scheduleCalibrationCheck() {
     if (calibrationTimer) clearTimeout(calibrationTimer);
     calibrationTimer = setTimeout(() => {
       calibrationTimer = null;
-      window.WanderEngine?.run?.('pedestrian-motion-calibration-timeout');
+      runEngine('pedestrian-motion-calibration-timeout');
     }, STARTUP_WAIT_MS + 100);
+  }
+
+  function scheduleTransitionCheck(delayMs = TRANSITION_TICK_MS) {
+    if (transitionTimer) return;
+    transitionTimer = setTimeout(() => {
+      transitionTimer = null;
+      runEngine('pedestrian-motion-transition-timeout');
+    }, Math.max(100, delayMs));
+  }
+
+  function clearTransitionCheck() {
+    if (!transitionTimer) return;
+    clearTimeout(transitionTimer);
+    transitionTimer = null;
   }
 
   function reset(at = Date.now(), reason = 'startup_calibration') {
@@ -80,11 +110,15 @@
     state.calibrationStartedAt = at;
     state.lastSampleAt = null;
     state.evidence = [reason];
+    state.rejectedSamples = 0;
+    state.lastRejectedReason = null;
+    clearTransitionCheck();
     scheduleCalibrationCheck();
   }
 
   function segmentMetrics(samples) {
     const speeds = [];
+    let rejected = 0;
     for (let index = 1; index < samples.length; index += 1) {
       const previous = samples[index - 1];
       const current = samples[index];
@@ -92,11 +126,17 @@
       if (elapsedMs < 1800 || elapsedMs > 20000) continue;
       const accuracy = Math.max(previous.accuracy || 8, current.accuracy || 8);
       const adjusted = Math.max(0, distanceMeters(previous, current) - clamp(accuracy * .65, 3, 30));
-      speeds.push(adjusted / (elapsedMs / 3600000));
+      const segmentSpeed = speedKmh(adjusted, elapsedMs);
+      if (segmentSpeed === null || segmentSpeed > MAX_SEGMENT_SPEED_KMH) {
+        rejected += 1;
+        continue;
+      }
+      speeds.push(segmentSpeed);
     }
     const fastCount = speeds.filter((speed) => speed >= 12).length;
     return {
       count: speeds.length,
+      rejected,
       medianSpeedKmh: median(speeds),
       fastCount,
       fastRatio: speeds.length ? fastCount / speeds.length : 0,
@@ -142,19 +182,21 @@
     const accuracyM = accuracyValues.length ? accuracyValues.reduce((sum, value) => sum + value, 0) / accuracyValues.length : 8;
     const noiseAllowanceM = clamp(accuracyM * .55, 4, 18);
     const adjustedDistanceM = Math.max(0, netDistanceM - noiseAllowanceM);
-    const derivedSpeedKmh = elapsedMs >= MIN_INTERVAL_MS ? adjustedDistanceM / (elapsedMs / 3600000) : 0;
+    const derivedSpeedKmh = elapsedMs >= MIN_INTERVAL_MS ? speedKmh(adjustedDistanceM, elapsedMs) || 0 : 0;
     const rawSpeeds = state.samples
       .filter((sample) => latest.at - sample.at <= RAW_SPEED_WINDOW_MS)
       .map((sample) => sample.rawSpeedKmh)
-      .filter((speed) => Number.isFinite(speed) && speed >= 0 && speed <= 220);
+      .filter((speed) => Number.isFinite(speed) && speed >= 0 && speed <= MAX_RAW_SPEED_KMH);
     const segments = segmentMetrics(state.samples);
     const stationaryWindow = stationaryWindowMetrics(latest);
-    const calibrationElapsedMs = Math.max(0, Date.now() - Number(state.calibrationStartedAt || Date.now()));
+    const now = Date.now();
+    const calibrationElapsedMs = Math.max(0, now - Number(state.calibrationStartedAt || now));
     const enoughStartupHistory = state.samples.length >= MIN_STARTUP_SAMPLES && calibrationElapsedMs >= STARTUP_MIN_DURATION_MS;
     const timedFallback = state.samples.length >= 1 && calibrationElapsedMs >= STARTUP_WAIT_MS;
 
     return {
       sampleAt: latest.at,
+      sampleAgeMs: Math.max(0, now - latest.at),
       sampleCount: state.samples.length,
       elapsedMs,
       netDistanceM,
@@ -165,6 +207,7 @@
       rawSpeedSampleCount: rawSpeeds.length,
       derivedSpeedKmh,
       segmentCount: segments.count,
+      rejectedSegmentCount: segments.rejected,
       segmentMedianSpeedKmh: segments.medianSpeedKmh,
       fastSegmentCount: segments.fastCount,
       fastSegmentRatio: segments.fastRatio,
@@ -176,6 +219,13 @@
       calibrationElapsedMs,
       calibrationReady: enoughStartupHistory || timedFallback,
     };
+  }
+
+  function rejectSample(reason) {
+    state.rejectedSamples += 1;
+    state.lastRejectedReason = reason;
+    state.evidence = [reason, 'previous_motion_preserved'];
+    return { isNew: false, rejected: reason, metrics: metrics() };
   }
 
   function addSample(effective) {
@@ -195,16 +245,30 @@
     const key = `${lat.toFixed(7)}|${lng.toFixed(7)}|${at}`;
     if (last?.key === key) return { isNew: false, metrics: metrics() };
 
+    if (last) {
+      const elapsedMs = at - last.at;
+      const distanceM = distanceMeters(last, { lat, lng });
+      const accuracyM = Math.max(last.accuracy || 8, finite(effective?.accuracy) || 8);
+      const apparentSpeedKmh = speedKmh(distanceM, elapsedMs);
+      const meaningfulJumpM = Math.max(12, accuracyM * 1.5);
+      if (elapsedMs > 0 && distanceM > meaningfulJumpM && apparentSpeedKmh !== null && apparentSpeedKmh > MAX_SEGMENT_SPEED_KMH) {
+        return rejectSample('impossible_position_jump_rejected');
+      }
+    }
+
     const rawSpeedMps = finite(effective?.speedMps);
+    const rawSpeedKmh = rawSpeedMps === null ? null : Math.max(0, rawSpeedMps * 3.6);
     state.samples.push({
       key,
       at,
       lat,
       lng,
       accuracy: finite(effective?.accuracy),
-      rawSpeedKmh: rawSpeedMps === null ? null : Math.max(0, rawSpeedMps * 3.6),
+      rawSpeedKmh: rawSpeedKmh !== null && rawSpeedKmh <= MAX_RAW_SPEED_KMH ? rawSpeedKmh : null,
     });
     state.lastSampleAt = at;
+    state.lastRejectedReason = rawSpeedKmh !== null && rawSpeedKmh > MAX_RAW_SPEED_KMH ? 'impossible_raw_speed_rejected' : null;
+    if (state.lastRejectedReason) state.rejectedSamples += 1;
 
     const cutoff = at - SAMPLE_WINDOW_MS;
     while (state.samples.length > 2 && state.samples[0].at < cutoff) state.samples.shift();
@@ -225,22 +289,24 @@
 
     const derived = finite(currentMetrics.derivedSpeedKmh) || 0;
     const rawMedian = finite(currentMetrics.rawSpeedMedianKmh);
-    const providerSpeed = finite(providerSpeedKmh);
+    const providerSpeedRaw = finite(providerSpeedKmh);
+    const providerSpeed = providerSpeedRaw !== null && providerSpeedRaw <= MAX_RAW_SPEED_KMH ? providerSpeedRaw : null;
     const providerMoving = providerMode && !['stationary', 'unknown', ''].includes(providerMode);
     const providerTrusted = providerMoving && providerConfidence !== null && providerConfidence >= .7;
     const ready = currentMetrics.elapsedMs >= MIN_INTERVAL_MS;
     const reportedLow = (rawMedian === null || rawMedian <= .7) &&
       (providerSpeed === null || providerSpeed <= .7 || providerMode === 'stationary');
     const providerStationary = providerMode === 'stationary' && providerConfidence !== null && providerConfidence >= .7;
+    const plausibleDerived = derived <= MAX_SEGMENT_SPEED_KMH;
 
-    const positionStationary = ready && derived <= .6 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 6;
-    const decisiveStationary = currentMetrics.stationaryWindowReady && reportedLow && derived <= .8 && !currentMetrics.fastSegmentCount;
-    const positionMoving = ready && currentMetrics.adjustedDistanceM >= 5 && derived >= .8;
+    const positionStationary = ready && plausibleDerived && derived <= .6 && currentMetrics.netDistanceM <= currentMetrics.noiseAllowanceM + 6;
+    const decisiveStationary = currentMetrics.stationaryWindowReady && reportedLow && plausibleDerived && derived <= .8 && !currentMetrics.fastSegmentCount;
+    const positionMoving = ready && plausibleDerived && currentMetrics.adjustedDistanceM >= 5 && derived >= .8;
     const fastPositionConfirmed = currentMetrics.segmentCount >= 2 && currentMetrics.fastSegmentCount >= 2 &&
       currentMetrics.fastSegmentRatio >= .66 && finite(currentMetrics.segmentMedianSpeedKmh) >= 12;
 
     if (decisiveStationary || positionStationary || (providerStationary && reportedLow)) {
-      const rejected = [rawMedian, providerSpeed].some((speed) => speed !== null && speed >= 1.4);
+      const rejected = [rawMedian, providerSpeedRaw].some((speed) => speed !== null && speed >= 1.4);
       return {
         speedKmh: 0,
         positionStationary: true,
@@ -261,13 +327,15 @@
     if (providerTrusted && providerSpeed !== null && positionMoving && (providerSpeed <= 15 || fastPositionConfirmed)) candidates.push(providerSpeed);
 
     if (!candidates.length) {
+      const evidence = ['speed_unconfirmed', 'position_corroboration_required'];
+      if (!plausibleDerived || providerSpeedRaw !== providerSpeed) evidence.unshift('impossible_speed_rejected');
       return {
         speedKmh: 0,
         positionStationary: false,
         decisiveStationary: false,
         positionMoving: false,
         fastPositionConfirmed,
-        evidence: ['speed_unconfirmed', 'position_corroboration_required'],
+        evidence,
       };
     }
 
@@ -303,6 +371,7 @@
       return pendingMotion('Preparando contexto', state.evidence, .5);
     }
 
+    const now = Date.now();
     const speed = finite(speedKmh);
     const strongMovement = Boolean(filtered.fastPositionConfirmed) || (filtered.positionMoving && speed !== null && speed >= 1.4);
     const movementEvidence = Boolean(filtered.positionMoving) && (strongMovement || (speed !== null && speed >= .7));
@@ -314,21 +383,25 @@
       state.movingCandidateAt = null;
       state.stationaryCandidateAt = null;
       state.evidence = [...filtered.evidence, 'stationary_confirmed'];
+      clearTransitionCheck();
     } else if (state.status === 'pending') {
       if (stationaryEvidence) {
         state.movingCandidateAt = null;
-        if (!state.stationaryCandidateAt) state.stationaryCandidateAt = currentMetrics.sampleAt;
-        if (currentMetrics.sampleAt - state.stationaryCandidateAt >= START_STATIONARY_MS || currentMetrics.calibrationElapsedMs >= STARTUP_WAIT_MS) {
+        if (!state.stationaryCandidateAt) state.stationaryCandidateAt = now;
+        const elapsed = now - state.stationaryCandidateAt;
+        if (elapsed >= START_STATIONARY_MS || currentMetrics.calibrationElapsedMs >= STARTUP_WAIT_MS) {
           state.status = 'stationary';
           state.stationaryCandidateAt = null;
           state.evidence = [...filtered.evidence, 'startup_stationary_confirmed'];
+          clearTransitionCheck();
         } else {
           state.evidence = [...filtered.evidence, 'startup_stationary_candidate'];
+          scheduleTransitionCheck(Math.min(TRANSITION_TICK_MS, START_STATIONARY_MS - elapsed + 20));
         }
       } else if (movementEvidence && isNew) {
         state.stationaryCandidateAt = null;
-        if (!state.movingCandidateAt) state.movingCandidateAt = currentMetrics.sampleAt;
-        if (currentMetrics.sampleAt - state.movingCandidateAt >= START_MOVING_MS) {
+        if (!state.movingCandidateAt) state.movingCandidateAt = now;
+        if (now - state.movingCandidateAt >= START_MOVING_MS) {
           state.status = 'moving';
           state.movingCandidateAt = null;
           state.evidence = [...filtered.evidence, 'sustained_movement_confirmed'];
@@ -342,8 +415,8 @@
     } else if (state.status === 'stationary') {
       if (movementEvidence && isNew) {
         state.stationaryCandidateAt = null;
-        if (!state.movingCandidateAt) state.movingCandidateAt = currentMetrics.sampleAt;
-        if (currentMetrics.sampleAt - state.movingCandidateAt >= START_MOVING_MS) {
+        if (!state.movingCandidateAt) state.movingCandidateAt = now;
+        if (now - state.movingCandidateAt >= START_MOVING_MS) {
           state.status = 'moving';
           state.movingCandidateAt = null;
           state.evidence = [...filtered.evidence, 'sustained_movement_confirmed'];
@@ -358,16 +431,19 @@
       if (movementEvidence) {
         state.stationaryCandidateAt = null;
         state.evidence = [...filtered.evidence, 'movement_maintained'];
+        clearTransitionCheck();
       } else if (stationaryEvidence) {
-        if (!state.stationaryCandidateAt) state.stationaryCandidateAt = currentMetrics.sampleAt;
-        const elapsed = currentMetrics.sampleAt - state.stationaryCandidateAt;
+        if (!state.stationaryCandidateAt) state.stationaryCandidateAt = now;
+        const elapsed = now - state.stationaryCandidateAt;
         if (elapsed >= STOP_MOVING_MS) {
           state.status = 'stationary';
           state.stationaryCandidateAt = null;
-          state.evidence = [...filtered.evidence, 'stop_confirmed'];
+          state.evidence = [...filtered.evidence, 'stop_confirmed_by_wall_clock'];
+          clearTransitionCheck();
         } else {
           confirmingStop = true;
           state.evidence = [...filtered.evidence, 'stop_candidate'];
+          scheduleTransitionCheck(Math.min(TRANSITION_TICK_MS, STOP_MOVING_MS - elapsed + 20));
         }
       } else if (isNew) {
         state.evidence = [...filtered.evidence, 'ambiguous_sample', 'previous_motion_preserved'];
@@ -414,6 +490,7 @@
         },
       };
     }
+
     const sample = addSample(effective);
     const providerSpeedKmh = finite(context.value?.('mobility.provider.speedKmh', null));
     const providerMode = String(context.value?.('mobility.provider.mode', '') || '').toLowerCase();
@@ -422,9 +499,9 @@
     const rawSpeedKmh = rawSpeedMps === null ? null : Math.max(0, rawSpeedMps * 3.6);
     const accelerometer = context.value?.('motion.sensor.summary', null);
     const filtered = filterSpeed(sample.metrics, providerSpeedKmh, providerMode, providerConfidence);
-    let speedKmh = filtered.speedKmh;
-    const motion = resolveMotion(speedKmh, sample.metrics, sample.isNew, filtered);
-    if (motion.status !== 'moving') speedKmh = 0;
+    let speed = filtered.speedKmh;
+    const motion = resolveMotion(speed, sample.metrics, sample.isNew, filtered);
+    if (motion.status !== 'moving') speed = 0;
 
     let mobility = original.mobility;
     if (motion.status === 'pending') {
@@ -437,7 +514,8 @@
 
     return {
       ...original,
-      speedKmh,
+      speedKmh: speed,
+      heading: motion.status === 'moving' ? original.heading : null,
       motion,
       mobility,
       motionEvidence: {
@@ -448,9 +526,12 @@
         derivedSpeedKmh: sample.metrics?.derivedSpeedKmh ?? null,
         segmentMedianSpeedKmh: sample.metrics?.segmentMedianSpeedKmh ?? null,
         segmentCount: sample.metrics?.segmentCount || 0,
-        fastSegmentCount: sample.metrics?.fastSegmentCount || 0,
+        rejectedSegmentCount: sample.metrics?.rejectedSegmentCount || 0,
+        rejectedSampleCount: state.rejectedSamples,
+        lastRejectedReason: sample.rejected || state.lastRejectedReason,
         accelerometer,
         sampleCount: sample.metrics?.sampleCount || 0,
+        sampleAgeMs: sample.metrics?.sampleAgeMs || 0,
         stationaryWindowCount: sample.metrics?.stationaryWindowCount || 0,
         stationaryWindowElapsedMs: sample.metrics?.stationaryWindowElapsedMs || 0,
         stationaryWindowSpreadM: sample.metrics?.stationaryWindowSpreadM ?? null,
@@ -474,6 +555,8 @@
       movingConfirmMs: START_MOVING_MS,
       stoppedConfirmMs: STOP_MOVING_MS,
       decisiveStopMs: DECISIVE_STOP_MS,
+      maximumRawSpeedKmh: MAX_RAW_SPEED_KMH,
+      maximumSegmentSpeedKmh: MAX_SEGMENT_SPEED_KMH,
       profile: 'pedestrian-first-sustained-confirmation',
     },
     reset: () => reset(Date.now(), 'manual_reset'),
@@ -482,10 +565,13 @@
       evidence: [...state.evidence],
       sampleCount: state.samples.length,
       calibrationStartedAt: state.calibrationStartedAt,
+      stationaryCandidateAt: state.stationaryCandidateAt,
+      rejectedSamples: state.rejectedSamples,
+      lastRejectedReason: state.lastRejectedReason,
     }),
   });
 
   reset(Date.now());
-  window.WanderEngine?.run?.('pedestrian-motion-installed');
+  runEngine('pedestrian-motion-installed');
   window.dispatchEvent(new CustomEvent('wander:pedestrian-motion-ready'));
 })();
