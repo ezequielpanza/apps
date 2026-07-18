@@ -1,6 +1,6 @@
 importScripts('./runtime-version.js');
 
-const SHELL_REVISION = '20260718-05';
+const SHELL_REVISION = '20260718-06';
 const CACHE_NAME = 'wander-travel-' + self.WanderVersion + '-' + SHELL_REVISION;
 const APP_SHELL = [
   './index.html',
@@ -66,14 +66,17 @@ const APP_SHELL = [
   './runtime-rule-checker.js',
   './runtime-ui.js',
   './runtime-context-dashboard.js',
+  './runtime-place-hierarchy-dashboard.js',
   './runtime-dashboard-order.js',
   './runtime-panel.js',
   './runtime-context-panel.js',
+  './runtime-place-hierarchy-panel.js',
   './runtime-tracks.js',
   './runtime-provider-simulator.js',
   './runtime-current-poi-motion-guard.js',
   './runtime-coordinate-format-ui.js',
   './runtime-personal-poi-core.js',
+  './runtime-place-hierarchy.js',
   './runtime-personal-poi-situation.js',
   './runtime-personal-map-tools.js',
   './runtime-personal-poi-sheet.js',
