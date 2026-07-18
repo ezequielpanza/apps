@@ -15,11 +15,8 @@
   let lastSnapshot = null;
 
   function readState() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {};
-    } catch {
-      return {};
-    }
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; }
+    catch { return {}; }
   }
 
   function writeState(state) {
@@ -62,17 +59,26 @@
     };
   }
 
-  function categoryText(item) {
+  function categoryKeys(item) {
     return (Array.isArray(item?.categories) ? item.categories : [])
       .flatMap((category) => [category?.id, category?.label])
-      .map((value) => String(value || '').toLowerCase())
-      .join(' ');
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  function categoryText(item) {
+    return categoryKeys(item).join(' ');
+  }
+
+  function learnedPreferenceScore(item) {
+    const interests = window.WanderEngine?.getState?.()?.profile?.interests || {};
+    return categoryKeys(item).reduce((score, key) => score + (Number(interests[key]) || 0) * 7, 0);
   }
 
   function scoreNearby(item, snapshot) {
     const distance = Math.max(0, finite(item?.distanceM) ?? 9999);
     const categories = categoryText(item);
-    let score = Math.max(0, 80 - distance / 8);
+    let score = Math.max(0, 80 - distance / 8) + learnedPreferenceScore(item);
 
     if (/restaurant|food|cafe|bar|bakery/.test(categories)) {
       if (/morning|mañana/.test(snapshot.dayPeriod)) score += /cafe|bakery|breakfast/.test(categories) ? 18 : 4;
@@ -85,8 +91,10 @@
     return score;
   }
 
-  function bestNearby(snapshot) {
+  function bestNearby(snapshot, excludedIds = []) {
+    const excluded = new Set((Array.isArray(excludedIds) ? excludedIds : []).map(String));
     return snapshot.nearby
+      .filter((item) => !excluded.has(String(item?.id || '')))
       .map((item) => ({ item, score: scoreNearby(item, snapshot) }))
       .filter((entry) => entry.score > 20 && entry.item?.id && entry.item?.name)
       .sort((left, right) => right.score - left.score || (left.item.distanceM || 9999) - (right.item.distanceM || 9999))[0]?.item || null;
@@ -101,15 +109,9 @@
     if (currentName && containerName && currentName !== containerName) {
       return `Estás en ${currentName}, dentro de ${containerName}. Voy a observar qué hay cerca y proponerte opciones útiles según la hora y cómo te estés moviendo.`;
     }
-    if (currentName) {
-      return `Estás en ${currentName}. Voy a acompañarte con sugerencias cercanas y contexto útil, sin interrumpirte de más.`;
-    }
-    if (containerName) {
-      return `Estás dentro de ${containerName}. Puedo ayudarte a descubrir qué tenés cerca y qué conviene hacer ahora.`;
-    }
-    if (zoneName || cityName) {
-      return `Estás en ${zoneName || cityName}. Voy a usar este contexto para anticipar opciones y sugerirte lugares relevantes.`;
-    }
+    if (currentName) return `Estás en ${currentName}. Voy a acompañarte con sugerencias cercanas y contexto útil, sin interrumpirte de más.`;
+    if (containerName) return `Estás dentro de ${containerName}. Puedo ayudarte a descubrir qué tenés cerca y qué conviene hacer ahora.`;
+    if (zoneName || cityName) return `Estás en ${zoneName || cityName}. Voy a usar este contexto para anticipar opciones y sugerirte lugares relevantes.`;
     return null;
   }
 
@@ -121,7 +123,6 @@
     const state = readState();
     const previousAt = finite(state.placeIntroductions?.[snapshot.placeId]);
     if (previousAt !== null && now - previousAt < PLACE_REINTRO_MS) return false;
-
     const message = placeMessage(snapshot);
     if (!message) return false;
 
@@ -136,6 +137,8 @@
       suggestion: {
         id: `place-context:${snapshot.placeId}`,
         kind: 'place_context',
+        interactionType: 'inform',
+        priority: 'low',
         title: 'Ya tengo tu contexto',
         message,
         contentId: `place-context:${snapshot.placeId}`,
@@ -155,13 +158,15 @@
     return result?.disposition !== 'ignore' || result?.reason === 'content_already_told';
   }
 
-  function emitNearbySuggestion(snapshot, now) {
+  function emitNearbySuggestion(snapshot, now, options = {}) {
     const state = readState();
     const lastAt = finite(state.lastSuggestionAt);
-    if (lastAt !== null && now - lastAt < SUGGESTION_COOLDOWN_MS) return false;
+    if (!options.ignoreCooldown && lastAt !== null && now - lastAt < SUGGESTION_COOLDOWN_MS) return false;
     if (snapshot.motion === 'moving' && snapshot.speedKmh > 6) return false;
 
-    const poi = bestNearby(snapshot);
+    const excludedIds = [...(options.excludedIds || [])];
+    if (!options.userRequested && state.lastNearbyId) excludedIds.push(state.lastNearbyId);
+    const poi = bestNearby(snapshot, excludedIds);
     if (!poi) return false;
     const distanceM = Math.max(0, Math.round(finite(poi.distanceM) || 0));
     const note = String(poi.note || poi.description || '').replace(/\s+/g, ' ').trim().slice(0, 220);
@@ -170,12 +175,14 @@
 
     const result = companion.handleEvaluation({
       type: 'contextual_suggestion',
-      reason: 'nearby_contextual_option',
+      reason: options.userRequested ? 'user_requested_alternative' : 'nearby_contextual_option',
       semanticPlace: { id: snapshot.placeId, name: snapshot.placeName, level: 'place' },
       suggestion: {
-        id: `nearby-suggestion:${poi.id}`,
+        id: `nearby-suggestion:${poi.id}:${options.userRequested ? now : 'auto'}`,
         kind: 'contextual_suggestion',
-        title: 'Una opción cerca',
+        interactionType: 'suggest',
+        priority: options.userRequested ? 'normal' : 'low',
+        title: options.userRequested ? 'Otra opción cerca' : 'Una opción cerca',
         message,
         contentId: `nearby-suggestion:${poi.id}`,
         topic: 'nearby_suggestion',
@@ -194,7 +201,7 @@
         } : null,
       },
       situation: { motion: { status: snapshot.motion }, speedKmh: snapshot.speedKmh },
-    }, 'proactive:nearby');
+    }, options.userRequested ? 'proactive:alternative' : 'proactive:nearby');
 
     if (accepted(result)) {
       state.lastSuggestionAt = now;
@@ -202,6 +209,20 @@
       writeState(state);
     }
     return result?.disposition !== 'ignore' || result?.reason === 'content_already_told';
+  }
+
+  function requestAlternative(excludeId) {
+    const snapshot = currentSnapshot();
+    lastSnapshot = snapshot;
+    const shown = emitNearbySuggestion(snapshot, Date.now(), {
+      userRequested: true,
+      ignoreCooldown: true,
+      excludedIds: [excludeId].filter(Boolean),
+    });
+    if (!shown) {
+      window.WanderUI?.showWander?.('No encontré otra mejor ahora', 'Voy a seguir observando y te aviso cuando aparezca una opción distinta.', { timeoutMs: 6500 });
+    }
+    return shown;
   }
 
   function evaluate() {
@@ -236,13 +257,8 @@
 
   context.subscribe((key) => {
     if (
-      key === 'placeHierarchy.current' ||
-      key === 'currentPOI.current' ||
-      key === 'container.current' ||
-      key === 'nearby.items' ||
-      key === 'motion.status' ||
-      key === 'motion.speedKmh' ||
-      key === 'time.dayPeriod'
+      key === 'placeHierarchy.current' || key === 'currentPOI.current' || key === 'container.current' ||
+      key === 'nearby.items' || key === 'motion.status' || key === 'motion.speedKmh' || key === 'time.dayPeriod'
     ) schedule();
   });
 
@@ -254,7 +270,12 @@
   window.WanderProactiveCompanion = Object.freeze({
     evaluate,
     schedule,
+    requestAlternative,
     getSnapshot: () => lastSnapshot,
+    rankNearby: (snapshot = currentSnapshot(), excludedIds = []) => snapshot.nearby
+      .filter((item) => !excludedIds.map(String).includes(String(item?.id || '')))
+      .map((item) => ({ item, score: scoreNearby(item, snapshot) }))
+      .sort((left, right) => right.score - left.score),
     constants: { INITIAL_DELAY_MS, PLACE_STABILITY_MS, SUGGESTION_COOLDOWN_MS, PLACE_REINTRO_MS },
   });
 

@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wander">
-<link rel="manifest" href="manifest.webmanifest?v=20260718-05">
+<link rel="manifest" href="manifest.webmanifest?v=20260718-06">
 <link rel="icon" href="wander-app-icon.svg?v=20260718-02" type="image/svg+xml">
 <link rel="apple-touch-icon" href="wander-app-icon.svg?v=20260718-02">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -26,6 +26,7 @@
 <link rel="stylesheet" href="wander-map-selected-point.css?v=20260717-01">
 <link rel="stylesheet" href="wander-points-screen.css?v=20260717-01">
 <link rel="stylesheet" href="wander-sessions.css?v=20260716-38">
+<link rel="stylesheet" href="wander-interaction.css?v=20260718-01">
 </head>
 <body>
 <main class="wander-app" data-screen="map" data-menu="closed">
@@ -37,13 +38,14 @@
 </header>
 <nav id="main-menu" class="main-menu" aria-label="Menú principal" hidden>
 <div class="drawer-brand"><div class="drawer-logo" aria-hidden="true">W</div><div><strong>Wander</strong><span>Tu compañero de viaje</span><small id="drawer-version"></small></div></div>
-<div class="drawer-group"><button type="button" data-screen-target="context"><svg class="nav-icon"><use href="wander-icons.svg#brain"></use></svg><span>Contexto</span></button><button type="button" data-screen-target="points"><svg class="nav-icon"><use href="wander-icons.svg#pin"></use></svg><span>Puntos</span></button><button type="button" data-screen-target="routes"><svg class="nav-icon"><use href="wander-icons.svg#route"></use></svg><span>Recorridos</span></button></div>
+<div class="drawer-group"><button type="button" data-screen-target="companion"><svg class="nav-icon"><use href="wander-icons.svg#brain"></use></svg><span>Wander</span></button><button type="button" data-screen-target="context"><svg class="nav-icon"><use href="wander-icons.svg#target"></use></svg><span>Contexto</span></button><button type="button" data-screen-target="points"><svg class="nav-icon"><use href="wander-icons.svg#pin"></use></svg><span>Puntos</span></button><button type="button" data-screen-target="routes"><svg class="nav-icon"><use href="wander-icons.svg#route"></use></svg><span>Recorridos</span></button></div>
 <div class="drawer-divider"></div>
 <div class="drawer-group"><button type="button" data-screen-target="simulator"><svg class="nav-icon"><use href="wander-icons.svg#flask"></use></svg><span>Simulador</span></button><button type="button" data-screen-target="settings"><svg class="nav-icon"><use href="wander-icons.svg#settings"></use></svg><span>Ajustes</span></button></div>
 </nav>
 <section id="wander-card" class="wander-card" hidden aria-live="polite"><div class="card-title-row"><div><span>Wander</span><h2 id="wander-title">Listo</h2></div><button id="close-wander" type="button" aria-label="Cerrar tarjeta"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button></div><p id="wander-message">Wander listo para acompañar el viaje.</p></section>
 <div id="simulation-map-controls" class="simulation-map-controls" hidden aria-label="Controles de simulación"><div class="simulation-hud"><strong>SIM</strong><span id="simulation-hud-value">0.0 km/h · —</span></div><div id="simulation-joystick-base" class="simulation-joystick" role="application" aria-label="Joystick de movimiento simulado"><div class="simulation-joystick-ring"></div><div id="simulation-joystick-knob" class="simulation-joystick-knob"></div></div></div>
 </section>
+<section id="companion-screen" class="app-screen" data-app-screen="companion" hidden><header class="app-screen-header"><button class="screen-close" type="button" data-close-screen aria-label="Cerrar Wander"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button><h1>Wander</h1><span></span></header><div class="app-screen-scroll"><div class="screen-content"><section class="panel-section"><div class="screen-card panel-block"><h3><svg class="section-icon"><use href="wander-icons.svg#brain"></use></svg>Última decisión</h3><p class="panel-note">Por qué Wander habló, esperó o decidió no interrumpir.</p><div id="companion-decision" class="companion-decision"></div></div><div class="screen-card panel-block"><h3>Perfil aprendido</h3><div id="companion-profile-summary" class="companion-profile-summary"></div></div><div class="screen-card panel-block"><h3>Historial reciente</h3><div id="companion-history-list" class="companion-history-list"></div></div></section></div></div></section>
 <section id="context-screen" class="app-screen" data-app-screen="context" hidden><header class="app-screen-header"><button class="screen-close" type="button" data-close-screen aria-label="Cerrar Contexto"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button><h1>Contexto</h1><span></span></header><div class="app-screen-scroll"><div class="screen-content"><section id="context-panel" class="panel-section"><div class="screen-card panel-block"><h3><svg class="section-icon"><use href="wander-icons.svg#brain"></use></svg>Contexto actual</h3><p class="panel-note">Lo que Wander percibe, sabe e infiere ahora mismo.</p><div id="context-list" class="context-list"></div></div><div class="screen-card"><details class="technical-details"><summary>Detalles técnicos</summary><div id="context-technical" class="technical-list"></div></details><div class="button-row compact-actions screen-card-actions"><button id="refresh-context-button" type="button"><svg class="button-icon"><use href="wander-icons.svg#refresh"></use></svg><span>Actualizar</span></button></div></div></section></div></div></section>
 <section class="app-screen" data-app-screen="points" hidden><header class="app-screen-header"><button class="screen-close" type="button" data-close-screen aria-label="Cerrar Puntos"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button><h1>Puntos</h1><span></span></header><div class="app-screen-scroll"><div class="screen-content"><section class="panel-section"><div class="screen-card panel-block"><h3><svg class="section-icon"><use href="wander-icons.svg#pin"></use></svg>Puntos personales</h3><p id="points-summary" class="compact-summary">0 puntos guardados</p><div id="points-list" class="points-list"></div></div></section></div></div></section>
 <section class="app-screen" data-app-screen="routes" hidden><header class="app-screen-header"><button class="screen-close" type="button" data-close-screen aria-label="Cerrar Recorridos"><svg class="ui-icon"><use href="wander-icons.svg#close"></use></svg></button><h1>Recorridos</h1><span></span></header><div class="app-screen-scroll"><div class="screen-content"><section class="panel-section"><div class="screen-card panel-block"><h3><svg class="section-icon"><use href="wander-icons.svg#route"></use></svg>Sesiones</h3><p id="track-summary" class="compact-summary">Preparando registro automático</p><div id="track-list" class="track-list"></div></div></section></div></div></section>
@@ -54,7 +56,8 @@
 <script src="runtime-context-store.js?v=20260718-04"></script>
 <script src="runtime-context-location.js?v=20260714-08"></script>
 <script src="runtime-context-init.js?v=20260714-08"></script>
-<script src="runtime-version.js?v=20260718-09"></script>
+<script src="runtime-memory-repository.js?v=20260718-01"></script>
+<script src="runtime-version.js?v=20260718-10"></script>
 <script src="runtime-platform.js?v=20260718-01"></script>
 <script src="runtime-native-app-version.js?v=20260718-01"></script>
 <script src="runtime-map-core.js?v=20260717-01"></script>
@@ -80,7 +83,7 @@
 <script src="runtime-provider-container-google.js?v=20260717-01"></script>
 <script src="runtime-provider-current-poi.js?v=20260717-01"></script>
 <script src="runtime-provider-current-container-bridge.js?v=20260717-01"></script>
-<script src="runtime-engine-state.js?v=20260714-08"></script>
+<script src="runtime-engine-state.js?v=20260718-01"></script>
 <script src="runtime-engine-inference.js?v=20260714-08"></script>
 <script src="runtime-engine-transition.js?v=20260714-08"></script>
 <script src="runtime-engine-journey.js?v=20260714-08"></script>
@@ -89,7 +92,7 @@
 <script src="runtime-engine-discovery.js?v=20260717-02"></script>
 <script src="runtime-engine-relevance.js?v=20260714-08"></script>
 <script src="runtime-engine-decision.js?v=20260714-08"></script>
-<script src="runtime-companion-policy.js?v=20260718-02"></script>
+<script src="runtime-companion-policy.js?v=20260718-03"></script>
 <script src="runtime-engine.js?v=20260714-08"></script>
 <script src="runtime-pedestrian-motion.js?v=20260718-05"></script>
 <script src="runtime-sensor-motion-bridge.js?v=20260718-01"></script>
@@ -97,6 +100,7 @@
 <script src="runtime-situation-engine.js?v=20260717-01"></script>
 <script src="runtime-rule-checker.js?v=20260717-01"></script>
 <script src="runtime-ui.js?v=20260718-03"></script>
+<script src="runtime-interaction-core.js?v=20260718-01"></script>
 <script src="runtime-context-dashboard.js?v=20260718-05"></script>
 <script src="runtime-place-hierarchy-dashboard.js?v=20260718-01"></script>
 <script src="runtime-dashboard-order.js?v=20260718-03"></script>
@@ -115,8 +119,9 @@
 <script src="runtime-map-selected-point.js?v=20260717-01"></script>
 <script src="runtime-points-screen.js?v=20260717-01"></script>
 <script src="runtime-message-timeout-settings.js?v=20260717-01"></script>
-<script src="runtime-companion.js?v=20260718-04"></script>
-<script src="runtime-proactive-companion.js?v=20260718-01"></script>
+<script src="runtime-companion.js?v=20260718-05"></script>
+<script src="runtime-proactive-companion.js?v=20260718-02"></script>
+<script src="runtime-interaction-panel.js?v=20260718-01"></script>
 <script src="runtime-navigation.js?v=20260717-03"></script>
 <script src="app.js?v=20260717-01"></script>
 </body>
