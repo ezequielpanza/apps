@@ -33,9 +33,9 @@ public class WanderNotificationPlugin extends Plugin {
             return enabled ? "granted" : "blocked";
         }
         PermissionState state = getPermissionState("notifications");
-        if (state == PermissionState.GRANTED && enabled) return "granted";
+        if (state == PermissionState.GRANTED) return enabled ? "granted" : "blocked";
         if (state == PermissionState.DENIED) return "denied";
-        return enabled ? "not_requested" : "blocked";
+        return "not_requested";
     }
 
     private JSObject permissionResult() {
@@ -79,7 +79,7 @@ public class WanderNotificationPlugin extends Plugin {
     @PluginMethod
     public void notifyCompanion(PluginCall call) {
         JSObject result = permissionResult();
-        if (!result.getBool("granted", false)) {
+        if (!"granted".equals(permissionStatus())) {
             result.put("delivered", false);
             call.resolve(result);
             return;
