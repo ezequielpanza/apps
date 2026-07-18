@@ -26,6 +26,10 @@ const mapControls = read('runtime-map-controls.js');
 const pointsRuntime = read('runtime-points-screen.js');
 const tracksRuntime = read('runtime-tracks.js');
 const sessionEngine = read('runtime-session-engine.js');
+const platformRuntime = read('runtime-platform.js');
+const settingsRuntime = read('runtime-message-timeout-settings.js');
+const notificationPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderNotificationPlugin.java');
+const mainActivity = read('android/app/src/main/java/app/wandertravel/mobile/MainActivity.java');
 
 function localReferences(source) {
   return [...source.matchAll(/(?:src|href)=["']([^"']+)["']/g)]
@@ -51,13 +55,29 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define the web version');
-assert.equal(versionMatch[1], 'v0.104.1');
-assert.equal(manifest.start_url, './?app=v0.104.1');
-assert.equal(packageManifest.version, '0.104.1');
-assert.equal(androidVersion.versionName, '0.5.0');
-assert.equal(androidVersion.versionCode, 9);
+assert.equal(versionMatch[1], 'v0.104.2');
+assert.equal(manifest.start_url, './?app=v0.104.2');
+assert.equal(packageManifest.version, '0.104.2');
+assert.equal(androidVersion.versionName, '0.6.0');
+assert.equal(androidVersion.versionCode, 10);
 assert.equal(capacitorConfig.server.url, 'https://wander-travel.pages.dev');
 assert.equal(capacitorConfig.server.errorPath, 'index.html');
+
+assert.match(notificationPlugin, /name = "WanderNotifications"/);
+assert.match(notificationPlugin, /void checkPermission\(PluginCall call\)/);
+assert.match(notificationPlugin, /void requestPermission\(PluginCall call\)/);
+assert.match(notificationPlugin, /ACTION_APP_NOTIFICATION_SETTINGS/);
+assert.match(notificationPlugin, /result\.put\("delivered", false\)/);
+assert.match(notificationPlugin, /NotificationManagerCompat\.from\(getContext\(\)\)\.areNotificationsEnabled\(\)/);
+assert.match(mainActivity, /registerPlugin\(WanderNotificationPlugin\.class\)/);
+assert.match(platformRuntime, /refreshNotificationPermission/);
+assert.match(platformRuntime, /requestNotificationPermission/);
+assert.match(platformRuntime, /deliverNotification/);
+assert.match(platformRuntime, /notificationState\.granted === true/);
+assert.match(settingsRuntime, /Notificaciones de Wander/);
+assert.match(settingsRuntime, /Activar notificaciones/);
+assert.match(settingsRuntime, /Enviar prueba/);
+assert.match(settingsRuntime, /Dejá que Wander te avise/);
 
 assert.match(memoryRepository, /indexedDB\.open\(DB_NAME, DB_VERSION\)/);
 assert.match(memoryRepository, /migratedFrom: LEGACY_STATE_KEY/);
@@ -107,4 +127,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} interaction memory shell is consistent`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} notification permission shell is consistent`);
