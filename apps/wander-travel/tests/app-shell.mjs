@@ -56,6 +56,10 @@ assert.doesNotMatch(serviceWorker, /wander-travel-v\d+/, 'sw.js must derive its 
 assert.match(mapControls, /installLockedPinchZoom/, 'Pinch zoom must use a locked anchor while following');
 assert.match(mapControls, /centerForAnchor\(pinchAnchor, zoom\)/, 'Pinch zoom must calculate the center from the active user anchor');
 assert.match(mapControls, /map\._move\(center, zoom, \{ pinch: true, round: false \}\)/, 'Pinch zoom must update around the fixed anchor during the gesture');
+assert.match(mapControls, /residualTouchLock = Boolean\(event\.touches\?\.length\)/, 'Pinch completion must detect a finger that remains on screen');
+assert.match(mapControls, /if \(residualTouchLock\) \{[\s\S]*?consumeTouch\(event\)/, 'Residual one-finger movement must be consumed after pinch completion');
+assert.match(mapControls, /map\.dragging\.disable\(\)/, 'Map dragging must be cancelled when the second pinch finger arrives');
+assert.match(mapControls, /map\.dragging\?\.enable\?\.\(\)/, 'Map dragging must resume only after every pinch finger is released');
 assert.doesNotMatch(dashboardCss, /data-dashboard-field=["']appVersion["'][\s\S]{0,120}display:\s*none/, 'The app version field must remain visible on mobile dashboards');
 assert.match(messageCss, /\.wander-card\s*\{[\s\S]*?top:\s*0;/, 'Wander messages must open from the top edge');
 assert.match(messageCss, /z-index:\s*115;/, 'Wander messages must cover the map header');

@@ -15,6 +15,8 @@
   let pinchStartDistance = 0;
   let pinchStartZoom = 0;
   let pinchAnchor = null;
+  let residualTouchLock = false;
+  let draggingWasEnabled = false;
 
   function loadCenterMode() {
     try {
@@ -81,7 +83,7 @@
   }
 
   function scheduleFollowPosition() {
-    if (pinchActive || !position.isFollowingPosition()) return;
+    if (pinchActive || residualTouchLock || !position.isFollowingPosition()) return;
     if (anchorFrame) cancelAnimationFrame(anchorFrame);
     anchorFrame = requestAnimationFrame(() => {
       anchorFrame = 0;
@@ -112,7 +114,18 @@
     if (container.dataset.wanderLockedPinch === 'true') return;
     container.dataset.wanderLockedPinch = 'true';
 
+    function releaseResidualTouchLock() {
+      residualTouchLock = false;
+      if (draggingWasEnabled) map.dragging?.enable?.();
+      draggingWasEnabled = false;
+      scheduleFollowPosition();
+    }
+
     container.addEventListener('touchstart', (event) => {
+      if (residualTouchLock) {
+        consumeTouch(event);
+        return;
+      }
       if (!position.isFollowingPosition() || event.touches.length !== 2) return;
       const anchor = position.getPosition?.();
       if (!anchor) return;
@@ -120,6 +133,8 @@
         cancelAnimationFrame(anchorFrame);
         anchorFrame = 0;
       }
+      draggingWasEnabled = map.dragging?.enabled?.() === true;
+      if (draggingWasEnabled) map.dragging.disable();
       pinchActive = true;
       pinchMoved = false;
       pinchStartDistance = Math.max(1, touchDistance(event.touches));
@@ -130,6 +145,10 @@
     }, { capture: true, passive: false });
 
     container.addEventListener('touchmove', (event) => {
+      if (residualTouchLock) {
+        consumeTouch(event);
+        return;
+      }
       if (!pinchActive || event.touches.length !== 2 || !pinchAnchor) return;
       const scale = touchDistance(event.touches) / pinchStartDistance;
       const rawZoom = pinchStartZoom + Math.log2(Math.max(0.01, scale));
@@ -144,15 +163,24 @@
     }, { capture: true, passive: false });
 
     const finishPinch = (event) => {
-      if (!pinchActive) return;
+      if (!pinchActive) {
+        if (!residualTouchLock) return;
+        consumeTouch(event);
+        if (!event.touches || event.touches.length === 0) releaseResidualTouchLock();
+        return;
+      }
       if (event.touches && event.touches.length >= 2) return;
       consumeTouch(event);
       const anchor = pinchAnchor;
       const moved = pinchMoved;
+      residualTouchLock = Boolean(event.touches?.length);
       pinchActive = false;
       pinchMoved = false;
       pinchAnchor = null;
-      if (!moved || !anchor) return;
+      if (!moved || !anchor) {
+        if (!residualTouchLock) releaseResidualTouchLock();
+        return;
+      }
 
       const snap = Number(map.options.zoomSnap) || 1;
       const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), Math.round(map.getZoom() / snap) * snap));
@@ -160,7 +188,7 @@
       requestAnimationFrame(() => {
         map._move(center, zoom, { pinch: true, round: true });
         map._moveEnd?.(true);
-        scheduleFollowPosition();
+        if (!residualTouchLock) releaseResidualTouchLock();
       });
     };
 
@@ -243,7 +271,7 @@
   installLockedPinchZoom();
 
   map.on('dragstart', () => {
-    if (pinchActive || !position.isFollowingPosition()) return;
+    if (pinchActive || residualTouchLock || !position.isFollowingPosition()) return;
     followSuspendedByDrag = true;
     position.setFollowMode(false, { centerNow: false });
     syncZoomAnchorMode();
