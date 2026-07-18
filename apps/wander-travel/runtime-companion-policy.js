@@ -24,6 +24,8 @@
     return {
       id: `arrival:${place.id}`,
       kind: 'place_intro',
+      interactionType: 'inform',
+      priority: 'normal',
       title: `Te doy la bienvenida a ${place.name}`,
       message: `${greeting(at)} Parece que es tu primera visita a ${place.name}. ` +
         'Voy a acompañarte con contexto y sugerencias solamente cuando puedan mejorar el recorrido. ' +
@@ -61,11 +63,14 @@
     return {
       id: `discovery:${poi.id}`,
       kind: 'poi_discovery',
+      interactionType: 'suggest',
+      priority: 'normal',
       title: 'Algo interesante cerca',
       message: lead + fact,
       contentId: poi.contentId || `poi-discovery:${poi.id}`,
       topic: 'poi_discovery',
       placeId: poi.id,
+      placeName: poi.name,
       poi,
       action: lat !== null && lng !== null ? {
         id: 'take-me',
@@ -82,6 +87,8 @@
     return {
       id: suggestion.id,
       kind: suggestion.kind || 'contextual_suggestion',
+      interactionType: suggestion.interactionType || 'suggest',
+      priority: suggestion.priority || 'normal',
       title: suggestion.title,
       message: suggestion.message,
       contentId: suggestion.contentId || suggestion.id,
