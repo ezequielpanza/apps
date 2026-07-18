@@ -9,7 +9,13 @@ const REPOSITORY_ROOT = path.resolve(ROOT, '..', '..');
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const serviceWorker = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
 const versionRuntime = fs.readFileSync(path.join(ROOT, 'runtime-version.js'), 'utf8');
+const nativeVersionRuntime = fs.readFileSync(path.join(ROOT, 'runtime-native-app-version.js'), 'utf8');
+const dashboardRuntime = fs.readFileSync(path.join(ROOT, 'runtime-context-dashboard.js'), 'utf8');
+const contextPanelRuntime = fs.readFileSync(path.join(ROOT, 'runtime-context-panel.js'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
+const androidVersion = JSON.parse(fs.readFileSync(path.join(ROOT, 'android-version.json'), 'utf8'));
+const androidBuild = fs.readFileSync(path.join(ROOT, 'android', 'app', 'build.gradle'), 'utf8');
+const nativePlugin = fs.readFileSync(path.join(ROOT, 'android', 'app', 'src', 'main', 'java', 'app', 'wandertravel', 'mobile', 'WanderLocationPlugin.java'), 'utf8');
 const mapControls = fs.readFileSync(path.join(ROOT, 'runtime-map-controls.js'), 'utf8');
 const dashboardCss = fs.readFileSync(path.join(ROOT, 'wander-context-dashboard.css'), 'utf8');
 const messageCss = fs.readFileSync(path.join(ROOT, 'wander-message-top.css'), 'utf8');
@@ -49,9 +55,20 @@ for (const file of fs.readdirSync(ROOT)) {
 }
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
-assert.ok(versionMatch, 'runtime-version.js must define the app version');
-assert.equal(manifest.start_url, `./?app=${versionMatch[1]}`, 'Manifest start URL must follow the app version');
-assert.doesNotMatch(html, /v\d+\.\d+\.\d+/, 'index.html must not duplicate the app version');
+assert.ok(versionMatch, 'runtime-version.js must define the web app version');
+assert.equal(manifest.start_url, `./?app=${versionMatch[1]}`, 'Manifest start URL must follow the web version');
+assert.match(versionRuntime, /app\.webVersion/, 'The web version must have its own context key');
+assert.equal(androidVersion.versionName, '0.3.0', 'The native APK line must start at 0.3.0');
+assert.ok(Number.isInteger(androidVersion.versionCode) && androidVersion.versionCode > 6, 'Android versionCode must remain upgrade-compatible');
+assert.match(androidBuild, /android-version\.json/, 'Gradle must read the separate Android version source');
+assert.match(nativePlugin, /void getAppInfo\(PluginCall call\)/, 'The native bridge must expose APK metadata');
+assert.match(nativePlugin, /BuildConfig\.VERSION_NAME/, 'The APK version must come from the installed native package');
+assert.match(nativeVersionRuntime, /plugin\.getAppInfo\(\)/, 'The web runtime must query the installed APK version');
+assert.match(nativeVersionRuntime, /app\.apkVersion/, 'The installed APK version must enter WanderContext');
+assert.match(dashboardRuntime, /label: 'Versión Web'/, 'The dashboard must expose the web version separately');
+assert.match(dashboardRuntime, /label: 'Versión APK'/, 'The dashboard must expose the APK version separately');
+assert.match(contextPanelRuntime, /'apkVersion'/, 'Contexto must allow selecting the APK version for the dashboard');
+assert.doesNotMatch(html, /v\d+\.\d+\.\d+/, 'index.html must not duplicate the web version');
 assert.doesNotMatch(serviceWorker, /wander-travel-v\d+/, 'sw.js must derive its cache name from runtime-version.js');
 assert.match(mapControls, /installLockedPinchZoom/, 'Pinch zoom must use a locked anchor while following');
 assert.match(mapControls, /centerForAnchor\(pinchAnchor, zoom\)/, 'Pinch zoom must calculate the center from the active user anchor');
@@ -60,7 +77,7 @@ assert.match(mapControls, /residualTouchLock = Boolean\(event\.touches\?\.length
 assert.match(mapControls, /if \(residualTouchLock\) \{[\s\S]*?consumeTouch\(event\)/, 'Residual one-finger movement must be consumed after pinch completion');
 assert.match(mapControls, /map\.dragging\.disable\(\)/, 'Map dragging must be cancelled when the second pinch finger arrives');
 assert.match(mapControls, /map\.dragging\?\.enable\?\.\(\)/, 'Map dragging must resume only after every pinch finger is released');
-assert.doesNotMatch(dashboardCss, /data-dashboard-field=["']appVersion["'][\s\S]{0,120}display:\s*none/, 'The app version field must remain visible on mobile dashboards');
+assert.doesNotMatch(dashboardCss, /data-dashboard-field=["']appVersion["'][\s\S]{0,120}display:\s*none/, 'The web version field must remain visible on mobile dashboards');
 assert.match(messageCss, /\.wander-card\s*\{[\s\S]*?top:\s*0;/, 'Wander messages must open from the top edge');
 assert.match(messageCss, /z-index:\s*115;/, 'Wander messages must cover the map header');
 assert.match(uiRuntime, /configureChoices\(options\.choices\)/, 'Wander messages must support explicit choices');
@@ -81,4 +98,4 @@ for (const retiredPath of [
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander ${versionMatch[1]} app shell is consistent`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} app shell is consistent`);

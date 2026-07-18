@@ -33,6 +33,8 @@ class MockElement {
   }
 
   insertBefore(child, before) {
+    const existing = this.children.indexOf(child);
+    if (existing >= 0) this.children.splice(existing, 1);
     const index = before ? this.children.indexOf(before) : -1;
     if (index >= 0) this.children.splice(index, 0, child);
     else this.children.push(child);
@@ -51,6 +53,8 @@ function createRuntime(sharedStorage = new Map()) {
     ['location.effective.lat', 19.123456],
     ['location.effective.lng', -70.654321],
     ['place.city', 'Luperón'],
+    ['app.webVersion', 'v0.101.3'],
+    ['app.apkVersion', '0.3.0'],
   ]);
   const subscribers = new Set();
   const context = {
@@ -86,6 +90,7 @@ function createRuntime(sharedStorage = new Map()) {
     ['metric-zone', new MockElement({ id: 'metric-zone' })],
     ['metric-place-memory', new MockElement({ id: 'metric-place-memory' })],
     ['metric-app-version', new MockElement({ id: 'metric-app-version' })],
+    ['metric-apk-version', new MockElement({ id: 'metric-apk-version' })],
   ]);
 
   const document = {
@@ -108,6 +113,8 @@ function createRuntime(sharedStorage = new Map()) {
     localStorage: new MemoryStorage(sharedStorage),
     document,
     WanderContext: context,
+    WanderWebVersion: 'v0.101.3',
+    WanderVersion: 'v0.101.3',
     addEventListener() {},
   };
   sandbox.window = sandbox;
@@ -132,15 +139,22 @@ assert.equal(first.metrics.get('metric-heading').textContent, '90°');
 assert.equal(first.metrics.get('metric-activity').textContent, 'En movimiento');
 assert.equal(first.metrics.get('metric-location-status').textContent, 'Disponible');
 assert.equal(first.metrics.get('metric-location-source').textContent, 'GPS');
-assert.equal(first.api.fields.length, 21);
+assert.equal(first.metrics.get('metric-app-version').textContent, 'v0.101.3');
+assert.equal(first.metrics.get('metric-apk-version').textContent, '0.3.0');
+assert.equal(first.api.fields.length, 22);
 assert.ok(first.dashboard.querySelector('[data-dashboard-field="activity"]'));
 assert.ok(first.dashboard.querySelector('[data-dashboard-field="coordinates"]'));
 assert.ok(first.dashboard.querySelector('[data-dashboard-field="placeMemory"]'));
+assert.ok(first.dashboard.querySelector('[data-dashboard-field="apkVersion"]'));
 
 first.api.setFieldVisible('coordinates', true);
 assert.equal(first.api.isVisible('coordinates'), true);
 assert.equal(first.dashboard.querySelector('[data-dashboard-field="coordinates"]').hidden, false);
 assert.equal(first.metrics.get('metric-coordinates').textContent, '19.123456, -70.654321');
+
+first.api.setFieldVisible('apkVersion', true);
+assert.equal(first.api.isVisible('apkVersion'), true);
+assert.equal(first.dashboard.querySelector('[data-dashboard-field="apkVersion"]').hidden, false);
 
 first.api.setFieldVisible('place', true);
 assert.equal(first.api.isVisible('place'), true);
@@ -151,6 +165,7 @@ assert.match(shared.get(first.api.storageKey), /"place"/);
 const reopened = createRuntime(shared);
 assert.equal(reopened.api.isVisible('place'), true);
 assert.equal(reopened.dashboard.querySelector('[data-dashboard-field="place"]').hidden, false);
+assert.equal(reopened.api.isVisible('apkVersion'), true);
 
 for (const fieldId of reopened.api.getVisibleFields()) reopened.api.setFieldVisible(fieldId, false);
 assert.deepEqual(Array.from(reopened.api.getVisibleFields()), []);

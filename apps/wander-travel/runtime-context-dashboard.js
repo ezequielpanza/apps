@@ -144,7 +144,8 @@
     return textValue(value, 'Desactivada');
   }
 
-  function appVersionValue() { return textValue(context.value('app.version') || window.WanderVersion, 'Pendiente'); }
+  function webVersionValue() { return textValue(context.value('app.webVersion') || context.value('app.version') || window.WanderWebVersion || window.WanderVersion, 'Pendiente'); }
+  function apkVersionValue() { return textValue(context.value('app.apkVersion'), 'No disponible'); }
 
   const FIELDS = Object.freeze([
     { id: 'summary', label: 'Estado actual', icon: 'target', metricId: 'metric-status', value: () => textValue(context.value('context.status'), 'Preparando contexto') },
@@ -167,7 +168,8 @@
     { id: 'currentPOI', label: 'POI actual', icon: 'pin', metricId: 'metric-current-poi', value: currentPOIValue },
     { id: 'nearby', label: 'Estado Nearby', icon: 'pin', metricId: 'metric-nearby', value: nearbyValue },
     { id: 'simulation', label: 'Simulación', icon: 'flask', metricId: 'metric-simulation', value: simulationValue },
-    { id: 'appVersion', label: 'Versión de la app', icon: 'info', metricId: 'metric-app-version', value: appVersionValue },
+    { id: 'appVersion', label: 'Versión Web', icon: 'info', metricId: 'metric-app-version', value: webVersionValue },
+    { id: 'apkVersion', label: 'Versión APK', icon: 'info', metricId: 'metric-apk-version', value: apkVersionValue },
   ].map(Object.freeze));
 
   const fieldIds = new Set(FIELDS.map((field) => field.id));

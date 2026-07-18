@@ -84,6 +84,15 @@ public class WanderLocationPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getAppInfo(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("versionName", BuildConfig.VERSION_NAME);
+        result.put("versionCode", BuildConfig.VERSION_CODE);
+        result.put("packageName", getContext().getPackageName());
+        call.resolve(result);
+    }
+
+    @PluginMethod
     public void notifyCompanion(PluginCall call) {
         String title = call.getString("title", "Wander");
         String message = call.getString("message", "Wander tiene algo para contarte.");
