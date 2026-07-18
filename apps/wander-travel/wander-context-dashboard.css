@@ -60,12 +60,22 @@ body.drawer-open #context-dashboard {
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   grid-auto-rows: minmax(38px, auto) !important;
   align-items: center !important;
+  align-content: start !important;
   column-gap: 4px !important;
   row-gap: 4px !important;
   height: auto !important;
   min-height: calc(8px + (var(--dashboard-rows, 1) * 42px)) !important;
+  max-height: calc(100dvh - 92px - env(safe-area-inset-top, 0px)) !important;
   padding: 4px 10px !important;
   border-radius: 28px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"])::-webkit-scrollbar {
+  display: none;
 }
 
 .status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item:not([hidden]) {
@@ -76,6 +86,21 @@ body.drawer-open #context-dashboard {
   min-height: 38px !important;
   height: auto !important;
   padding: 5px 4px !important;
+  overflow: hidden;
+}
+
+.status-rail#context-dashboard[data-dashboard-dense="true"] {
+  grid-auto-rows: minmax(34px, auto) !important;
+  min-height: calc(8px + (var(--dashboard-rows, 1) * 38px)) !important;
+  column-gap: 2px !important;
+  row-gap: 2px !important;
+  padding: 4px 7px !important;
+}
+
+.status-rail#context-dashboard[data-dashboard-dense="true"] .status-item:not([hidden]) {
+  min-height: 34px !important;
+  padding: 3px !important;
+  gap: 4px !important;
 }
 
 .status-rail#context-dashboard .status-item[data-dashboard-field="summary"] {
@@ -93,19 +118,44 @@ body.drawer-open #context-dashboard {
   font-size: .76rem;
 }
 
-.status-rail#context-dashboard .status-item[data-dashboard-field="summary"] strong,
-.status-rail#context-dashboard .status-item[data-dashboard-field="currentPOI"] strong,
-.status-rail#context-dashboard .status-item[data-dashboard-field="place"] strong {
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item strong {
   display: -webkit-box;
   white-space: normal;
   line-height: 1.08;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow: hidden;
   overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="time"] strong,
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="dayPeriod"] strong,
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="accuracy"] strong,
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="speed"] strong,
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="heading"] strong,
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="nearby"] strong,
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="simulation"] strong,
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="appVersion"] strong,
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="apkVersion"] strong,
+.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="placeConfidence"] strong {
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.status-rail#context-dashboard[data-dashboard-dense="true"] .status-item strong {
+  font-size: .68rem;
 }
 
 .status-rail#context-dashboard .status-icon {
   flex: 0 0 15px;
+}
+
+.status-rail#context-dashboard[data-dashboard-dense="true"] .status-icon {
+  flex-basis: 14px;
+  width: 14px;
+  height: 14px;
 }
 
 .status-rail#context-dashboard:active {
@@ -141,9 +191,7 @@ body.drawer-open #context-dashboard {
     max-width: none !important;
   }
   .status-rail#context-dashboard .status-item strong { font-size: .74rem; }
-  .status-rail#context-dashboard[data-dashboard-rows="1"] .status-item[data-dashboard-field="summary"] {
-    grid-column: 1 / -1 !important;
-  }
+  .status-rail#context-dashboard[data-dashboard-dense="true"] .status-item strong { font-size: .67rem; }
 }
 
 @media (max-width: 380px) {
