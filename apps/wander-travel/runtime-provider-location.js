@@ -4,11 +4,15 @@
   if (!context || !locationSources) return;
 
   const providers = window.WanderProviders || (window.WanderProviders = {});
+  const CONTEXT_WATCHDOG_INTERVAL_MS = 2000;
+  const CONTEXT_WATCHDOG_LIMIT_MS = 30000;
   let activeSource = null;
   const samples = [];
   let stableMode = 'unknown';
   let candidateMode = 'unknown';
   let candidateSince = 0;
+  let contextWatchdogTimer = null;
+  let contextWatchdogStartedAt = 0;
 
   function finite(value) {
     const number = Number(value);
@@ -56,7 +60,6 @@
     const accuracyNoise = Math.min(70, Math.max(8, first.accuracy, last.accuracy));
     const stationaryRadius = Math.max(10, accuracyNoise * 1.35);
 
-    // GPS drift inside the accuracy envelope is not real movement.
     if (distance <= stationaryRadius) return 0;
 
     const displacementSpeed = Math.max(0, distance - accuracyNoise) / seconds * 3.6;
@@ -67,7 +70,6 @@
       .sort((a, b) => a - b);
     const medianGpsSpeed = gpsSpeeds.length ? gpsSpeeds[Math.floor(gpsSpeeds.length / 2)] : 0;
 
-    // A single noisy speed reading cannot declare movement without net displacement.
     return Math.max(displacementSpeed, medianGpsSpeed >= 2 ? medianGpsSpeed : 0);
   }
 
@@ -88,7 +90,6 @@
       candidateSince = now;
     }
 
-    // Returning to stationary should be quick; declaring movement must be sustained.
     const requiredMs = next === 'stationary' ? 6000 : next === 'car' ? 12000 : 18000;
     if (next !== stableMode && now - candidateSince >= requiredMs) stableMode = next;
 
@@ -102,6 +103,31 @@
     context.set('mobility.provider.speedKmh', stableMode === 'stationary' ? 0 : speedKmh, {
       source: 'gps-motion-provider', kind: 'derived', ttlMs: 45000, confidence,
     });
+  }
+
+  function clearContextWatchdog() {
+    if (contextWatchdogTimer) clearTimeout(contextWatchdogTimer);
+    contextWatchdogTimer = null;
+    contextWatchdogStartedAt = 0;
+  }
+
+  function contextStillPending() {
+    const motion = String(context.value('motion.status') || 'pending').toLowerCase();
+    const status = String(context.value('context.status') || '').toLowerCase();
+    return motion === 'pending' || status === 'preparando contexto';
+  }
+
+  function scheduleContextWatchdog() {
+    if (contextWatchdogTimer || !samples.length || !contextStillPending()) return;
+    if (!contextWatchdogStartedAt) contextWatchdogStartedAt = Date.now();
+    contextWatchdogTimer = setTimeout(() => {
+      contextWatchdogTimer = null;
+      publishMobility(Date.now());
+      window.WanderEngine?.run?.('location-context-watchdog');
+      const elapsed = Date.now() - contextWatchdogStartedAt;
+      if (contextStillPending() && elapsed < CONTEXT_WATCHDOG_LIMIT_MS) scheduleContextWatchdog();
+      else clearContextWatchdog();
+    }, CONTEXT_WATCHDOG_INTERVAL_MS);
   }
 
   function onPosition(position) {
@@ -119,9 +145,11 @@
       confidence: 1,
     });
     publishMobility(position.timestamp || Date.now());
+    scheduleContextWatchdog();
   }
 
   function onError(status) {
+    clearContextWatchdog();
     context.setRealLocationStatus(status || 'unavailable', { source: activeSource?.id || 'location-source' });
   }
 
@@ -148,6 +176,7 @@
   }
 
   function stop() {
+    clearContextWatchdog();
     activeSource?.stop();
   }
 
