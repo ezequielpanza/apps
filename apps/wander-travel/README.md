@@ -1,6 +1,6 @@
 # Wander Travel
 
-Versión: **v0.101.0**
+Versión: **v0.101.1**
 
 Wander Travel combina una base técnica estable para observar el viaje con el primer ciclo funcional del compañero: interpreta la llegada a un lugar aparentemente nuevo, espera un momento apropiado, da una bienvenida contextual, acepta una corrección del usuario y recuerda lo presentado.
 
@@ -19,6 +19,8 @@ La versión v0.100.1 alinea el ícono y la pantalla de inicio de Android con la 
 La versión v0.100.2 reemplaza la respuesta escrita de familiaridad por decisiones explícitas y presenta todas las intervenciones del compañero desde el borde superior, cubriendo por completo la W y el dashboard mientras están activas.
 
 La versión v0.101.0 convierte Android en un contenedor nativo estable: carga la web publicada cuando existe conexión y conserva el último shell íntegro para uso sin red, con la versión incluida en la APK como recuperación. También incorpora el acelerómetro nativo como evidencia auxiliar de movimiento en primer y segundo plano.
+
+La versión v0.101.1 mantiene el punto del usuario fijo durante todo el gesto de zoom cuando el centrado está activo, tanto en modo central como inferior. También elimina la regla móvil que ocultaba `Versión de la app`, de modo que todos los campos seleccionados se representan en el dashboard.
 
 ## Arquitectura activa
 
