@@ -72,6 +72,14 @@
     return $('#track-list')?.closest('.screen-card') || $('[data-app-screen="routes"] .screen-card');
   }
 
+  function recordingOptionsMarkup() {
+    const profiles = engine()?.recordingProfiles?.() || [];
+    return profiles.map((profile) => {
+      const detail = profile.id === 'manual' ? '' : ` · ${profile.intervalSec} s / ${profile.distanceM} m`;
+      return `<option value="${profile.id}">${profile.label}${detail}</option>`;
+    }).join('');
+  }
+
   function buildScreen() {
     const card = routeCard();
     if (!card || card.dataset.sessionUi === 'true') return Boolean(card);
@@ -85,6 +93,20 @@
       <div class="session-auto-card">
         <div><strong>Mostrar recorrido actual</strong><span>Dibuja en el mapa el trayecto acumulado de la sesión activa.</span></div>
         <label class="switch-control"><input id="session-map-toggle" type="checkbox" role="switch" aria-label="Mostrar recorrido actual en el mapa"><span class="switch-track"><span class="switch-thumb"></span></span></label>
+      </div>
+      <div class="session-recording-card">
+        <div class="session-recording-heading">
+          <div><strong>Perfil de grabación</strong><span id="session-recording-summary">Equilibrado · 5 s · 5 m</span></div>
+        </div>
+        <label class="session-recording-field">
+          <span>Perfil</span>
+          <select id="session-recording-profile" aria-label="Perfil de grabación del recorrido">${recordingOptionsMarkup()}</select>
+        </label>
+        <div id="session-recording-manual" class="session-recording-manual" hidden>
+          <label class="session-recording-field"><span>Tiempo mínimo</span><div><input id="session-recording-interval" type="number" inputmode="numeric" min="2" max="60" step="1"><small>segundos</small></div></label>
+          <label class="session-recording-field"><span>Distancia mínima</span><div><input id="session-recording-distance" type="number" inputmode="numeric" min="1" max="100" step="1"><small>metros</small></div></label>
+        </div>
+        <p id="session-recording-description" class="panel-note">Buen detalle con consumo moderado.</p>
       </div>
       <div class="session-current-card">
         <span id="session-phase">Preparando contexto</span>
@@ -110,6 +132,18 @@
     $('#session-map-toggle')?.addEventListener('change', (event) => {
       setCurrentTrackVisible(event.target.checked);
     });
+    $('#session-recording-profile')?.addEventListener('change', (event) => {
+      engine()?.setRecordingProfile?.(event.target.value);
+      renderRecordingControls();
+    });
+    const updateManual = () => {
+      const intervalSec = Number($('#session-recording-interval')?.value);
+      const distanceM = Number($('#session-recording-distance')?.value);
+      engine()?.setManualRecordingConfig?.({ intervalSec, distanceM });
+      renderRecordingControls();
+    };
+    $('#session-recording-interval')?.addEventListener('change', updateManual);
+    $('#session-recording-distance')?.addEventListener('change', updateManual);
     $('#session-finish-button')?.addEventListener('click', () => {
       const completed = engine()?.finishSession?.('manual');
       if (completed) window.WanderUI?.showToast?.('Sesión finalizada', 'Esperando el próximo movimiento');
@@ -123,6 +157,22 @@
     });
     $('#track-list')?.addEventListener('click', handleListClick);
     return true;
+  }
+
+  function renderRecordingControls(state = null) {
+    const recording = state?.recording || engine()?.getRecordingState?.();
+    if (!recording?.config) return;
+    const config = recording.config;
+    const profileSelect = $('#session-recording-profile');
+    if (profileSelect) profileSelect.value = recording.profileId;
+    const manual = $('#session-recording-manual');
+    if (manual) manual.hidden = recording.profileId !== 'manual';
+    const interval = $('#session-recording-interval');
+    if (interval) interval.value = String(recording.manualIntervalSec);
+    const distance = $('#session-recording-distance');
+    if (distance) distance.value = String(recording.manualDistanceM);
+    window.WanderUI?.setText?.('#session-recording-summary', `${config.label} · ${config.intervalSec} s · ${config.distanceM} m`);
+    window.WanderUI?.setText?.('#session-recording-description', config.description || 'Configuración de grabación activa.');
   }
 
   function activeSummary(active) {
@@ -200,6 +250,7 @@
     if (mapToggle) mapToggle.checked = currentTrackVisible;
     const finish = $('#session-finish-button');
     if (finish) finish.disabled = !active;
+    renderRecordingControls(snapshot);
     window.WanderUI?.setText('#session-phase', phaseLabel(snapshot));
     window.WanderUI?.setText('#track-summary', activeSummary(live));
     window.WanderUI?.setText('#session-distance', distanceLabel(live?.distanceM || 0));
@@ -288,6 +339,7 @@
   }
 
   window.addEventListener('wander:session-engine-ready', initialize);
+  window.addEventListener('wander:recording-profile-changed', () => renderRecordingControls());
   document.addEventListener('click', (event) => {
     if (event.target.closest('[data-screen-target="routes"]')) setTimeout(render, 0);
   });
