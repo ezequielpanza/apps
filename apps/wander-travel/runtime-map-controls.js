@@ -10,10 +10,11 @@
   let centerMode = loadCenterMode();
   let followSuspendedByDrag = false;
   let anchorFrame = 0;
-  const activeTouchPointers = new Set();
-  let followedAtTouchStart = false;
-  let restoreFollowAfterPinch = false;
-  let pinchZoomActive = false;
+  let pinchActive = false;
+  let pinchMoved = false;
+  let pinchStartDistance = 0;
+  let pinchStartZoom = 0;
+  let pinchAnchor = null;
 
   function loadCenterMode() {
     try {
@@ -80,7 +81,7 @@
   }
 
   function scheduleFollowPosition() {
-    if (!position.isFollowingPosition()) return;
+    if (pinchActive || !position.isFollowingPosition()) return;
     if (anchorFrame) cancelAnimationFrame(anchorFrame);
     anchorFrame = requestAnimationFrame(() => {
       anchorFrame = 0;
@@ -92,6 +93,79 @@
     map.options.scrollWheelZoom = true;
     map.options.doubleClickZoom = true;
     map.options.touchZoom = true;
+  }
+
+  function touchDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function consumeTouch(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+  }
+
+  function installLockedPinchZoom() {
+    const container = map.getContainer();
+    if (container.dataset.wanderLockedPinch === 'true') return;
+    container.dataset.wanderLockedPinch = 'true';
+
+    container.addEventListener('touchstart', (event) => {
+      if (!position.isFollowingPosition() || event.touches.length !== 2) return;
+      const anchor = position.getPosition?.();
+      if (!anchor) return;
+      if (anchorFrame) {
+        cancelAnimationFrame(anchorFrame);
+        anchorFrame = 0;
+      }
+      pinchActive = true;
+      pinchMoved = false;
+      pinchStartDistance = Math.max(1, touchDistance(event.touches));
+      pinchStartZoom = map.getZoom();
+      pinchAnchor = L.latLng(anchor);
+      map._stop?.();
+      consumeTouch(event);
+    }, { capture: true, passive: false });
+
+    container.addEventListener('touchmove', (event) => {
+      if (!pinchActive || event.touches.length !== 2 || !pinchAnchor) return;
+      const scale = touchDistance(event.touches) / pinchStartDistance;
+      const rawZoom = pinchStartZoom + Math.log2(Math.max(0.01, scale));
+      const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), rawZoom));
+      const center = centerForAnchor(pinchAnchor, zoom);
+      if (!pinchMoved) {
+        pinchMoved = true;
+        map._moveStart?.(true, false);
+      }
+      map._move(center, zoom, { pinch: true, round: false });
+      consumeTouch(event);
+    }, { capture: true, passive: false });
+
+    const finishPinch = (event) => {
+      if (!pinchActive) return;
+      if (event.touches && event.touches.length >= 2) return;
+      consumeTouch(event);
+      const anchor = pinchAnchor;
+      const moved = pinchMoved;
+      pinchActive = false;
+      pinchMoved = false;
+      pinchAnchor = null;
+      if (!moved || !anchor) return;
+
+      const snap = Number(map.options.zoomSnap) || 1;
+      const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), Math.round(map.getZoom() / snap) * snap));
+      const center = centerForAnchor(anchor, zoom);
+      requestAnimationFrame(() => {
+        map._move(center, zoom, { pinch: true, round: true });
+        map._moveEnd?.(true);
+        scheduleFollowPosition();
+      });
+    };
+
+    container.addEventListener('touchend', finishPinch, { capture: true, passive: false });
+    container.addEventListener('touchcancel', finishPinch, { capture: true, passive: false });
   }
 
   function setFollowMode(next, options = {}) {
@@ -166,52 +240,17 @@
   });
 
   map.addControl(new MapActions());
-
-  const mapContainer = map.getContainer();
-
-  mapContainer.addEventListener('pointerdown', (event) => {
-    if (event.pointerType !== 'touch') return;
-    if (activeTouchPointers.size === 0) followedAtTouchStart = position.isFollowingPosition();
-    activeTouchPointers.add(event.pointerId);
-    if (activeTouchPointers.size >= 2 && followedAtTouchStart) restoreFollowAfterPinch = true;
-  });
-
-  function releaseTouchPointer(event) {
-    if (event.pointerType !== 'touch') return;
-    activeTouchPointers.delete(event.pointerId);
-    if (activeTouchPointers.size === 0) {
-      followedAtTouchStart = false;
-      if (!pinchZoomActive) restoreFollowAfterPinch = false;
-    }
-  }
-
-  window.addEventListener('pointerup', releaseTouchPointer);
-  window.addEventListener('pointercancel', releaseTouchPointer);
+  installLockedPinchZoom();
 
   map.on('dragstart', () => {
-    if (activeTouchPointers.size >= 2 || restoreFollowAfterPinch) return;
-    if (!position.isFollowingPosition()) return;
+    if (pinchActive || !position.isFollowingPosition()) return;
     followSuspendedByDrag = true;
     position.setFollowMode(false, { centerNow: false });
     syncZoomAnchorMode();
     syncFollowButton();
   });
 
-  map.on('zoomstart', () => {
-    pinchZoomActive = restoreFollowAfterPinch;
-  });
-
-  map.on('zoomend', () => {
-    if (restoreFollowAfterPinch) {
-      position.setFollowMode(true, { centerNow: false });
-      followSuspendedByDrag = false;
-      restoreFollowAfterPinch = false;
-      syncFollowButton();
-    }
-    pinchZoomActive = false;
-    scheduleFollowPosition();
-  });
-  map.on('resize', scheduleFollowPosition);
+  map.on('zoomend resize', scheduleFollowPosition);
 
   context?.subscribe?.((key) => {
     if (key === 'location.effective' || key.startsWith('location.effective.')) scheduleFollowPosition();
