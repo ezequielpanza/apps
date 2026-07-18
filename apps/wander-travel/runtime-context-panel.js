@@ -27,9 +27,9 @@
     ['history.currentPlace', 'Memoria del lugar', 'brain', 'placeMemory'],
   ];
 
-  const EXTRA_DASHBOARD_FIELDS = ['currentPOI', 'nearby', 'simulation', 'appVersion'];
+  const EXTRA_DASHBOARD_FIELDS = ['currentPOI', 'nearby', 'simulation', 'appVersion', 'apkVersion'];
   const TECHNICAL = [
-    'app.version','simulation.status','context.status','context.activity','time.now','time.dayPeriod',
+    'app.version','app.webVersion','app.apkVersion','app.apkVersionCode','app.platform','app.packageName','simulation.status','context.status','context.activity','time.now','time.dayPeriod',
     'location.real.status','location.real.lat','location.real.lng','location.real.accuracy','location.real.altitude','location.real.heading','location.real.speedMps','location.real.updatedAt','location.real.source',
     'location.override.enabled','location.override.status','location.override.lat','location.override.lng','location.override.accuracy','location.override.altitude','location.override.heading','location.override.speedMps','location.override.updatedAt','location.override.source',
     'location.effective.status','location.effective.lat','location.effective.lng','location.effective.accuracy','location.effective.altitude','location.effective.heading','location.effective.speedMps','location.effective.updatedAt','location.effective.source',
