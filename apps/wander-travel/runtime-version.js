@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.102.0';
+  const VERSION = 'v0.102.1';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
