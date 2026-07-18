@@ -1,0 +1,124 @@
+.wander-card-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.wander-card-choices[hidden] { display: none !important; }
+
+.wander-card-choices button {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid rgba(16, 38, 56, .14);
+  border-radius: 13px;
+  background: rgba(255,255,255,.88);
+  color: inherit;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 700;
+}
+
+.wander-card-choices button.primary {
+  border-color: transparent;
+  background: var(--accent, #01e0cb);
+  color: #072f2b;
+}
+
+.companion-decision {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(1, 224, 203, .08);
+}
+
+.companion-decision span {
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.companion-decision small { opacity: .62; }
+
+.companion-profile-summary p {
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.companion-profile-summary small { opacity: .66; }
+
+.companion-interest-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.companion-interest-list span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(1, 224, 203, .11);
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.companion-interest-list span[data-sentiment="negative"] {
+  background: rgba(184, 57, 57, .09);
+}
+
+.companion-history-list {
+  display: grid;
+  gap: 9px;
+}
+
+.companion-history-item {
+  display: grid;
+  gap: 6px;
+  padding: 11px 12px;
+  border: 1px solid rgba(16, 38, 56, .09);
+  border-radius: 15px;
+  background: rgba(255,255,255,.72);
+}
+
+.companion-history-item[data-kind="suggest"] {
+  border-left: 4px solid var(--accent, #01e0cb);
+}
+
+.companion-history-item[data-kind="warn"] {
+  border-left: 4px solid #d85353;
+}
+
+.companion-history-item[data-kind="response"] {
+  background: rgba(1, 224, 203, .06);
+}
+
+.companion-history-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.companion-history-header time {
+  flex: 0 0 auto;
+  font-size: .72rem;
+  opacity: .58;
+}
+
+.companion-history-item p {
+  margin: 0;
+  line-height: 1.3;
+}
+
+.companion-history-item small {
+  opacity: .62;
+  line-height: 1.25;
+}
+
+@media (max-width: 430px) {
+  .wander-card-choices { grid-template-columns: 1fr 1fr; }
+  .companion-decision { grid-template-columns: 1fr auto; }
+  .companion-decision span { grid-column: 1 / -1; }
+}
