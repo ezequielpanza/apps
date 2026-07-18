@@ -159,7 +159,8 @@
     productionOrigin: PRODUCTION_ORIGIN,
   };
 
-  loadRoomCompanion();
+  if (window.WanderAppReady) loadRoomCompanion();
+  else window.addEventListener('wander:app-ready', loadRoomCompanion, { once: true });
   refreshNotificationPermission();
   refreshNotificationSound();
 })();
