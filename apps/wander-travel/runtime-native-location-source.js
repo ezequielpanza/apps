@@ -53,6 +53,8 @@
         heading: location.heading ?? null,
         speed: location.speed ?? null,
       },
+      provider: location.provider || null,
+      permissionPrecision: location.permissionPrecision || null,
       timestamp: location.timestamp || Date.now(),
     };
   }
@@ -77,6 +79,8 @@
       background: true,
       stopsWhenClosed: true,
       configurableSampling: true,
+      reportsProvider: true,
+      reportsPermissionPrecision: true,
     },
 
     isSupported: () => typeof plugin()?.start === 'function',
