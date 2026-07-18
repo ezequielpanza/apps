@@ -113,6 +113,10 @@
     return null;
   }
 
+  function accepted(result) {
+    return ['present', 'notify'].includes(result?.disposition) || result?.reason === 'content_already_told';
+  }
+
   function emitPlaceContext(snapshot, now) {
     const state = readState();
     const previousAt = finite(state.placeIntroductions?.[snapshot.placeId]);
@@ -121,7 +125,7 @@
     const message = placeMessage(snapshot);
     if (!message) return false;
 
-    companion.handleEvaluation({
+    const result = companion.handleEvaluation({
       type: 'contextual_suggestion',
       reason: 'stable_place_context',
       semanticPlace: {
@@ -142,11 +146,13 @@
       situation: { motion: { status: snapshot.motion }, speedKmh: snapshot.speedKmh },
     }, 'proactive:place-context');
 
-    state.placeIntroductions ||= {};
-    state.placeIntroductions[snapshot.placeId] = now;
-    state.lastSuggestionAt = now;
-    writeState(state);
-    return true;
+    if (accepted(result)) {
+      state.placeIntroductions ||= {};
+      state.placeIntroductions[snapshot.placeId] = now;
+      state.lastSuggestionAt = now;
+      writeState(state);
+    }
+    return result?.disposition !== 'ignore' || result?.reason === 'content_already_told';
   }
 
   function emitNearbySuggestion(snapshot, now) {
@@ -162,7 +168,7 @@
     const where = distanceM > 0 ? `a ${distanceM} metros` : 'muy cerca';
     const message = `${poi.name} está ${where}.${note ? ` ${note}` : ''} Puede ser una buena próxima parada desde donde estás.`;
 
-    companion.handleEvaluation({
+    const result = companion.handleEvaluation({
       type: 'contextual_suggestion',
       reason: 'nearby_contextual_option',
       semanticPlace: { id: snapshot.placeId, name: snapshot.placeName, level: 'place' },
@@ -190,10 +196,12 @@
       situation: { motion: { status: snapshot.motion }, speedKmh: snapshot.speedKmh },
     }, 'proactive:nearby');
 
-    state.lastSuggestionAt = now;
-    state.lastNearbyId = poi.id;
-    writeState(state);
-    return true;
+    if (accepted(result)) {
+      state.lastSuggestionAt = now;
+      state.lastNearbyId = poi.id;
+      writeState(state);
+    }
+    return result?.disposition !== 'ignore' || result?.reason === 'content_already_told';
   }
 
   function evaluate() {
@@ -218,7 +226,7 @@
       schedule(SUGGESTION_COOLDOWN_MS);
       return;
     }
-    emitNearbySuggestion(snapshot, now);
+    if (emitNearbySuggestion(snapshot, now)) schedule(SUGGESTION_COOLDOWN_MS);
   }
 
   function schedule(delay = 1200) {
