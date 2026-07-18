@@ -7,11 +7,25 @@
   const SESSIONS_KEY = 'wander.sessions.v1';
   const ACTIVE_KEY = 'wander.session.active.v1';
   const SETTINGS_KEY = 'wander.sessions.settings.v1';
+  const RECORDING_KEY = 'wander.recording.profile.v1';
   const NIGHT_MIN_MS = 6 * 60 * 60 * 1000;
   const NIGHT_START_HOUR = 21;
   const NIGHT_END_HOUR = 10;
-  const MIN_POINT_DISTANCE_M = 3;
   const MAX_ACCURACY_M = 120;
+  const RECORDING_LIMITS = Object.freeze({
+    minimumIntervalSec: 2,
+    maximumIntervalSec: 60,
+    minimumDistanceM: 1,
+    maximumDistanceM: 100,
+  });
+  const RECORDING_PROFILES = Object.freeze([
+    Object.freeze({ id: 'precise', label: 'Preciso', intervalSec: 2, distanceM: 2, description: 'Más detalle para caminar, giros y recorridos cortos.' }),
+    Object.freeze({ id: 'balanced', label: 'Equilibrado', intervalSec: 5, distanceM: 5, description: 'Buen detalle con consumo moderado. Perfil recomendado.' }),
+    Object.freeze({ id: 'vehicle', label: 'Vehículo', intervalSec: 3, distanceM: 10, description: 'Pensado para auto, barco o bicicleta a mayor velocidad.' }),
+    Object.freeze({ id: 'saver', label: 'Ahorro', intervalSec: 15, distanceM: 20, description: 'Reduce puntos y consumo de batería en trayectos largos.' }),
+    Object.freeze({ id: 'manual', label: 'Manual', intervalSec: null, distanceM: null, description: 'Permite definir tiempo y distancia mínimos.' }),
+  ]);
+  const PROFILE_BY_ID = Object.freeze(Object.fromEntries(RECORDING_PROFILES.map((profile) => [profile.id, profile])));
   const listeners = new Set();
 
   let sessions = loadArray(SESSIONS_KEY);
@@ -33,6 +47,7 @@
     }
   }
   let settings = { autoEnabled: true, ...loadObject(SETTINGS_KEY) };
+  let recordingSettings = normalizeRecordingSettings(loadObject(RECORDING_KEY));
   let phase = settings.autoEnabled ? 'preparing' : 'disabled';
   let lastMotion = 'pending';
   let lastObservedAt = 0;
@@ -57,6 +72,104 @@
     if (value === null || value === undefined || value === '') return null;
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
+  }
+
+  function clampInteger(value, minimum, maximum, fallback) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.max(minimum, Math.min(maximum, Math.round(number)));
+  }
+
+  function normalizeRecordingSettings(raw = {}) {
+    const profileId = PROFILE_BY_ID[raw.profileId] ? raw.profileId : 'balanced';
+    return {
+      profileId,
+      manualIntervalSec: clampInteger(
+        raw.manualIntervalSec,
+        RECORDING_LIMITS.minimumIntervalSec,
+        RECORDING_LIMITS.maximumIntervalSec,
+        5
+      ),
+      manualDistanceM: clampInteger(
+        raw.manualDistanceM,
+        RECORDING_LIMITS.minimumDistanceM,
+        RECORDING_LIMITS.maximumDistanceM,
+        5
+      ),
+    };
+  }
+
+  function recordingProfile() {
+    return PROFILE_BY_ID[recordingSettings.profileId] || PROFILE_BY_ID.balanced;
+  }
+
+  function recordingConfig() {
+    const profile = recordingProfile();
+    const manual = profile.id === 'manual';
+    return {
+      profileId: profile.id,
+      label: profile.label,
+      description: profile.description,
+      intervalSec: manual ? recordingSettings.manualIntervalSec : profile.intervalSec,
+      distanceM: manual ? recordingSettings.manualDistanceM : profile.distanceM,
+    };
+  }
+
+  function recordingState() {
+    return {
+      ...recordingSettings,
+      config: recordingConfig(),
+    };
+  }
+
+  function publishRecordingContext() {
+    const config = recordingConfig();
+    const metadata = { source: 'session-engine', kind: 'confirmed', confidence: 1 };
+    context.set('sessions.recordingProfile', config.profileId, metadata);
+    context.set('sessions.recordingProfileLabel', config.label, metadata);
+    context.set('sessions.recordingIntervalSec', config.intervalSec, metadata);
+    context.set('sessions.recordingDistanceM', config.distanceM, metadata);
+  }
+
+  function persistRecordingSettings(dispatch = true) {
+    try { localStorage.setItem(RECORDING_KEY, JSON.stringify(recordingSettings)); } catch {}
+    publishRecordingContext();
+    if (!dispatch) return recordingState();
+    const detail = recordingState();
+    window.dispatchEvent(new CustomEvent('wander:recording-profile-changed', { detail }));
+    if (active) {
+      active.events.push({ type: 'recording.profile.changed', at: Date.now(), config: clone(detail.config) });
+      active.updatedAt = Date.now();
+      persist();
+    }
+    return detail;
+  }
+
+  function setRecordingProfile(profileId) {
+    const normalized = PROFILE_BY_ID[profileId] ? profileId : 'balanced';
+    if (recordingSettings.profileId === normalized) return recordingState();
+    recordingSettings = { ...recordingSettings, profileId: normalized };
+    return persistRecordingSettings(true);
+  }
+
+  function setManualRecordingConfig(changes = {}) {
+    recordingSettings = {
+      ...recordingSettings,
+      profileId: 'manual',
+      manualIntervalSec: clampInteger(
+        changes.intervalSec ?? recordingSettings.manualIntervalSec,
+        RECORDING_LIMITS.minimumIntervalSec,
+        RECORDING_LIMITS.maximumIntervalSec,
+        recordingSettings.manualIntervalSec
+      ),
+      manualDistanceM: clampInteger(
+        changes.distanceM ?? recordingSettings.manualDistanceM,
+        RECORDING_LIMITS.minimumDistanceM,
+        RECORDING_LIMITS.maximumDistanceM,
+        recordingSettings.manualDistanceM
+      ),
+    };
+    return persistRecordingSettings(true);
   }
 
   function validPosition(position) {
@@ -134,6 +247,7 @@
       active: clone(active),
       sessions: clone(sessions),
       attachedVehicleId,
+      recording: recordingState(),
     };
   }
 
@@ -144,6 +258,7 @@
     if (summary) context.set('sessions.active', summary, { source: 'session-engine', kind: 'derived', confidence: 1 });
     else context.remove?.('sessions.active');
     context.set('sessions.historyCount', sessions.length, { source: 'session-engine', kind: 'derived', confidence: 1 });
+    publishRecordingContext();
   }
 
   function movementSegments(session) {
@@ -192,6 +307,7 @@
       stayCount: (session.stays || []).length,
       currentStay: clone(openStay(session)),
       closeReason: session.closeReason || null,
+      recording: recordingConfig(),
     };
   }
 
@@ -212,6 +328,7 @@
       events: [],
       attachedVehicleId: attachedVehicleId || null,
       parkedCandidate: parkedCandidate || null,
+      recordingInitial: recordingConfig(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -226,6 +343,7 @@
       startedAt: at,
       endedAt: null,
       method: mobilityMode(),
+      recording: recordingConfig(),
       points: [],
       distanceM: 0,
     };
@@ -248,11 +366,13 @@
     };
     const last = segment.points[segment.points.length - 1];
     if (last) {
+      const config = recordingConfig();
       const distance = distanceMeters(last, point);
       const elapsedMs = Math.max(1, at - Number(last.at || at));
-      const plausibleSpeed = distance / (elapsedMs / 3600000);
-      if (!force && distance < MIN_POINT_DISTANCE_M) return false;
-      if (!force && elapsedMs < 30000 && plausibleSpeed > 250) return false;
+      const plausibleSpeedKmh = (distance / 1000) / (elapsedMs / 3600000);
+      if (!force && elapsedMs < config.intervalSec * 1000) return false;
+      if (!force && distance < config.distanceM) return false;
+      if (!force && elapsedMs < 30000 && plausibleSpeedKmh > 250) return false;
       segment.distanceM = Math.round(Number(segment.distanceM || 0) + distance);
     }
     segment.points.push(point);
@@ -541,9 +661,16 @@
     renameSession,
     list: () => clone(sessions),
     getActive: () => clone(active),
+    recordingProfiles: () => RECORDING_PROFILES.map((profile) => ({ ...profile })),
+    recordingLimits: { ...RECORDING_LIMITS },
+    getRecordingState: () => clone(recordingState()),
+    getRecordingConfig: () => clone(recordingConfig()),
+    setRecordingProfile,
+    setManualRecordingConfig,
     policy: Object.freeze({ nightMinMs: NIGHT_MIN_MS, nightStartHour: NIGHT_START_HOUR, nightEndHour: NIGHT_END_HOUR }),
   });
 
+  persistRecordingSettings(false);
   publishContext();
   observe('startup');
   window.dispatchEvent(new CustomEvent('wander:session-engine-ready', { detail: snapshot() }));

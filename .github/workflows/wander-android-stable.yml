@@ -1,0 +1,80 @@
+name: Build Wander Android Stable
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/wander-travel/**'
+      - '.github/workflows/wander-android-stable.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-stable-debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/wander-travel/package-lock.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Restore stable Wander signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: wander-android-debug-keystore-v1
+
+      - name: Create signing key when missing
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Wander Travel Development,O=Wander Travel,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+          fi
+
+      - name: Install dependencies
+        working-directory: apps/wander-travel
+        run: npm ci
+
+      - name: Sync Android project
+        working-directory: apps/wander-travel
+        run: npm run android:sync
+
+      - name: Build APK 0.4.0
+        working-directory: apps/wander-travel/android
+        run: ./gradlew assembleDebug
+
+      - name: Upload stable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: wander-travel-stable-debug-apk
+          path: apps/wander-travel/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 90

@@ -1,24 +1,35 @@
 package app.wandertravel.mobile;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.OpenableColumns;
+import androidx.activity.result.ActivityResult;
+import androidx.core.app.NotificationCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.ref.WeakReference;
-import androidx.core.app.NotificationCompat;
+import java.nio.charset.StandardCharsets;
 
 @CapacitorPlugin(
     name = "WanderLocation",
@@ -32,6 +43,7 @@ import androidx.core.app.NotificationCompat;
 )
 public class WanderLocationPlugin extends Plugin {
     private static final String MESSAGE_CHANNEL_ID = "wander_companion_messages";
+    private static final int MAX_GPX_BYTES = 10 * 1024 * 1024;
     private static WeakReference<WanderLocationPlugin> activePlugin = new WeakReference<>(null);
 
     @Override
@@ -96,10 +108,139 @@ public class WanderLocationPlugin extends Plugin {
             result.put("versionName", packageInfo.versionName);
             result.put("versionCode", versionCode);
             result.put("packageName", getContext().getPackageName());
+            result.put("gpxFileAccess", true);
             call.resolve(result);
         } catch (PackageManager.NameNotFoundException error) {
             call.reject("Unable to read app version", "APP_INFO_UNAVAILABLE", error);
         }
+    }
+
+    @PluginMethod
+    public void pickGpx(PluginCall call) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+            "application/gpx+xml",
+            "application/xml",
+            "text/xml",
+            "text/plain"
+        });
+        startActivityForResult(call, intent, "pickGpxResult");
+    }
+
+    @ActivityCallback
+    private void pickGpxResult(PluginCall call, ActivityResult activityResult) {
+        if (call == null) return;
+        if (activityResult.getResultCode() != Activity.RESULT_OK || activityResult.getData() == null) {
+            JSObject result = new JSObject();
+            result.put("cancelled", true);
+            call.resolve(result);
+            return;
+        }
+
+        Uri uri = activityResult.getData().getData();
+        if (uri == null) {
+            call.reject("No GPX file was selected", "GPX_URI_MISSING");
+            return;
+        }
+
+        try {
+            String content = readText(uri);
+            JSObject result = new JSObject();
+            result.put("cancelled", false);
+            result.put("name", displayName(uri));
+            result.put("content", content);
+            call.resolve(result);
+        } catch (IOException error) {
+            call.reject("Unable to read GPX file", "GPX_READ_FAILED", error);
+        }
+    }
+
+    @PluginMethod
+    public void saveGpx(PluginCall call) {
+        String content = call.getString("content", "");
+        if (content.isEmpty()) {
+            call.reject("GPX content is empty", "GPX_CONTENT_EMPTY");
+            return;
+        }
+        if (content.getBytes(StandardCharsets.UTF_8).length > MAX_GPX_BYTES) {
+            call.reject("GPX file is too large", "GPX_TOO_LARGE");
+            return;
+        }
+
+        String filename = safeFilename(call.getString("filename", "wander-points.gpx"));
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/gpx+xml");
+        intent.putExtra(Intent.EXTRA_TITLE, filename);
+        startActivityForResult(call, intent, "saveGpxResult");
+    }
+
+    @ActivityCallback
+    private void saveGpxResult(PluginCall call, ActivityResult activityResult) {
+        if (call == null) return;
+        if (activityResult.getResultCode() != Activity.RESULT_OK || activityResult.getData() == null) {
+            JSObject result = new JSObject();
+            result.put("cancelled", true);
+            call.resolve(result);
+            return;
+        }
+
+        Uri uri = activityResult.getData().getData();
+        if (uri == null) {
+            call.reject("No destination was selected", "GPX_DESTINATION_MISSING");
+            return;
+        }
+
+        String content = call.getString("content", "");
+        try (OutputStream output = getContext().getContentResolver().openOutputStream(uri)) {
+            if (output == null) throw new IOException("Unable to open destination");
+            output.write(content.getBytes(StandardCharsets.UTF_8));
+            output.flush();
+            JSObject result = new JSObject();
+            result.put("cancelled", false);
+            result.put("uri", uri.toString());
+            result.put("name", displayName(uri));
+            call.resolve(result);
+        } catch (IOException error) {
+            call.reject("Unable to save GPX file", "GPX_WRITE_FAILED", error);
+        }
+    }
+
+    private String readText(Uri uri) throws IOException {
+        try (InputStream input = getContext().getContentResolver().openInputStream(uri);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            if (input == null) throw new IOException("Unable to open selected file");
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                total += count;
+                if (total > MAX_GPX_BYTES) throw new IOException("GPX file exceeds size limit");
+                output.write(buffer, 0, count);
+            }
+            return output.toString(StandardCharsets.UTF_8.name());
+        }
+    }
+
+    private String displayName(Uri uri) {
+        try (Cursor cursor = getContext().getContentResolver().query(uri, new String[] { OpenableColumns.DISPLAY_NAME }, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (index >= 0) return cursor.getString(index);
+            }
+        } catch (RuntimeException ignored) {}
+        String last = uri.getLastPathSegment();
+        return last == null || last.trim().isEmpty() ? "wander-points.gpx" : last;
+    }
+
+    private String safeFilename(String value) {
+        String filename = value == null ? "wander-points.gpx" : value.trim();
+        if (filename.isEmpty()) filename = "wander-points.gpx";
+        filename = filename.replaceAll("[\\\\/:*?\"<>|]", "-");
+        if (!filename.toLowerCase().endsWith(".gpx")) filename += ".gpx";
+        return filename;
     }
 
     @PluginMethod
