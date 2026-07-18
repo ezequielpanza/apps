@@ -148,7 +148,7 @@
   core.subscribe(render);
   engine?.subscribe?.(renderProfile);
   window.addEventListener('wander:screen-change', (event) => {
-    if (event.detail?.screen === 'companion') render();
+    if (event.detail?.to === 'companion') render();
   });
   window.addEventListener('wander:memory-ready', render);
   render();
