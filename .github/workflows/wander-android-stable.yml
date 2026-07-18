@@ -38,13 +38,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Restore stable Wander signing key
-        uses: actions/cache@v4
+        id: signing-key
+        uses: actions/cache/restore@v4
         with:
           path: ~/.android/debug.keystore
           key: wander-android-debug-keystore-v1
@@ -64,6 +65,13 @@ jobs:
               -keysize 2048 \
               -validity 10000
           fi
+
+      - name: Save stable Wander signing key
+        if: steps.signing-key.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: wander-android-debug-keystore-v1
 
       - name: Install dependencies
         working-directory: apps/wander-travel
