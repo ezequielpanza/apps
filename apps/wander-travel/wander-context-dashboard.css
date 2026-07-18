@@ -5,22 +5,24 @@
   right: 10px !important;
   bottom: auto !important;
   z-index: 94 !important;
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  gap: 2px !important;
+  display: grid !important;
+  grid-template-columns: repeat(var(--dashboard-columns, 3), minmax(0, 1fr)) !important;
+  grid-auto-rows: minmax(42px, auto) !important;
+  align-items: stretch !important;
+  align-content: start !important;
+  gap: 4px !important;
   width: auto !important;
   max-width: none !important;
   min-width: 0 !important;
-  height: 46px !important;
-  min-height: 46px !important;
+  height: auto !important;
+  min-height: 50px !important;
+  max-height: calc(100dvh - 92px - env(safe-area-inset-top, 0px)) !important;
   padding: 5px 8px !important;
   visibility: visible !important;
   opacity: 1 !important;
   transform: translateZ(0);
   border: 0;
-  border-radius: 23px !important;
+  border-radius: 26px !important;
   background: rgba(255,255,255,.96);
   box-shadow: 0 10px 24px rgba(20,35,55,.13);
   backdrop-filter: blur(14px);
@@ -28,11 +30,16 @@
   color: inherit;
   text-align: left;
   pointer-events: auto;
-  touch-action: manipulation;
-  overflow: hidden !important;
+  touch-action: pan-y;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   -webkit-tap-highlight-color: transparent;
   transition: box-shadow 120ms ease;
 }
+
+.status-rail#context-dashboard::-webkit-scrollbar { display: none; }
 
 .status-rail#context-dashboard[hidden],
 .wander-app:not([data-screen="map"]) #context-dashboard,
@@ -44,112 +51,58 @@ body.drawer-open #context-dashboard {
   pointer-events: none !important;
 }
 
-.status-rail#context-dashboard .status-item {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  max-width: 100%;
-  padding: 5px 6px;
-  white-space: nowrap;
-}
-
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) {
-  display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  grid-auto-rows: minmax(38px, auto) !important;
-  align-items: center !important;
-  align-content: start !important;
-  column-gap: 4px !important;
-  row-gap: 4px !important;
-  height: auto !important;
-  min-height: calc(8px + (var(--dashboard-rows, 1) * 42px)) !important;
-  max-height: calc(100dvh - 92px - env(safe-area-inset-top, 0px)) !important;
-  padding: 4px 10px !important;
-  border-radius: 28px !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-}
-
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"])::-webkit-scrollbar {
-  display: none;
-}
-
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item:not([hidden]) {
+.status-rail#context-dashboard .status-item:not([hidden]) {
   display: flex !important;
-  grid-column: span var(--dashboard-span, 1) !important;
-  width: auto !important;
+  grid-column: span 1 !important;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  width: 100% !important;
+  min-width: 0;
   max-width: none !important;
-  min-height: 38px !important;
-  height: auto !important;
-  padding: 5px 4px !important;
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 5px 5px !important;
+  box-sizing: border-box;
   overflow: hidden;
+  white-space: normal;
 }
 
 .status-rail#context-dashboard[data-dashboard-dense="true"] {
-  grid-auto-rows: minmax(34px, auto) !important;
-  min-height: calc(8px + (var(--dashboard-rows, 1) * 38px)) !important;
-  column-gap: 2px !important;
-  row-gap: 2px !important;
-  padding: 4px 7px !important;
+  grid-auto-rows: 38px !important;
+  gap: 2px !important;
+  padding: 5px 6px !important;
 }
 
 .status-rail#context-dashboard[data-dashboard-dense="true"] .status-item:not([hidden]) {
-  min-height: 34px !important;
-  padding: 3px !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  padding: 3px 4px !important;
   gap: 4px !important;
 }
 
-.status-rail#context-dashboard .status-item[data-dashboard-field="summary"] {
-  flex: 1 1 auto;
-  overflow: hidden;
-}
-
 .status-rail#context-dashboard .status-item strong {
-  min-width: 0;
-  max-width: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  overflow-wrap: normal;
-  font-size: .76rem;
-}
-
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item strong {
   display: -webkit-box;
+  min-width: 0;
+  max-width: 100%;
   white-space: normal;
   line-height: 1.08;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
   text-overflow: clip;
-}
-
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="time"] strong,
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="dayPeriod"] strong,
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="accuracy"] strong,
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="speed"] strong,
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="heading"] strong,
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="nearby"] strong,
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="simulation"] strong,
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="appVersion"] strong,
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="apkVersion"] strong,
-.status-rail#context-dashboard[data-dashboard-rows]:not([data-dashboard-rows="1"]) .status-item[data-dashboard-field="placeConfidence"] strong {
-  display: block;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: .74rem;
 }
 
 .status-rail#context-dashboard[data-dashboard-dense="true"] .status-item strong {
-  font-size: .68rem;
+  font-size: .67rem;
 }
 
 .status-rail#context-dashboard .status-icon {
   flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
 }
 
 .status-rail#context-dashboard[data-dashboard-dense="true"] .status-icon {
@@ -190,16 +143,12 @@ body.drawer-open #context-dashboard {
     width: auto !important;
     max-width: none !important;
   }
-  .status-rail#context-dashboard .status-item strong { font-size: .74rem; }
-  .status-rail#context-dashboard[data-dashboard-dense="true"] .status-item strong { font-size: .67rem; }
 }
 
 @media (max-width: 380px) {
   .status-rail#context-dashboard {
     left: 60px !important;
     right: 8px !important;
-    height: 44px !important;
-    min-height: 44px !important;
   }
 }
 
@@ -208,8 +157,5 @@ body.drawer-open #context-dashboard {
     top: calc(14px + env(safe-area-inset-top, 0px)) !important;
     left: 64px !important;
     right: 16px !important;
-    height: 40px !important;
-    min-height: 40px !important;
-    border-radius: 20px !important;
   }
 }
