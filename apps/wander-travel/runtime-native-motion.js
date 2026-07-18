@@ -24,6 +24,8 @@
     const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
     const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
     const rms = Math.sqrt(values.reduce((sum, value) => sum + value ** 2, 0) / values.length);
+    const activityThreshold = sample.linear ? .35 : .25;
+    const activeCount = values.filter((value) => value >= activityThreshold).length;
     const summary = {
       sensor: sample.linear ? 'linear_acceleration' : 'accelerometer',
       sampleCount: values.length,
@@ -32,11 +34,15 @@
       rms: rounded(rms),
       variance: rounded(variance),
       peak: rounded(Math.max(...values)),
+      activityThreshold,
+      activeCount,
+      activeRatio: rounded(activeCount / values.length),
       last: {
         x: rounded(sample.x),
         y: rounded(sample.y),
         z: rounded(sample.z),
         magnitude: rounded(sample.magnitude),
+        activity: rounded(sample.activity),
       },
       updatedAt: new Date(sample.at).toISOString(),
     };
