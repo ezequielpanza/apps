@@ -8,6 +8,7 @@
   window.WanderBase = {
     map: core.map,
     route: core.route,
+    currentTrack: core.currentTrack,
     hasPosition: () => Boolean(position.getPosition()),
     getPosition: position.getPosition,
     getRealPosition: position.getRealPosition,
