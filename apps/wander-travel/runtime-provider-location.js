@@ -130,8 +130,17 @@
     }, CONTEXT_WATCHDOG_INTERVAL_MS);
   }
 
+  function normalizedProvider(position) {
+    const provider = String(position?.provider || '').trim().toLowerCase();
+    if (provider === 'gps' || provider === 'network' || provider === 'fused' || provider === 'passive') return provider;
+    return null;
+  }
+
   function onPosition(position) {
     const coords = position.coords;
+    const provider = normalizedProvider(position);
+    const permissionPrecision = String(position?.permissionPrecision || '').trim().toLowerCase() || null;
+    const source = provider === 'network' ? 'network' : provider === 'fused' ? 'fused' : 'gps';
     addSample(position);
     context.setRealLocation({
       lat: coords.latitude,
@@ -140,9 +149,11 @@
       altitude: coords.altitude,
       heading: coords.heading,
       speedMps: coords.speed,
+      provider,
+      permissionPrecision,
       updatedAt: position.timestamp || Date.now(),
-      source: 'gps',
-      confidence: 1,
+      source,
+      confidence: permissionPrecision === 'approximate' ? 0.55 : provider === 'network' ? 0.7 : 1,
     });
     publishMobility(position.timestamp || Date.now());
     scheduleContextWatchdog();
