@@ -62,7 +62,8 @@ assert.equal(androidVersion.versionName, '0.3.0', 'The native APK line must star
 assert.ok(Number.isInteger(androidVersion.versionCode) && androidVersion.versionCode > 6, 'Android versionCode must remain upgrade-compatible');
 assert.match(androidBuild, /android-version\.json/, 'Gradle must read the separate Android version source');
 assert.match(nativePlugin, /void getAppInfo\(PluginCall call\)/, 'The native bridge must expose APK metadata');
-assert.match(nativePlugin, /BuildConfig\.VERSION_NAME/, 'The APK version must come from the installed native package');
+assert.match(nativePlugin, /PackageInfo packageInfo/, 'The APK version must come from the installed Android package');
+assert.match(nativePlugin, /packageInfo\.getLongVersionCode\(\)/, 'The native version code must support current Android versions');
 assert.match(nativeVersionRuntime, /plugin\.getAppInfo\(\)/, 'The web runtime must query the installed APK version');
 assert.match(nativeVersionRuntime, /app\.apkVersion/, 'The installed APK version must enter WanderContext');
 assert.match(dashboardRuntime, /label: 'Versión Web'/, 'The dashboard must expose the web version separately');

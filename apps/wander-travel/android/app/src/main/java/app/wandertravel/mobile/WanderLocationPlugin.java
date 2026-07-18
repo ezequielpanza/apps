@@ -5,6 +5,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
 import com.getcapacitor.JSObject;
@@ -85,11 +87,19 @@ public class WanderLocationPlugin extends Plugin {
 
     @PluginMethod
     public void getAppInfo(PluginCall call) {
-        JSObject result = new JSObject();
-        result.put("versionName", BuildConfig.VERSION_NAME);
-        result.put("versionCode", BuildConfig.VERSION_CODE);
-        result.put("packageName", getContext().getPackageName());
-        call.resolve(result);
+        try {
+            PackageInfo packageInfo = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0);
+            long versionCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? packageInfo.getLongVersionCode()
+                : packageInfo.versionCode;
+            JSObject result = new JSObject();
+            result.put("versionName", packageInfo.versionName);
+            result.put("versionCode", versionCode);
+            result.put("packageName", getContext().getPackageName());
+            call.resolve(result);
+        } catch (PackageManager.NameNotFoundException error) {
+            call.reject("Unable to read app version", "APP_INFO_UNAVAILABLE", error);
+        }
     }
 
     @PluginMethod
