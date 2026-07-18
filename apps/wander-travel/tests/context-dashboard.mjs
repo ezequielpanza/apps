@@ -111,6 +111,8 @@ assert.match(html, /aria-controls="context-screen"/);
 const css = fs.readFileSync(path.join(ROOT, 'wander-context-dashboard.css'), 'utf8');
 assert.match(css, /pointer-events:\s*auto/);
 assert.doesNotMatch(css, /data-dashboard-field="appVersion"[\s\S]{0,120}display:\s*none/, 'Mobile CSS must not hide a selected app-version field');
-assert.match(css, /data-dashboard-field="summary"/);
+assert.match(css, /grid-template-columns:\s*repeat\(var\(--dashboard-columns, 3\), minmax\(0, 1fr\)\)/, 'Dashboard fields must use equal-width columns');
+assert.match(css, /grid-column:\s*span 1/, 'Each dashboard field must occupy one uniform cell');
+assert.doesNotMatch(css, /data-dashboard-field="summary"[\s\S]{0,180}(grid-column|flex:)/, 'Summary must not receive a special width');
 
-console.log('PASS context dashboard opens Contexto');
+console.log('PASS context dashboard opens Contexto with uniform cells');

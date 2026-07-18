@@ -76,6 +76,25 @@
     };
   }
 
+  function contextualIntervention(evaluation) {
+    const suggestion = evaluation?.suggestion;
+    if (!suggestion?.id || !suggestion?.title || !suggestion?.message) return null;
+    return {
+      id: suggestion.id,
+      kind: suggestion.kind || 'contextual_suggestion',
+      title: suggestion.title,
+      message: suggestion.message,
+      contentId: suggestion.contentId || suggestion.id,
+      topic: suggestion.topic || 'contextual_suggestion',
+      placeId: suggestion.placeId || evaluation?.semanticPlace?.id || null,
+      placeLevel: evaluation?.semanticPlace?.level || 'place',
+      placeName: suggestion.placeName || evaluation?.semanticPlace?.name || null,
+      poi: suggestion.poi || null,
+      action: suggestion.action || null,
+      allowsFamiliarityCorrection: false,
+    };
+  }
+
   function decide({
     evaluation,
     at = Date.now(),
@@ -87,20 +106,22 @@
     recentInterventions = [],
     navigationActive = false,
   } = {}) {
-    if (!['introduce_place', 'discover_poi'].includes(evaluation?.type)) {
+    if (!['introduce_place', 'discover_poi', 'contextual_suggestion'].includes(evaluation?.type)) {
       return { disposition: 'ignore', reason: 'unsupported_action' };
     }
 
     const intervention = evaluation.type === 'introduce_place'
       ? placeIntro(evaluation, at)
-      : discoveryIntervention(evaluation);
+      : evaluation.type === 'discover_poi'
+        ? discoveryIntervention(evaluation)
+        : contextualIntervention(evaluation);
     if (!intervention) return { disposition: 'ignore', reason: 'unsupported_place' };
     if (contentAlreadyTold) return { disposition: 'ignore', reason: 'content_already_told', intervention };
     if (!documentVisible && !backgroundNotificationsAvailable) {
       return { disposition: 'defer', reason: 'document_hidden', intervention };
     }
     if (documentVisible && !mapAvailable) return { disposition: 'defer', reason: 'map_unavailable', intervention };
-    if (evaluation.type === 'discover_poi' && navigationActive) {
+    if (['discover_poi', 'contextual_suggestion'].includes(evaluation.type) && navigationActive) {
       return { disposition: 'defer', reason: 'navigation_active', intervention };
     }
 
@@ -137,7 +158,7 @@
 
     return {
       disposition: documentVisible ? 'present' : 'notify',
-      reason: evaluation.reason || 'place_assumed_new',
+      reason: evaluation.reason || 'contextual_opportunity',
       intervention,
     };
   }
