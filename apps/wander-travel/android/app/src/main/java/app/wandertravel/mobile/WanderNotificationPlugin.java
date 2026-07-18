@@ -254,9 +254,8 @@ public class WanderNotificationPlugin extends Plugin {
         try {
             NotificationManagerCompat.from(getContext()).notify(id.hashCode(), notification.build());
             result.put("delivered", true);
-            JSObject sound = soundResult();
-            result.put("soundMode", sound.getString("mode"));
-            result.put("soundLabel", sound.getString("label"));
+            result.put("soundMode", soundMode());
+            result.put("soundLabel", storedSoundLabel());
         } catch (SecurityException error) {
             result = permissionResult();
             result.put("delivered", false);
