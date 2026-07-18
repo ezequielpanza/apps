@@ -75,7 +75,19 @@ jobs:
 
       - name: Build APK 0.4.0
         working-directory: apps/wander-travel/android
-        run: ./gradlew assembleDebug
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug 2>&1 | tee gradle-build.log
+
+      - name: Upload Gradle log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wander-travel-stable-gradle-log
+          path: apps/wander-travel/android/gradle-build.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload stable APK
         uses: actions/upload-artifact@v4
