@@ -110,7 +110,7 @@ assert.match(html, /aria-controls="context-screen"/);
 
 const css = fs.readFileSync(path.join(ROOT, 'wander-context-dashboard.css'), 'utf8');
 assert.match(css, /pointer-events:\s*auto/);
-assert.match(css, /data-dashboard-field="appVersion"/);
+assert.doesNotMatch(css, /data-dashboard-field="appVersion"[\s\S]{0,120}display:\s*none/, 'Mobile CSS must not hide a selected app-version field');
 assert.match(css, /data-dashboard-field="summary"/);
 
 console.log('PASS context dashboard opens Contexto');
