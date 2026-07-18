@@ -325,7 +325,7 @@
       else context.remove(`placeHierarchy.${key}`);
     }
 
-    const leaf = hierarchy.personal || hierarchy.specific || hierarchy.container;
+    const leaf = ['personal', 'specific', 'container'].includes(hierarchy.current?.kind) ? hierarchy.current : null;
     if (leaf) {
       const legacy = {
         ...leaf,
