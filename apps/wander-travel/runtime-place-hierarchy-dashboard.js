@@ -11,13 +11,18 @@
     return String(value);
   }
 
+  function currentPlaceValue() {
+    const hierarchy = context.value('placeHierarchy.current');
+    return text(hierarchy?.current || hierarchy, 'Sin lugar definido');
+  }
+
   function percent(value) {
     const number = Number(value);
     return Number.isFinite(number) ? `${Math.round(number * 100)}%` : 'Pendiente';
   }
 
   const EXTRA_FIELDS = Object.freeze([
-    { id: 'currentPlace', label: 'Lugar actual', icon: 'pin', metricId: 'metric-current-place', value: () => text(context.value('placeHierarchy.current'), 'Sin lugar definido') },
+    { id: 'currentPlace', label: 'Lugar actual', icon: 'pin', metricId: 'metric-current-place', value: currentPlaceValue },
     { id: 'specificPlace', label: 'POI específico', icon: 'target', metricId: 'metric-specific-place', value: () => text(context.value('placeHierarchy.specific'), 'Sin POI específico') },
     { id: 'containerPlace', label: 'Contenedor', icon: 'zone', metricId: 'metric-container-place', value: () => text(context.value('placeHierarchy.container'), 'Sin contenedor') },
     { id: 'placeConfidence', label: 'Confianza del lugar', icon: 'brain', metricId: 'metric-place-confidence', value: () => percent(context.value('placeHierarchy.confidence')) },
