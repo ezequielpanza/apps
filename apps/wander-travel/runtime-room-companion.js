@@ -58,14 +58,12 @@
   function currentSnapshot() {
     const hierarchy = context.value('placeHierarchy.current');
     const current = hierarchy?.current || context.value('currentPOI.current') || null;
-    const motion = String(context.value('motion.status') || 'pending');
-    const speedKmh = finite(context.value('motion.speedKmh')) || 0;
     return {
       room: isRoomLike(current) ? current : null,
       placeId: current?.id || null,
       placeName: named(current),
-      motion,
-      speedKmh,
+      motion: String(context.value('motion.status') || 'pending'),
+      speedKmh: finite(context.value('motion.speedKmh')) || 0,
     };
   }
 
@@ -88,22 +86,14 @@
   function recordPresentation(intervention, channel, reason) {
     interactionCore?.present?.(intervention, { channel, reason });
     engine.observe?.({
-      type: 'companion_intervention',
-      interventionId: intervention.id,
-      kind: intervention.kind,
-      interactionType: intervention.interactionType,
-      priority: intervention.priority,
-      contentId: intervention.contentId,
-      reason,
+      type: 'companion_intervention', interventionId: intervention.id, kind: intervention.kind,
+      interactionType: intervention.interactionType, priority: intervention.priority,
+      contentId: intervention.contentId, reason,
     });
     context.set('companion.lastIntervention', {
-      id: intervention.id,
-      kind: intervention.kind,
-      interactionType: intervention.interactionType,
-      priority: intervention.priority,
-      placeId: intervention.placeId,
-      presentedAt: new Date().toISOString(),
-      channel,
+      id: intervention.id, kind: intervention.kind, interactionType: intervention.interactionType,
+      priority: intervention.priority, placeId: intervention.placeId,
+      presentedAt: new Date().toISOString(), channel,
     }, { source: 'room-companion', kind: 'derived', ttlMs: 30 * 60 * 1000, confidence: 1 });
   }
 
@@ -111,11 +101,8 @@
     interactionCore?.respond?.({ id, type: id, label });
     interactionCore?.complete?.(id);
     engine.observe?.({
-      type: 'companion_feedback',
-      interventionId: intervention?.id || null,
-      feedbackType: id,
-      contentId: intervention?.contentId || null,
-      label,
+      type: 'companion_feedback', interventionId: intervention?.id || null,
+      feedbackType: id, contentId: intervention?.contentId || null, label,
     });
     const state = readState();
     state.lastResponse = { id, label, placeId: intervention?.placeId || null, at: Date.now() };
@@ -175,7 +162,7 @@
     return true;
   }
 
-  function markPrompted(snapshot, pendingNotification = null) {
+  function updatePromptState(snapshot, pendingNotification = null) {
     const state = readState();
     state.lastPromptAtByPlace ||= {};
     state.lastPromptAtByPlace[snapshot.placeId] = Date.now();
@@ -192,8 +179,7 @@
       message: `${intervention.message} Abrí Wander para elegir.`,
     });
     if (!delivery.delivered) return false;
-    const pending = { intervention, placeId: snapshot.placeId, createdAt: Date.now() };
-    markPrompted(snapshot, pending);
+    updatePromptState(snapshot, { intervention, placeId: snapshot.placeId, createdAt: Date.now() });
     recordPresentation(intervention, 'notification', 'room:background');
     return true;
   }
@@ -202,12 +188,10 @@
     const state = readState();
     const pending = state.pendingNotification;
     if (!pending || pending.placeId !== snapshot.placeId) return null;
-    if (Date.now() - Number(pending.createdAt || 0) > PENDING_NOTIFICATION_TTL_MS) {
-      state.pendingNotification = null;
-      writeState(state);
-      return null;
-    }
-    return pending;
+    if (Date.now() - Number(pending.createdAt || 0) <= PENDING_NOTIFICATION_TTL_MS) return pending;
+    state.pendingNotification = null;
+    writeState(state);
+    return null;
   }
 
   function clearPending() {
@@ -222,8 +206,7 @@
   }
 
   function recentlyPrompted(snapshot) {
-    const state = readState();
-    const at = Number(state.lastPromptAtByPlace?.[snapshot.placeId] || 0);
+    const at = Number(readState().lastPromptAtByPlace?.[snapshot.placeId] || 0);
     return at > 0 && Date.now() - at < PROMPT_COOLDOWN_MS;
   }
 
@@ -245,8 +228,9 @@
 
     const pending = pendingFor(snapshot);
     if (pending && document.visibilityState !== 'hidden') {
-      clearPending();
-      return showPrompt(snapshot, pending.intervention, 'room:notification-opened');
+      const shown = showPrompt(snapshot, pending.intervention, 'room:notification-opened');
+      if (shown) clearPending();
+      return shown;
     }
 
     if (quietFor(snapshot) || recentlyPrompted(snapshot)) return false;
@@ -256,19 +240,16 @@
       return false;
     }
 
-    markPrompted(snapshot);
     if (document.visibilityState === 'hidden') {
       notifyPrompt(snapshot).then((delivered) => {
-        if (!delivered) {
-          const state = readState();
-          if (state.lastPromptAtByPlace) delete state.lastPromptAtByPlace[snapshot.placeId];
-          writeState(state);
-          schedule(60000);
-        }
+        if (!delivered) schedule(60000);
       });
       return true;
     }
-    return showPrompt(snapshot);
+
+    const shown = showPrompt(snapshot);
+    if (shown) updatePromptState(snapshot);
+    return shown;
   }
 
   function schedule(delay = 1200) {
