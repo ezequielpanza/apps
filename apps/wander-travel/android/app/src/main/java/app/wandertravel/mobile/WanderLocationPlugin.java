@@ -282,6 +282,8 @@ public class WanderLocationPlugin extends Plugin {
         WanderLocationPlugin plugin = activePlugin.get();
         if (plugin == null) return;
 
+        boolean precisePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+            || plugin.getContext().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         JSObject payload = new JSObject();
         payload.put("latitude", location.getLatitude());
         payload.put("longitude", location.getLongitude());
@@ -289,6 +291,8 @@ public class WanderLocationPlugin extends Plugin {
         payload.put("altitude", location.hasAltitude() ? location.getAltitude() : null);
         payload.put("heading", location.hasBearing() ? location.getBearing() : null);
         payload.put("speed", location.hasSpeed() ? location.getSpeed() : null);
+        payload.put("provider", location.getProvider());
+        payload.put("permissionPrecision", precisePermission ? "precise" : "approximate");
         payload.put("timestamp", location.getTime());
         plugin.notifyListeners("location", payload, true);
     }

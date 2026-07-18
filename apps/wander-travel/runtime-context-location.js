@@ -8,13 +8,19 @@
   const sameValue = context._sameValue;
   const get = context.get;
   const value = context.value;
-  const LOCATION_FIELDS = ['status','lat','lng','accuracy','altitude','heading','speedMps','updatedAt','source'];
-  const SEMANTIC_LOCATION_FIELDS = ['status','lat','lng','accuracy','altitude','heading','speedMps','source'];
+  const LOCATION_FIELDS = ['status','lat','lng','accuracy','altitude','heading','speedMps','provider','permissionPrecision','updatedAt','source'];
+  const SEMANTIC_LOCATION_FIELDS = ['status','lat','lng','accuracy','altitude','heading','speedMps','provider','permissionPrecision','source'];
 
   function finiteNumber(raw) {
     if (raw === null || raw === undefined || raw === '') return null;
     const numeric = Number(raw);
     return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  function text(raw) {
+    if (raw === null || raw === undefined) return null;
+    const normalized = String(raw).trim().toLowerCase();
+    return normalized || null;
   }
 
   function validCoordinate(lat, lng) {
@@ -90,6 +96,11 @@
       if (numeric !== null) write('location.real.' + field, numeric, options, false);
       else remove('location.real.' + field, false);
     });
+    ['provider','permissionPrecision'].forEach((field) => {
+      const normalized = text(payload[field]);
+      if (normalized) write('location.real.' + field, normalized, options, false);
+      else remove('location.real.' + field, false);
+    });
 
     const after = branchValues('location.real');
     if (!sameBranch(before, after)) notify('location.real', get('location.real.lat'));
@@ -101,7 +112,7 @@
     const before = branchValues('location.real');
     write('location.real.status', status, { source: options.source || 'geolocation', kind: 'observed', confidence: 1 }, false);
     if (status !== 'available') {
-      ['lat','lng','accuracy','altitude','heading','speedMps','updatedAt'].forEach((field) => remove('location.real.' + field, false));
+      ['lat','lng','accuracy','altitude','heading','speedMps','provider','permissionPrecision','updatedAt'].forEach((field) => remove('location.real.' + field, false));
     }
     const after = branchValues('location.real');
     if (!sameBranch(before, after)) notify('location.real.status', get('location.real.status'));
@@ -121,6 +132,8 @@
     write('location.override.lat', Number(lat.toFixed(7)), options, false);
     write('location.override.lng', Number(lng.toFixed(7)), options, false);
     write('location.override.source', 'simulator', options, false);
+    write('location.override.provider', 'simulator', options, false);
+    write('location.override.permissionPrecision', 'simulated', options, false);
     write('location.override.updatedAt', new Date(updatedAt).toISOString(), options, false);
 
     ['accuracy','altitude','heading','speedMps'].forEach((field) => {
@@ -156,6 +169,8 @@
       altitude: value('location.effective.altitude'),
       heading: value('location.effective.heading'),
       speedMps: value('location.effective.speedMps'),
+      provider: value('location.effective.provider'),
+      permissionPrecision: value('location.effective.permissionPrecision'),
       updatedAt: value('location.effective.updatedAt'),
       source: value('location.effective.source'),
     };

@@ -26,6 +26,9 @@ public class WanderLocationService extends Service implements LocationListener, 
     static final String ACTION_STOP = "app.wandertravel.mobile.action.STOP_LOCATION";
     private static final String CHANNEL_ID = "wander_companion";
     private static final int NOTIFICATION_ID = 4107;
+    private static final long BETTER_FIX_RETENTION_MS = 20000;
+    private static final float ACCURACY_REGRESSION_TOLERANCE_M = 8f;
+    private static final float SIGNIFICANT_ACCURACY_GAIN_M = 10f;
     private static volatile boolean running = false;
 
     private LocationManager locationManager;
@@ -33,6 +36,7 @@ public class WanderLocationService extends Service implements LocationListener, 
     private Sensor motionSensor;
     private boolean linearAccelerationSensor = false;
     private long lastSensorPublishAt = 0;
+    private Location lastPublishedLocation;
 
     static boolean isRunning() {
         return running;
@@ -74,6 +78,7 @@ public class WanderLocationService extends Service implements LocationListener, 
         }
 
         locationManager.removeUpdates(this);
+        lastPublishedLocation = null;
         running = false;
         try {
             if (highAccuracy && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
@@ -94,6 +99,7 @@ public class WanderLocationService extends Service implements LocationListener, 
     private void stopTracking() {
         if (locationManager != null) locationManager.removeUpdates(this);
         if (sensorManager != null) sensorManager.unregisterListener(this);
+        lastPublishedLocation = null;
         running = false;
         stopForeground(STOP_FOREGROUND_REMOVE);
     }
@@ -164,8 +170,39 @@ public class WanderLocationService extends Service implements LocationListener, 
             .build();
     }
 
+    private float accuracyOf(Location location) {
+        return location != null && location.hasAccuracy() ? location.getAccuracy() : Float.POSITIVE_INFINITY;
+    }
+
+    private boolean shouldPublish(Location location) {
+        if (location == null) return false;
+        if (lastPublishedLocation == null) return true;
+
+        long currentTime = location.getTime();
+        long previousTime = lastPublishedLocation.getTime();
+        if (currentTime > 0 && previousTime > 0 && currentTime + 1000 < previousTime) return false;
+
+        long ageMs = currentTime > 0 && previousTime > 0
+            ? Math.max(0, currentTime - previousTime)
+            : BETTER_FIX_RETENTION_MS;
+        float currentAccuracy = accuracyOf(location);
+        float previousAccuracy = accuracyOf(lastPublishedLocation);
+
+        if (ageMs >= BETTER_FIX_RETENTION_MS) return true;
+        if (currentAccuracy + SIGNIFICANT_ACCURACY_GAIN_M < previousAccuracy) return true;
+        if (currentAccuracy <= previousAccuracy + ACCURACY_REGRESSION_TOLERANCE_M) return true;
+
+        String currentProvider = location.getProvider();
+        String previousProvider = lastPublishedLocation.getProvider();
+        boolean currentIsGps = LocationManager.GPS_PROVIDER.equals(currentProvider);
+        boolean previousIsGps = LocationManager.GPS_PROVIDER.equals(previousProvider);
+        return currentIsGps && !previousIsGps && currentAccuracy <= previousAccuracy * 1.5f;
+    }
+
     @Override
     public void onLocationChanged(Location location) {
+        if (!shouldPublish(location)) return;
+        lastPublishedLocation = new Location(location);
         WanderLocationPlugin.publish(location);
     }
 
