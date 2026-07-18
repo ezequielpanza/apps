@@ -18,20 +18,39 @@
     card?.insertBefore(toolbar, list);
   }
 
+  let transferToolbar = card?.querySelector('.points-transfer-toolbar');
+  if (!transferToolbar) {
+    transferToolbar = document.createElement('div');
+    transferToolbar.className = 'points-transfer-toolbar';
+    transferToolbar.innerHTML = `
+      <button id="points-export-gpx" type="button"><svg class="button-icon"><use href="wander-icons.svg#export"></use></svg><span>Exportar GPX</span></button>
+      <button id="points-import-gpx" type="button"><svg class="button-icon is-import"><use href="wander-icons.svg#export"></use></svg><span>Importar GPX</span></button>`;
+    card?.insertBefore(transferToolbar, list);
+  }
+
   const newButton = toolbar.querySelector('#points-new');
   const selectButton = toolbar.querySelector('#points-select');
   const deleteButton = toolbar.querySelector('#points-delete');
-  if (!newButton || !selectButton || !deleteButton) return;
+  const exportButton = transferToolbar.querySelector('#points-export-gpx');
+  const importButton = transferToolbar.querySelector('#points-import-gpx');
+  if (!newButton || !selectButton || !deleteButton || !exportButton || !importButton) return;
 
   const selectedIds = new Set();
   let selecting = false;
+  let transferring = false;
 
   function updateToolbar() {
+    const itemCount = api.list().length;
     selectButton.setAttribute('aria-pressed', String(selecting));
     selectButton.classList.toggle('is-active', selecting);
     selectButton.querySelector('span').textContent = selecting ? 'Cancelar' : 'Seleccionar';
     deleteButton.disabled = !selecting || selectedIds.size === 0;
     deleteButton.querySelector('span').textContent = selectedIds.size ? `Borrar (${selectedIds.size})` : 'Borrar';
+    exportButton.disabled = transferring || itemCount === 0 || (selecting && selectedIds.size === 0);
+    importButton.disabled = transferring;
+    exportButton.querySelector('span').textContent = selecting && selectedIds.size
+      ? `Exportar (${selectedIds.size})`
+      : 'Exportar GPX';
   }
 
   function setSelecting(value) {
@@ -120,9 +139,38 @@
     setSelecting(false);
   });
 
+  exportButton.addEventListener('click', async () => {
+    const gpx = window.WanderPersonalPOIGPX;
+    if (!gpx) return window.WanderUI?.showToast?.('GPX', 'La función todavía no está disponible');
+    transferring = true;
+    updateToolbar();
+    try {
+      await gpx.exportPoints(selecting ? [...selectedIds] : null);
+    } finally {
+      transferring = false;
+      updateToolbar();
+    }
+  });
+
+  importButton.addEventListener('click', async () => {
+    const gpx = window.WanderPersonalPOIGPX;
+    if (!gpx) return window.WanderUI?.showToast?.('GPX', 'La función todavía no está disponible');
+    transferring = true;
+    setSelecting(false);
+    updateToolbar();
+    try {
+      await gpx.importPoints();
+      render();
+    } finally {
+      transferring = false;
+      updateToolbar();
+    }
+  });
+
   window.addEventListener('wander:personal-poi-created', render);
   window.addEventListener('wander:personal-poi-removed', render);
   window.addEventListener('wander:personal-poi-updated', render);
+  window.addEventListener('wander:personal-poi-imported', render);
   document.addEventListener('click', (event) => {
     if (event.target.closest('[data-screen-target="points"]')) setTimeout(render, 0);
   });
