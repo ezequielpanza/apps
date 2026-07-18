@@ -173,12 +173,20 @@
     return true;
   }
 
+  function contentIdFor(evaluation) {
+    if (evaluation?.type === 'discover_poi') {
+      return evaluation.poi?.contentId || (evaluation.poi?.id ? `poi-discovery:${evaluation.poi.id}` : null);
+    }
+    if (evaluation?.type === 'contextual_suggestion') {
+      return evaluation.suggestion?.contentId || evaluation.suggestion?.id || null;
+    }
+    const placeId = evaluation?.semanticPlace?.id;
+    return placeId ? `place-intro:${placeId}` : null;
+  }
+
   function attempt(reason = 'manual') {
     if (!pendingEvaluation) return { disposition: 'ignore', reason: 'nothing_pending' };
-    const placeId = pendingEvaluation.semanticPlace?.id;
-    const contentId = pendingEvaluation.type === 'discover_poi'
-      ? pendingEvaluation.poi?.contentId || (pendingEvaluation.poi?.id ? `poi-discovery:${pendingEvaluation.poi.id}` : null)
-      : (placeId ? `place-intro:${placeId}` : null);
+    const contentId = contentIdFor(pendingEvaluation);
     const result = policy.decide({
       evaluation: pendingEvaluation,
       at: Date.now(),
@@ -199,7 +207,7 @@
   }
 
   function handleEvaluation(evaluation, reason = 'engine') {
-    if (evaluation?.type === 'introduce_place' || evaluation?.type === 'discover_poi') pendingEvaluation = evaluation;
+    if (['introduce_place', 'discover_poi', 'contextual_suggestion'].includes(evaluation?.type)) pendingEvaluation = evaluation;
     return attempt(reason);
   }
 
