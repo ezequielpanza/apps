@@ -225,8 +225,6 @@
     };
 
     addCurrent(context.value('container.current'), 'openstreetmap');
-    addCurrent(context.value('currentPOI.container'), 'openstreetmap');
-
     for (const item of allPOIs()) {
       if (!isContainer(item)) continue;
       const geometry = containmentGeometry(item);
@@ -382,9 +380,9 @@
     const selectedLeaf = selection.selected;
     currentLeafId = selectedLeaf?.id || null;
 
-    const personal = publicCandidate(personalRanked[0]);
-    const specific = publicCandidate(specificRanked[0]);
-    const container = publicCandidate(containerRanked[0]);
+    const personal = publicCandidate(selectedLeaf?.kind === 'personal' ? selectedLeaf : personalRanked[0]);
+    const specific = publicCandidate(selectedLeaf?.kind === 'specific' ? selectedLeaf : specificRanked[0]);
+    const container = publicCandidate(selectedLeaf?.kind === 'container' ? selectedLeaf : containerRanked[0]);
     const zone = compactAdministrative(context.value('place.zone'), 'zone');
     const city = compactAdministrative(context.value('place.city'), 'city');
     const country = compactAdministrative(context.value('place.country'), 'country');
@@ -452,7 +450,6 @@
       key === 'nearby.items' ||
       key === 'personalPOI.items' ||
       key === 'container.current' ||
-      key === 'currentPOI.container' ||
       key === 'location.effective' ||
       key.startsWith('location.effective.') ||
       key === 'motion.status' ||
