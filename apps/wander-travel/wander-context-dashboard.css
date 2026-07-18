@@ -141,7 +141,6 @@ body.drawer-open #context-dashboard {
     max-width: none !important;
   }
   .status-rail#context-dashboard .status-item strong { font-size: .74rem; }
-  .status-rail#context-dashboard .status-item[data-dashboard-field="appVersion"] { display: none !important; }
   .status-rail#context-dashboard[data-dashboard-rows="1"] .status-item[data-dashboard-field="summary"] {
     grid-column: 1 / -1 !important;
   }
