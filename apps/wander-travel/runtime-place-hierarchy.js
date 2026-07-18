@@ -338,6 +338,9 @@
       context.set('currentPOI.distanceM', legacy.distanceM || 0, options);
       context.set('currentPOI.status', leaf.kind === 'container' ? 'inside_container' : 'detected', options);
       if (hierarchy.container) context.set('currentPOI.container', hierarchy.container, options);
+      else context.remove('currentPOI.container');
+    } else {
+      for (const key of ['current', 'value', 'distanceM', 'status', 'container']) context.remove(`currentPOI.${key}`);
     }
 
     const signature = JSON.stringify([
@@ -359,6 +362,7 @@
     for (const key of ['current', 'status', 'confidence', 'source', 'path', 'diagnostics', 'personal', 'specific', 'container', 'zone', 'city', 'country']) {
       context.remove(`placeHierarchy.${key}`);
     }
+    for (const key of ['current', 'value', 'distanceM', 'status', 'container']) context.remove(`currentPOI.${key}`);
   }
 
   function evaluate() {
