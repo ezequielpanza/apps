@@ -110,9 +110,8 @@
     }
 
     const diagnostics = context.value('placeHierarchy.diagnostics');
-    const current = context.value('placeHierarchy.current');
-    const hierarchy = context.value('placeHierarchy.current') ? context.value('placeHierarchy.current') : null;
-    const selected = hierarchy?.current || current;
+    const hierarchy = context.value('placeHierarchy.current');
+    const selected = hierarchy?.current || hierarchy;
     const candidates = Array.isArray(diagnostics?.candidates) ? diagnostics.candidates : [];
     const reasonLabels = {
       highest_score: 'Mayor puntuación',
@@ -147,18 +146,6 @@
   }
 
   context.subscribe(schedule);
-  const list = document.querySelector('#context-list');
-  list?.addEventListener('change', (event) => {
-    const input = event.target.closest('[data-dashboard-inline-toggle]');
-    if (!input || !FIELD_IDS.includes(input.dataset.dashboardInlineToggle)) return;
-    dashboard()?.setFieldVisible?.(input.dataset.dashboardInlineToggle, input.checked);
-    schedule();
-  });
-
-  const observer = new MutationObserver(schedule);
-  const panel = document.querySelector('#context-panel');
-  if (panel) observer.observe(panel, { childList: true, subtree: true });
-
   window.WanderPlaceHierarchyPanel = Object.freeze({ render, fieldIds: FIELD_IDS });
   render();
 })();
