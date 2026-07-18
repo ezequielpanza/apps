@@ -1,6 +1,6 @@
 importScripts('./runtime-version.js');
 
-const SHELL_REVISION = '20260718-06';
+const SHELL_REVISION = '20260718-07';
 const CACHE_NAME = 'wander-travel-' + self.WanderVersion + '-' + SHELL_REVISION;
 const APP_SHELL = [
   './index.html',
@@ -84,6 +84,7 @@ const APP_SHELL = [
   './runtime-points-screen.js',
   './runtime-message-timeout-settings.js',
   './runtime-companion.js',
+  './runtime-proactive-companion.js',
   './runtime-navigation.js',
   './app.js',
 ];
