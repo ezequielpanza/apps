@@ -149,12 +149,16 @@
   }
 
   async function recordInteraction(input = {}) {
+    const source = clone(input) || {};
+    const suppliedId = source.id || null;
+    delete source.id;
     const entry = {
-      id: input.id || randomId('interaction'),
-      at: input.at || new Date().toISOString(),
+      ...source,
+      id: randomId('interaction'),
+      interactionId: source.interactionId || suppliedId || null,
+      at: source.at || new Date().toISOString(),
       userId: identity.userId,
       deviceId: identity.deviceId,
-      ...clone(input),
     };
     fallbackAppend(FALLBACK_INTERACTIONS_KEY, entry, 300);
     if (database) await put('interactions', entry);
@@ -163,13 +167,17 @@
   }
 
   async function recordSignal(input = {}) {
+    const source = clone(input) || {};
+    const suppliedId = source.id || null;
+    delete source.id;
     const signal = {
-      id: input.id || randomId('signal'),
-      at: input.at || new Date().toISOString(),
+      ...source,
+      id: randomId('signal'),
+      signalId: source.signalId || suppliedId || null,
+      at: source.at || new Date().toISOString(),
       userId: identity.userId,
       deviceId: identity.deviceId,
-      confidence: Number.isFinite(Number(input.confidence)) ? Number(input.confidence) : 1,
-      ...clone(input),
+      confidence: Number.isFinite(Number(source.confidence)) ? Number(source.confidence) : 1,
     };
     fallbackAppend(FALLBACK_SIGNALS_KEY, signal, 300);
     if (database) await put('signals', signal);
