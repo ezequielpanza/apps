@@ -1,6 +1,6 @@
 importScripts('./runtime-version.js');
 
-const SHELL_REVISION = '20260718-11';
+const SHELL_REVISION = '20260719-01';
 const CACHE_NAME = 'wander-travel-' + self.WanderVersion + '-' + SHELL_REVISION;
 const APP_SHELL = [
   './index.html',
@@ -21,6 +21,7 @@ const APP_SHELL = [
   './wander-points-screen.css',
   './wander-sessions.css',
   './wander-interaction.css',
+  './wander-travel-log.css',
   './runtime-context-store.js',
   './runtime-context-location.js',
   './runtime-context-init.js',
@@ -92,6 +93,9 @@ const APP_SHELL = [
   './runtime-room-companion.js',
   './runtime-interaction-panel.js',
   './runtime-navigation.js',
+  './runtime-travel-log.js',
+  './runtime-travel-log-screen.js',
+  './runtime-morning-briefing.js',
   './app.js',
 ];
 
