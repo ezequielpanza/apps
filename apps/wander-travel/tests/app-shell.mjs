@@ -14,6 +14,7 @@ const manifest = JSON.parse(read('manifest.webmanifest'));
 const packageManifest = JSON.parse(read('package.json'));
 const androidVersion = JSON.parse(read('android-version.json'));
 const capacitorConfig = JSON.parse(read('capacitor.config.json'));
+const appRuntime = read('app.js');
 const memoryRepository = read('runtime-memory-repository.js');
 const engineState = read('runtime-engine-state.js');
 const interactionCore = read('runtime-interaction-core.js');
@@ -22,7 +23,11 @@ const companion = read('runtime-companion.js');
 const companionPolicy = read('runtime-companion-policy.js');
 const proactiveCompanion = read('runtime-proactive-companion.js');
 const roomCompanion = read('runtime-room-companion.js');
+const travelLog = read('runtime-travel-log.js');
+const travelLogScreen = read('runtime-travel-log-screen.js');
+const morningBriefing = read('runtime-morning-briefing.js');
 const interactionCss = read('wander-interaction.css');
+const travelLogCss = read('wander-travel-log.css');
 const mapControls = read('runtime-map-controls.js');
 const pointsRuntime = read('runtime-points-screen.js');
 const tracksRuntime = read('runtime-tracks.js');
@@ -38,10 +43,19 @@ function localReferences(source) {
     .filter((reference) => reference && !/^https?:\/\//.test(reference));
 }
 
-const htmlReferences = new Set(localReferences(html));
-for (const match of platformRuntime.matchAll(/script\.src\s*=\s*["']\.\/([^"']+)["']/g)) {
-  htmlReferences.add(match[1].split(/[?#]/)[0]);
+function addDynamicReferences(target, source) {
+  const patterns = [
+    /(?:script\.src|link\.href)\s*=\s*["']\.\/([^"']+)["']/g,
+    /loadScript\(\s*["']\.\/([^"']+)["']/g,
+  ];
+  patterns.forEach((pattern) => {
+    for (const match of source.matchAll(pattern)) target.add(match[1].split(/[?#]/)[0]);
+  });
 }
+
+const htmlReferences = new Set(localReferences(html));
+addDynamicReferences(htmlReferences, platformRuntime);
+addDynamicReferences(htmlReferences, appRuntime);
 htmlReferences.add('index.html');
 const cached = new Set([...serviceWorker.matchAll(/["']\.\/([^"']+)["']/g)].map((match) => match[1]));
 
@@ -59,9 +73,9 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define the web version');
-assert.equal(versionMatch[1], 'v0.105.0');
-assert.equal(manifest.start_url, './?app=v0.105.0');
-assert.equal(packageManifest.version, '0.105.0');
+assert.equal(versionMatch[1], 'v0.106.0');
+assert.equal(manifest.start_url, './?app=v0.106.0');
+assert.equal(packageManifest.version, '0.106.0');
 assert.equal(androidVersion.versionName, '0.7.0');
 assert.equal(androidVersion.versionCode, 11);
 assert.equal(capacitorConfig.server.url, 'https://wander-travel.pages.dev');
@@ -130,6 +144,18 @@ assert.match(proactiveCompanion, /function requestAlternative\(/);
 assert.match(proactiveCompanion, /PLACE_STABILITY_MS = 12000/);
 assert.match(proactiveCompanion, /SUGGESTION_COOLDOWN_MS = 10 \* 60 \* 1000/);
 
+assert.match(appRuntime, /loadTravelMemory/);
+assert.match(travelLog, /window\.WanderTravelLog/);
+assert.match(travelLog, /contextChanges/);
+assert.match(travelLog, /sessionId/);
+assert.match(travelLogScreen, /Bitácora de viaje/);
+assert.match(travelLogScreen, /Hoy/);
+assert.match(travelLogScreen, /Próximamente/);
+assert.match(travelLogScreen, /Historial/);
+assert.match(morningBriefing, /Buenos días/);
+assert.match(morningBriefing, /organizamos el día/);
+assert.match(travelLogCss, /travel-log/);
+
 assert.match(mapControls, /installLockedPinchZoom/);
 assert.match(pointsRuntime, /id="points-export-gpx"/);
 assert.match(pointsRuntime, /id="points-import-gpx"/);
@@ -146,4 +172,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} room interaction and notification sound shell is consistent`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} travel memory shell is consistent`);
