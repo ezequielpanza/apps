@@ -47,7 +47,42 @@
     queueMicrotask(renderLocationQualityNow);
   }
 
-  function initialize() {
+  function ensureTravelLogStyles() {
+    if (document.querySelector('link[data-wander-travel-log]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = './wander-travel-log.css?v=20260719-01';
+    link.dataset.wanderTravelLog = 'true';
+    document.head.appendChild(link);
+  }
+
+  function loadScript(src, marker) {
+    const existing = document.querySelector(`script[data-${marker}]`);
+    if (existing) return existing.dataset.loaded === 'true'
+      ? Promise.resolve()
+      : new Promise((resolve) => existing.addEventListener('load', resolve, { once: true }));
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = false;
+      script.dataset[marker.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = 'true';
+      script.addEventListener('load', () => { script.dataset.loaded = 'true'; resolve(); }, { once: true });
+      script.addEventListener('error', reject, { once: true });
+      document.head.appendChild(script);
+    });
+  }
+
+  async function loadTravelMemory() {
+    ensureTravelLogStyles();
+    await loadScript('./runtime-travel-log.js?v=20260719-01', 'wander-travel-log');
+    await loadScript('./runtime-travel-log-screen.js?v=20260719-01', 'wander-travel-log-screen');
+    await loadScript('./runtime-morning-briefing.js?v=20260719-01', 'wander-morning-briefing');
+  }
+
+  async function initialize() {
+    try { await loadTravelMemory(); }
+    catch (error) { console.warn('Wander travel memory could not be loaded', error); }
+
     window.WanderProviders?.nearby?.configure?.({
       sources: ['google-places', 'openstreetmap', 'wikidata'],
     });
