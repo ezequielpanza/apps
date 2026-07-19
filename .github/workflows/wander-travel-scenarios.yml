@@ -61,8 +61,8 @@ jobs:
       - name: Run session reconciliation tests
         run: node apps/wander-travel/tests/session-reconciliation.mjs
 
-      - name: Verify app shell consistency
-        run: node apps/wander-travel/tests/app-shell.mjs
+      - name: Verify travel log memory shell
+        run: node apps/wander-travel/tests/travel-log-memory.mjs
 
       - name: Run companion arrival tests
         run: node apps/wander-travel/tests/companion-arrival.mjs
