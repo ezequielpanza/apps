@@ -1,0 +1,85 @@
+name: Deploy Wander v0.106.0 Emergency
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-wander-v0106-emergency.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-wander-v0106-emergency
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify v0.106.0 shell
+        run: |
+          node apps/wander-travel/tests/app-shell.mjs
+          find apps/wander-travel -maxdepth 1 -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Publish v0.106.0 to Cloudflare Pages
+        working-directory: apps/wander-travel
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@latest pages deploy . --project-name=wander-travel --branch=main
+
+      - name: Verify live v0.106.0
+        run: |
+          version_file="${RUNNER_TEMP}/wander-runtime-version.js"
+          manifest_file="${RUNNER_TEMP}/wander-manifest.json"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            nonce="${GITHUB_SHA}-${attempt}-$(date +%s)"
+            curl --fail --silent --show-error --location --header 'Cache-Control: no-cache' \
+              "https://wander-travel.pages.dev/runtime-version.js?probe=${nonce}" -o "${version_file}" || true
+            curl --fail --silent --show-error --location --header 'Cache-Control: no-cache' \
+              "https://wander-travel.pages.dev/manifest.webmanifest?probe=${nonce}" -o "${manifest_file}" || true
+            if grep -q "const VERSION = 'v0.106.0'" "${version_file}" 2>/dev/null \
+              && grep -q '"start_url": "./?app=v0.106.0"' "${manifest_file}" 2>/dev/null; then
+              echo "Wander v0.106.0 is live."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: production still reports an older version."
+            sleep 12
+          done
+          echo "runtime-version.js returned:"
+          cat "${version_file}" || true
+          echo "manifest.webmanifest returned:"
+          cat "${manifest_file}" || true
+          exit 1
+
+      - name: Record deployment result
+        if: always()
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          mkdir -p deploy-status
+          cat > deploy-status/wander-v0106.json <<EOF
+          {
+            "result": "${RESULT}",
+            "runId": "${GITHUB_RUN_ID}",
+            "commit": "${GITHUB_SHA}",
+            "recordedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy-status/wander-v0106.json
+          git commit -m "Record Wander v0.106.0 deployment result" || exit 0
+          git push
