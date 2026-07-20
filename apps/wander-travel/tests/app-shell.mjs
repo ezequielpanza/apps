@@ -34,6 +34,10 @@ const tracksRuntime = read('runtime-tracks.js');
 const sessionEngine = read('runtime-session-engine.js');
 const platformRuntime = read('runtime-platform.js');
 const settingsRuntime = read('runtime-message-timeout-settings.js');
+const googleConnector = read('runtime-poi-connector-google-places.js');
+const googleContainer = read('runtime-provider-container-google.js');
+const osmContainer = read('runtime-provider-container.js');
+const placesApi = read('functions/api/places/nearby.js');
 const notificationPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderNotificationPlugin.java');
 const mainActivity = read('android/app/src/main/java/app/wandertravel/mobile/MainActivity.java');
 
@@ -73,9 +77,9 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define the web version');
-assert.equal(versionMatch[1], 'v0.106.0');
-assert.equal(manifest.start_url, './?app=v0.106.0');
-assert.equal(packageManifest.version, '0.106.0');
+assert.equal(versionMatch[1], 'v0.106.1');
+assert.equal(manifest.start_url, './?app=v0.106.1');
+assert.equal(packageManifest.version, '0.106.1');
 assert.equal(androidVersion.versionName, '0.7.0');
 assert.equal(androidVersion.versionCode, 11);
 assert.equal(capacitorConfig.server.url, 'https://wander-travel.pages.dev');
@@ -102,6 +106,18 @@ assert.match(settingsRuntime, /Activar notificaciones/);
 assert.match(settingsRuntime, /Elegir sonido/);
 assert.match(settingsRuntime, /Enviar prueba/);
 assert.match(settingsRuntime, /Dejá que Wander te avise/);
+
+assert.match(placesApi, /const CONTAINER_TYPES/);
+assert.match(placesApi, /'apartment_complex'/);
+assert.match(placesApi, /includedTypes: CONTAINER_TYPES/);
+assert.match(placesApi, /function mergePlaces/);
+assert.match(googleConnector, /containerCount/);
+assert.match(googleConnector, /'container-search'/);
+assert.match(googleContainer, /'condominium_complex'/);
+assert.match(googleContainer, /store\.listConsolidated/);
+assert.match(googleContainer, /container\.googleDiagnostics/);
+assert.match(osmContainer, /existing\.source === 'openstreetmap'/);
+assert.match(osmContainer, /preservedSource/);
 
 assert.match(roomCompanion, /ROOM_STABILITY_MS = 2 \* 60 \* 1000/);
 assert.match(roomCompanion, /label: 'Descansar'/);
@@ -172,4 +188,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} travel memory shell is consistent`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} current-place shell is consistent`);
