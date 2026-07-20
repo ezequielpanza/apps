@@ -1,14 +1,14 @@
 name: Deploy Wander v0.106.0 Emergency
 
 on:
-  push:
+  pull_request:
     branches: [main]
     paths:
-      - ".github/workflows/deploy-wander-v0106-emergency.yml"
+      - "apps/wander-travel/.deploy-live-v0106"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: deploy-wander-v0106-emergency
@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'wander-live-v0106'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -53,6 +54,7 @@ jobs:
             if grep -q "const VERSION = 'v0.106.0'" "${version_file}" 2>/dev/null \
               && grep -q '"start_url": "./?app=v0.106.0"' "${manifest_file}" 2>/dev/null; then
               echo "Wander v0.106.0 is live."
+              cat "${version_file}"
               exit 0
             fi
             echo "Attempt ${attempt}: production still reports an older version."
@@ -63,23 +65,3 @@ jobs:
           echo "manifest.webmanifest returned:"
           cat "${manifest_file}" || true
           exit 1
-
-      - name: Record deployment result
-        if: always()
-        env:
-          RESULT: ${{ job.status }}
-        run: |
-          mkdir -p deploy-status
-          cat > deploy-status/wander-v0106.json <<EOF
-          {
-            "result": "${RESULT}",
-            "runId": "${GITHUB_RUN_ID}",
-            "commit": "${GITHUB_SHA}",
-            "recordedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          }
-          EOF
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add deploy-status/wander-v0106.json
-          git commit -m "Record Wander v0.106.0 deployment result" || exit 0
-          git push
