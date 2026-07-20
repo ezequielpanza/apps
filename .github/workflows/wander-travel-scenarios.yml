@@ -99,8 +99,13 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Verify approved shell
-        run: node apps/wander-travel/tests/app-shell.mjs
+      - name: Verify approved v0.106.0 release
+        run: |
+          node apps/wander-travel/tests/travel-log-memory.mjs
+          find apps/wander-travel -maxdepth 1 -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          grep -q "const VERSION = 'v0.106.0'" apps/wander-travel/runtime-version.js
+          grep -q '"start_url": "./?app=v0.106.0"' apps/wander-travel/manifest.webmanifest
+          grep -q '"version": "0.106.0"' apps/wander-travel/package.json
 
       - name: Publish to Cloudflare Pages
         working-directory: apps/wander-travel
