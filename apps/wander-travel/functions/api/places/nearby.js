@@ -13,16 +13,6 @@ const CONTAINER_TYPES = Object.freeze([
   'condominium_complex',
   'housing_complex',
   'marina',
-  'shopping_mall',
-  'airport',
-  'hospital',
-  'university',
-  'college',
-  'school',
-  'stadium',
-  'sports_complex',
-  'amusement_park',
-  'theme_park',
 ]);
 
 function json(data, status = 200) {
