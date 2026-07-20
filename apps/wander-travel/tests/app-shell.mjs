@@ -77,11 +77,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define the web version');
-assert.equal(versionMatch[1], 'v0.106.1');
-assert.equal(manifest.start_url, './?app=v0.106.1');
-assert.equal(packageManifest.version, '0.106.1');
-assert.equal(androidVersion.versionName, '0.7.0');
-assert.equal(androidVersion.versionCode, 11);
+assert.equal(versionMatch[1], 'v0.106.2');
+assert.equal(manifest.start_url, './?app=v0.106.2');
+assert.equal(packageManifest.version, '0.106.2');
+assert.equal(androidVersion.versionName, '0.8.0');
+assert.equal(androidVersion.versionCode, 12);
 assert.equal(capacitorConfig.server.url, 'https://wander-travel.pages.dev');
 assert.equal(capacitorConfig.server.errorPath, 'index.html');
 

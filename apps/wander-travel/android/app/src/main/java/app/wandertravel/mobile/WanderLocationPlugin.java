@@ -15,6 +15,7 @@ import android.os.Build;
 import android.provider.OpenableColumns;
 import androidx.activity.result.ActivityResult;
 import androidx.core.app.NotificationCompat;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -94,6 +95,39 @@ public class WanderLocationPlugin extends Plugin {
     public void isWatching(PluginCall call) {
         JSObject result = new JSObject();
         result.put("watching", WanderLocationService.isRunning());
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void getPendingLocations(PluginCall call) {
+        int limit = Math.max(1, Math.min(1000, call.getInt("limit", 500)));
+        WanderLocationJournal journal = WanderLocationJournal.get(getContext());
+        JSObject result = new JSObject();
+        result.put("locations", journal.pending(limit));
+        result.put("pendingCount", journal.count());
+        result.put("latestRecordedAt", journal.latestRecordedAt());
+        result.put("watching", WanderLocationService.isRunning());
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void acknowledgeLocations(PluginCall call) {
+        JSArray ids = call.getArray("ids");
+        WanderLocationJournal journal = WanderLocationJournal.get(getContext());
+        JSObject result = new JSObject();
+        result.put("acknowledged", journal.acknowledge(ids));
+        result.put("pendingCount", journal.count());
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void getBackgroundStatus(PluginCall call) {
+        WanderLocationJournal journal = WanderLocationJournal.get(getContext());
+        JSObject result = new JSObject();
+        result.put("watching", WanderLocationService.isRunning());
+        result.put("pendingCount", journal.count());
+        result.put("latestRecordedAt", journal.latestRecordedAt());
+        result.put("nativeJournal", true);
         call.resolve(result);
     }
 
@@ -278,13 +312,14 @@ public class WanderLocationPlugin extends Plugin {
         call.resolve();
     }
 
-    static void publish(Location location) {
+    static void publish(Location location, long journalId) {
         WanderLocationPlugin plugin = activePlugin.get();
         if (plugin == null) return;
 
         boolean precisePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.M
             || plugin.getContext().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         JSObject payload = new JSObject();
+        payload.put("journalId", journalId > 0 ? journalId : null);
         payload.put("latitude", location.getLatitude());
         payload.put("longitude", location.getLongitude());
         payload.put("accuracy", location.hasAccuracy() ? location.getAccuracy() : null);
@@ -294,6 +329,7 @@ public class WanderLocationPlugin extends Plugin {
         payload.put("provider", location.getProvider());
         payload.put("permissionPrecision", precisePermission ? "precise" : "approximate");
         payload.put("timestamp", location.getTime());
+        payload.put("replayed", false);
         plugin.notifyListeners("location", payload, true);
     }
 

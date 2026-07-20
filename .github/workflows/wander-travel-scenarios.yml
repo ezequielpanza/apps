@@ -46,6 +46,9 @@ jobs:
       - name: Run exact current-place resolution tests
         run: node apps/wander-travel/tests/current-place-resolution.mjs
 
+      - name: Run native background location tests
+        run: node apps/wander-travel/tests/native-background-location.mjs
+
       - name: Run context dashboard test
         run: node apps/wander-travel/tests/context-dashboard.mjs
 

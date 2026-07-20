@@ -34,6 +34,7 @@ public class WanderLocationService extends Service implements LocationListener, 
     private LocationManager locationManager;
     private SensorManager sensorManager;
     private Sensor motionSensor;
+    private WanderLocationJournal locationJournal;
     private boolean linearAccelerationSensor = false;
     private long lastSensorPublishAt = 0;
     private Location lastPublishedLocation;
@@ -47,6 +48,7 @@ public class WanderLocationService extends Service implements LocationListener, 
         super.onCreate();
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        locationJournal = WanderLocationJournal.get(this);
         motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         linearAccelerationSensor = motionSensor != null;
         if (motionSensor == null) motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -66,7 +68,7 @@ public class WanderLocationService extends Service implements LocationListener, 
         float minimumDistanceM = intent == null ? 5 : intent.getIntExtra("minimumDistanceM", 5);
         boolean highAccuracy = intent == null || intent.getBooleanExtra("highAccuracy", true);
         startTracking(minimumIntervalMs, minimumDistanceM, highAccuracy);
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     private void startTracking(long minimumIntervalMs, float minimumDistanceM, boolean highAccuracy) {
@@ -199,11 +201,18 @@ public class WanderLocationService extends Service implements LocationListener, 
         return currentIsGps && !previousIsGps && currentAccuracy <= previousAccuracy * 1.5f;
     }
 
+    private String permissionPrecision() {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            ? "precise"
+            : "approximate";
+    }
+
     @Override
     public void onLocationChanged(Location location) {
         if (!shouldPublish(location)) return;
         lastPublishedLocation = new Location(location);
-        WanderLocationPlugin.publish(location);
+        long journalId = locationJournal == null ? -1 : locationJournal.append(location, permissionPrecision());
+        WanderLocationPlugin.publish(location, journalId);
     }
 
     @Override
