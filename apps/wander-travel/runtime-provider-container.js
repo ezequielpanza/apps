@@ -70,14 +70,25 @@
       context.set('container.current', value, options);
       context.set('container.status', 'inside', options);
     } else {
-      context.remove('container.current');
-      context.set('container.status', 'none', options);
+      const existing = context.value('container.current');
+      if (!existing || existing.source === 'openstreetmap') {
+        context.remove('container.current');
+        context.set('container.status', 'none', options);
+      } else {
+        context.set('container.status', 'inside', {
+          source: existing.source || 'container-provider',
+          kind: 'inferred',
+          ttlMs: 10 * 60 * 1000,
+          confidence: 0.82,
+        });
+      }
     }
 
-    context.set('container.diagnostics', {
+    context.set('container.osmDiagnostics', {
       count: payload?.count || 0,
       source: payload?.source || null,
       query: payload?.query || null,
+      preservedSource: !container ? context.value('container.current')?.source || null : null,
       updatedAt: new Date().toISOString(),
     }, { ...options, ttlMs: 30 * 60 * 1000 });
   }
@@ -88,12 +99,14 @@
     if (activePromise) return activePromise;
 
     lastRequest = { location: { lat: location.lat, lng: location.lng }, at: Date.now() };
-    context.set('container.status', 'searching', {
-      source: 'container-provider',
-      kind: 'derived',
-      ttlMs: 2 * 60 * 1000,
-      confidence: 0.7,
-    });
+    if (!context.value('container.current')) {
+      context.set('container.status', 'searching', {
+        source: 'container-provider',
+        kind: 'derived',
+        ttlMs: 2 * 60 * 1000,
+        confidence: 0.7,
+      });
+    }
 
     const path = `/api/osm/container?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`;
     const endpoint = window.WanderPlatform?.apiUrl?.(path) || path;
@@ -105,14 +118,16 @@
         return payload.current || null;
       })
       .catch((error) => {
-        context.set('container.status', 'unavailable', {
-          source: 'container-provider',
+        const existing = context.value('container.current');
+        context.set('container.status', existing ? 'inside' : 'unavailable', {
+          source: existing?.source || 'container-provider',
           kind: 'derived',
           ttlMs: 5 * 60 * 1000,
-          confidence: 0.4,
+          confidence: existing ? 0.8 : 0.4,
         });
-        context.set('container.diagnostics', {
+        context.set('container.osmDiagnostics', {
           error: error?.message || String(error),
+          preservedSource: existing?.source || null,
           updatedAt: new Date().toISOString(),
         }, {
           source: 'container-provider',
