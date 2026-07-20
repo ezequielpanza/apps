@@ -19,7 +19,7 @@ jobs:
   deploy:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.head_ref == 'wander-live-v0106' &&
+      (github.head_ref == 'wander-live-v0106b' &&
        github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -53,12 +53,9 @@ jobs:
           manifest_file="${RUNNER_TEMP}/wander-manifest.json"
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
             nonce="${GITHUB_RUN_ID}-${attempt}-$(date +%s)"
-            curl --fail --silent --show-error --location --header 'Cache-Control: no-cache' \
-              "https://wander-travel.pages.dev/runtime-version.js?probe=${nonce}" -o "${version_file}" || true
-            curl --fail --silent --show-error --location --header 'Cache-Control: no-cache' \
-              "https://wander-travel.pages.dev/manifest.webmanifest?probe=${nonce}" -o "${manifest_file}" || true
-            if grep -q "const VERSION = 'v0.106.0'" "${version_file}" 2>/dev/null \
-              && grep -q '"start_url": "./?app=v0.106.0"' "${manifest_file}" 2>/dev/null; then
+            curl --fail --silent --show-error --location --header 'Cache-Control: no-cache' "https://wander-travel.pages.dev/runtime-version.js?probe=${nonce}" -o "${version_file}" || true
+            curl --fail --silent --show-error --location --header 'Cache-Control: no-cache' "https://wander-travel.pages.dev/manifest.webmanifest?probe=${nonce}" -o "${manifest_file}" || true
+            if grep -q "const VERSION = 'v0.106.0'" "${version_file}" 2>/dev/null && grep -q '"start_url": "./?app=v0.106.0"' "${manifest_file}" 2>/dev/null; then
               echo "Wander v0.106.0 is live."
               cat "${version_file}"
               exit 0
@@ -66,8 +63,6 @@ jobs:
             echo "Attempt ${attempt}: production still reports an older version."
             sleep 12
           done
-          echo "runtime-version.js returned:"
           cat "${version_file}" || true
-          echo "manifest.webmanifest returned:"
           cat "${manifest_file}" || true
           exit 1
