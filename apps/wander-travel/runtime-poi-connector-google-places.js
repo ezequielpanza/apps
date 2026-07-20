@@ -130,6 +130,10 @@
         endpoint: '/api/places/nearby',
         requestedRadiusM: radiusM,
         returnedCount: pois.length,
+        genericCount: Number(payload.diagnostics?.genericCount) || 0,
+        containerCount: Number(payload.diagnostics?.containerCount) || 0,
+        containerSearchRadiusM: Number(payload.diagnostics?.containerSearchRadiusM) || null,
+        containerError: payload.diagnostics?.containerError || null,
         validated: true,
       },
     };
@@ -138,7 +142,7 @@
   engine.register(Object.freeze({
     id: SOURCE_ID,
     version: SOURCE_VERSION,
-    capabilities: Object.freeze(['nearby-search', 'validated-pois', 'place-viewport']),
+    capabilities: Object.freeze(['nearby-search', 'validated-pois', 'place-viewport', 'container-search']),
     search,
   }));
 })();
