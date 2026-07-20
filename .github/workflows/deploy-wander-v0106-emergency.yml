@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-wander-v0106-emergency
+  group: deploy-wander-v0106-emergency-pr
   cancel-in-progress: true
 
 jobs:
