@@ -195,8 +195,7 @@
       key === 'nearby.items' ||
       key === 'nearby.status' ||
       key === 'location.effective' ||
-      key.startsWith('location.effective.') ||
-      key === 'container.status'
+      key.startsWith('location.effective.')
     ) queueMicrotask(apply);
   });
 
