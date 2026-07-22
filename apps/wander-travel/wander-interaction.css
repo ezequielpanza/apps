@@ -80,6 +80,13 @@
   border: 1px solid rgba(16, 38, 56, .09);
   border-radius: 15px;
   background: rgba(255,255,255,.72);
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.companion-history-item.is-notification-target {
+  border-color: var(--accent, #01e0cb);
+  background: rgba(1, 224, 203, .13);
+  box-shadow: 0 0 0 4px rgba(1, 224, 203, .16);
 }
 
 .companion-history-item[data-kind="suggest"] {
