@@ -26,6 +26,7 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import java.lang.ref.WeakReference;
 
 @CapacitorPlugin(
     name = "WanderNotifications",
@@ -41,6 +42,22 @@ public class WanderNotificationPlugin extends Plugin {
     private static final String KEY_CHANNEL_GENERATION = "channel_generation";
     private static final String SOUND_DEFAULT = "default";
     private static final String SOUND_SILENT = "silent";
+    static final String EXTRA_NOTIFICATION_ID = "wander_notification_id";
+    static final String EXTRA_INTERACTION_ID = "wander_interaction_id";
+    static final String EXTRA_INTERVENTION_ID = "wander_intervention_id";
+    static final String EXTRA_NOTIFICATION_TARGET = "wander_notification_target";
+    static final String EXTRA_NOTIFICATION_TITLE = "wander_notification_title";
+    static final String EXTRA_NOTIFICATION_MESSAGE = "wander_notification_message";
+
+    private static WeakReference<WanderNotificationPlugin> activePlugin = new WeakReference<>(null);
+    private static JSObject pendingOpen = null;
+
+    @Override
+    public void load() {
+        activePlugin = new WeakReference<>(this);
+        Activity activity = getActivity();
+        if (activity != null) captureOpenIntent(activity.getIntent());
+    }
 
     private SharedPreferences preferences() {
         return getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -219,6 +236,45 @@ public class WanderNotificationPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void consumePendingOpen(PluginCall call) {
+        JSObject result = new JSObject();
+        synchronized (WanderNotificationPlugin.class) {
+            result.put("notification", pendingOpen);
+            pendingOpen = null;
+        }
+        call.resolve(result);
+    }
+
+    static void captureOpenIntent(Intent intent) {
+        if (intent == null) return;
+        String id = intent.getStringExtra(EXTRA_NOTIFICATION_ID);
+        if (id == null || id.trim().isEmpty()) return;
+
+        JSObject payload = new JSObject();
+        payload.put("id", id);
+        payload.put("interactionId", intent.getStringExtra(EXTRA_INTERACTION_ID));
+        payload.put("interventionId", intent.getStringExtra(EXTRA_INTERVENTION_ID));
+        payload.put("target", intent.getStringExtra(EXTRA_NOTIFICATION_TARGET));
+        payload.put("title", intent.getStringExtra(EXTRA_NOTIFICATION_TITLE));
+        payload.put("message", intent.getStringExtra(EXTRA_NOTIFICATION_MESSAGE));
+        payload.put("openedAt", System.currentTimeMillis());
+
+        intent.removeExtra(EXTRA_NOTIFICATION_ID);
+        intent.removeExtra(EXTRA_INTERACTION_ID);
+        intent.removeExtra(EXTRA_INTERVENTION_ID);
+        intent.removeExtra(EXTRA_NOTIFICATION_TARGET);
+        intent.removeExtra(EXTRA_NOTIFICATION_TITLE);
+        intent.removeExtra(EXTRA_NOTIFICATION_MESSAGE);
+        intent.setData(null);
+
+        WanderNotificationPlugin plugin = activePlugin.get();
+        synchronized (WanderNotificationPlugin.class) {
+            pendingOpen = payload;
+        }
+        if (plugin != null) plugin.notifyListeners("notificationOpened", payload, true);
+    }
+
+    @PluginMethod
     public void notifyCompanion(PluginCall call) {
         JSObject result = permissionResult();
         if (!"granted".equals(permissionStatus())) {
@@ -231,9 +287,19 @@ public class WanderNotificationPlugin extends Plugin {
         String title = call.getString("title", "Wander");
         String message = call.getString("message", "Wander tiene algo para contarte.");
         String id = call.getString("id", String.valueOf(System.currentTimeMillis()));
+        String interactionId = call.getString("interactionId", id);
+        String interventionId = call.getString("interventionId", id);
+        String target = call.getString("target", "companion");
 
         Intent openIntent = new Intent(getContext(), MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        openIntent.setData(Uri.parse("wander://notification/" + Uri.encode(id)));
+        openIntent.putExtra(EXTRA_NOTIFICATION_ID, id);
+        openIntent.putExtra(EXTRA_INTERACTION_ID, interactionId);
+        openIntent.putExtra(EXTRA_INTERVENTION_ID, interventionId);
+        openIntent.putExtra(EXTRA_NOTIFICATION_TARGET, target);
+        openIntent.putExtra(EXTRA_NOTIFICATION_TITLE, title);
+        openIntent.putExtra(EXTRA_NOTIFICATION_MESSAGE, message);
         PendingIntent openPendingIntent = PendingIntent.getActivity(
             getContext(),
             id.hashCode(),
