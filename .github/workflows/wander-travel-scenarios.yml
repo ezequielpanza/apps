@@ -50,7 +50,18 @@ jobs:
         run: node apps/wander-travel/tests/native-background-location.mjs
 
       - name: Run hybrid direction indicator tests
-        run: node apps/wander-travel/tests/direction-indicator.mjs
+        run: |
+          set -o pipefail
+          node apps/wander-travel/tests/direction-indicator.mjs 2>&1 | tee direction-indicator-test.log
+
+      - name: Upload direction test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wander-direction-test-diagnostics
+          path: direction-indicator-test.log
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Run context dashboard test
         run: node apps/wander-travel/tests/context-dashboard.mjs
