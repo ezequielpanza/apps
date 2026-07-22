@@ -7,6 +7,8 @@
   if (!core || !historyList || !decisionBox || !profileBox) return;
 
   let renderToken = 0;
+  let focusId = null;
+  let focusTimer = null;
 
   function timeLabel(value) {
     const date = new Date(value || Date.now());
@@ -32,6 +34,8 @@
   function entryCard(entry) {
     const article = document.createElement('article');
     article.className = 'companion-history-item';
+    article.dataset.interactionId = entry.interactionId || '';
+    article.dataset.interventionId = entry.interventionId || '';
     const header = document.createElement('div');
     header.className = 'companion-history-header';
     const title = document.createElement('strong');
@@ -76,6 +80,21 @@
     return null;
   }
 
+  function focusRenderedEntry(id = focusId) {
+    if (!id) return false;
+    const card = Array.from(historyList.querySelectorAll('.companion-history-item')).find((item) => (
+      item.dataset.interactionId === id || item.dataset.interventionId === id
+    ));
+    if (!card) return false;
+    historyList.querySelectorAll('.is-notification-target').forEach((item) => item.classList.remove('is-notification-target'));
+    card.classList.add('is-notification-target');
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (focusTimer) clearTimeout(focusTimer);
+    focusTimer = setTimeout(() => card.classList.remove('is-notification-target'), 9000);
+    focusId = null;
+    return true;
+  }
+
   async function renderHistory() {
     const token = ++renderToken;
     const history = await core.getHistory(60);
@@ -93,6 +112,7 @@
       const card = entryCard(entry);
       if (card) historyList.appendChild(card);
     });
+    requestAnimationFrame(() => focusRenderedEntry());
   }
 
   function renderDecision() {
@@ -145,6 +165,15 @@
     renderHistory();
   }
 
+  function focus(id) {
+    focusId = String(id || '').trim() || null;
+    if (!focusId) return false;
+    window.WanderScreen?.open?.('companion');
+    if (focusRenderedEntry(focusId)) return true;
+    renderHistory();
+    return true;
+  }
+
   core.subscribe(render);
   engine?.subscribe?.(renderProfile);
   window.addEventListener('wander:screen-change', (event) => {
@@ -152,4 +181,10 @@
   });
   window.addEventListener('wander:memory-ready', render);
   render();
+
+  window.WanderInteractionPanel = Object.freeze({
+    render,
+    renderHistory,
+    focus,
+  });
 })();
