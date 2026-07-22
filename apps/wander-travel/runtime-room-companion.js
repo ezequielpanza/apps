@@ -69,8 +69,10 @@
 
   function interventionFor(snapshot) {
     const name = snapshot.placeName || 'la habitación';
+    const id = `room-pause:${snapshot.placeId}:${Date.now()}`;
     return {
-      id: `room-pause:${snapshot.placeId}:${Date.now()}`,
+      id,
+      interactionId: id,
       kind: 'room_pause',
       interactionType: 'ask',
       priority: 'normal',
@@ -78,6 +80,7 @@
       message: `Parece que hicieron una pausa en ${name}. ¿Descansan un rato o quieren que Wander piense qué hacer después?`,
       contentId: `room-pause:${snapshot.placeId}`,
       topic: 'room_pause',
+      notificationTarget: 'room-prompt',
       placeId: snapshot.placeId,
       placeName: snapshot.placeName,
     };
@@ -175,6 +178,9 @@
     const intervention = interventionFor(snapshot);
     const delivery = await platform.deliverNotification({
       id: intervention.id,
+      interactionId: intervention.interactionId,
+      interventionId: intervention.id,
+      target: intervention.notificationTarget,
       title: intervention.title,
       message: `${intervention.message} Abrí Wander para elegir.`,
     });
@@ -184,10 +190,11 @@
     return true;
   }
 
-  function pendingFor(snapshot) {
+  function pendingFor(snapshot = null) {
     const state = readState();
     const pending = state.pendingNotification;
-    if (!pending || pending.placeId !== snapshot.placeId) return null;
+    if (!pending) return null;
+    if (snapshot?.placeId && pending.placeId !== snapshot.placeId) return null;
     if (Date.now() - Number(pending.createdAt || 0) <= PENDING_NOTIFICATION_TTL_MS) return pending;
     state.pendingNotification = null;
     writeState(state);
@@ -198,6 +205,17 @@
     const state = readState();
     state.pendingNotification = null;
     writeState(state);
+  }
+
+  function openNotification(id) {
+    const pending = pendingFor();
+    const intervention = pending?.intervention;
+    if (!intervention || (id && intervention.id !== id && intervention.interactionId !== id)) return false;
+    window.WanderScreen?.open?.('map');
+    const snapshot = currentSnapshot();
+    const shown = showPrompt(snapshot, intervention, 'room:notification-opened');
+    if (shown) clearPending();
+    return shown;
   }
 
   function quietFor(snapshot) {
@@ -263,11 +281,16 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden') schedule(300);
   });
+  window.addEventListener('wander:notification-opened', (event) => {
+    const payload = event.detail || {};
+    if (payload.target === 'room-prompt' || String(payload.id || '').startsWith('room-pause:')) openNotification(payload.id);
+  });
   window.addEventListener('wander:app-ready', () => schedule(1000), { once: true });
 
   window.WanderRoomCompanion = Object.freeze({
     evaluate,
     schedule,
+    openNotification,
     isRoomLike,
     isCurrentRoom: () => Boolean(currentSnapshot().room),
     getSnapshot: currentSnapshot,
