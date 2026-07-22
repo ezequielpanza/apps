@@ -28,6 +28,9 @@ const travelLogScreen = read('runtime-travel-log-screen.js');
 const morningBriefing = read('runtime-morning-briefing.js');
 const directionRuntime = read('runtime-direction-indicator.js');
 const directionSettings = read('runtime-direction-indicator-settings.js');
+const notificationRouter = read('runtime-notification-router.js');
+const mapCacheSettings = read('runtime-map-cache-settings.js');
+const mapCore = read('runtime-map-core.js');
 const interactionCss = read('wander-interaction.css');
 const travelLogCss = read('wander-travel-log.css');
 const directionCss = read('wander-direction-indicator.css');
@@ -82,11 +85,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define the web version');
-assert.equal(versionMatch[1], 'v0.107.0');
-assert.equal(manifest.start_url, './?app=v0.107.0');
-assert.equal(packageManifest.version, '0.107.0');
-assert.equal(androidVersion.versionName, '0.9.0');
-assert.equal(androidVersion.versionCode, 13);
+assert.equal(versionMatch[1], 'v0.107.1');
+assert.equal(manifest.start_url, './?app=v0.107.1');
+assert.equal(packageManifest.version, '0.107.1');
+assert.equal(androidVersion.versionName, '0.9.1');
+assert.equal(androidVersion.versionCode, 14);
 assert.equal(capacitorConfig.server.url, 'https://wander-travel.pages.dev');
 assert.equal(capacitorConfig.server.errorPath, 'index.html');
 
@@ -99,13 +102,29 @@ assert.match(notificationPlugin, /void pickSound\(PluginCall call\)/);
 assert.match(notificationPlugin, /CHANNEL_PREFIX = "wander_companion_messages_v"/);
 assert.match(notificationPlugin, /result\.put\("delivered", false\)/);
 assert.match(notificationPlugin, /NotificationManagerCompat\.from\(getContext\(\)\)\.areNotificationsEnabled\(\)/);
+assert.match(notificationPlugin, /EXTRA_NOTIFICATION_ID/);
+assert.match(notificationPlugin, /void consumePendingOpen\(PluginCall call\)/);
+assert.match(notificationPlugin, /notifyListeners\("notificationOpened"/);
+assert.match(notificationPlugin, /wander:\/\/notification\//);
 assert.match(mainActivity, /registerPlugin\(WanderNotificationPlugin\.class\)/);
+assert.match(mainActivity, /protected void onNewIntent\(Intent intent\)/);
+assert.match(mainActivity, /WanderNotificationPlugin\.captureOpenIntent\(intent\)/);
 assert.match(platformRuntime, /refreshNotificationPermission/);
 assert.match(platformRuntime, /requestNotificationPermission/);
 assert.match(platformRuntime, /deliverNotification/);
 assert.match(platformRuntime, /pickNotificationSound/);
+assert.match(platformRuntime, /consumePendingNotificationOpen/);
+assert.match(platformRuntime, /addListener\('notificationOpened'/);
+assert.match(platformRuntime, /wander:notification-opened/);
 assert.match(platformRuntime, /runtime-room-companion\.js/);
 assert.match(platformRuntime, /notificationState\.granted === true/);
+assert.match(notificationRouter, /target === 'room-prompt'/);
+assert.match(notificationRouter, /WanderInteractionPanel\?\.focus/);
+assert.match(interactionPanel, /function focus\(id\)/);
+assert.match(interactionPanel, /dataset\.interactionId/);
+assert.match(interactionCss, /is-notification-target/);
+assert.match(roomCompanion, /function openNotification\(id\)/);
+assert.match(roomCompanion, /notificationTarget: 'room-prompt'/);
 assert.match(settingsRuntime, /Notificaciones de Wander/);
 assert.match(settingsRuntime, /Activar notificaciones/);
 assert.match(settingsRuntime, /Elegir sonido/);
@@ -136,6 +155,18 @@ assert.match(appRuntime, /loadDirectionIndicator/);
 assert.match(serviceWorker, /runtime-direction-indicator\.js/);
 assert.match(serviceWorker, /runtime-direction-indicator-settings\.js/);
 assert.match(serviceWorker, /wander-direction-indicator\.css/);
+
+assert.match(mapCore, /https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png/);
+assert.match(serviceWorker, /TILE_CACHE_NAME = 'wander-map-tiles-v1'/);
+assert.match(serviceWorker, /DEFAULT_TILE_RETENTION_DAYS = 30/);
+assert.match(serviceWorker, /MAX_TILE_ENTRIES = 2500/);
+assert.match(serviceWorker, /function isMapTileRequest\(/);
+assert.match(serviceWorker, /WANDER_MAP_CACHE_CONFIG/);
+assert.match(serviceWorker, /WANDER_MAP_CACHE_CLEAR/);
+assert.match(mapCacheSettings, /Mapa guardado/);
+assert.match(mapCacheSettings, /No descarga zonas por adelantado/);
+assert.match(mapCacheSettings, /Vaciar mapas guardados/);
+assert.match(appRuntime, /loadMapCacheSettings/);
 
 assert.match(placesApi, /const CONTAINER_TYPES/);
 assert.match(placesApi, /'apartment_complex'/);
@@ -218,4 +249,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} hybrid direction shell is consistent`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} notification and map cache shell is consistent`);
