@@ -26,8 +26,11 @@ const roomCompanion = read('runtime-room-companion.js');
 const travelLog = read('runtime-travel-log.js');
 const travelLogScreen = read('runtime-travel-log-screen.js');
 const morningBriefing = read('runtime-morning-briefing.js');
+const directionRuntime = read('runtime-direction-indicator.js');
+const directionSettings = read('runtime-direction-indicator-settings.js');
 const interactionCss = read('wander-interaction.css');
 const travelLogCss = read('wander-travel-log.css');
+const directionCss = read('wander-direction-indicator.css');
 const mapControls = read('runtime-map-controls.js');
 const pointsRuntime = read('runtime-points-screen.js');
 const tracksRuntime = read('runtime-tracks.js');
@@ -39,6 +42,8 @@ const googleContainer = read('runtime-provider-container-google.js');
 const osmContainer = read('runtime-provider-container.js');
 const placesApi = read('functions/api/places/nearby.js');
 const notificationPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderNotificationPlugin.java');
+const directionPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderDirectionPlugin.java');
+const locationService = read('android/app/src/main/java/app/wandertravel/mobile/WanderLocationService.java');
 const mainActivity = read('android/app/src/main/java/app/wandertravel/mobile/MainActivity.java');
 
 function localReferences(source) {
@@ -77,11 +82,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define the web version');
-assert.equal(versionMatch[1], 'v0.106.2');
-assert.equal(manifest.start_url, './?app=v0.106.2');
-assert.equal(packageManifest.version, '0.106.2');
-assert.equal(androidVersion.versionName, '0.8.0');
-assert.equal(androidVersion.versionCode, 12);
+assert.equal(versionMatch[1], 'v0.107.0');
+assert.equal(manifest.start_url, './?app=v0.107.0');
+assert.equal(packageManifest.version, '0.107.0');
+assert.equal(androidVersion.versionName, '0.9.0');
+assert.equal(androidVersion.versionCode, 13);
 assert.equal(capacitorConfig.server.url, 'https://wander-travel.pages.dev');
 assert.equal(capacitorConfig.server.errorPath, 'index.html');
 
@@ -106,6 +111,31 @@ assert.match(settingsRuntime, /Activar notificaciones/);
 assert.match(settingsRuntime, /Elegir sonido/);
 assert.match(settingsRuntime, /Enviar prueba/);
 assert.match(settingsRuntime, /Dejá que Wander te avise/);
+
+assert.match(directionPlugin, /name = "WanderDirection"/);
+assert.match(directionPlugin, /void setSensorEnabled\(PluginCall call\)/);
+assert.match(directionPlugin, /void getStatus\(PluginCall call\)/);
+assert.match(directionPlugin, /rotation_vector/);
+assert.match(mainActivity, /registerPlugin\(WanderDirectionPlugin\.class\)/);
+assert.match(locationService, /Sensor\.TYPE_ROTATION_VECTOR/);
+assert.match(locationService, /ACTION_DIRECTION_SENSOR/);
+assert.match(locationService, /WanderDirectionPlugin\.publishDirection/);
+assert.match(directionRuntime, /thresholdKmh: 0/);
+assert.match(directionRuntime, /magneticEnabled/);
+assert.match(directionRuntime, /function compassCutoffKmh\(/);
+assert.match(directionRuntime, /source: 'gps'/);
+assert.match(directionRuntime, /source: 'compass'/);
+assert.match(directionRuntime, /wander-direction-arrow/);
+assert.match(directionSettings, /Mostrar indicador/);
+assert.match(directionSettings, /Brújula magnética \+ giróscopo/);
+assert.match(directionSettings, /Umbral para usar brújula/);
+assert.match(directionSettings, /Con 0 km\/h/);
+assert.match(directionCss, /wander-direction-marker/);
+assert.match(directionCss, /:has\(\.wander-direction-marker\)/);
+assert.match(appRuntime, /loadDirectionIndicator/);
+assert.match(serviceWorker, /runtime-direction-indicator\.js/);
+assert.match(serviceWorker, /runtime-direction-indicator-settings\.js/);
+assert.match(serviceWorker, /wander-direction-indicator\.css/);
 
 assert.match(placesApi, /const CONTAINER_TYPES/);
 assert.match(placesApi, /'apartment_complex'/);
@@ -188,4 +218,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} current-place shell is consistent`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} hybrid direction shell is consistent`);
