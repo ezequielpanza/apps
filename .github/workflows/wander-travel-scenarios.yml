@@ -49,6 +49,9 @@ jobs:
       - name: Run native background location tests
         run: node apps/wander-travel/tests/native-background-location.mjs
 
+      - name: Run hybrid direction indicator tests
+        run: node apps/wander-travel/tests/direction-indicator.mjs
+
       - name: Run context dashboard test
         run: node apps/wander-travel/tests/context-dashboard.mjs
 
@@ -84,3 +87,17 @@ jobs:
 
       - name: Run companion interruption budget tests
         run: node apps/wander-travel/tests/companion-budget.mjs
+
+      - name: Verify Wander app shell
+        run: |
+          set -o pipefail
+          node apps/wander-travel/tests/app-shell.mjs 2>&1 | tee app-shell-test.log
+
+      - name: Upload app shell diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wander-app-shell-diagnostics
+          path: app-shell-test.log
+          if-no-files-found: error
+          retention-days: 3

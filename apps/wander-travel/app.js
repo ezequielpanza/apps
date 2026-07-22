@@ -56,6 +56,15 @@
     document.head.appendChild(link);
   }
 
+  function ensureDirectionStyles() {
+    if (document.querySelector('link[data-wander-direction-indicator]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = './wander-direction-indicator.css?v=20260722-01';
+    link.dataset.wanderDirectionIndicator = 'true';
+    document.head.appendChild(link);
+  }
+
   function loadScript(src, marker) {
     const existing = document.querySelector(`script[data-${marker}]`);
     if (existing) return existing.dataset.loaded === 'true'
@@ -79,9 +88,17 @@
     await loadScript('./runtime-morning-briefing.js?v=20260719-01', 'wander-morning-briefing');
   }
 
+  async function loadDirectionIndicator() {
+    ensureDirectionStyles();
+    await loadScript('./runtime-direction-indicator.js?v=20260722-01', 'wander-direction-indicator');
+    await loadScript('./runtime-direction-indicator-settings.js?v=20260722-01', 'wander-direction-indicator-settings');
+  }
+
   async function initialize() {
     try { await loadTravelMemory(); }
     catch (error) { console.warn('Wander travel memory could not be loaded', error); }
+    try { await loadDirectionIndicator(); }
+    catch (error) { console.warn('Wander direction indicator could not be loaded', error); }
 
     window.WanderProviders?.nearby?.configure?.({
       sources: ['google-places', 'openstreetmap', 'wikidata'],
