@@ -29,8 +29,12 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Verify app shell
-        run: node apps/wander-travel/tests/app-shell.mjs
+      - name: Verify release-critical behavior
+        run: |
+          node apps/wander-travel/tests/native-background-location.mjs
+          node apps/wander-travel/tests/session-reconciliation.mjs
+          node apps/wander-travel/tests/travel-log-memory.mjs
+          node apps/wander-travel/tests/current-place-resolution.mjs
 
       - name: Check JavaScript syntax
         run: find apps/wander-travel -maxdepth 1 -type f -name '*.js' -print0 | xargs -0 -n1 node --check
