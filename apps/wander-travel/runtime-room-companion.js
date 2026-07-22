@@ -161,7 +161,9 @@
       },
     });
     if (!shown) return false;
-    recordPresentation(intervention, 'in_app', reason);
+    if (interactionCore?.getCurrent?.()?.id !== intervention.id) {
+      recordPresentation(intervention, 'in_app', reason);
+    }
     return true;
   }
 
@@ -208,6 +210,10 @@
   }
 
   function openNotification(id) {
+    if (activeIntervention?.id === id) {
+      window.WanderScreen?.open?.('map');
+      return true;
+    }
     const pending = pendingFor();
     const intervention = pending?.intervention;
     if (!intervention || (id && intervention.id !== id && intervention.interactionId !== id)) return false;
@@ -280,10 +286,6 @@
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden') schedule(300);
-  });
-  window.addEventListener('wander:notification-opened', (event) => {
-    const payload = event.detail || {};
-    if (payload.target === 'room-prompt' || String(payload.id || '').startsWith('room-pause:')) openNotification(payload.id);
   });
   window.addEventListener('wander:app-ready', () => schedule(1000), { once: true });
 
