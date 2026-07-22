@@ -153,12 +153,12 @@ public class WanderLocationService extends Service implements LocationListener, 
         directionRunning = false;
         if (!enabled) return;
         if (!active) {
-            WanderLocationPlugin.publishDirectionUnavailable();
+            WanderDirectionPlugin.publishUnavailable();
             return;
         }
         directionAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE;
         directionRunning = sensorManager.registerListener(this, directionSensor, SensorManager.SENSOR_DELAY_GAME);
-        if (!directionRunning) WanderLocationPlugin.publishDirectionUnavailable();
+        if (!directionRunning) WanderDirectionPlugin.publishUnavailable();
     }
 
     @Override
@@ -191,7 +191,7 @@ public class WanderLocationService extends Service implements LocationListener, 
         SensorManager.getOrientation(displayMatrix, orientationAngles);
         float heading = (float) Math.toDegrees(orientationAngles[0]);
         if (heading < 0) heading += 360f;
-        WanderLocationPlugin.publishDirection(heading, directionAccuracy, now);
+        WanderDirectionPlugin.publishDirection(heading, directionAccuracy, now);
     }
 
     private float[] remapForDisplay(float[] source) {
