@@ -89,4 +89,15 @@ jobs:
         run: node apps/wander-travel/tests/companion-budget.mjs
 
       - name: Verify Wander app shell
-        run: node apps/wander-travel/tests/app-shell.mjs
+        run: |
+          set -o pipefail
+          node apps/wander-travel/tests/app-shell.mjs 2>&1 | tee app-shell-test.log
+
+      - name: Upload app shell diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wander-app-shell-diagnostics
+          path: app-shell-test.log
+          if-no-files-found: error
+          retention-days: 3
