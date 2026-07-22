@@ -199,7 +199,7 @@ assert.match(travelLogScreen, /Hoy/);
 assert.match(travelLogScreen, /Próximamente/);
 assert.match(travelLogScreen, /Historial/);
 assert.match(morningBriefing, /Buenos días/);
-assert.match(morningBriefing, /organizamos el día/);
+assert.match(morningBriefing, /organicemos el día/);
 assert.match(travelLogCss, /travel-log/);
 
 assert.match(mapControls, /installLockedPinchZoom/);
