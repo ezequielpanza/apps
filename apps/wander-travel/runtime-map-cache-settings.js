@@ -105,19 +105,21 @@
     }
   }
 
-  async function applyRetention(days) {
+  async function applyRetention(days, options = {}) {
     const retentionDays = saveDays(days);
     select.disabled = true;
     try {
       const status = await request('WANDER_MAP_CACHE_CONFIG', { retentionDays });
       render(status);
-      ui?.showWander?.(
-        'Mapa guardado actualizado',
-        retentionDays === 0
-          ? 'Wander dejó de mantener una caché propia de mapas. El navegador seguirá usando su caché normal.'
-          : `Los sectores del mapa que mires se conservarán durante ${retentionDays === 365 ? 'un año' : `${retentionDays} días`}.`,
-        { timeoutMs: 6500 }
-      );
+      if (options.silent !== true) {
+        ui?.showWander?.(
+          'Mapa guardado actualizado',
+          retentionDays === 0
+            ? 'Wander dejó de mantener una caché propia de mapas. El navegador seguirá usando su caché normal.'
+            : `Los sectores del mapa que mires se conservarán durante ${retentionDays === 365 ? 'un año' : `${retentionDays} días`}.`,
+          { timeoutMs: 6500 }
+        );
+      }
       return status;
     } finally {
       select.disabled = false;
@@ -143,7 +145,7 @@
     if (event.detail?.to === 'settings') refresh();
   });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    setTimeout(() => applyRetention(storedDays()), 300);
+    setTimeout(() => applyRetention(storedDays(), { silent: true }), 300);
   });
 
   window.WanderMapCacheSettings = Object.freeze({
@@ -154,6 +156,6 @@
   });
 
   navigator.serviceWorker.ready
-    .then(() => applyRetention(storedDays()))
+    .then(() => applyRetention(storedDays(), { silent: true }))
     .catch(() => refresh());
 })();
