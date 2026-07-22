@@ -11,7 +11,7 @@
   map.attributionControl.addAttribution('Place data &copy; OpenStreetMap contributors');
 
   const baseLayers = {
-    streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    streets: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap',
     }),
