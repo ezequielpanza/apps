@@ -7,16 +7,19 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.view.Surface;
+import android.view.WindowManager;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
@@ -24,23 +27,39 @@ import androidx.core.app.NotificationCompat;
 public class WanderLocationService extends Service implements LocationListener, SensorEventListener {
     static final String ACTION_START = "app.wandertravel.mobile.action.START_LOCATION";
     static final String ACTION_STOP = "app.wandertravel.mobile.action.STOP_LOCATION";
+    static final String ACTION_DIRECTION_SENSOR = "app.wandertravel.mobile.action.DIRECTION_SENSOR";
+    static final String EXTRA_DIRECTION_SENSOR_ENABLED = "directionSensorEnabled";
     private static final String CHANNEL_ID = "wander_companion";
+    private static final String RUNTIME_PREFS = "wander_direction_runtime";
+    private static final String DIRECTION_ACTIVE_KEY = "direction_active";
     private static final int NOTIFICATION_ID = 4107;
     private static final long BETTER_FIX_RETENTION_MS = 20000;
     private static final float ACCURACY_REGRESSION_TOLERANCE_M = 8f;
     private static final float SIGNIFICANT_ACCURACY_GAIN_M = 10f;
+    private static final long DIRECTION_PUBLISH_INTERVAL_MS = 100;
     private static volatile boolean running = false;
+    private static volatile boolean directionRunning = false;
 
     private LocationManager locationManager;
     private SensorManager sensorManager;
     private Sensor motionSensor;
+    private Sensor directionSensor;
     private WanderLocationJournal locationJournal;
     private boolean linearAccelerationSensor = false;
     private long lastSensorPublishAt = 0;
+    private long lastDirectionPublishAt = 0;
+    private int directionAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE;
     private Location lastPublishedLocation;
+    private final float[] rotationMatrix = new float[9];
+    private final float[] adjustedRotationMatrix = new float[9];
+    private final float[] orientationAngles = new float[3];
 
     static boolean isRunning() {
         return running;
+    }
+
+    static boolean isDirectionRunning() {
+        return directionRunning;
     }
 
     @Override
@@ -52,22 +71,33 @@ public class WanderLocationService extends Service implements LocationListener, 
         motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         linearAccelerationSensor = motionSensor != null;
         if (motionSensor == null) motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        directionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         createNotificationChannel();
+        boolean restoreDirection = getSharedPreferences(RUNTIME_PREFS, MODE_PRIVATE).getBoolean(DIRECTION_ACTIVE_KEY, false);
+        if (restoreDirection) setDirectionSensorEnabled(true);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+            setDirectionSensorEnabled(false);
             stopTracking();
             stopSelf();
             return START_NOT_STICKY;
+        }
+
+        if (intent != null && ACTION_DIRECTION_SENSOR.equals(intent.getAction())) {
+            setDirectionSensorEnabled(intent.getBooleanExtra(EXTRA_DIRECTION_SENSOR_ENABLED, false));
+            return START_STICKY;
         }
 
         startForeground(NOTIFICATION_ID, buildNotification());
         long minimumIntervalMs = intent == null ? 5000 : intent.getIntExtra("minimumIntervalMs", 5000);
         float minimumDistanceM = intent == null ? 5 : intent.getIntExtra("minimumDistanceM", 5);
         boolean highAccuracy = intent == null || intent.getBooleanExtra("highAccuracy", true);
+        boolean directionEnabled = intent != null && intent.getBooleanExtra(EXTRA_DIRECTION_SENSOR_ENABLED, directionRunning);
         startTracking(minimumIntervalMs, minimumDistanceM, highAccuracy);
+        setDirectionSensorEnabled(directionEnabled);
         return START_STICKY;
     }
 
@@ -100,7 +130,7 @@ public class WanderLocationService extends Service implements LocationListener, 
 
     private void stopTracking() {
         if (locationManager != null) locationManager.removeUpdates(this);
-        if (sensorManager != null) sensorManager.unregisterListener(this);
+        if (sensorManager != null && motionSensor != null) sensorManager.unregisterListener(this, motionSensor);
         lastPublishedLocation = null;
         running = false;
         stopForeground(STOP_FOREGROUND_REMOVE);
@@ -111,13 +141,34 @@ public class WanderLocationService extends Service implements LocationListener, 
             WanderLocationPlugin.publishMotionUnavailable();
             return;
         }
-        sensorManager.unregisterListener(this);
+        sensorManager.unregisterListener(this, motionSensor);
         sensorManager.registerListener(this, motionSensor, SensorManager.SENSOR_DELAY_NORMAL);
+    }
+
+    private void setDirectionSensorEnabled(boolean enabled) {
+        SharedPreferences preferences = getSharedPreferences(RUNTIME_PREFS, MODE_PRIVATE);
+        boolean active = enabled && sensorManager != null && directionSensor != null;
+        preferences.edit().putBoolean(DIRECTION_ACTIVE_KEY, active).apply();
+        if (sensorManager != null && directionSensor != null) sensorManager.unregisterListener(this, directionSensor);
+        directionRunning = false;
+        if (!enabled) return;
+        if (!active) {
+            WanderLocationPlugin.publishDirectionUnavailable();
+            return;
+        }
+        directionAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE;
+        directionRunning = sensorManager.registerListener(this, directionSensor, SensorManager.SENSOR_DELAY_GAME);
+        if (!directionRunning) WanderLocationPlugin.publishDirectionUnavailable();
     }
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event == null || event.sensor != motionSensor || event.values.length < 3) return;
+        if (event == null || event.sensor == null) return;
+        if (event.sensor == directionSensor) {
+            publishDirection(event);
+            return;
+        }
+        if (event.sensor != motionSensor || event.values.length < 3) return;
         long now = System.currentTimeMillis();
         if (now - lastSensorPublishAt < 500) return;
         lastSensorPublishAt = now;
@@ -129,8 +180,44 @@ public class WanderLocationService extends Service implements LocationListener, 
         WanderLocationPlugin.publishMotion(x, y, z, magnitude, activity, linearAccelerationSensor, now);
     }
 
+    private void publishDirection(SensorEvent event) {
+        if (!directionRunning || event.values.length < 3) return;
+        long now = System.currentTimeMillis();
+        if (now - lastDirectionPublishAt < DIRECTION_PUBLISH_INTERVAL_MS) return;
+        lastDirectionPublishAt = now;
+
+        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
+        float[] displayMatrix = remapForDisplay(rotationMatrix);
+        SensorManager.getOrientation(displayMatrix, orientationAngles);
+        float heading = (float) Math.toDegrees(orientationAngles[0]);
+        if (heading < 0) heading += 360f;
+        WanderLocationPlugin.publishDirection(heading, directionAccuracy, now);
+    }
+
+    private float[] remapForDisplay(float[] source) {
+        WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        int rotation = windowManager == null ? Surface.ROTATION_0 : windowManager.getDefaultDisplay().getRotation();
+        int axisX = SensorManager.AXIS_X;
+        int axisY = SensorManager.AXIS_Y;
+        if (rotation == Surface.ROTATION_90) {
+            axisX = SensorManager.AXIS_Y;
+            axisY = SensorManager.AXIS_MINUS_X;
+        } else if (rotation == Surface.ROTATION_180) {
+            axisX = SensorManager.AXIS_MINUS_X;
+            axisY = SensorManager.AXIS_MINUS_Y;
+        } else if (rotation == Surface.ROTATION_270) {
+            axisX = SensorManager.AXIS_MINUS_Y;
+            axisY = SensorManager.AXIS_X;
+        }
+        if (rotation == Surface.ROTATION_0) return source;
+        SensorManager.remapCoordinateSystem(source, axisX, axisY, adjustedRotationMatrix);
+        return adjustedRotationMatrix;
+    }
+
     @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        if (sensor == directionSensor) directionAccuracy = accuracy;
+    }
 
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(
@@ -225,6 +312,7 @@ public class WanderLocationService extends Service implements LocationListener, 
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
+        setDirectionSensorEnabled(false);
         stopTracking();
         stopSelf();
         super.onTaskRemoved(rootIntent);
@@ -232,6 +320,7 @@ public class WanderLocationService extends Service implements LocationListener, 
 
     @Override
     public void onDestroy() {
+        setDirectionSensorEnabled(false);
         stopTracking();
         super.onDestroy();
     }
