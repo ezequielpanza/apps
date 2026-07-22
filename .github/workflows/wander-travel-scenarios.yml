@@ -52,6 +52,12 @@ jobs:
       - name: Run hybrid direction indicator tests
         run: node apps/wander-travel/tests/direction-indicator.mjs
 
+      - name: Run notification deep-link tests
+        run: node apps/wander-travel/tests/notification-deeplink.mjs
+
+      - name: Run viewed map tile cache tests
+        run: node apps/wander-travel/tests/map-cache.mjs
+
       - name: Run context dashboard test
         run: node apps/wander-travel/tests/context-dashboard.mjs
 
@@ -89,15 +95,4 @@ jobs:
         run: node apps/wander-travel/tests/companion-budget.mjs
 
       - name: Verify Wander app shell
-        run: |
-          set -o pipefail
-          node apps/wander-travel/tests/app-shell.mjs 2>&1 | tee app-shell-test.log
-
-      - name: Upload app shell diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wander-app-shell-diagnostics
-          path: app-shell-test.log
-          if-no-files-found: error
-          retention-days: 3
+        run: node apps/wander-travel/tests/app-shell.mjs

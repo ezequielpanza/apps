@@ -94,11 +94,23 @@
     await loadScript('./runtime-direction-indicator-settings.js?v=20260722-01', 'wander-direction-indicator-settings');
   }
 
+  async function loadNotificationRouting() {
+    await loadScript('./runtime-notification-router.js?v=20260722-01', 'wander-notification-router');
+  }
+
+  async function loadMapCacheSettings() {
+    await loadScript('./runtime-map-cache-settings.js?v=20260722-01', 'wander-map-cache-settings');
+  }
+
   async function initialize() {
     try { await loadTravelMemory(); }
     catch (error) { console.warn('Wander travel memory could not be loaded', error); }
     try { await loadDirectionIndicator(); }
     catch (error) { console.warn('Wander direction indicator could not be loaded', error); }
+    try { await loadNotificationRouting(); }
+    catch (error) { console.warn('Wander notification routing could not be loaded', error); }
+    try { await loadMapCacheSettings(); }
+    catch (error) { console.warn('Wander map cache settings could not be loaded', error); }
 
     window.WanderProviders?.nearby?.configure?.({
       sources: ['google-places', 'openstreetmap', 'wikidata'],
