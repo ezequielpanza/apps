@@ -48,7 +48,7 @@ public class WanderLocationService extends Service implements LocationListener, 
     private boolean linearAccelerationSensor = false;
     private long lastSensorPublishAt = 0;
     private long lastDirectionPublishAt = 0;
-    private int directionAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE;
+    private int directionAccuracy = SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM;
     private Location lastPublishedLocation;
     private final float[] rotationMatrix = new float[9];
     private final float[] adjustedRotationMatrix = new float[9];
@@ -156,7 +156,7 @@ public class WanderLocationService extends Service implements LocationListener, 
             WanderDirectionPlugin.publishUnavailable();
             return;
         }
-        directionAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE;
+        directionAccuracy = SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM;
         directionRunning = sensorManager.registerListener(this, directionSensor, SensorManager.SENSOR_DELAY_GAME);
         if (!directionRunning) WanderDirectionPlugin.publishUnavailable();
     }
