@@ -81,6 +81,7 @@ function createHarness(location = {}) {
     globalThis: null,
     document: documentTarget,
     localStorage: new MemoryStorage(),
+    L,
     CustomEvent: CustomEventPolyfill,
     Event,
     EventTarget,
