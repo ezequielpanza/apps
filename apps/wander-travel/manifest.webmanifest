@@ -3,7 +3,7 @@
   "short_name": "Wander",
   "description": "Tu compañero inteligente de viaje",
   "id": "./",
-  "start_url": "./?app=v0.106.2",
+  "start_url": "./?app=v0.107.0",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
