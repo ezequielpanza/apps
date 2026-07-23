@@ -35,6 +35,8 @@ jobs:
           node apps/wander-travel/tests/session-reconciliation.mjs
           node apps/wander-travel/tests/travel-log-memory.mjs
           node apps/wander-travel/tests/current-place-resolution.mjs
+          node apps/wander-travel/tests/direction-indicator.mjs
+          node apps/wander-travel/tests/direction-track-rendering.mjs
           node apps/wander-travel/tests/notification-deeplink.mjs
           node apps/wander-travel/tests/map-cache.mjs
           node apps/wander-travel/tests/app-shell.mjs
