@@ -49,6 +49,9 @@ jobs:
       - name: Run native background location tests
         run: node apps/wander-travel/tests/native-background-location.mjs
 
+      - name: Run GPS jump filter tests
+        run: node apps/wander-travel/tests/location-jump-filter.mjs
+
       - name: Run hybrid direction indicator tests
         run: node apps/wander-travel/tests/direction-indicator.mjs
 
