@@ -53,9 +53,9 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.107.2');
-assert.equal(manifest.start_url, './?app=v0.107.2');
-assert.equal(packageManifest.version, '0.107.2');
+assert.equal(versionMatch[1], 'v0.107.3');
+assert.equal(manifest.start_url, './?app=v0.107.3');
+assert.equal(packageManifest.version, '0.107.3');
 assert.equal(androidVersion.versionName, '0.9.1');
 assert.equal(androidVersion.versionCode, 14);
 assert.equal(capacitorConfig.server.url, 'https://wander-travel.pages.dev');
@@ -64,6 +64,7 @@ assert.equal(capacitorConfig.server.errorPath, 'index.html');
 const dashboard = read('runtime-context-dashboard.js');
 const direction = read('runtime-direction-indicator.js');
 const directionSettings = read('runtime-direction-indicator-settings.js');
+const locationProvider = read('runtime-provider-location.js');
 const tracks = read('runtime-tracks.js');
 const sessionEngine = read('runtime-session-engine.js');
 const notificationPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderNotificationPlugin.java');
@@ -87,6 +88,12 @@ assert.match(dashboard, /function directionValue\(/);
 assert.match(dashboard, /context\.value\('direction\.heading'\)/);
 assert.match(dashboard, /label: 'Dirección'/);
 assert.match(dashboard, /cardinalDirection/);
+
+assert.match(locationProvider, /function validateSample\(/);
+assert.match(locationProvider, /reason: 'isolated-jump'/);
+assert.match(locationProvider, /reason: 'confirmed-relocation'/);
+assert.match(locationProvider, /location\.validation\.rejectedJumpCount/);
+assert.match(locationProvider, /wander:location-sample-rejected/);
 
 assert.match(sessionEngine, /type: 'movement'/);
 assert.match(sessionEngine, /segments: \[\]/);
@@ -128,4 +135,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} direction and segmented-track shell is consistent`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} GPS-filtered direction shell is consistent`);
