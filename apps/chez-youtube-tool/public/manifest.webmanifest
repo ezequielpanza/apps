@@ -1,0 +1,11 @@
+{
+  "name": "Chez YouTube Tool",
+  "short_name": "Chez YouTube",
+  "description": "Gestión de comentarios de YouTube para Chez Team",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#111827",
+  "lang": "es",
+  "orientation": "portrait-primary"
+}
