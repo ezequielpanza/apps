@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="Gestión inteligente de comentarios de YouTube para Chez Team">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <title>Chez YouTube Tool</title>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">CHEZ TEAM</p>
+      <h1>Chez YouTube Tool</h1>
+    </div>
+    <button id="syncButton" class="primary">Sincronizar</button>
+  </header>
+
+  <nav class="tabs" aria-label="Secciones">
+    <button data-view="dashboard" class="active">Resumen</button>
+    <button data-view="comments">Comentarios</button>
+    <button data-view="videos">Episodios</button>
+    <button data-view="style">Estilo</button>
+    <button data-view="setup">Ajustes</button>
+  </nav>
+
+  <main id="app" class="content" aria-live="polite">
+    <section class="loading">Cargando Chez YouTube Tool…</section>
+  </main>
+
+  <template id="emptyTemplate">
+    <section class="empty">
+      <h2>Sin datos todavía</h2>
+      <p>Conectá el canal de YouTube para comenzar a sincronizar comentarios.</p>
+    </section>
+  </template>
+
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
