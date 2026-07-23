@@ -215,10 +215,17 @@
     return (session?.segments || []).filter((segment) => segment.type === 'movement').flatMap((segment) => segment.points || []);
   }
 
+  function sessionLatLngSegments(session) {
+    return (session?.segments || [])
+      .filter((segment) => segment.type === 'movement')
+      .map((segment) => (segment.points || [])
+        .filter((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)))
+        .map((point) => [Number(point.lat), Number(point.lng)]))
+      .filter((points) => points.length > 0);
+  }
+
   function currentLatLngs(active) {
-    return sessionPoints(active)
-      .filter((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)))
-      .map((point) => [Number(point.lat), Number(point.lng)]);
+    return sessionLatLngSegments(active);
   }
 
   function syncCurrentTrack(state = null) {
@@ -277,10 +284,10 @@
   function showSession(id) {
     const state = engine()?.snapshot?.();
     const session = state?.active?.id === id ? state.active : state?.sessions?.find((item) => item.id === id);
-    const points = sessionPoints(session);
-    if (!session || !points.length) return window.WanderUI?.showToast?.('Sesión', 'Todavía no tiene recorrido visible');
-    const latLngs = points.map((point) => [point.lat, point.lng]);
-    if (!(state?.active?.id === id && currentTrackVisible)) line.setLatLngs(latLngs);
+    const segments = sessionLatLngSegments(session);
+    const latLngs = segments.flat();
+    if (!session || !latLngs.length) return window.WanderUI?.showToast?.('Sesión', 'Todavía no tiene recorrido visible');
+    if (!(state?.active?.id === id && currentTrackVisible)) line.setLatLngs(segments);
     map.fitBounds(latLngs, { padding: [40, 40], maxZoom: 16 });
     const distance = session.distanceM || window.WanderContext?.value?.('sessions.active')?.distanceM || 0;
     window.WanderUI?.showToast?.('Sesión', distanceLabel(distance));
@@ -356,6 +363,7 @@
     addPoint: () => engine()?.observe?.('legacy-add-point'),
     setCurrentTrackVisible,
     isCurrentTrackVisible: () => currentTrackVisible,
+    segmentLatLngs: sessionLatLngSegments,
   };
 
   initialize();
