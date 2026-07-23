@@ -1,0 +1,16 @@
+{
+  "name": "chez-youtube-tool",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PWA y backend Cloudflare para gestionar comentarios de YouTube de Chez Team.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "node --check src/index.js && node --check public/app.js",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
