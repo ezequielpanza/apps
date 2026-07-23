@@ -63,6 +63,24 @@
     return Number.isFinite(value) ? value.toFixed(digits) + suffix : fallback;
   }
 
+  function cardinalDirection(value) {
+    const heading = Number(value);
+    if (!Number.isFinite(heading)) return '';
+    const labels = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+    const normalized = ((heading % 360) + 360) % 360;
+    return labels[Math.round(normalized / 45) % labels.length];
+  }
+
+  function directionValue() {
+    const source = String(context.value('direction.source') || '').toLowerCase();
+    const hybrid = Number(context.value('direction.heading'));
+    const gps = Number(context.value('motion.heading'));
+    const value = source !== 'none' && source !== 'disabled' && Number.isFinite(hybrid) ? hybrid : gps;
+    if (!Number.isFinite(value)) return '—';
+    const normalized = ((value % 360) + 360) % 360;
+    return `${Math.round(normalized)}° · ${cardinalDirection(normalized)}`;
+  }
+
   function coordinateFormat() {
     try {
       const stored = localStorage.getItem(COORDINATE_FORMAT_KEY);
@@ -159,7 +177,7 @@
     { id: 'motionStatus', label: 'Movimiento físico', icon: 'route', metricId: 'metric-motion-status', value: motionStatusValue },
     { id: 'mobility', label: 'Método de desplazamiento', icon: 'compass', metricId: 'metric-mobility', value: movementMethodValue },
     { id: 'speed', label: 'Velocidad', icon: 'speed', metricId: 'metric-speed', value: () => numberValue('motion.speedKmh', ' km/h', 1) },
-    { id: 'heading', label: 'Rumbo', icon: 'heading', metricId: 'metric-heading', value: () => numberValue('motion.heading', '°') },
+    { id: 'heading', label: 'Dirección', icon: 'heading', metricId: 'metric-heading', value: directionValue },
     { id: 'journey', label: 'Journey', icon: 'route', metricId: 'metric-journey', value: journeyValue },
     { id: 'country', label: 'País', icon: 'pin', metricId: 'metric-country', value: () => textValue(context.value('place.country'), 'Pendiente') },
     { id: 'place', label: 'Ciudad', icon: 'city', metricId: 'metric-place', value: () => textValue(context.value('place.city'), 'Pendiente') },
