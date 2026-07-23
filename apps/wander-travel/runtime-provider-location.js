@@ -6,6 +6,10 @@
   const providers = window.WanderProviders || (window.WanderProviders = {});
   const CONTEXT_WATCHDOG_INTERVAL_MS = 2000;
   const CONTEXT_WATCHDOG_LIMIT_MS = 30000;
+  const MAX_ACCEPTED_ACCURACY_M = 180;
+  const MAX_GAP_WITH_JUMP_FILTER_MS = 10 * 60 * 1000;
+  const JUMP_CONFIRMATION_WINDOW_MS = 45 * 1000;
+  const MIN_JUMP_DISTANCE_M = 55;
   let activeSource = null;
   const samples = [];
   let stableMode = 'unknown';
@@ -13,6 +17,9 @@
   let candidateSince = 0;
   let contextWatchdogTimer = null;
   let contextWatchdogStartedAt = 0;
+  let acceptedSample = null;
+  let pendingJump = null;
+  let rejectedJumpCount = 0;
 
   function finite(value) {
     const number = Number(value);
@@ -31,6 +38,97 @@
     const lat2 = radians(b.lat);
     const value = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
     return radius * 2 * Math.asin(Math.min(1, Math.sqrt(value)));
+  }
+
+  function normalizedSample(position) {
+    const coords = position?.coords || {};
+    const lat = finite(coords.latitude);
+    const lng = finite(coords.longitude);
+    if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return {
+      lat,
+      lng,
+      accuracy: finite(coords.accuracy) ?? 999,
+      speedMps: finite(coords.speed),
+      heading: finite(coords.heading),
+      at: Number(position.timestamp) || Date.now(),
+      provider: normalizedProvider(position),
+      replayed: position?.replayed === true,
+    };
+  }
+
+  function modeSpeedLimitKmh(mode = stableMode) {
+    if (mode === 'stationary') return 35;
+    if (mode === 'walking') return 45;
+    if (mode === 'cycling') return 100;
+    if (mode === 'car') return 250;
+    return 180;
+  }
+
+  function publishValidation(status, details = {}) {
+    const metadata = { source: 'gps-quality-filter', kind: 'derived', ttlMs: 15 * 60 * 1000, confidence: 1 };
+    context.set('location.validation.status', status, metadata);
+    context.set('location.validation.rejectedJumpCount', rejectedJumpCount, metadata);
+    context.set('location.validation.details', {
+      ...details,
+      evaluatedAt: new Date().toISOString(),
+    }, metadata);
+  }
+
+  function nearSameCluster(a, b) {
+    if (!a || !b) return false;
+    const allowance = Math.max(45, Math.min(180, Math.max(a.accuracy || 0, b.accuracy || 0) * 1.8));
+    return distanceMeters(a, b) <= allowance;
+  }
+
+  function validateSample(sample) {
+    if (!sample) return { accepted: false, reason: 'invalid' };
+    if (!acceptedSample) return { accepted: true, reason: 'initial' };
+    if (sample.at + 1000 < acceptedSample.at) return { accepted: false, reason: 'stale' };
+
+    const elapsedMs = Math.max(1, sample.at - acceptedSample.at);
+    const distanceM = distanceMeters(acceptedSample, sample);
+    const accuracyAllowanceM = Math.max(25, Math.min(240, Math.max(acceptedSample.accuracy || 0, sample.accuracy || 0) * 1.8));
+    if (distanceM <= accuracyAllowanceM) return { accepted: true, reason: 'within-accuracy', distanceM, elapsedMs };
+    if (elapsedMs >= MAX_GAP_WITH_JUMP_FILTER_MS) return { accepted: true, reason: 'long-gap', distanceM, elapsedMs, relocated: true };
+
+    const impliedSpeedKmh = distanceM / elapsedMs * 3600;
+    const reportedSpeedKmh = sample.speedMps === null ? null : Math.max(0, sample.speedMps * 3.6);
+    const speedLimitKmh = Math.max(modeSpeedLimitKmh(), reportedSpeedKmh === null ? 0 : reportedSpeedKmh * 2 + 20);
+    const speedContradiction = reportedSpeedKmh !== null && reportedSpeedKmh <= 5 && impliedSpeedKmh > 45;
+    const poorAccuracyJump = sample.accuracy > 100 && distanceM > Math.max(MIN_JUMP_DISTANCE_M, accuracyAllowanceM);
+    const implausible = distanceM >= MIN_JUMP_DISTANCE_M && (
+      impliedSpeedKmh > speedLimitKmh ||
+      impliedSpeedKmh > 280 ||
+      speedContradiction ||
+      poorAccuracyJump
+    );
+
+    if (!implausible) return { accepted: true, reason: 'plausible', distanceM, elapsedMs, impliedSpeedKmh, reportedSpeedKmh };
+
+    const pendingAgeMs = pendingJump ? sample.at - pendingJump.at : Infinity;
+    if (pendingJump && pendingAgeMs >= 0 && pendingAgeMs <= JUMP_CONFIRMATION_WINDOW_MS && nearSameCluster(pendingJump, sample)) {
+      return {
+        accepted: true,
+        reason: 'confirmed-relocation',
+        relocated: true,
+        distanceM,
+        elapsedMs,
+        impliedSpeedKmh,
+        reportedSpeedKmh,
+      };
+    }
+
+    pendingJump = sample;
+    return {
+      accepted: false,
+      reason: 'isolated-jump',
+      distanceM,
+      elapsedMs,
+      impliedSpeedKmh,
+      reportedSpeedKmh,
+      accuracyM: sample.accuracy,
+    };
   }
 
   function addSample(position) {
@@ -141,7 +239,20 @@
     const provider = normalizedProvider(position);
     const permissionPrecision = String(position?.permissionPrecision || '').trim().toLowerCase() || null;
     const source = provider === 'network' ? 'network' : provider === 'fused' ? 'fused' : 'gps';
+    const sample = normalizedSample(position);
+    const validation = validateSample(sample);
+
+    if (!validation.accepted) {
+      if (validation.reason === 'isolated-jump') rejectedJumpCount += 1;
+      publishValidation('rejected', validation);
+      window.dispatchEvent(new CustomEvent('wander:location-sample-rejected', { detail: validation }));
+      return false;
+    }
+
+    acceptedSample = sample;
+    pendingJump = null;
     addSample(position);
+    publishValidation(validation.relocated ? 'relocated' : 'accepted', validation);
     context.setRealLocation({
       lat: coords.latitude,
       lng: coords.longitude,
@@ -157,6 +268,7 @@
     });
     publishMobility(position.timestamp || Date.now());
     scheduleContextWatchdog();
+    return true;
   }
 
   function onError(status) {
@@ -208,6 +320,12 @@
       capabilities: { ...(activeSource.capabilities || {}) },
     } : null,
     getMobilitySamples: () => samples.map((sample) => ({ ...sample })),
+    getValidationState: () => ({
+      acceptedSample: acceptedSample ? { ...acceptedSample } : null,
+      pendingJump: pendingJump ? { ...pendingJump } : null,
+      rejectedJumpCount,
+    }),
+    validateSample,
   };
 
   inspectPermission();
