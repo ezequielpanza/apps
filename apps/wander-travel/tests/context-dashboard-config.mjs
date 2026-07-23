@@ -46,6 +46,8 @@ function createRuntime(sharedStorage = new Map()) {
     ['context.status', 'Listo para explorar'],
     ['motion.speedKmh', 4.2],
     ['motion.heading', 90],
+    ['direction.source', 'gps'],
+    ['direction.heading', 90],
     ['motion.status', 'moving'],
     ['context.activity', 'paused'],
     ['location.effective.status', 'available'],
@@ -135,13 +137,14 @@ assert.equal(first.dashboard.querySelector('[data-dashboard-field="summary"]').h
 assert.equal(first.dashboard.querySelector('[data-dashboard-field="place"]').hidden, true);
 assert.equal(first.metrics.get('metric-status').textContent, 'Listo para explorar');
 assert.equal(first.metrics.get('metric-speed').textContent, '4.2 km/h');
-assert.equal(first.metrics.get('metric-heading').textContent, '90°');
+assert.equal(first.metrics.get('metric-heading').textContent, '90° · E');
 assert.equal(first.metrics.get('metric-activity').textContent, 'En movimiento');
 assert.equal(first.metrics.get('metric-location-status').textContent, 'Disponible');
 assert.equal(first.metrics.get('metric-location-source').textContent, 'GPS');
 assert.equal(first.metrics.get('metric-app-version').textContent, 'v0.101.3');
 assert.equal(first.metrics.get('metric-apk-version').textContent, '0.3.0');
 assert.equal(first.api.fields.length, 22);
+assert.equal(first.api.fields.find((field) => field.id === 'heading').label, 'Dirección');
 assert.ok(first.dashboard.querySelector('[data-dashboard-field="activity"]'));
 assert.ok(first.dashboard.querySelector('[data-dashboard-field="coordinates"]'));
 assert.ok(first.dashboard.querySelector('[data-dashboard-field="placeMemory"]'));
