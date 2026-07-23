@@ -52,6 +52,9 @@ jobs:
       - name: Run hybrid direction indicator tests
         run: node apps/wander-travel/tests/direction-indicator.mjs
 
+      - name: Run direction dashboard and segmented track tests
+        run: node apps/wander-travel/tests/direction-track-rendering.mjs
+
       - name: Run notification deep-link tests
         run: node apps/wander-travel/tests/notification-deeplink.mjs
 
