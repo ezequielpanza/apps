@@ -1,7 +1,7 @@
 {
   "result": "success",
-  "expectedVersion": "v0.107.2",
-  "runId": "30044018832",
-  "commit": "fe9f4946e92479fed49ef1628553b2b98c6b7612",
-  "recordedAt": "2026-07-23T20:54:39Z"
+  "expectedVersion": "v0.107.3",
+  "runId": "30044996364",
+  "commit": "474351053c92dcc9df0f2fb9387e453b5b10e341",
+  "recordedAt": "2026-07-23T21:09:08Z"
 }
