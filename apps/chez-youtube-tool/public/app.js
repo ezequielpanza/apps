@@ -22,7 +22,7 @@ function showToast(message) {
   toast.textContent = message;
   toast.hidden = false;
   clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => { toast.hidden = true; }, 3200);
+  showToast.timer = setTimeout(() => { toast.hidden = true; }, 3600);
 }
 
 function number(value) { return Number(value || 0).toLocaleString('es-AR'); }
@@ -33,7 +33,7 @@ async function dashboard() {
   const s = data.stats || {};
   app.innerHTML = `
     <section class="hero"><div><h2>Comentarios bajo control</h2><p>Resumen del funcionamiento de Chez YouTube Tool.</p></div>
-    <span class="badge ${data.connection ? 'ok' : 'warn'}">${data.connection ? 'YouTube conectado' : 'YouTube pendiente'}</span></section>
+    <span class="badge ${data.connection ? 'ok' : 'warn'}">${data.connection ? `Conectado a ${escapeHtml(data.connection.title)}` : 'YouTube pendiente'}</span></section>
     <section class="grid">
       <article class="stat"><strong>${number(s.pending)}</strong><span>Pendientes</span></article>
       <article class="stat"><strong>${number(s.proposed)}</strong><span>Con propuesta</span></article>
@@ -58,19 +58,25 @@ function renderVideos(items) {
 
 async function comments() {
   const data = await api('/api/comments?status=all');
-  app.innerHTML = `<section class="hero"><div><h2>Comentarios</h2><p>Revisá propuestas, editá y registrá cada decisión.</p></div></section>${renderComments(data.items || [])}`;
+  app.innerHTML = `<section class="hero"><div><h2>Comentarios</h2><p>Revisá propuestas, editá, aprendé y publicá.</p></div></section>${renderComments(data.items || [])}`;
   bindCommentActions();
 }
 
 function renderComments(items) {
   if (!items.length) return '<div class="empty">No hay comentarios todavía.</div>';
-  return `<div class="cards">${items.map(c => `<article class="card" data-comment="${c.id}" data-proposal="${c.proposal_id || ''}">
-    <div class="card-head"><div><h3>${escapeHtml(c.author_name)}</h3><p class="meta">${escapeHtml(c.video_title)} · ${date(c.published_at)}</p></div><span class="badge">${escapeHtml(c.status)}</span></div>
-    <p class="comment">${escapeHtml(c.text_original)}</p>
-    ${c.proposed_text ? `<div class="proposal"><strong>Propuesta</strong><p>${escapeHtml(c.final_text || c.proposed_text)}</p></div>` : `<textarea placeholder="Escribí una propuesta de respuesta"></textarea>`}
-    <div class="actions">
-      ${c.proposed_text ? `<button class="secondary" data-action="accept">Aceptar</button><button class="ghost" data-action="edit">Editar</button><button class="danger" data-action="reject">Rechazar</button><button class="ghost" data-action="skip">No responder</button>` : `<button class="primary" data-action="create">Guardar propuesta</button>`}
-    </div></article>`).join('')}</div>`;
+  return `<div class="cards">${items.map(c => {
+    const approved = ['accepted', 'edited'].includes(c.proposal_status);
+    const published = c.status === 'published' || c.publish_status === 'published';
+    return `<article class="card" data-comment="${c.id}" data-proposal="${c.proposal_id || ''}">
+      <div class="card-head"><div><h3>${escapeHtml(c.author_name)}</h3><p class="meta">${escapeHtml(c.video_title)} · ${date(c.published_at)}</p></div><span class="badge ${published ? 'ok' : ''}">${escapeHtml(c.status)}</span></div>
+      <p class="comment">${escapeHtml(c.text_original)}</p>
+      ${c.proposed_text ? `<div class="proposal"><strong>${published ? 'Respuesta publicada' : 'Propuesta'}</strong><p>${escapeHtml(c.final_text || c.proposed_text)}</p></div>` : `<textarea placeholder="Escribí una propuesta de respuesta"></textarea>`}
+      <div class="actions">
+        ${!c.proposed_text ? '<button class="primary" data-action="create">Guardar propuesta</button>' : ''}
+        ${c.proposed_text && c.proposal_status === 'proposed' ? '<button class="secondary" data-action="accept">Aceptar</button><button class="ghost" data-action="edit">Editar</button><button class="danger" data-action="reject">Rechazar</button><button class="ghost" data-action="skip">No responder</button>' : ''}
+        ${approved && !published ? '<button class="primary" data-action="publish">Publicar en YouTube</button>' : ''}
+      </div></article>`;
+  }).join('')}</div>`;
 }
 
 function bindCommentActions() {
@@ -80,6 +86,7 @@ function bindCommentActions() {
     const commentId = card.dataset.comment;
     const proposalId = card.dataset.proposal;
     try {
+      button.disabled = true;
       if (action === 'create') {
         const proposed_text = card.querySelector('textarea').value.trim();
         await api(`/api/comments/${commentId}/proposals`, { method: 'POST', body: JSON.stringify({ proposed_text }) });
@@ -88,13 +95,20 @@ function bindCommentActions() {
         const final_text = prompt('Editar respuesta', original);
         if (final_text === null) return;
         await api(`/api/proposals/${proposalId}/review`, { method: 'POST', body: JSON.stringify({ action: 'edited', final_text }) });
+      } else if (action === 'publish') {
+        if (!confirm('¿Publicar esta respuesta en YouTube?')) return;
+        await api(`/api/proposals/${proposalId}/publish`, { method: 'POST', body: '{}' });
+        showToast('Respuesta publicada en YouTube');
       } else {
         const map = { accept: 'accepted', reject: 'rejected', skip: 'skipped' };
         await api(`/api/proposals/${proposalId}/review`, { method: 'POST', body: JSON.stringify({ action: map[action] }) });
+        showToast('Decisión guardada');
       }
-      showToast('Decisión guardada');
       await comments();
-    } catch (error) { showToast(error.message); }
+    } catch (error) {
+      showToast(error.message);
+      button.disabled = false;
+    }
   }));
 }
 
@@ -111,14 +125,20 @@ async function styleView() {
     <section class="panel"><h3>Reglas</h3>${data.rules?.length ? `<div class="cards">${data.rules.map(r => `<article class="card"><span class="badge">${escapeHtml(r.status)}</span><h4>${escapeHtml(r.title)}</h4><p>${escapeHtml(r.description)}</p><p class="meta">${number(r.evidence_count)} evidencias</p></article>`).join('')}</div>` : '<div class="empty">Las reglas aparecerán a medida que revisen respuestas.</div>'}</section>`;
 }
 
+async function connectYouTube() {
+  const result = await api('/api/youtube/connect', { method: 'POST', body: '{}' });
+  location.href = result.authorizationUrl;
+}
+
 async function setupView() {
   const data = await api('/api/setup');
   app.innerHTML = `<section class="hero"><div><h2>Ajustes</h2><p>Estado de las integraciones necesarias.</p></div></section>
     <section class="panel setup-list">
       <div class="setup-row"><div><strong>Autenticación</strong><p class="meta">Protección de la PWA</p></div><span class="badge ok">${escapeHtml(data.authMode)}</span></div>
-      <div class="setup-row"><div><strong>YouTube OAuth</strong><p class="meta">Lectura y publicación de comentarios</p></div><span class="badge ${data.youtubeConfigured ? 'ok' : 'warn'}">${data.youtubeConfigured ? 'Configurado' : 'Pendiente'}</span></div>
+      <div class="setup-row"><div><strong>YouTube OAuth</strong><p class="meta">Lectura y publicación de comentarios</p></div><div><span class="badge ${data.youtubeConnected ? 'ok' : 'warn'}">${data.youtubeConnected ? 'Conectado' : data.youtubeConfigured ? 'Listo para conectar' : 'Faltan secretos'}</span>${data.youtubeConfigured ? '<button class="secondary" id="connectYouTube">Conectar / renovar</button>' : ''}</div></div>
       <div class="setup-row"><div><strong>GPT privado</strong><p class="meta">Actions para traer pendientes y guardar propuestas</p></div><span class="badge ${data.gptConfigured ? 'ok' : 'warn'}">${data.gptConfigured ? 'Configurado' : 'Pendiente'}</span></div>
     </section>`;
+  document.querySelector('#connectYouTube')?.addEventListener('click', connectYouTube);
 }
 
 async function render() {
@@ -142,10 +162,23 @@ tabs.forEach(tab => tab.addEventListener('click', () => {
 
 syncButton.addEventListener('click', async () => {
   try {
+    syncButton.disabled = true;
     const result = await api('/api/sync', { method: 'POST', body: '{}' });
-    showToast(result.message || 'Sincronización solicitada');
+    showToast(result.message || 'Sincronización completada');
+    await render();
   } catch (error) { showToast(error.message); }
+  finally { syncButton.disabled = false; }
 });
+
+const oauth = new URLSearchParams(location.search).get('oauth');
+if (oauth === 'connected') {
+  showToast('Canal de YouTube conectado');
+  history.replaceState({}, '', location.pathname);
+}
+if (oauth === 'error') {
+  showToast('No se pudo conectar YouTube');
+  history.replaceState({}, '', location.pathname);
+}
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 render();
