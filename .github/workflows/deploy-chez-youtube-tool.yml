@@ -104,5 +104,18 @@ jobs:
         env:
           WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
         run: |
-          sleep 5
-          curl --fail --silent --show-error "$WORKER_URL/api/health"
+          set -euo pipefail
+          HEALTH_URL="$WORKER_URL/api/health"
+          echo "Checking $HEALTH_URL"
+          for attempt in $(seq 1 12); do
+            STATUS=$(curl --silent --show-error --output health-response.txt --write-out '%{http_code}' "$HEALTH_URL" || true)
+            if [ "$STATUS" = "200" ]; then
+              cat health-response.txt
+              exit 0
+            fi
+            echo "Attempt $attempt/12 returned HTTP $STATUS; waiting for propagation..."
+            cat health-response.txt || true
+            sleep 5
+          done
+          echo "Health endpoint did not become ready in time."
+          exit 1
