@@ -4,17 +4,20 @@ PWA y backend en Cloudflare para centralizar comentarios de YouTube, preparar re
 
 ## Estado
 
-Primera base ejecutable:
+Segunda base ejecutable:
 
 - PWA responsive e instalable.
 - Cloudflare Worker con API REST.
 - Base D1 con comentarios, propuestas, revisiones, publicaciones y aprendizaje de estilo.
-- Acciones para aceptar, editar, rechazar o marcar “no responder”.
-- Endpoints preparados para el GPT privado.
-- Workflow de GitHub Actions que crea D1, aplica migraciones y despliega Worker + assets.
+- Google OAuth 2.0 con PKCE y protección `state`.
+- Tokens de YouTube cifrados con AES-GCM antes de guardarse en D1.
+- Renovación automática del access token mediante refresh token.
+- Sincronización de videos y comentarios del canal.
 - Cron configurado cada 15 minutos.
-
-La conexión OAuth con YouTube y la publicación real se implementan en la siguiente etapa.
+- Acciones para aceptar, editar, rechazar o marcar “no responder”.
+- Publicación de respuestas aprobadas mediante `comments.insert`.
+- Endpoints preparados para el GPT privado.
+- Workflow de GitHub Actions que crea D1, aplica migraciones, despliega y configura secretos.
 
 ## Tecnología
 
@@ -23,6 +26,8 @@ La conexión OAuth con YouTube y la publicación real se implementan en la sigui
 - Workers Static Assets
 - HTML, CSS y JavaScript
 - PWA / Service Worker
+- YouTube Data API v3
+- Google OAuth 2.0
 
 ## Desarrollo
 
@@ -38,11 +43,19 @@ npm run dev
 - Carpeta: `apps/chez-youtube-tool`
 - Worker: `chez-youtube-tool`
 - Workflow: `.github/workflows/deploy-chez-youtube-tool.yml`
-- URL prevista: `https://chez-youtube-tool.<subdominio-workers>.workers.dev`
+- URL: se obtiene del resultado de `wrangler deploy`
 
-## Secretos futuros
+## Secretos de GitHub Actions
 
-No deben guardarse en el repositorio:
+Además de los secretos globales de Cloudflare, el repositorio debe contener:
+
+- `CHEZ_YOUTUBE_GOOGLE_CLIENT_ID`
+- `CHEZ_YOUTUBE_GOOGLE_CLIENT_SECRET`
+- `CHEZ_YOUTUBE_TOKEN_ENCRYPTION_KEY`
+- `CHEZ_YOUTUBE_GPT_SHARED_SECRET`
+- `CHEZ_YOUTUBE_ALLOWED_EMAILS`
+
+El workflow los carga en el Worker con estos nombres internos:
 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
@@ -50,9 +63,41 @@ No deben guardarse en el repositorio:
 - `GPT_SHARED_SECRET`
 - `ALLOWED_EMAILS`
 
+No deben guardarse valores reales dentro del repositorio.
+
+## Configuración de Google Cloud
+
+1. Crear o elegir un proyecto en Google Cloud.
+2. Habilitar **YouTube Data API v3**.
+3. Configurar la pantalla de consentimiento OAuth.
+4. Crear credenciales OAuth de tipo **Web application**.
+5. Agregar como URI de redirección autorizada:
+
+```text
+https://<URL-DEL-WORKER>/api/youtube/callback
+```
+
+6. Guardar el Client ID y Client Secret en los secretos de GitHub indicados arriba.
+7. Abrir la PWA, entrar en **Ajustes** y pulsar **Conectar / renovar**.
+
+El scope utilizado es:
+
+```text
+https://www.googleapis.com/auth/youtube.force-ssl
+```
+
+## Flujo de comentarios
+
+```text
+YouTube → sincronización → comentario pendiente → propuesta →
+aceptar/editar/rechazar/no responder → publicar → aprendizaje
+```
+
+La publicación solo se habilita después de aceptar o editar una propuesta.
+
 ## API del GPT
 
-Autenticación futura:
+Autenticación:
 
 ```text
 Authorization: Bearer GPT_SHARED_SECRET
@@ -64,10 +109,9 @@ Endpoints iniciales:
 - `GET /api/gpt/style-profile`
 - `POST /api/gpt/proposals/batch`
 
-## Próxima etapa
+## Pendiente
 
-1. Implementar Google OAuth.
-2. Sincronizar videos, comentarios e hilos.
-3. Publicar respuestas aprobadas.
-4. Proteger la PWA con Cloudflare Access.
-5. Crear la Action del GPT privado Chez YouTube.
+1. Proteger la PWA con Cloudflare Access y configurar los emails permitidos.
+2. Crear la Action OpenAPI del GPT privado Chez YouTube.
+3. Añadir filtros y procesamiento por episodio.
+4. Construir reglas de estilo sugeridas a partir de correcciones repetidas.
