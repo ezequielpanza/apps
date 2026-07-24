@@ -43,7 +43,7 @@ npm run dev
 - Carpeta: `apps/chez-youtube-tool`
 - Worker: `chez-youtube-tool`
 - Workflow: `.github/workflows/deploy-chez-youtube-tool.yml`
-- URL: se obtiene del resultado de `wrangler deploy`
+- URL: `https://chez-youtube-tool.ezequielpanza.workers.dev`
 
 ## Secretos de GitHub Actions
 
@@ -74,7 +74,7 @@ No deben guardarse valores reales dentro del repositorio.
 5. Agregar como URI de redirección autorizada:
 
 ```text
-https://<URL-DEL-WORKER>/api/youtube/callback
+https://chez-youtube-tool.ezequielpanza.workers.dev/api/youtube/callback
 ```
 
 6. Guardar el Client ID y Client Secret en los secretos de GitHub indicados arriba.
