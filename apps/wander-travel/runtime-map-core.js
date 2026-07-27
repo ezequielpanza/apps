@@ -1,6 +1,8 @@
 (() => {
   const TRANSPARENT_TILE = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" fill="transparent"/></svg>')}`;
-  const nativeTiles = window.Capacitor?.Plugins?.WanderOfflineTiles || null;
+  const nativeTiles = window.Capacitor?.isNativePlatform?.() === true
+    ? window.Capacitor?.Plugins?.WanderOfflineTiles || null
+    : null;
 
   const map = L.map('wander-map', {
     zoomControl: false,
