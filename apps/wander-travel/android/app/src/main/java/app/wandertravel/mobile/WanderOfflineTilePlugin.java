@@ -18,6 +18,8 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @CapacitorPlugin(name = "WanderOfflineTiles")
 public class WanderOfflineTilePlugin extends Plugin {
@@ -32,6 +34,7 @@ public class WanderOfflineTilePlugin extends Plugin {
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int READ_TIMEOUT_MS = 12000;
     private static final int MAX_TILE_BYTES = 1024 * 1024;
+    private static final ExecutorService IO_EXECUTOR = Executors.newFixedThreadPool(4);
 
     private File cacheRoot() {
         File root = new File(getContext().getFilesDir(), CACHE_DIRECTORY);
@@ -151,7 +154,7 @@ public class WanderOfflineTilePlugin extends Plugin {
             return;
         }
 
-        getBridge().executeOnThreadPool(() -> {
+        IO_EXECUTOR.execute(() -> {
             File file = tileFile(z, x, y);
             int days = retentionDays();
             boolean hasCached = file.isFile() && file.length() > 0;
@@ -244,14 +247,14 @@ public class WanderOfflineTilePlugin extends Plugin {
 
     @PluginMethod
     public void getStats(PluginCall call) {
-        getBridge().executeOnThreadPool(() -> call.resolve(statsPayload()));
+        IO_EXECUTOR.execute(() -> call.resolve(statsPayload()));
     }
 
     @PluginMethod
     public void configure(PluginCall call) {
         int days = normalizeRetentionDays(call.getInt("retentionDays"));
         saveRetentionDays(days);
-        getBridge().executeOnThreadPool(() -> {
+        IO_EXECUTOR.execute(() -> {
             if (days == 0) deleteRecursively(cacheRoot());
             else pruneIfNeeded(days);
             cacheRoot().mkdirs();
@@ -269,7 +272,7 @@ public class WanderOfflineTilePlugin extends Plugin {
 
     @PluginMethod
     public void clear(PluginCall call) {
-        getBridge().executeOnThreadPool(() -> {
+        IO_EXECUTOR.execute(() -> {
             boolean cleared = deleteRecursively(cacheRoot());
             cacheRoot().mkdirs();
             JSObject result = statsPayload();
