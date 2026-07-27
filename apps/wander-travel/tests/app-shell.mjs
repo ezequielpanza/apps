@@ -53,13 +53,14 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.107.3');
-assert.equal(manifest.start_url, './?app=v0.107.3');
-assert.equal(packageManifest.version, '0.107.3');
-assert.equal(androidVersion.versionName, '0.9.1');
-assert.equal(androidVersion.versionCode, 14);
-assert.equal(capacitorConfig.server.url, 'https://wander-travel.pages.dev');
-assert.equal(capacitorConfig.server.errorPath, 'index.html');
+assert.equal(versionMatch[1], 'v0.108.0');
+assert.equal(manifest.start_url, './?app=v0.108.0');
+assert.equal(packageManifest.version, '0.108.0');
+assert.equal(androidVersion.versionName, '0.10.0');
+assert.equal(androidVersion.versionCode, 15);
+assert.equal(capacitorConfig.webDir, 'mobile-dist');
+assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
+assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
 
 const dashboard = read('runtime-context-dashboard.js');
 const direction = read('runtime-direction-indicator.js');
@@ -68,12 +69,14 @@ const locationProvider = read('runtime-provider-location.js');
 const tracks = read('runtime-tracks.js');
 const sessionEngine = read('runtime-session-engine.js');
 const notificationPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderNotificationPlugin.java');
+const offlineTilePlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderOfflineTilePlugin.java');
 const mainActivity = read('android/app/src/main/java/app/wandertravel/mobile/MainActivity.java');
 const notificationRouter = read('runtime-notification-router.js');
 const interactionPanel = read('runtime-interaction-panel.js');
 const roomCompanion = read('runtime-room-companion.js');
 const mapCore = read('runtime-map-core.js');
 const mapCacheSettings = read('runtime-map-cache-settings.js');
+const mobileBuild = read('mobile/build-web.mjs');
 const travelLog = read('runtime-travel-log.js');
 const travelLogScreen = read('runtime-travel-log-screen.js');
 
@@ -111,13 +114,33 @@ assert.match(notificationRouter, /WanderInteractionPanel\?\.focus/);
 assert.match(interactionPanel, /function focus\(id\)/);
 assert.match(roomCompanion, /function openNotification\(id\)/);
 
-assert.match(mapCore, /https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png/);
+assert.match(mainActivity, /registerPlugin\(WanderOfflineTilePlugin\.class\)/);
+assert.match(offlineTilePlugin, /name = "WanderOfflineTiles"/);
+assert.match(offlineTilePlugin, /CACHE_DIRECTORY = "osm-tile-cache-v1"/);
+assert.match(offlineTilePlugin, /void getTile\(PluginCall call\)/);
+assert.match(offlineTilePlugin, /tileResponse\(readBytes\(file\), true, true/);
+assert.match(offlineTilePlugin, /void getStats\(PluginCall call\)/);
+assert.match(offlineTilePlugin, /void configure\(PluginCall call\)/);
+assert.match(offlineTilePlugin, /void clear\(PluginCall call\)/);
+assert.match(mapCore, /NativeOsmTileLayer/);
+assert.match(mapCore, /WanderOfflineTiles/);
+assert.match(mapCore, /wander-current-track-pane/);
+assert.match(mapCore, /errorTileUrl: TRANSPARENT_TILE/);
+assert.match(mapCacheSettings, /El recorrido se registra y se dibuja incluso cuando no hay ningún tile disponible/);
+assert.match(mapCacheSettings, /Almacenamiento/);
+assert.match(mapCacheSettings, /App local/);
+assert.match(platform, /const PRODUCTION_ORIGIN = 'https:\/\/wander-travel\.pages\.dev'/);
+assert.match(platform, /const origin = isNative\(\) \? PRODUCTION_ORIGIN : window\.location\.origin/);
+assert.match(mobileBuild, /vendor', 'leaflet/);
+assert.match(mobileBuild, /leafletAssets/);
+assert.match(mobileBuild, /Integrity mismatch/);
+assert.match(mobileBuild, /replace\('https:\/\/unpkg\.com\/leaflet@1\.9\.4\/dist\/leaflet\.css', 'vendor\/leaflet\/leaflet\.css'\)/);
+assert.match(mobileBuild, /replace\('https:\/\/unpkg\.com\/leaflet@1\.9\.4\/dist\/leaflet\.js', 'vendor\/leaflet\/leaflet\.js'\)/);
+
 assert.match(serviceWorker, /TILE_CACHE_NAME = 'wander-map-tiles-v1'/);
 assert.match(serviceWorker, /MAX_TILE_ENTRIES = 2500/);
 assert.match(serviceWorker, /WANDER_MAP_CACHE_CONFIG/);
 assert.match(serviceWorker, /WANDER_MAP_CACHE_CLEAR/);
-assert.match(mapCacheSettings, /No descarga zonas por adelantado/);
-assert.match(mapCacheSettings, /Vaciar mapas guardados/);
 
 assert.match(travelLog, /window\.WanderTravelLog/);
 assert.match(travelLog, /contextChanges/);
@@ -135,4 +158,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} GPS-filtered direction shell is consistent`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts locally and keeps OSM tiles on-device`);
