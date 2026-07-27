@@ -1,10 +1,11 @@
 (() => {
   const settingsPanel = document.querySelector('#settings-panel');
   const ui = window.WanderUI;
-  if (!settingsPanel || !('serviceWorker' in navigator) || window.WanderMapCacheSettings) return;
+  if (!settingsPanel || window.WanderMapCacheSettings) return;
 
+  const nativeTiles = window.Capacitor?.Plugins?.WanderOfflineTiles || null;
   const STORAGE_KEY = 'wander.mapCache.retentionDays.v1';
-  const DEFAULT_DAYS = 30;
+  const DEFAULT_DAYS = nativeTiles ? 90 : 30;
   const ALLOWED_DAYS = new Set([0, 7, 30, 90, 180, 365]);
 
   function storedDays() {
@@ -22,12 +23,20 @@
     return days;
   }
 
+  function formatBytes(value) {
+    const bytes = Math.max(0, Number(value) || 0);
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(bytes >= 100 * 1024 * 1024 ? 0 : 1)} MB`;
+  }
+
   async function worker() {
+    if (!('serviceWorker' in navigator)) return null;
     const registration = await navigator.serviceWorker.ready;
     return navigator.serviceWorker.controller || registration.active || registration.waiting || null;
   }
 
-  async function request(type, payload = {}) {
+  async function workerRequest(type, payload = {}) {
     const target = await worker();
     if (!target) throw new Error('Service worker unavailable');
     return new Promise((resolve, reject) => {
@@ -42,18 +51,27 @@
     });
   }
 
+  async function request(type, payload = {}) {
+    if (typeof nativeTiles?.getStats === 'function') {
+      if (type === 'WANDER_MAP_CACHE_STATUS') return nativeTiles.getStats();
+      if (type === 'WANDER_MAP_CACHE_CONFIG') return nativeTiles.configure({ retentionDays: payload.retentionDays });
+      if (type === 'WANDER_MAP_CACHE_CLEAR') return nativeTiles.clear();
+    }
+    return workerRequest(type, payload);
+  }
+
   const card = document.createElement('div');
   card.className = 'screen-card settings-group map-cache-settings';
   card.innerHTML = `
-    <h3>Mapa guardado</h3>
-    <p class="panel-note">Wander conserva los sectores del mapa que vas viendo para poder mostrarlos nuevamente cuando no haya cobertura. No descarga zonas por adelantado.</p>
+    <h3>Mapa local</h3>
+    <p class="panel-note">Wander conserva los sectores OSM que vas viendo y los vuelve a mostrar sin cobertura. El recorrido se registra y se dibuja incluso cuando no hay ningún tile disponible.</p>
     <div class="message-timeout-setting-row">
       <div>
         <strong>Conservar mapas</strong>
-        <span>Tiempo durante el cual se guardan los tiles ya visualizados.</span>
+        <span>Tiempo durante el cual se guardan los sectores ya visualizados.</span>
       </div>
       <select id="map-cache-retention-select" aria-label="Tiempo de conservación del mapa">
-        <option value="0">Solo caché del sistema</option>
+        <option value="0">No guardar</option>
         <option value="7">7 días</option>
         <option value="30">30 días</option>
         <option value="90">90 días</option>
@@ -62,36 +80,48 @@
       </select>
     </div>
     <div class="simulator-state-row"><span>Tiles guardados</span><strong id="map-cache-count">Comprobando</strong></div>
+    <div class="simulator-state-row"><span>Espacio local</span><strong id="map-cache-size">—</strong></div>
+    <div class="simulator-state-row"><span>Almacenamiento</span><strong id="map-cache-storage">—</strong></div>
     <div class="simulator-state-row"><span>Política activa</span><strong id="map-cache-policy">—</strong></div>
+    <p class="panel-note">Wander solo guarda mapas que abrís normalmente. La descarga anticipada de regiones requiere una fuente OSM propia o que autorice expresamente el uso offline.</p>
     <div class="button-row compact-actions screen-card-actions">
-      <button id="map-cache-clear" type="button">Vaciar mapas guardados</button>
+      <button id="map-cache-clear" type="button">Vaciar mapa local</button>
     </div>
   `;
   settingsPanel.prepend(card);
 
   const select = card.querySelector('#map-cache-retention-select');
   const count = card.querySelector('#map-cache-count');
+  const size = card.querySelector('#map-cache-size');
+  const storage = card.querySelector('#map-cache-storage');
   const policy = card.querySelector('#map-cache-policy');
   const clearButton = card.querySelector('#map-cache-clear');
 
   function policyLabel(days) {
-    if (days === 0) return 'Caché normal del navegador';
+    if (days === 0) return 'No se guardan tiles nuevos';
     if (days === 365) return 'Hasta 1 año';
     return `${days} días · disponible sin conexión`;
   }
 
   function render(status = {}) {
     const days = Number.isFinite(Number(status.retentionDays)) ? Number(status.retentionDays) : storedDays();
+    const tileCount = Number(status.count ?? status.tileCount) || 0;
+    const bytes = Number(status.bytes) || 0;
     select.value = String(days);
-    count.textContent = `${Number(status.count) || 0} tiles`;
+    count.textContent = `${tileCount} tiles`;
+    size.textContent = bytes > 0 ? formatBytes(bytes) : 'Sin datos';
+    storage.textContent = status.native === true || nativeTiles ? 'App local' : 'Caché web';
     policy.textContent = policyLabel(days);
-    clearButton.disabled = !(Number(status.count) > 0);
+    clearButton.disabled = tileCount <= 0;
     window.WanderContext?.set?.('map.cache', {
       retentionDays: days,
-      count: Number(status.count) || 0,
-      maxEntries: Number(status.maxEntries) || null,
+      count: tileCount,
+      bytes,
+      native: status.native === true || Boolean(nativeTiles),
+      maxEntries: Number(status.maxEntries ?? status.maxTileCount) || null,
       updatedAt: new Date().toISOString(),
     }, { source: 'map-cache-settings', kind: 'observed', ttlMs: 10 * 60 * 1000, confidence: 1 });
+    window.dispatchEvent(new CustomEvent('wander:map-cache-status', { detail: { ...status, count: tileCount, bytes, retentionDays: days } }));
     return status;
   }
 
@@ -100,6 +130,8 @@
       return render(await request('WANDER_MAP_CACHE_STATUS'));
     } catch {
       count.textContent = 'No disponible';
+      size.textContent = '—';
+      storage.textContent = nativeTiles ? 'App local' : 'Caché web';
       policy.textContent = policyLabel(storedDays());
       return null;
     }
@@ -113,10 +145,10 @@
       render(status);
       if (options.silent !== true) {
         ui?.showWander?.(
-          'Mapa guardado actualizado',
+          'Mapa local actualizado',
           retentionDays === 0
-            ? 'Wander dejó de mantener una caché propia de mapas. El navegador seguirá usando su caché normal.'
-            : `Los sectores del mapa que mires se conservarán durante ${retentionDays === 365 ? 'un año' : `${retentionDays} días`}.`,
+            ? 'Wander dejó de guardar nuevos sectores del mapa. El recorrido seguirá registrándose normalmente.'
+            : `Los sectores que mires se conservarán durante ${retentionDays === 365 ? 'un año' : `${retentionDays} días`}.`,
           { timeoutMs: 6500 }
         );
       }
@@ -131,7 +163,7 @@
     try {
       const status = await request('WANDER_MAP_CACHE_CLEAR');
       render(status);
-      ui?.showWander?.('Mapas eliminados', 'Se vació la caché propia de mapas. Se volverán a guardar las zonas que recorras o consultes.', { timeoutMs: 6500 });
+      ui?.showWander?.('Mapa local eliminado', 'Se borraron los tiles guardados. Las sesiones y los recorridos no fueron modificados.', { timeoutMs: 6500 });
       return status;
     } finally {
       clearButton.disabled = false;
@@ -144,7 +176,7 @@
   window.addEventListener('wander:screen-change', (event) => {
     if (event.detail?.to === 'settings') refresh();
   });
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
+  navigator.serviceWorker?.addEventListener?.('controllerchange', () => {
     setTimeout(() => applyRetention(storedDays(), { silent: true }), 300);
   });
 
@@ -153,9 +185,8 @@
     clear,
     setRetentionDays: applyRetention,
     getRetentionDays: storedDays,
+    usesNativeStorage: () => Boolean(nativeTiles),
   });
 
-  navigator.serviceWorker.ready
-    .then(() => applyRetention(storedDays(), { silent: true }))
-    .catch(() => refresh());
+  applyRetention(storedDays(), { silent: true }).catch(() => refresh());
 })();
