@@ -27,6 +27,7 @@ function addDynamicReferences(target, source) {
   const patterns = [
     /(?:script\.src|link\.href)\s*=\s*["']\.\/([^"']+)["']/g,
     /loadScript\(\s*["']\.\/([^"']+)["']/g,
+    /ensureStyles\(\s*["']\.\/([^"']+)["']/g,
   ];
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) target.add(match[1].split(/[?#]/)[0]);
