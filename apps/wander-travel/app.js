@@ -47,21 +47,12 @@
     queueMicrotask(renderLocationQualityNow);
   }
 
-  function ensureTravelLogStyles() {
-    if (document.querySelector('link[data-wander-travel-log]')) return;
+  function ensureStyles(href, marker) {
+    if (document.querySelector(`link[data-${marker}]`)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = './wander-travel-log.css?v=20260719-01';
-    link.dataset.wanderTravelLog = 'true';
-    document.head.appendChild(link);
-  }
-
-  function ensureDirectionStyles() {
-    if (document.querySelector('link[data-wander-direction-indicator]')) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = './wander-direction-indicator.css?v=20260722-01';
-    link.dataset.wanderDirectionIndicator = 'true';
+    link.href = href;
+    link.dataset[marker.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = 'true';
     document.head.appendChild(link);
   }
 
@@ -82,14 +73,14 @@
   }
 
   async function loadTravelMemory() {
-    ensureTravelLogStyles();
+    ensureStyles('./wander-travel-log.css?v=20260719-01', 'wander-travel-log');
     await loadScript('./runtime-travel-log.js?v=20260719-01', 'wander-travel-log');
     await loadScript('./runtime-travel-log-screen.js?v=20260719-01', 'wander-travel-log-screen');
     await loadScript('./runtime-morning-briefing.js?v=20260719-01', 'wander-morning-briefing');
   }
 
   async function loadDirectionIndicator() {
-    ensureDirectionStyles();
+    ensureStyles('./wander-direction-indicator.css?v=20260722-01', 'wander-direction-indicator');
     await loadScript('./runtime-direction-indicator.js?v=20260722-01', 'wander-direction-indicator');
     await loadScript('./runtime-direction-indicator-settings.js?v=20260722-01', 'wander-direction-indicator-settings');
   }
@@ -99,7 +90,7 @@
   }
 
   async function loadMapCacheSettings() {
-    await loadScript('./runtime-map-cache-settings.js?v=20260722-01', 'wander-map-cache-settings');
+    await loadScript('./runtime-map-cache-settings.js?v=20260723-01', 'wander-map-cache-settings');
   }
 
   async function initialize() {
