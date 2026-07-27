@@ -90,7 +90,6 @@
   }
 
   async function loadMapCacheSettings() {
-    ensureStyles('./wander-offline-map.css?v=20260723-01', 'wander-offline-map');
     await loadScript('./runtime-map-cache-settings.js?v=20260723-01', 'wander-map-cache-settings');
   }
 
