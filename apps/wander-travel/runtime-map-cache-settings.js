@@ -3,7 +3,9 @@
   const ui = window.WanderUI;
   if (!settingsPanel || window.WanderMapCacheSettings) return;
 
-  const nativeTiles = window.Capacitor?.Plugins?.WanderOfflineTiles || null;
+  const nativeTiles = window.Capacitor?.isNativePlatform?.() === true
+    ? window.Capacitor?.Plugins?.WanderOfflineTiles || null
+    : null;
   const STORAGE_KEY = 'wander.mapCache.retentionDays.v1';
   const DEFAULT_DAYS = nativeTiles ? 90 : 30;
   const ALLOWED_DAYS = new Set([0, 7, 30, 90, 180, 365]);
@@ -121,6 +123,7 @@
       maxEntries: Number(status.maxEntries ?? status.maxTileCount) || null,
       updatedAt: new Date().toISOString(),
     }, { source: 'map-cache-settings', kind: 'observed', ttlMs: 10 * 60 * 1000, confidence: 1 });
+    window.WanderContext?.set?.('map.track.available', true, { source: 'map-cache-settings', kind: 'observed', ttlMs: Infinity, confidence: 1 });
     window.dispatchEvent(new CustomEvent('wander:map-cache-status', { detail: { ...status, count: tileCount, bytes, retentionDays: days } }));
     return status;
   }
