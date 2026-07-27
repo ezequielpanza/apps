@@ -1,5 +1,6 @@
 package app.wandertravel.mobile;
 
+import android.content.SharedPreferences;
 import android.util.Base64;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -23,6 +24,9 @@ public class WanderOfflineTilePlugin extends Plugin {
     private static final String CACHE_DIRECTORY = "osm-tile-cache-v1";
     private static final String TILE_TEMPLATE = "https://tile.openstreetmap.org/%d/%d/%d.png";
     private static final String USER_AGENT = "WanderTravel/0.10.0 (+https://wander-travel.pages.dev)";
+    private static final String PREFS_NAME = "wander_offline_tiles";
+    private static final String RETENTION_KEY = "retention_days";
+    private static final int DEFAULT_RETENTION_DAYS = 90;
     private static final int MAX_ZOOM = 19;
     private static final int MAX_TILE_COUNT = 4000;
     private static final int CONNECT_TIMEOUT_MS = 8000;
@@ -37,6 +41,30 @@ public class WanderOfflineTilePlugin extends Plugin {
 
     private File tileFile(int z, int x, int y) {
         return new File(new File(new File(cacheRoot(), String.valueOf(z)), String.valueOf(x)), y + ".png");
+    }
+
+    private int normalizeRetentionDays(Integer value) {
+        if (value == null) return DEFAULT_RETENTION_DAYS;
+        int days = value;
+        return days == 0 || days == 7 || days == 30 || days == 90 || days == 180 || days == 365
+            ? days
+            : DEFAULT_RETENTION_DAYS;
+    }
+
+    private int retentionDays() {
+        SharedPreferences preferences = getContext().getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE);
+        return normalizeRetentionDays(preferences.getInt(RETENTION_KEY, DEFAULT_RETENTION_DAYS));
+    }
+
+    private void saveRetentionDays(int days) {
+        getContext().getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putInt(RETENTION_KEY, normalizeRetentionDays(days))
+            .apply();
+    }
+
+    private long retentionMs(int days) {
+        return Math.max(0, days) * 24L * 60L * 60L * 1000L;
     }
 
     private boolean validCoordinates(int z, int x, int y) {
@@ -97,12 +125,14 @@ public class WanderOfflineTilePlugin extends Plugin {
         }
         if (destination.exists() && !destination.delete()) throw new IOException("Could not replace cached tile");
         if (!temporary.renameTo(destination)) throw new IOException("Could not commit cached tile");
+        destination.setLastModified(System.currentTimeMillis());
     }
 
-    private JSObject tileResponse(byte[] bytes, boolean cached, int z, int x, int y) {
+    private JSObject tileResponse(byte[] bytes, boolean cached, boolean stale, int z, int x, int y) {
         JSObject result = new JSObject();
         result.put("ok", true);
         result.put("cached", cached);
+        result.put("stale", stale);
         result.put("z", z);
         result.put("x", x);
         result.put("y", y);
@@ -123,18 +153,30 @@ public class WanderOfflineTilePlugin extends Plugin {
 
         getBridge().executeOnThreadPool(() -> {
             File file = tileFile(z, x, y);
+            int days = retentionDays();
+            boolean hasCached = file.isFile() && file.length() > 0;
+            boolean fresh = hasCached && days > 0 && System.currentTimeMillis() - file.lastModified() <= retentionMs(days);
             try {
-                if (file.isFile() && file.length() > 0) {
+                if (fresh) {
                     file.setLastModified(System.currentTimeMillis());
-                    call.resolve(tileResponse(readBytes(file), true, z, x, y));
+                    call.resolve(tileResponse(readBytes(file), true, false, z, x, y));
                     return;
                 }
 
                 byte[] bytes = downloadTile(z, x, y);
-                writeAtomically(file, bytes);
-                pruneIfNeeded();
-                call.resolve(tileResponse(bytes, false, z, x, y));
+                if (days > 0) {
+                    writeAtomically(file, bytes);
+                    pruneIfNeeded(days);
+                }
+                call.resolve(tileResponse(bytes, false, false, z, x, y));
             } catch (Exception error) {
+                if (hasCached) {
+                    try {
+                        file.setLastModified(System.currentTimeMillis());
+                        call.resolve(tileResponse(readBytes(file), true, true, z, x, y));
+                        return;
+                    } catch (Exception ignored) {}
+                }
                 JSObject result = new JSObject();
                 result.put("ok", false);
                 result.put("cached", false);
@@ -169,25 +211,51 @@ public class WanderOfflineTilePlugin extends Plugin {
         return total;
     }
 
-    private void pruneIfNeeded() {
+    private void pruneIfNeeded(int days) {
         List<File> files = allTiles();
+        long cutoff = days > 0 ? System.currentTimeMillis() - retentionMs(days) : Long.MIN_VALUE;
+        if (days > 0) {
+            for (File file : new ArrayList<>(files)) {
+                if (file.lastModified() < cutoff) file.delete();
+            }
+            files = allTiles();
+        }
         if (files.size() <= MAX_TILE_COUNT) return;
         files.sort(Comparator.comparingLong(File::lastModified));
         int removeCount = files.size() - MAX_TILE_COUNT;
         for (int index = 0; index < removeCount; index++) files.get(index).delete();
     }
 
+    private JSObject statsPayload() {
+        List<File> files = allTiles();
+        JSObject result = new JSObject();
+        result.put("ok", true);
+        result.put("available", true);
+        result.put("native", true);
+        result.put("count", files.size());
+        result.put("tileCount", files.size());
+        result.put("bytes", totalBytes(files));
+        result.put("maxEntries", MAX_TILE_COUNT);
+        result.put("maxTileCount", MAX_TILE_COUNT);
+        result.put("retentionDays", retentionDays());
+        result.put("source", "openstreetmap-view-cache");
+        return result;
+    }
+
     @PluginMethod
     public void getStats(PluginCall call) {
+        getBridge().executeOnThreadPool(() -> call.resolve(statsPayload()));
+    }
+
+    @PluginMethod
+    public void configure(PluginCall call) {
+        int days = normalizeRetentionDays(call.getInt("retentionDays"));
+        saveRetentionDays(days);
         getBridge().executeOnThreadPool(() -> {
-            List<File> files = allTiles();
-            JSObject result = new JSObject();
-            result.put("available", true);
-            result.put("tileCount", files.size());
-            result.put("bytes", totalBytes(files));
-            result.put("maxTileCount", MAX_TILE_COUNT);
-            result.put("source", "openstreetmap-view-cache");
-            call.resolve(result);
+            if (days == 0) deleteRecursively(cacheRoot());
+            else pruneIfNeeded(days);
+            cacheRoot().mkdirs();
+            call.resolve(statsPayload());
         });
     }
 
@@ -204,10 +272,8 @@ public class WanderOfflineTilePlugin extends Plugin {
         getBridge().executeOnThreadPool(() -> {
             boolean cleared = deleteRecursively(cacheRoot());
             cacheRoot().mkdirs();
-            JSObject result = new JSObject();
+            JSObject result = statsPayload();
             result.put("cleared", cleared);
-            result.put("tileCount", 0);
-            result.put("bytes", 0);
             call.resolve(result);
         });
     }
