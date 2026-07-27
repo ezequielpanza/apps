@@ -47,22 +47,25 @@
     queueMicrotask(renderLocationQualityNow);
   }
 
-  function ensureTravelLogStyles() {
-    if (document.querySelector('link[data-wander-travel-log]')) return;
+  function ensureStyles(href, marker) {
+    if (document.querySelector(`link[data-${marker}]`)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = './wander-travel-log.css?v=20260719-01';
-    link.dataset.wanderTravelLog = 'true';
+    link.href = href;
+    link.dataset[marker.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = 'true';
     document.head.appendChild(link);
   }
 
+  function ensureTravelLogStyles() {
+    ensureStyles('./wander-travel-log.css?v=20260719-01', 'wander-travel-log');
+  }
+
   function ensureDirectionStyles() {
-    if (document.querySelector('link[data-wander-direction-indicator]')) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = './wander-direction-indicator.css?v=20260722-01';
-    link.dataset.wanderDirectionIndicator = 'true';
-    document.head.appendChild(link);
+    ensureStyles('./wander-direction-indicator.css?v=20260722-01', 'wander-direction-indicator');
+  }
+
+  function ensureOfflineMapStyles() {
+    ensureStyles('./wander-offline-map.css?v=20260723-01', 'wander-offline-map');
   }
 
   function loadScript(src, marker) {
@@ -98,8 +101,13 @@
     await loadScript('./runtime-notification-router.js?v=20260722-01', 'wander-notification-router');
   }
 
+  async function loadOfflineMap() {
+    ensureOfflineMapStyles();
+    await loadScript('./runtime-offline-map.js?v=20260723-01', 'wander-offline-map');
+  }
+
   async function loadMapCacheSettings() {
-    await loadScript('./runtime-map-cache-settings.js?v=20260722-01', 'wander-map-cache-settings');
+    await loadScript('./runtime-map-cache-settings.js?v=20260723-01', 'wander-map-cache-settings');
   }
 
   async function initialize() {
@@ -109,6 +117,8 @@
     catch (error) { console.warn('Wander direction indicator could not be loaded', error); }
     try { await loadNotificationRouting(); }
     catch (error) { console.warn('Wander notification routing could not be loaded', error); }
+    try { await loadOfflineMap(); }
+    catch (error) { console.warn('Wander offline map runtime could not be loaded', error); }
     try { await loadMapCacheSettings(); }
     catch (error) { console.warn('Wander map cache settings could not be loaded', error); }
 
