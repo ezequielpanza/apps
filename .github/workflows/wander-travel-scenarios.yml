@@ -88,6 +88,9 @@ jobs:
       - name: Run simulator motion isolation tests
         run: node apps/wander-travel/tests/simulator-motion.mjs
 
+      - name: Run movement startup stability tests
+        run: node apps/wander-travel/tests/motion-stability.mjs
+
       - name: Run session reconciliation tests
         run: node apps/wander-travel/tests/session-reconciliation.mjs
 

@@ -4,17 +4,25 @@
   if (!context || !inference?.inferSituation || window.WanderSensorMotionBridge) return;
 
   const originalInferSituation = inference.inferSituation.bind(inference);
-  const SENSOR_START_CONFIRM_MS = 2500;
-  const SENSOR_HOLD_MS = 3500;
-  const SENSOR_FRESH_MS = 3500;
-  const MIN_SAMPLE_COUNT = 6;
-  const MIN_WINDOW_MS = 2500;
+  const SENSOR_START_CONFIRM_MS = 6000;
+  const SENSOR_HOLD_MS = 5000;
+  const SENSOR_FRESH_MS = 4000;
+  const MIN_SAMPLE_COUNT = 8;
+  const MIN_WINDOW_MS = 3500;
+  const STARTUP_GUARD_MS = 20000;
+  const MOVING_CONFIRM_MS = 6000;
+  const STRONG_MOVING_CONFIRM_MS = 2500;
+  const STOP_CONFIRM_MS = 10000;
 
   const state = {
+    startedAt: Date.now(),
     candidateAt: null,
     confirmedAt: null,
     lastActiveAt: null,
     active: false,
+    stableStatus: 'pending',
+    movingCandidateAt: null,
+    stationaryCandidateAt: null,
     evidence: ['waiting_for_sustained_sensor_motion'],
   };
 
@@ -38,10 +46,10 @@
     const activeRatio = finite(summary?.activeRatio) || 0;
     const lastActivity = finite(summary?.last?.activity) || 0;
     const enoughHistory = sampleCount >= MIN_SAMPLE_COUNT && windowMs >= MIN_WINDOW_MS;
-    const active = enoughHistory && activeRatio >= .45 && rms >= .22 && variance >= .01 && peak >= .55 &&
-      (lastActivity >= .12 || activeRatio >= .65);
-    const strong = active && activeRatio >= .6 && rms >= .35 && variance >= .025 && peak >= .9;
-    const confidence = active ? Math.min(.92, .62 + activeRatio * .25 + Math.min(.08, rms / 10)) : 0;
+    const active = enoughHistory && activeRatio >= .5 && rms >= .24 && variance >= .012 && peak >= .62 &&
+      (lastActivity >= .14 || activeRatio >= .7);
+    const strong = active && activeRatio >= .68 && rms >= .4 && variance >= .03 && peak >= 1;
+    const confidence = active ? Math.min(.92, .6 + activeRatio * .25 + Math.min(.08, rms / 10)) : 0;
 
     return {
       active,
@@ -61,16 +69,16 @@
       if (signal.strong || now - state.candidateAt >= SENSOR_START_CONFIRM_MS) {
         state.active = true;
         state.confirmedAt = state.confirmedAt || now;
-        state.evidence = [...signal.evidence, signal.strong ? 'strong_sensor_motion_confirmed' : 'sustained_sensor_motion_confirmed'];
+        state.evidence = [...signal.evidence, signal.strong ? 'strong_sensor_activity_confirmed' : 'sustained_sensor_activity_confirmed'];
       } else {
-        state.evidence = [...signal.evidence, 'sensor_motion_candidate'];
+        state.evidence = [...signal.evidence, 'sensor_activity_candidate'];
       }
       return;
     }
 
     state.candidateAt = null;
     if (state.active && state.lastActiveAt && now - state.lastActiveAt <= SENSOR_HOLD_MS) {
-      state.evidence = ['sensor_motion_hold'];
+      state.evidence = ['sensor_activity_hold'];
       return;
     }
     state.active = false;
@@ -78,49 +86,159 @@
     state.evidence = [...signal.evidence];
   }
 
+  function movementEvidence(result) {
+    const evidence = result?.motionEvidence || {};
+    const adjusted = finite(evidence.adjustedDisplacementM) || 0;
+    const displacement = finite(evidence.displacementM) || 0;
+    const accuracy = Math.max(5, finite(evidence.accuracyM) || 10);
+    const derived = finite(evidence.derivedSpeedKmh) || 0;
+    const segmentMedian = finite(evidence.segmentMedianSpeedKmh) || 0;
+    const segmentCount = finite(evidence.segmentCount) || 0;
+    const providerSpeed = finite(evidence.providerSpeedKmh) || 0;
+    const rawMedian = finite(evidence.rawSpeedMedianKmh) || 0;
+    const minimumDisplacement = Math.max(12, Math.min(35, accuracy * 1.4));
+    const multiSegment = segmentCount >= 2 && adjusted >= 8 && displacement >= minimumDisplacement &&
+      (derived >= 1.4 || segmentMedian >= 1.4);
+    const fastMovement = segmentCount >= 2 && adjusted >= 10 && (segmentMedian >= 8 || derived >= 8);
+    const providerConfirmed = segmentCount >= 1 && adjusted >= 8 && providerSpeed >= 6;
+    const rawConfirmed = segmentCount >= 2 && adjusted >= 8 && rawMedian >= 4;
+    return {
+      confirmed: multiSegment || fastMovement || providerConfirmed || rawConfirmed,
+      strong: fastMovement || providerConfirmed,
+      evidence: [
+        ...(multiSegment ? ['multi_segment_displacement_confirmed'] : []),
+        ...(fastMovement ? ['fast_position_movement_confirmed'] : []),
+        ...(providerConfirmed ? ['provider_speed_with_displacement_confirmed'] : []),
+        ...(rawConfirmed ? ['raw_speed_with_displacement_confirmed'] : []),
+      ],
+    };
+  }
+
+  function stationaryEvidence(result) {
+    const evidence = result?.motionEvidence || {};
+    const motionStatus = String(result?.motion?.status || '').toLowerCase();
+    const speed = finite(result?.speedKmh) || 0;
+    const spread = finite(evidence.stationaryWindowSpreadM);
+    const accuracy = Math.max(5, finite(evidence.accuracyM) || 10);
+    const stableCluster = Number.isFinite(spread) && spread <= Math.max(10, Math.min(30, accuracy * 1.2));
+    return motionStatus === 'stationary' || (speed <= .5 && stableCluster);
+  }
+
+  function applyStableMotion(result, status, extraEvidence = []) {
+    const baseEvidence = Array.isArray(result?.motion?.evidence) ? result.motion.evidence : [];
+    const sensorFusion = {
+      active: state.active,
+      confidence: state.active ? .75 : 0,
+      evidence: [...state.evidence],
+      corroborationRequired: true,
+    };
+    if (status === 'moving') {
+      return {
+        ...result,
+        motion: {
+          ...result.motion,
+          status: 'moving',
+          activity: 'moving',
+          label: 'En movimiento',
+          evidence: [...baseEvidence, ...extraEvidence, 'stable_movement_confirmed'],
+        },
+        motionEvidence: { ...(result.motionEvidence || {}), sensorFusion },
+      };
+    }
+    if (status === 'stationary') {
+      return {
+        ...result,
+        speedKmh: 0,
+        heading: null,
+        motion: {
+          status: 'stationary',
+          activity: 'paused',
+          label: 'En pausa',
+          confidence: .94,
+          source: 'motion-stability-gate',
+          evidence: [...baseEvidence, ...extraEvidence, 'stable_stationary_confirmed'],
+        },
+        mobility: { mode: 'stationary', confidence: .94, source: 'motion-stability-gate', evidence: ['stationary_confirmed'] },
+        motionEvidence: { ...(result.motionEvidence || {}), sensorFusion },
+      };
+    }
+    return {
+      ...result,
+      speedKmh: 0,
+      heading: null,
+      motion: {
+        status: 'pending',
+        activity: 'pending',
+        label: 'Estabilizando posición',
+        confidence: .62,
+        source: 'motion-stability-gate',
+        evidence: [...baseEvidence, ...extraEvidence, 'startup_or_transition_guard'],
+      },
+      mobility: { mode: 'unknown', confidence: .25, source: 'motion-stability-gate', evidence: ['movement_not_confirmed'] },
+      motionEvidence: { ...(result.motionEvidence || {}), sensorFusion },
+    };
+  }
+
+  function stabilize(result, corroboration, now = Date.now()) {
+    const startup = now - state.startedAt < STARTUP_GUARD_MS;
+    const requested = String(result?.motion?.status || 'pending').toLowerCase();
+    const wantsMoving = requested === 'moving' && corroboration.confirmed;
+    const wantsStationary = stationaryEvidence(result);
+
+    if (state.stableStatus === 'pending') {
+      if (wantsMoving) {
+        state.stationaryCandidateAt = null;
+        state.movingCandidateAt = state.movingCandidateAt || now;
+        const required = corroboration.strong ? STRONG_MOVING_CONFIRM_MS : MOVING_CONFIRM_MS;
+        if (now - state.movingCandidateAt >= required) {
+          state.stableStatus = 'moving';
+          state.movingCandidateAt = null;
+        }
+      } else {
+        state.movingCandidateAt = null;
+        if (!startup && wantsStationary) state.stableStatus = 'stationary';
+      }
+    } else if (state.stableStatus === 'stationary') {
+      if (wantsMoving) {
+        state.movingCandidateAt = state.movingCandidateAt || now;
+        const required = corroboration.strong ? STRONG_MOVING_CONFIRM_MS : MOVING_CONFIRM_MS;
+        if (now - state.movingCandidateAt >= required) {
+          state.stableStatus = 'moving';
+          state.movingCandidateAt = null;
+        }
+      } else {
+        state.movingCandidateAt = null;
+      }
+    } else if (state.stableStatus === 'moving') {
+      if (wantsMoving) {
+        state.stationaryCandidateAt = null;
+      } else if (wantsStationary) {
+        state.stationaryCandidateAt = state.stationaryCandidateAt || now;
+        if (now - state.stationaryCandidateAt >= STOP_CONFIRM_MS) {
+          state.stableStatus = 'stationary';
+          state.stationaryCandidateAt = null;
+        }
+      } else {
+        state.stationaryCandidateAt = null;
+      }
+    }
+
+    return applyStableMotion(result, state.stableStatus, [
+      ...(startup ? ['startup_guard_active'] : []),
+      ...corroboration.evidence,
+      ...(state.active && !corroboration.confirmed ? ['accelerometer_without_position_corroboration'] : []),
+    ]);
+  }
+
   inference.inferSituation = (sourceContext) => {
     const original = originalInferSituation(sourceContext);
     if (!original?.locationAvailable || String(original.source || '').toLowerCase() === 'simulator') return original;
 
+    const now = Date.now();
     const signal = sensorSignal();
-    updateSensorState(signal);
-    if (!state.active || original.motion?.status === 'moving') {
-      return {
-        ...original,
-        motionEvidence: {
-          ...(original.motionEvidence || {}),
-          sensorFusion: { active: state.active, confidence: signal.confidence, evidence: [...state.evidence] },
-        },
-      };
-    }
-
-    const originalSpeed = finite(original.speedKmh);
-    const mobility = String(original.mobility?.mode || '').toLowerCase() === 'stationary'
-      ? {
-          mode: 'unknown',
-          confidence: .45,
-          source: 'motion-sensor-fusion',
-          evidence: ['accelerometer_overrode_stationary_provider'],
-        }
-      : original.mobility;
-
-    return {
-      ...original,
-      speedKmh: originalSpeed !== null && originalSpeed > .3 ? originalSpeed : 0,
-      motion: {
-        status: 'moving',
-        activity: 'moving',
-        label: 'En movimiento',
-        confidence: Math.max(.76, signal.confidence || 0),
-        source: 'motion-sensor-fusion',
-        evidence: [...state.evidence, 'gps_speed_pending'],
-      },
-      mobility,
-      motionEvidence: {
-        ...(original.motionEvidence || {}),
-        sensorFusion: { active: true, confidence: signal.confidence, evidence: [...state.evidence] },
-      },
-    };
+    updateSensorState(signal, now);
+    const corroboration = movementEvidence(original);
+    return stabilize(original, corroboration, now);
   };
 
   context.subscribe((key) => {
@@ -132,6 +250,17 @@
   window.WanderSensorMotionBridge = Object.freeze({
     getState: () => ({ ...state, evidence: [...state.evidence] }),
     signal: sensorSignal,
-    constants: { SENSOR_START_CONFIRM_MS, SENSOR_HOLD_MS, SENSOR_FRESH_MS, MIN_SAMPLE_COUNT, MIN_WINDOW_MS },
+    movementEvidence,
+    constants: {
+      SENSOR_START_CONFIRM_MS,
+      SENSOR_HOLD_MS,
+      SENSOR_FRESH_MS,
+      MIN_SAMPLE_COUNT,
+      MIN_WINDOW_MS,
+      STARTUP_GUARD_MS,
+      MOVING_CONFIRM_MS,
+      STRONG_MOVING_CONFIRM_MS,
+      STOP_CONFIRM_MS,
+    },
   });
 })();
