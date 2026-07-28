@@ -9,11 +9,7 @@
   const GPS_MAX_AGE_MS = 15000;
   const SENSOR_RETRY_MS = 5000;
   const HEALTHCHECK_INTERVAL_MS = 1000;
-  const DEFAULT_CONFIG = Object.freeze({
-    enabled: true,
-    magneticEnabled: true,
-    thresholdKmh: 0,
-  });
+  const DEFAULT_CONFIG = Object.freeze({ enabled: true, magneticEnabled: true, thresholdKmh: 0 });
 
   let config = loadConfig();
   let compass = null;
@@ -24,6 +20,7 @@
   let directionMarker = null;
   let directionListener = null;
   let directionErrorListener = null;
+  let listenersInstalling = false;
   let sensorCommand = Promise.resolve();
   let lastSensorRetryAt = 0;
   let healthTimer = null;
@@ -35,21 +32,15 @@
 
   function normalizeHeading(value) {
     const number = finite(value);
-    if (number === null) return null;
-    return ((number % 360) + 360) % 360;
-  }
-
-  function clampThreshold(value) {
-    const number = finite(value);
-    if (number === null) return 0;
-    return Math.max(0, Math.min(50, Math.round(number * 2) / 2));
+    return number === null ? null : ((number % 360) + 360) % 360;
   }
 
   function normalizeConfig(value = {}) {
+    const threshold = finite(value.thresholdKmh);
     return {
       enabled: value.enabled !== false,
       magneticEnabled: value.magneticEnabled !== false,
-      thresholdKmh: clampThreshold(value.thresholdKmh),
+      thresholdKmh: threshold === null ? 0 : Math.max(0, Math.min(50, Math.round(threshold * 2) / 2)),
     };
   }
 
@@ -93,7 +84,7 @@
 
   function bearingDegrees(a, b) {
     const radians = (degrees) => degrees * Math.PI / 180;
-    const degrees = (radiansValue) => radiansValue * 180 / Math.PI;
+    const degrees = (value) => value * 180 / Math.PI;
     const lat1 = radians(a.lat);
     const lat2 = radians(b.lat);
     const dLng = radians(b.lng - a.lng);
@@ -104,9 +95,8 @@
 
   function updateGpsState() {
     const location = context.getEffectiveLocation?.();
-    if (!location) return;
-    const lat = finite(location.lat);
-    const lng = finite(location.lng);
+    const lat = finite(location?.lat);
+    const lng = finite(location?.lng);
     if (lat === null || lng === null) return;
 
     const timestamp = Date.parse(location.updatedAt || '') || Date.now();
@@ -114,13 +104,13 @@
     speedKmh = speedKmh === null ? null : Math.max(0, speedKmh * 3.6);
     let heading = normalizeHeading(location.heading);
     let derived = false;
-
     const point = { lat, lng, timestamp };
+
     if (previousPoint && timestamp > previousPoint.timestamp) {
       const distanceM = distanceMeters(previousPoint, point);
       const elapsedSec = (timestamp - previousPoint.timestamp) / 1000;
       const derivedSpeedKmh = elapsedSec > 0 ? distanceM / elapsedSec * 3.6 : null;
-      if (speedKmh === null && derivedSpeedKmh !== null && Number.isFinite(derivedSpeedKmh)) speedKmh = derivedSpeedKmh;
+      if (speedKmh === null && Number.isFinite(derivedSpeedKmh)) speedKmh = derivedSpeedKmh;
       if (heading === null && distanceM >= 2 && elapsedSec <= 120) {
         heading = bearingDegrees(previousPoint, point);
         derived = heading !== null;
@@ -146,7 +136,10 @@
   }
 
   function sensorShouldRun() {
-    return config.enabled && config.magneticEnabled && document.visibilityState !== 'hidden' && typeof plugin()?.setSensorEnabled === 'function';
+    // Android's native plugin already pauses and resumes the physical sensor.
+    // Keeping this as the logical preference avoids permanently disabling the
+    // compass when a WebView starts or pauses with visibilityState="hidden".
+    return config.enabled && config.magneticEnabled && typeof plugin()?.setSensorEnabled === 'function';
   }
 
   function syncNativeSensor() {
@@ -169,10 +162,6 @@
     return sensorCommand;
   }
 
-  function compassCutoffKmh() {
-    return config.thresholdKmh === 0 ? STOPPED_MAX_KMH : config.thresholdKmh;
-  }
-
   function compassFresh(now = Date.now()) {
     return compass && compass.heading !== null && now - compass.timestamp <= COMPASS_MAX_AGE_MS && compass.confidence !== 'unreliable';
   }
@@ -184,25 +173,23 @@
   function selectDirection(now = Date.now()) {
     const contextSpeedMps = finite(context.value('location.effective.speedMps'));
     const speedKmh = gps?.speedKmh ?? (contextSpeedMps === null ? null : contextSpeedMps * 3.6);
-    if (!config.enabled) return { source: 'none', heading: null, confidence: 'disabled', speedKmh: Number.isFinite(speedKmh) ? speedKmh : null };
+    const safeSpeed = Number.isFinite(speedKmh) ? speedKmh : null;
+    if (!config.enabled) return { source: 'none', heading: null, confidence: 'disabled', speedKmh: safeSpeed };
 
-    const cutoff = compassCutoffKmh();
-    const belowThreshold = !Number.isFinite(speedKmh) || speedKmh <= cutoff;
-    const moving = Number.isFinite(speedKmh) && speedKmh > STOPPED_MAX_KMH;
+    const cutoff = config.thresholdKmh === 0 ? STOPPED_MAX_KMH : config.thresholdKmh;
+    const belowThreshold = safeSpeed === null || safeSpeed <= cutoff;
+    const moving = safeSpeed !== null && safeSpeed > STOPPED_MAX_KMH;
 
     if (config.magneticEnabled && belowThreshold && compassFresh(now)) {
-      return { source: 'compass', heading: compass.heading, confidence: compass.confidence, speedKmh: Number.isFinite(speedKmh) ? speedKmh : null };
+      return { source: 'compass', heading: compass.heading, confidence: compass.confidence, speedKmh: safeSpeed };
     }
-
     if (moving && gpsFresh(now)) {
-      return { source: 'gps', heading: gps.heading, confidence: gps.confidence, speedKmh };
+      return { source: 'gps', heading: gps.heading, confidence: gps.confidence, speedKmh: safeSpeed };
     }
-
     if (config.magneticEnabled && compassFresh(now)) {
-      return { source: 'compass', heading: compass.heading, confidence: compass.confidence, speedKmh: Number.isFinite(speedKmh) ? speedKmh : null };
+      return { source: 'compass', heading: compass.heading, confidence: compass.confidence, speedKmh: safeSpeed };
     }
-
-    return { source: 'none', heading: null, confidence: 'unavailable', speedKmh: Number.isFinite(speedKmh) ? speedKmh : null };
+    return { source: 'none', heading: null, confidence: 'unavailable', speedKmh: safeSpeed };
   }
 
   function smoothHeading(nextHeading, source) {
@@ -216,8 +203,7 @@
       return smoothedHeading;
     }
     const delta = ((normalized - smoothedHeading + 540) % 360) - 180;
-    const alpha = source === 'compass' ? 0.22 : 0.48;
-    smoothedHeading = normalizeHeading(smoothedHeading + delta * alpha);
+    smoothedHeading = normalizeHeading(smoothedHeading + delta * (source === 'compass' ? 0.22 : 0.48));
     return smoothedHeading;
   }
 
@@ -281,11 +267,45 @@
 
   function evaluate(now = Date.now()) {
     const selected = selectDirection(now);
-    const heading = smoothHeading(selected.heading, selected.source);
-    const nextState = { ...selected, heading };
+    const nextState = { ...selected, heading: smoothHeading(selected.heading, selected.source) };
     renderMarker(nextState);
     publishState(nextState);
     return state;
+  }
+
+  async function installNativeListeners() {
+    if (listenersInstalling || directionListener || directionErrorListener) return;
+    const nativePlugin = plugin();
+    if (typeof nativePlugin?.addListener !== 'function') return;
+    listenersInstalling = true;
+    try {
+      directionListener = await nativePlugin.addListener('direction', (event) => {
+        const heading = normalizeHeading(event?.heading);
+        if (heading === null) return;
+        compass = {
+          heading,
+          confidence: String(event?.confidence || 'low'),
+          timestamp: Number(event?.timestamp) || Date.now(),
+        };
+        lastSensorRetryAt = compass.timestamp;
+        writeContext('direction.compass.heading', heading, compass.confidence === 'high' ? 1 : 0.7);
+        writeContext('direction.compass.confidence', compass.confidence, compass.confidence === 'high' ? 1 : 0.7);
+        evaluate();
+      });
+      directionErrorListener = await nativePlugin.addListener('directionError', () => {
+        compass = null;
+        writeContext('direction.magnetic.available', false, 0.4);
+        evaluate();
+      });
+      const status = await nativePlugin.getStatus?.().catch?.(() => null);
+      if (status) writeContext('direction.magnetic.available', status.available === true, status.available === true ? 1 : 0.4);
+      await syncNativeSensor();
+    } catch {
+      directionListener = null;
+      directionErrorListener = null;
+    } finally {
+      listenersInstalling = false;
+    }
   }
 
   function retryStaleSensor(now = Date.now()) {
@@ -296,6 +316,7 @@
 
   function healthcheck() {
     const now = Date.now();
+    if (!directionListener && !listenersInstalling) installNativeListeners();
     retryStaleSensor(now);
     evaluate(now);
   }
@@ -311,33 +332,11 @@
     return { ...config };
   }
 
-  function installNativeListeners() {
-    const nativePlugin = plugin();
-    if (typeof nativePlugin?.addListener !== 'function') return;
-    Promise.resolve(nativePlugin.addListener('direction', (event) => {
-      const heading = normalizeHeading(event?.heading);
-      if (heading === null) return;
-      compass = {
-        heading,
-        confidence: String(event?.confidence || 'low'),
-        timestamp: Number(event?.timestamp) || Date.now(),
-      };
-      lastSensorRetryAt = compass.timestamp;
-      writeContext('direction.compass.heading', heading, compass.confidence === 'high' ? 1 : 0.7);
-      writeContext('direction.compass.confidence', compass.confidence, compass.confidence === 'high' ? 1 : 0.7);
-      evaluate();
-    })).then((handle) => { directionListener = handle; }).catch(() => {});
-
-    Promise.resolve(nativePlugin.addListener('directionError', () => {
-      compass = null;
-      writeContext('direction.magnetic.available', false, 0.4);
-      evaluate();
-    })).then((handle) => { directionErrorListener = handle; }).catch(() => {});
-
-    nativePlugin.getStatus?.().then((status) => {
-      writeContext('direction.magnetic.available', status?.available === true, status?.available === true ? 1 : 0.4);
-      syncNativeSensor();
-    }).catch(() => syncNativeSensor());
+  function resumeSensor() {
+    lastSensorRetryAt = 0;
+    installNativeListeners();
+    syncNativeSensor();
+    evaluate();
   }
 
   context.subscribe((key) => {
@@ -347,15 +346,7 @@
     }
   });
 
-  function resumeSensor() {
-    if (document.visibilityState === 'hidden') return;
-    lastSensorRetryAt = 0;
-    syncNativeSensor();
-    evaluate();
-  }
-
   document.addEventListener('visibilitychange', () => {
-    syncNativeSensor();
     if (document.visibilityState === 'visible') resumeSensor();
   });
   document.addEventListener('resume', resumeSensor);
@@ -384,6 +375,7 @@
   publishConfig();
   updateGpsState();
   installNativeListeners();
+  syncNativeSensor();
   healthTimer = setInterval(healthcheck, HEALTHCHECK_INTERVAL_MS);
   evaluate();
 })();

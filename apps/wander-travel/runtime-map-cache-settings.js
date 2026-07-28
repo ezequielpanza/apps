@@ -7,21 +7,35 @@
     ? window.Capacitor?.Plugins?.WanderOfflineTiles || null
     : null;
   const STORAGE_KEY = 'wander.mapCache.retentionDays.v1';
+  const MIGRATION_KEY = 'wander.mapCache.retentionDefaultFixed.v1';
   const DEFAULT_DAYS = nativeTiles ? 90 : 30;
   const ALLOWED_DAYS = new Set([0, 7, 30, 90, 180, 365]);
 
   function storedDays() {
     try {
-      const value = Number(localStorage.getItem(STORAGE_KEY));
-      return ALLOWED_DAYS.has(value) ? value : DEFAULT_DAYS;
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw === null) return DEFAULT_DAYS;
+      const value = Number(raw);
+      if (!ALLOWED_DAYS.has(value)) return DEFAULT_DAYS;
+
+      // v0.109.1 converted a missing setting into Number(null) === 0 and
+      // therefore disabled/cleared the cache on first startup. Migrate that
+      // accidental value once. A later explicit selection of 0 is preserved.
+      const migrated = localStorage.getItem(MIGRATION_KEY) === 'done';
+      if (value === 0 && !migrated) return DEFAULT_DAYS;
+      return value;
     } catch {
       return DEFAULT_DAYS;
     }
   }
 
   function saveDays(value) {
-    const days = ALLOWED_DAYS.has(Number(value)) ? Number(value) : DEFAULT_DAYS;
-    try { localStorage.setItem(STORAGE_KEY, String(days)); } catch {}
+    const numeric = Number(value);
+    const days = ALLOWED_DAYS.has(numeric) ? numeric : DEFAULT_DAYS;
+    try {
+      localStorage.setItem(STORAGE_KEY, String(days));
+      localStorage.setItem(MIGRATION_KEY, 'done');
+    } catch {}
     return days;
   }
 
@@ -40,7 +54,7 @@
 
   async function workerRequest(type, payload = {}) {
     const target = await worker();
-    if (!target) throw new Error('Map cache request timed out');
+    if (!target) throw new Error('Service worker unavailable');
     return new Promise((resolve, reject) => {
       const channel = new MessageChannel();
       const timer = setTimeout(() => reject(new Error('Map cache request timed out')), 5000);

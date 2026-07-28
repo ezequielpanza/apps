@@ -20,13 +20,13 @@ class CustomEventPolyfill extends Event {
   }
 }
 
-function createHarness(location = {}) {
+function createHarness(location = {}, options = {}) {
   const values = new Map();
   const listeners = new Set();
   const nativeListeners = new Map();
   const intervalCallbacks = new Map();
+  const sensorStates = [];
   let intervalId = 0;
-  let sensorCommands = 0;
   let currentLocation = { lat: -34.6, lng: -58.4, accuracy: 8, updatedAt: new Date().toISOString(), ...location };
 
   const context = {
@@ -46,12 +46,12 @@ function createHarness(location = {}) {
     removeLayer(layer) { this.layers = this.layers.filter((item) => item !== layer); },
   };
   const L = {
-    divIcon(options) { return options; },
+    divIcon(iconOptions) { return iconOptions; },
     latLng(lat, lng) { return { lat, lng }; },
-    marker(point, options) {
+    marker(point, markerOptions) {
       const marker = {
         point,
-        options,
+        options: markerOptions,
         addTo(target) { target.layers.push(marker); return marker; },
         setLatLng(next) { marker.point = next; },
         getElement() { return markerElement; },
@@ -66,14 +66,14 @@ function createHarness(location = {}) {
       return { remove() { nativeListeners.delete(name); } };
     },
     async setSensorEnabled({ enabled }) {
-      sensorCommands += 1;
+      sensorStates.push(Boolean(enabled));
       return { available: true, enabled, running: enabled, independentFromLocation: true };
     },
     async getStatus() { return { available: true, running: false, independentFromLocation: true }; },
   };
 
   const documentTarget = new EventTarget();
-  documentTarget.visibilityState = 'visible';
+  documentTarget.visibilityState = options.visibilityState || 'visible';
   const windowTarget = new EventTarget();
   Object.assign(windowTarget, {
     WanderContext: context,
@@ -110,17 +110,23 @@ function createHarness(location = {}) {
   sandbox.globalThis = sandbox;
   vm.runInNewContext(source, sandbox, { filename: 'runtime-direction-indicator.js' });
 
+  const flush = async () => {
+    for (let index = 0; index < 8; index += 1) await Promise.resolve();
+  };
+
   return {
     api: windowTarget.WanderDirectionIndicator,
     context,
     values,
     map,
     arrow,
-    sensorCommands: () => sensorCommands,
+    document: documentTarget,
+    sensorStates: () => [...sensorStates],
+    flush,
     async compass(heading, confidence = 'high', timestamp = Date.now()) {
-      await Promise.resolve();
+      await flush();
       nativeListeners.get('direction')?.({ heading, confidence, timestamp });
-      await Promise.resolve();
+      await flush();
     },
     tick() {
       intervalCallbacks.forEach((callback) => callback());
@@ -161,7 +167,9 @@ test('magnetic mode can be disabled independently', async () => {
   const harness = createHarness({ heading: 70, speedMps: 0 });
   await harness.compass(190);
   harness.api.setConfig({ magneticEnabled: false });
+  await harness.flush();
   assert.equal(harness.api.getState().source, 'none');
+  assert.equal(harness.sensorStates().at(-1), false);
 
   harness.updateLocation({ heading: 72, speedMps: 1.2, updatedAt: new Date(Date.now() + 1000).toISOString() });
   assert.equal(harness.api.getState().source, 'gps');
@@ -178,12 +186,23 @@ test('indicator can be disabled without changing location data', async () => {
 test('stale compass data removes the frozen arrow and retries the sensor', async () => {
   const harness = createHarness({ heading: null, speedMps: 0 });
   await harness.compass(250, 'high', Date.now() - 10000);
-  const before = harness.sensorCommands();
+  const before = harness.sensorStates().length;
   harness.tick();
-  await Promise.resolve();
+  await harness.flush();
   assert.equal(harness.api.getState().source, 'none');
   assert.equal(harness.map.layers.length, 0);
-  assert.ok(harness.sensorCommands() >= before);
+  assert.ok(harness.sensorStates().length >= before);
+});
+
+test('cold reopen keeps the compass logically enabled when the WebView starts hidden', async () => {
+  const harness = createHarness({ heading: null, speedMps: 0 }, { visibilityState: 'hidden' });
+  await harness.flush();
+  assert.equal(harness.sensorStates().includes(true), true);
+  assert.equal(harness.sensorStates().includes(false), false);
+
+  await harness.compass(95);
+  assert.equal(harness.api.getState().source, 'compass');
+  assert.ok(Math.abs(harness.api.getState().heading - 95) < 1);
 });
 
 let passed = 0;
