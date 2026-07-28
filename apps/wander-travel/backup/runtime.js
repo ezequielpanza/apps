@@ -34,6 +34,14 @@
     counts: { points: 0, routes: 0, logEntries: 0, plans: 0 },
   };
 
+  class BackupConflictError extends Error {
+    constructor(payload) {
+      super(payload?.error || 'Backup changed in another installation.');
+      this.name = 'BackupConflictError';
+      this.payload = payload || {};
+    }
+  }
+
   function clone(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
@@ -123,7 +131,7 @@
     };
   }
 
-  async function request(method, body = null) {
+  async function request(method, body = null, extraHeaders = {}) {
     if (!endpoint) throw new Error('Backup endpoint missing');
     const response = await fetch(endpoint, {
       method,
@@ -131,12 +139,14 @@
         accept: 'application/json',
         authorization: `Bearer ${token}`,
         ...(body ? { 'content-type': 'application/json' } : {}),
+        ...extraHeaders,
       },
       body: body ? JSON.stringify(body) : null,
       cache: 'no-store',
     });
     const payload = await response.json().catch(() => ({}));
     if (response.status === 404 && payload?.exists === false) return { ...payload, status: 404 };
+    if (response.status === 409 && payload?.conflict === true) throw new BackupConflictError(payload);
     if (!response.ok || payload?.ok === false) throw new Error(payload?.error || `Backup HTTP ${response.status}`);
     return payload;
   }
@@ -208,7 +218,9 @@
     uploadTimer = null;
     updateState({ status: 'uploading', message: 'Guardando puntos, recorridos y bitácora' });
     try {
-      const result = await request('PUT', makeSnapshot());
+      const meta = readMeta();
+      const headers = meta.revision ? { 'if-match': String(meta.revision) } : {};
+      const result = await request('PUT', makeSnapshot(), headers);
       const now = result.updatedAt || new Date().toISOString();
       saveMeta({
         revision: result.revision || null,
@@ -225,6 +237,14 @@
       });
       return result;
     } catch (error) {
+      if (error instanceof BackupConflictError) {
+        const cloud = error.payload || {};
+        const cloudData = cloud.data && typeof cloud.data === 'object' ? cloud.data : {};
+        const merged = mergeData(readData(), cloudData);
+        updateState({ status: 'restoring', message: 'Integrando cambios de otra instalación' });
+        applyData(merged, cloud.revision, { keepDirty: true, uploadAfterReload: true });
+        return null;
+      }
       saveMeta({ lastError: error.message || String(error) });
       updateState({ status: 'error', message: error.message || 'No se pudo actualizar el backup' });
       return null;
