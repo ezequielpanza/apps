@@ -11,6 +11,7 @@ const serviceWorker = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
 const versionRuntime = fs.readFileSync(path.join(ROOT, 'runtime-version.js'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
 const packageManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+const travelLogScreen = fs.readFileSync(path.join(ROOT, 'runtime-travel-log-screen.js'), 'utf8');
 
 class CustomEventPolyfill extends Event {
   constructor(type, options = {}) {
@@ -115,13 +116,18 @@ windowObject.dispatchEvent(new CustomEventPolyfill('wander:sessions-changed', {
 assert.ok(log.listEntries().some((entry) => entry.title === 'Comenzó un recorrido' && entry.sessionId === 'session-1'));
 assert.ok(log.listEntries().some((entry) => entry.title === 'Recorrido finalizado' && entry.sessionId === 'session-1'));
 
-assert.match(versionRuntime, /const VERSION = 'v0\.109\.2'/);
-assert.equal(manifest.start_url, './?app=v0.109.2');
-assert.equal(packageManifest.version, '0.109.2');
-for (const asset of ['wander-travel-log.css', 'runtime-travel-log.js', 'runtime-travel-log-screen.js', 'runtime-morning-briefing.js']) {
+assert.match(versionRuntime, /const VERSION = 'v0\.109\.3'/);
+assert.equal(manifest.start_url, './?app=v0.109.3');
+assert.equal(packageManifest.version, '0.109.3');
+for (const asset of ['wander-travel-log.css', 'wander-travel-timeline.css', 'runtime-travel-log.js', 'runtime-travel-log-screen.js', 'runtime-morning-briefing.js']) {
   assert.ok(appRuntime.includes(asset), `${asset} must load at runtime`);
   assert.ok(serviceWorker.includes(`'./${asset}'`), `${asset} must be cached for offline use`);
   assert.ok(fs.existsSync(path.join(ROOT, asset)), `${asset} must exist`);
 }
+assert.match(travelLogScreen, /movementItemsForDay/);
+assert.match(travelLogScreen, /Track entre detenciones/);
+assert.match(travelLogScreen, /data-screen-target="routes"/);
+assert.match(travelLogScreen, /button\.dataset\.screenTarget = 'travel-log'/);
+assert.doesNotMatch(travelLogScreen, /open\?\.\('routes'\)/);
 
-console.log('PASS travel log stores contextual conversations, decisions, plans and session references');
+console.log('PASS travel log stores contextual memory and presents movement tracks between stops inside the integrated timeline');

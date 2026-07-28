@@ -31,16 +31,32 @@ public class WanderOfflineTilePlugin extends Plugin {
     private static final String CACHE_DIRECTORY = "osm-tile-cache-v1";
     private static final String OSM_TILE_TEMPLATE = "https://tile.openstreetmap.org/%d/%d/%d.png";
     private static final String ESRI_TILE_TEMPLATE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/%d/%d/%d";
-    private static final String USER_AGENT = "WanderTravel/0.11.1 (+https://wander-travel.pages.dev)";
+    private static final String USER_AGENT = "WanderTravel/0.11.3 (+https://wander-travel.pages.dev)";
     private static final String PREFS_NAME = "wander_offline_tiles";
     private static final String RETENTION_KEY = "retention_days";
     private static final int DEFAULT_RETENTION_DAYS = 90;
     private static final int MAX_ZOOM = 19;
     private static final int MAX_TILE_COUNT = 6000;
+    private static final int MAX_FALLBACK_DEPTH = 4;
+    private static final int WARM_ANCESTOR_DEPTH = 2;
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int READ_TIMEOUT_MS = 12000;
     private static final int MAX_TILE_BYTES = 2 * 1024 * 1024;
     private static final ExecutorService IO_EXECUTOR = Executors.newFixedThreadPool(4);
+
+    private static final class CachedAncestor {
+        final File file;
+        final int depth;
+        final int cropX;
+        final int cropY;
+
+        CachedAncestor(File file, int depth, int cropX, int cropY) {
+            this.file = file;
+            this.depth = depth;
+            this.cropX = cropX;
+            this.cropY = cropY;
+        }
+    }
 
     private File cacheRoot() {
         File root = new File(getContext().getFilesDir(), CACHE_DIRECTORY);
@@ -176,12 +192,23 @@ public class WanderOfflineTilePlugin extends Plugin {
         result.put("ok", true);
         result.put("cached", cached);
         result.put("stale", stale);
+        result.put("fallback", false);
         result.put("source", source);
         result.put("z", z);
         result.put("x", x);
         result.put("y", y);
         result.put("bytes", bytes.length);
         result.put("dataUrl", "data:" + mimeType(source) + ";base64," + Base64.encodeToString(bytes, Base64.NO_WRAP));
+        return result;
+    }
+
+    private JSObject fallbackTileResponse(byte[] bytes, boolean stale, String source, int z, int x, int y, CachedAncestor ancestor) {
+        JSObject result = tileResponse(bytes, true, stale, source, z, x, y);
+        result.put("fallback", true);
+        result.put("fallbackDepth", ancestor.depth);
+        result.put("cropX", ancestor.cropX);
+        result.put("cropY", ancestor.cropY);
+        result.put("scale", 1 << ancestor.depth);
         return result;
     }
 
@@ -196,6 +223,51 @@ public class WanderOfflineTilePlugin extends Plugin {
         result.put("y", y);
         result.put("message", message == null ? "Tile unavailable" : message);
         return result;
+    }
+
+    private CachedAncestor findCachedAncestor(String source, int z, int x, int y) {
+        int maximum = Math.min(MAX_FALLBACK_DEPTH, z);
+        for (int depth = 1; depth <= maximum; depth++) {
+            int scale = 1 << depth;
+            int parentZ = z - depth;
+            int parentX = x / scale;
+            int parentY = y / scale;
+            File parent = tileFile(source, parentZ, parentX, parentY);
+            if (parent.isFile() && parent.length() > 0) {
+                return new CachedAncestor(parent, depth, x % scale, y % scale);
+            }
+        }
+        return null;
+    }
+
+    private JSObject resolveAncestor(String source, int z, int x, int y, int days) {
+        CachedAncestor ancestor = findCachedAncestor(source, z, x, y);
+        if (ancestor == null) return null;
+        try {
+            boolean fresh = days > 0 && System.currentTimeMillis() - ancestor.file.lastModified() <= retentionMs(days);
+            byte[] bytes = readBytes(ancestor.file);
+            ancestor.file.setLastModified(System.currentTimeMillis());
+            return fallbackTileResponse(bytes, !fresh, source, z, x, y, ancestor);
+        } catch (Exception error) {
+            ancestor.file.delete();
+            return null;
+        }
+    }
+
+    private void warmAncestorTiles(String source, int z, int x, int y, int days) {
+        if (days <= 0 || !networkAvailable()) return;
+        int maximum = Math.min(WARM_ANCESTOR_DEPTH, z);
+        for (int depth = 1; depth <= maximum; depth++) {
+            int scale = 1 << depth;
+            int parentZ = z - depth;
+            int parentX = x / scale;
+            int parentY = y / scale;
+            File parent = tileFile(source, parentZ, parentX, parentY);
+            if (parent.isFile() && parent.length() > 0) continue;
+            try {
+                writeAtomically(parent, downloadTile(source, parentZ, parentX, parentY));
+            } catch (Exception ignored) {}
+        }
     }
 
     @PluginMethod
@@ -233,7 +305,8 @@ public class WanderOfflineTilePlugin extends Plugin {
             }
 
             if (!networkAvailable()) {
-                call.resolve(unavailableResponse(source, z, x, y, "No cached tile and no validated network"));
+                JSObject fallback = resolveAncestor(source, z, x, y, days);
+                call.resolve(fallback != null ? fallback : unavailableResponse(source, z, x, y, "No cached tile and no validated network"));
                 return;
             }
 
@@ -244,8 +317,11 @@ public class WanderOfflineTilePlugin extends Plugin {
                     pruneIfNeeded(days);
                 }
                 call.resolve(tileResponse(bytes, false, false, source, z, x, y));
+                warmAncestorTiles(source, z, x, y, days);
+                pruneIfNeeded(days);
             } catch (Exception error) {
-                call.resolve(unavailableResponse(source, z, x, y, error.getMessage()));
+                JSObject fallback = resolveAncestor(source, z, x, y, days);
+                call.resolve(fallback != null ? fallback : unavailableResponse(source, z, x, y, error.getMessage()));
             }
         });
     }
@@ -304,6 +380,7 @@ public class WanderOfflineTilePlugin extends Plugin {
         result.put("source", "viewed-map-cache");
         result.put("streets", true);
         result.put("satellite", true);
+        result.put("zoomFallback", true);
         return result;
     }
 

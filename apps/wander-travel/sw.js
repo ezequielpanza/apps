@@ -1,6 +1,6 @@
 importScripts('./runtime-version.js');
 
-const SHELL_REVISION = '20260722-02';
+const SHELL_REVISION = '20260728-03';
 const CACHE_NAME = 'wander-travel-' + self.WanderVersion + '-' + SHELL_REVISION;
 const TILE_CACHE_NAME = 'wander-map-tiles-v1';
 const TILE_META_DB = 'wander-map-cache-meta-v1';
@@ -27,10 +27,12 @@ const APP_SHELL = [
   './wander-track-delete.css',
   './wander-message-timeout-settings.css',
   './wander-map-selected-point.css',
+  './wander-map-crosshair.css',
   './wander-points-screen.css',
   './wander-sessions.css',
   './wander-interaction.css',
   './wander-travel-log.css',
+  './wander-travel-timeline.css',
   './wander-direction-indicator.css',
   './runtime-context-store.js',
   './runtime-context-location.js',
@@ -96,6 +98,7 @@ const APP_SHELL = [
   './runtime-personal-map-tools.js',
   './runtime-personal-poi-sheet.js',
   './runtime-map-selected-point.js',
+  './runtime-map-crosshair.js',
   './runtime-points-screen.js',
   './runtime-message-timeout-settings.js',
   './runtime-companion.js',
