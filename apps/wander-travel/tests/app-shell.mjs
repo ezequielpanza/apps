@@ -60,8 +60,8 @@ assert.ok(versionMatch, 'runtime-version.js must define a semantic web version')
 assert.equal(versionMatch[1], 'v0.109.4');
 assert.equal(manifest.start_url, './?app=v0.109.4');
 assert.equal(packageManifest.version, '0.109.4');
-assert.equal(androidVersion.versionName, '0.11.4');
-assert.equal(androidVersion.versionCode, 20);
+assert.equal(androidVersion.versionName, '0.11.5');
+assert.equal(androidVersion.versionCode, 21);
 assert.equal(capacitorConfig.webDir, 'mobile-dist');
 assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
 assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
@@ -189,6 +189,13 @@ assert.match(platform, /const origin = isNative\(\) \? PRODUCTION_ORIGIN : windo
 assert.match(mobileBuild, /vendor', 'leaflet/);
 assert.match(mobileBuild, /leafletAssets/);
 assert.match(mobileBuild, /Integrity mismatch/);
+assert.match(mobileBuild, /entry\.name === 'sw\.js'/);
+assert.match(mobileBuild, /__WANDER_DISABLE_SERVICE_WORKER__/);
+assert.match(mobileBuild, /navigator\.serviceWorker\.getRegistrations\(\)/);
+assert.match(mobileBuild, /registration\.unregister\(\)/);
+assert.match(mobileBuild, /caches\.delete\(key\)/);
+assert.match(mobileBuild, /window\.location\.reload\(\)/);
+assert.match(mobileBuild, /Could not locate Wander service worker guard/);
 
 assert.match(serviceWorker, /TILE_CACHE_NAME = 'wander-map-tiles-v1'/);
 assert.match(serviceWorker, /wander-map-crosshair\.css/);
@@ -230,4 +237,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts local-first with integrated travel tracks, stable direction, crosshair metrics, and offline zoom fallback`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts local-first without native service-worker races, with integrated travel tracks, stable direction, crosshair metrics, and offline zoom fallback`);
