@@ -114,6 +114,21 @@ function objectHeaders(object) {
   };
 }
 
+function parseStoredBackup(text, object) {
+  try {
+    const value = JSON.parse(text);
+    return value && typeof value === 'object' ? value : null;
+  } catch {
+    return object ? {
+      ok: false,
+      exists: true,
+      revision: object.customMetadata?.revision || object.httpEtag || null,
+      updatedAt: object.customMetadata?.updatedAt || null,
+      error: 'Stored backup could not be parsed.',
+    } : null;
+  }
+}
+
 export async function onRequestOptions(context) {
   return new Response(null, { status: 204, headers: corsHeaders(context.request) });
 }
@@ -159,6 +174,27 @@ export async function onRequestPut(context) {
   const validationError = validatePayload(payload);
   if (validationError) return json(context.request, { ok: false, error: validationError }, 400);
 
+  const current = await storage.get(LATEST_KEY);
+  let currentText = null;
+  let currentPayload = null;
+  let currentRevision = null;
+  if (current) {
+    currentText = await current.text();
+    currentPayload = parseStoredBackup(currentText, current);
+    currentRevision = String(currentPayload?.revision || current.customMetadata?.revision || current.httpEtag || '');
+    const expectedRevision = String(context.request.headers.get('if-match') || '').trim();
+    if (!expectedRevision || expectedRevision !== currentRevision) {
+      return json(context.request, {
+        ...(currentPayload || {}),
+        ok: false,
+        exists: true,
+        conflict: true,
+        error: 'Backup changed in another installation.',
+        revision: currentRevision || currentPayload?.revision || null,
+      }, 409, objectHeaders(current));
+    }
+  }
+
   const data = normalizeData(payload.data);
   const revision = crypto.randomUUID();
   const updatedAt = new Date().toISOString();
@@ -176,13 +212,12 @@ export async function onRequestPut(context) {
   };
   const body = JSON.stringify(canonical);
 
-  const current = await storage.get(LATEST_KEY);
-  if (current) {
-    await storage.put(PREVIOUS_KEY, current.body, {
+  if (current && currentText !== null) {
+    await storage.put(PREVIOUS_KEY, currentText, {
       httpMetadata: { contentType: 'application/json; charset=utf-8' },
       customMetadata: {
-        revision: current.customMetadata?.revision || '',
-        updatedAt: current.customMetadata?.updatedAt || '',
+        revision: currentRevision || '',
+        updatedAt: current.customMetadata?.updatedAt || currentPayload?.updatedAt || '',
         replacedAt: updatedAt,
       },
     });
