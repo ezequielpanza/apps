@@ -23,6 +23,32 @@
   L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map);
   map.attributionControl.addAttribution('Place data &copy; OpenStreetMap contributors');
 
+  function drawTile(canvas, result, done) {
+    const context = canvas.getContext('2d', { alpha: true });
+    if (!context || !result?.dataUrl) {
+      done(null, canvas);
+      return;
+    }
+    const image = new Image();
+    image.addEventListener('load', () => {
+      context.clearRect(0, 0, 256, 256);
+      if (result.fallback === true) {
+        const scale = Math.max(2, Number(result.scale) || 2);
+        const sourceSize = 256 / scale;
+        const sourceX = Math.max(0, Number(result.cropX) || 0) * sourceSize;
+        const sourceY = Math.max(0, Number(result.cropY) || 0) * sourceSize;
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 256, 256);
+      } else {
+        context.drawImage(image, 0, 0, 256, 256);
+      }
+      done(null, canvas);
+    }, { once: true });
+    image.addEventListener('error', () => done(null, canvas), { once: true });
+    image.src = result.dataUrl;
+  }
+
   const NativeStoredTileLayer = L.GridLayer.extend({
     initialize(options = {}) {
       L.GridLayer.prototype.initialize.call(this, options);
@@ -30,22 +56,16 @@
     },
 
     createTile(coords, done) {
-      const tile = document.createElement('img');
-      tile.alt = '';
-      tile.setAttribute('role', 'presentation');
+      const tile = document.createElement('canvas');
       tile.width = 256;
       tile.height = 256;
+      tile.setAttribute('role', 'presentation');
       let completed = false;
-      const finish = (error = null) => {
+      const finish = (error = null, element = tile) => {
         if (completed) return;
         completed = true;
-        done(error, tile);
+        done(error, element);
       };
-      tile.addEventListener('load', () => finish(), { once: true });
-      tile.addEventListener('error', () => {
-        tile.src = TRANSPARENT_TILE;
-        finish();
-      }, { once: true });
 
       Promise.resolve(nativeTiles?.getTile?.({ source: this.wanderSource, z: coords.z, x: coords.x, y: coords.y }))
         .then((result) => {
@@ -53,25 +73,28 @@
             tile.dataset.tileSource = result.cached ? 'native-cache' : 'network';
             tile.dataset.mapSource = this.wanderSource;
             tile.dataset.stale = result.stale === true ? 'true' : 'false';
-            this.fire(result.cached ? 'tilecachehit' : 'tilecached', {
+            tile.dataset.zoomFallback = result.fallback === true ? 'true' : 'false';
+            this.fire(result.fallback === true ? 'tilefallback' : result.cached ? 'tilecachehit' : 'tilecached', {
               coords,
               source: this.wanderSource,
               stale: result.stale === true,
+              fallback: result.fallback === true,
+              fallbackDepth: Number(result.fallbackDepth) || 0,
               bytes: result.bytes || 0,
             });
-            tile.src = result.dataUrl;
+            drawTile(tile, result, finish);
             return;
           }
           tile.dataset.tileSource = 'missing';
           tile.dataset.mapSource = this.wanderSource;
           this.fire('tilemissing', { coords, source: this.wanderSource, offline: result?.offline === true });
-          tile.src = TRANSPARENT_TILE;
+          finish();
         })
         .catch((error) => {
           tile.dataset.tileSource = 'missing';
           tile.dataset.mapSource = this.wanderSource;
           this.fire('tilemissing', { coords, source: this.wanderSource, offline: true, error });
-          tile.src = TRANSPARENT_TILE;
+          finish();
         });
       return tile;
     },
