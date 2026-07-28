@@ -57,11 +57,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.109.1');
-assert.equal(manifest.start_url, './?app=v0.109.1');
-assert.equal(packageManifest.version, '0.109.1');
-assert.equal(androidVersion.versionName, '0.11.1');
-assert.equal(androidVersion.versionCode, 17);
+assert.equal(versionMatch[1], 'v0.109.2');
+assert.equal(manifest.start_url, './?app=v0.109.2');
+assert.equal(packageManifest.version, '0.109.2');
+assert.equal(androidVersion.versionName, '0.11.2');
+assert.equal(androidVersion.versionCode, 18);
 assert.equal(capacitorConfig.webDir, 'mobile-dist');
 assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
 assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
@@ -99,6 +99,9 @@ assert.match(direction, /SENSOR_RETRY_MS/);
 assert.match(direction, /HEALTHCHECK_INTERVAL_MS/);
 assert.match(direction, /retryStaleSensor/);
 assert.match(direction, /removeMarker\(\)/);
+assert.doesNotMatch(direction, /document\.visibilityState !== 'hidden'/);
+assert.match(direction, /if \(document\.visibilityState === 'visible'\) resumeSensor\(\)/);
+assert.match(direction, /installNativeListeners\(\)/);
 assert.match(directionSettings, /Mostrar indicador/);
 assert.match(directionSettings, /Brújula magnética \+ giróscopo/);
 assert.match(directionSettings, /Umbral para usar brújula/);
@@ -158,6 +161,8 @@ assert.match(mapCore, /WanderOfflineTiles/);
 assert.match(mapCore, /wander-current-track-pane/);
 assert.match(mapCore, /errorTileUrl: TRANSPARENT_TILE/);
 assert.match(mapCacheSettings, /sectores de calles y satélite/);
+assert.match(mapCacheSettings, /MIGRATION_KEY/);
+assert.match(mapCacheSettings, /if \(raw === null\) return DEFAULT_DAYS/);
 assert.match(mapCacheSettings, /Almacenamiento/);
 assert.match(mapCacheSettings, /App local/);
 assert.match(platform, /const PRODUCTION_ORIGIN = 'https:\/\/wander-travel\.pages\.dev'/);
@@ -206,4 +211,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts locally, restores device backups, cached maps, and live compass orientation offline`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts locally, restores device backups, cached maps, and live compass orientation after an offline reopen`);
