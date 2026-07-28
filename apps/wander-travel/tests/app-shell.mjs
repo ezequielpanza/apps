@@ -54,11 +54,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.108.0');
-assert.equal(manifest.start_url, './?app=v0.108.0');
-assert.equal(packageManifest.version, '0.108.0');
-assert.equal(androidVersion.versionName, '0.10.0');
-assert.equal(androidVersion.versionCode, 15);
+assert.equal(versionMatch[1], 'v0.109.0');
+assert.equal(manifest.start_url, './?app=v0.109.0');
+assert.equal(packageManifest.version, '0.109.0');
+assert.equal(androidVersion.versionName, '0.11.0');
+assert.equal(androidVersion.versionCode, 16);
 assert.equal(capacitorConfig.webDir, 'mobile-dist');
 assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
 assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
@@ -80,6 +80,9 @@ const mapCacheSettings = read('runtime-map-cache-settings.js');
 const mobileBuild = read('mobile/build-web.mjs');
 const travelLog = read('runtime-travel-log.js');
 const travelLogScreen = read('runtime-travel-log-screen.js');
+const cloudBackup = read('backup/runtime.js');
+const cloudBackupConfig = read('backup/config.js');
+const cloudBackupFunction = read('functions/api/backup.js');
 
 assert.match(direction, /thresholdKmh: 0/);
 assert.match(direction, /magneticEnabled/);
@@ -135,6 +138,8 @@ assert.match(platform, /const origin = isNative\(\) \? PRODUCTION_ORIGIN : windo
 assert.match(mobileBuild, /vendor', 'leaflet/);
 assert.match(mobileBuild, /leafletAssets/);
 assert.match(mobileBuild, /Integrity mismatch/);
+assert.match(mobileBuild, /WANDER_BACKUP_SPACE_TOKEN/);
+assert.match(mobileBuild, /copyDirectory\(path\.join\(root, 'backup'/);
 assert.match(mobileBuild, /replace\('https:\/\/unpkg\.com\/leaflet@1\.9\.4\/dist\/leaflet\.css', 'vendor\/leaflet\/leaflet\.css'\)/);
 assert.match(mobileBuild, /replace\('https:\/\/unpkg\.com\/leaflet@1\.9\.4\/dist\/leaflet\.js', 'vendor\/leaflet\/leaflet\.js'\)/);
 
@@ -149,6 +154,21 @@ assert.match(travelLog, /sessionId/);
 assert.match(travelLogScreen, /Bitácora de viaje/);
 assert.match(travelLogScreen, /Próximamente/);
 
+assert.match(app, /function loadCloudBackup\(\)/);
+assert.match(app, /window\.Capacitor\?\.isNativePlatform\?\.\(\) !== true/);
+assert.match(app, /directory \+ 'config\.js'/);
+assert.match(app, /directory \+ 'runtime\.js'/);
+assert.match(cloudBackupConfig, /enabled: false/);
+assert.match(cloudBackup, /wander\.personalPOIs\.v1/);
+assert.match(cloudBackup, /wander\.sessions\.v1/);
+assert.match(cloudBackup, /wander\.travelLog\.entries\.v1/);
+assert.match(cloudBackup, /applyData\(cloudData, cloud\.revision\)/);
+assert.match(cloudBackup, /Sin conexión con el backup; Wander sigue funcionando localmente/);
+assert.match(cloudBackupFunction, /WANDER_BACKUP_BUCKET/);
+assert.match(cloudBackupFunction, /WANDER_BACKUP_SPACE_TOKEN/);
+assert.match(cloudBackupFunction, /PREVIOUS_KEY/);
+assert.doesNotMatch(cloudBackupFunction, /onRequestDelete/);
+
 assert.doesNotMatch(html, /v\d+\.\d+\.\d+/);
 assert.doesNotMatch(serviceWorker, /wander-travel-v\d+/);
 assert.match(serviceWorker, /if \(!response\.ok\) throw/);
@@ -159,4 +179,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts locally and keeps OSM tiles on-device`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts locally, keeps OSM tiles on-device, and restores cloud backups`);
