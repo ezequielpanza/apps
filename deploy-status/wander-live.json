@@ -1,7 +1,8 @@
 {
-  "result": "success",
-  "expectedVersion": "v0.108.0",
-  "runId": "30315346879",
-  "commit": "e841705fb4ccb44bd59213b55e251a5481647ea0",
-  "recordedAt": "2026-07-27T23:49:18Z"
+  "result": "failure",
+  "expectedVersion": "v0.109.0",
+  "runId": "30316847609",
+  "commit": "23c237a54333bded62e014a78a25b8ac64c26c81",
+  "cloudBackupVerified": false,
+  "recordedAt": "2026-07-28T00:17:12Z"
 }
