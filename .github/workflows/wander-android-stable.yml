@@ -77,6 +77,16 @@ jobs:
         working-directory: apps/wander-travel
         run: npm ci
 
+      - name: Require backup token for release builds
+        if: github.event_name != 'pull_request'
+        env:
+          WANDER_BACKUP_SPACE_TOKEN: ${{ secrets.WANDER_BACKUP_SPACE_TOKEN }}
+        run: |
+          if [ -z "$WANDER_BACKUP_SPACE_TOKEN" ]; then
+            echo "::error::Repository secret WANDER_BACKUP_SPACE_TOKEN is required for the release APK."
+            exit 1
+          fi
+
       - name: Sync Android project
         working-directory: apps/wander-travel
         env:
