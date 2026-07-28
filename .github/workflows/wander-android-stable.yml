@@ -79,6 +79,8 @@ jobs:
 
       - name: Sync Android project
         working-directory: apps/wander-travel
+        env:
+          WANDER_BACKUP_SPACE_TOKEN: ${{ secrets.WANDER_BACKUP_SPACE_TOKEN }}
         run: npm run android:sync
 
       - name: Build versioned APK
