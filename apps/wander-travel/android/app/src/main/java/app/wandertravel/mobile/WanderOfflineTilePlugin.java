@@ -1,6 +1,11 @@
 package app.wandertravel.mobile;
 
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
+import android.os.Build;
 import android.util.Base64;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -24,16 +29,17 @@ import java.util.concurrent.Executors;
 @CapacitorPlugin(name = "WanderOfflineTiles")
 public class WanderOfflineTilePlugin extends Plugin {
     private static final String CACHE_DIRECTORY = "osm-tile-cache-v1";
-    private static final String TILE_TEMPLATE = "https://tile.openstreetmap.org/%d/%d/%d.png";
-    private static final String USER_AGENT = "WanderTravel/0.10.0 (+https://wander-travel.pages.dev)";
+    private static final String OSM_TILE_TEMPLATE = "https://tile.openstreetmap.org/%d/%d/%d.png";
+    private static final String ESRI_TILE_TEMPLATE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/%d/%d/%d";
+    private static final String USER_AGENT = "WanderTravel/0.11.1 (+https://wander-travel.pages.dev)";
     private static final String PREFS_NAME = "wander_offline_tiles";
     private static final String RETENTION_KEY = "retention_days";
     private static final int DEFAULT_RETENTION_DAYS = 90;
     private static final int MAX_ZOOM = 19;
-    private static final int MAX_TILE_COUNT = 4000;
+    private static final int MAX_TILE_COUNT = 6000;
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int READ_TIMEOUT_MS = 12000;
-    private static final int MAX_TILE_BYTES = 1024 * 1024;
+    private static final int MAX_TILE_BYTES = 2 * 1024 * 1024;
     private static final ExecutorService IO_EXECUTOR = Executors.newFixedThreadPool(4);
 
     private File cacheRoot() {
@@ -42,8 +48,17 @@ public class WanderOfflineTilePlugin extends Plugin {
         return root;
     }
 
-    private File tileFile(int z, int x, int y) {
-        return new File(new File(new File(cacheRoot(), String.valueOf(z)), String.valueOf(x)), y + ".png");
+    private String normalizeSource(String value) {
+        String source = value == null ? "osm" : value.trim().toLowerCase();
+        if (source.equals("satellite") || source.equals("esri")) return "esri";
+        return "osm";
+    }
+
+    private File tileFile(String source, int z, int x, int y) {
+        if ("osm".equals(source)) {
+            return new File(new File(new File(cacheRoot(), String.valueOf(z)), String.valueOf(x)), y + ".png");
+        }
+        return new File(new File(new File(new File(cacheRoot(), source), String.valueOf(z)), String.valueOf(x)), y + ".tile");
     }
 
     private int normalizeRetentionDays(Integer value) {
@@ -76,6 +91,21 @@ public class WanderOfflineTilePlugin extends Plugin {
         return x >= 0 && y >= 0 && x < edge && y < edge;
     }
 
+    private boolean networkAvailable() {
+        ConnectivityManager manager = (ConnectivityManager) getContext().getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+        if (manager == null) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Network network = manager.getActiveNetwork();
+            if (network == null) return false;
+            NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+            return capabilities != null
+                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+        }
+        NetworkInfo info = manager.getActiveNetworkInfo();
+        return info != null && info.isConnected();
+    }
+
     private byte[] readBytes(File file) throws IOException {
         try (InputStream input = new FileInputStream(file); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[16384];
@@ -88,21 +118,27 @@ public class WanderOfflineTilePlugin extends Plugin {
         }
     }
 
-    private byte[] downloadTile(int z, int x, int y) throws IOException {
-        URL url = new URL(String.format(TILE_TEMPLATE, z, x, y));
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+    private URL tileUrl(String source, int z, int x, int y) throws IOException {
+        String value = "esri".equals(source)
+            ? String.format(ESRI_TILE_TEMPLATE, z, y, x)
+            : String.format(OSM_TILE_TEMPLATE, z, x, y);
+        return new URL(value);
+    }
+
+    private byte[] downloadTile(String source, int z, int x, int y) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) tileUrl(source, z, x, y).openConnection();
         connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
         connection.setReadTimeout(READ_TIMEOUT_MS);
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("User-Agent", USER_AGENT);
-        connection.setRequestProperty("Accept", "image/png,image/*;q=0.8");
+        connection.setRequestProperty("Accept", "image/avif,image/webp,image/jpeg,image/png,image/*;q=0.8");
         connection.setUseCaches(true);
         try {
             int status = connection.getResponseCode();
-            if (status != HttpURLConnection.HTTP_OK) throw new IOException("OSM tile HTTP " + status);
+            if (status != HttpURLConnection.HTTP_OK) throw new IOException("Map tile HTTP " + status);
             String contentType = connection.getContentType();
             if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
-                throw new IOException("Unexpected OSM tile content type");
+                throw new IOException("Unexpected map tile content type");
             }
             try (InputStream input = connection.getInputStream(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
                 byte[] buffer = new byte[16384];
@@ -131,16 +167,34 @@ public class WanderOfflineTilePlugin extends Plugin {
         destination.setLastModified(System.currentTimeMillis());
     }
 
-    private JSObject tileResponse(byte[] bytes, boolean cached, boolean stale, int z, int x, int y) {
+    private String mimeType(String source) {
+        return "esri".equals(source) ? "image/jpeg" : "image/png";
+    }
+
+    private JSObject tileResponse(byte[] bytes, boolean cached, boolean stale, String source, int z, int x, int y) {
         JSObject result = new JSObject();
         result.put("ok", true);
         result.put("cached", cached);
         result.put("stale", stale);
+        result.put("source", source);
         result.put("z", z);
         result.put("x", x);
         result.put("y", y);
         result.put("bytes", bytes.length);
-        result.put("dataUrl", "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP));
+        result.put("dataUrl", "data:" + mimeType(source) + ";base64," + Base64.encodeToString(bytes, Base64.NO_WRAP));
+        return result;
+    }
+
+    private JSObject unavailableResponse(String source, int z, int x, int y, String message) {
+        JSObject result = new JSObject();
+        result.put("ok", false);
+        result.put("cached", false);
+        result.put("offline", true);
+        result.put("source", source);
+        result.put("z", z);
+        result.put("x", x);
+        result.put("y", y);
+        result.put("message", message == null ? "Tile unavailable" : message);
         return result;
     }
 
@@ -149,46 +203,49 @@ public class WanderOfflineTilePlugin extends Plugin {
         Integer z = call.getInt("z");
         Integer x = call.getInt("x");
         Integer y = call.getInt("y");
+        String source = normalizeSource(call.getString("source", "osm"));
         if (z == null || x == null || y == null || !validCoordinates(z, x, y)) {
             call.reject("Invalid tile coordinates", "INVALID_TILE");
             return;
         }
 
         IO_EXECUTOR.execute(() -> {
-            File file = tileFile(z, x, y);
+            File file = tileFile(source, z, x, y);
             int days = retentionDays();
             boolean hasCached = file.isFile() && file.length() > 0;
             boolean fresh = hasCached && days > 0 && System.currentTimeMillis() - file.lastModified() <= retentionMs(days);
-            try {
-                if (fresh) {
-                    file.setLastModified(System.currentTimeMillis());
-                    call.resolve(tileResponse(readBytes(file), true, false, z, x, y));
-                    return;
-                }
 
-                byte[] bytes = downloadTile(z, x, y);
+            if (hasCached) {
+                try {
+                    byte[] bytes = readBytes(file);
+                    file.setLastModified(System.currentTimeMillis());
+                    call.resolve(tileResponse(bytes, true, !fresh, source, z, x, y));
+                    if (!fresh && days > 0 && networkAvailable()) {
+                        try {
+                            writeAtomically(file, downloadTile(source, z, x, y));
+                            pruneIfNeeded(days);
+                        } catch (Exception ignored) {}
+                    }
+                    return;
+                } catch (Exception error) {
+                    file.delete();
+                }
+            }
+
+            if (!networkAvailable()) {
+                call.resolve(unavailableResponse(source, z, x, y, "No cached tile and no validated network"));
+                return;
+            }
+
+            try {
+                byte[] bytes = downloadTile(source, z, x, y);
                 if (days > 0) {
                     writeAtomically(file, bytes);
                     pruneIfNeeded(days);
                 }
-                call.resolve(tileResponse(bytes, false, false, z, x, y));
+                call.resolve(tileResponse(bytes, false, false, source, z, x, y));
             } catch (Exception error) {
-                if (hasCached) {
-                    try {
-                        file.setLastModified(System.currentTimeMillis());
-                        call.resolve(tileResponse(readBytes(file), true, true, z, x, y));
-                        return;
-                    } catch (Exception ignored) {}
-                }
-                JSObject result = new JSObject();
-                result.put("ok", false);
-                result.put("cached", false);
-                result.put("offline", true);
-                result.put("z", z);
-                result.put("x", x);
-                result.put("y", y);
-                result.put("message", error.getMessage() == null ? "Tile unavailable" : error.getMessage());
-                call.resolve(result);
+                call.resolve(unavailableResponse(source, z, x, y, error.getMessage()));
             }
         });
     }
@@ -204,7 +261,10 @@ public class WanderOfflineTilePlugin extends Plugin {
         if (children == null) return;
         for (File child : children) {
             if (child.isDirectory()) collectTiles(child, output);
-            else if (child.getName().endsWith(".png")) output.add(child);
+            else {
+                String name = child.getName().toLowerCase();
+                if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".tile")) output.add(child);
+            }
         }
     }
 
@@ -241,7 +301,9 @@ public class WanderOfflineTilePlugin extends Plugin {
         result.put("maxEntries", MAX_TILE_COUNT);
         result.put("maxTileCount", MAX_TILE_COUNT);
         result.put("retentionDays", retentionDays());
-        result.put("source", "openstreetmap-view-cache");
+        result.put("source", "viewed-map-cache");
+        result.put("streets", true);
+        result.put("satellite", true);
         return result;
     }
 
