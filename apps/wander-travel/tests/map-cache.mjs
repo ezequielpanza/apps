@@ -68,6 +68,11 @@ assert.doesNotMatch(serviceWorker, /prefetch|preload.*tile|download.*area/i);
 
 assert.match(settings, /sectores de calles y satélite/);
 assert.match(settings, /El recorrido se registra y se dibuja incluso cuando no hay ningún tile disponible/);
+assert.match(settings, /MIGRATION_KEY/);
+assert.match(settings, /const raw = localStorage\.getItem\(STORAGE_KEY\)/);
+assert.match(settings, /if \(raw === null\) return DEFAULT_DAYS/);
+assert.match(settings, /value === 0 && !migrated/);
+assert.doesNotMatch(settings, /Number\(localStorage\.getItem\(STORAGE_KEY\)\)/);
 for (const days of ['0', '7', '30', '90', '180', '365']) {
   assert.match(settings, new RegExp(`<option value="${days}">`));
 }
@@ -78,4 +83,4 @@ assert.match(settings, /map\.track\.available/);
 assert.match(app, /loadMapCacheSettings/);
 assert.match(app, /runtime-map-cache-settings\.js/);
 
-console.log('PASS Wander starts locally and immediately restores viewed street and satellite tiles without connectivity');
+console.log('PASS Wander uses a real default retention, migrates the v0.109.1 zero-day bug, and restores cached street and satellite tiles offline');
