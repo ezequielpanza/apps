@@ -93,6 +93,13 @@
     await loadScript('./runtime-map-cache-settings.js?v=20260723-01', 'wander-map-cache-settings');
   }
 
+  async function loadCloudBackup() {
+    if (window.Capacitor?.isNativePlatform?.() !== true) return;
+    const directory = './backup/';
+    await loadScript(directory + 'config.js', 'wander-backup-config');
+    await loadScript(directory + 'runtime.js', 'wander-cloud-backup');
+  }
+
   async function initialize() {
     try { await loadTravelMemory(); }
     catch (error) { console.warn('Wander travel memory could not be loaded', error); }
@@ -102,6 +109,8 @@
     catch (error) { console.warn('Wander notification routing could not be loaded', error); }
     try { await loadMapCacheSettings(); }
     catch (error) { console.warn('Wander map cache settings could not be loaded', error); }
+    try { await loadCloudBackup(); }
+    catch (error) { console.warn('Wander cloud backup could not be loaded', error); }
 
     window.WanderProviders?.nearby?.configure?.({
       sources: ['google-places', 'openstreetmap', 'wikidata'],
