@@ -27,8 +27,33 @@ function copyRootAssets() {
   }
 }
 
+function copyDirectory(source, target) {
+  if (!fs.existsSync(source)) return;
+  fs.mkdirSync(target, { recursive: true });
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    const from = path.join(source, entry.name);
+    const to = path.join(target, entry.name);
+    if (entry.isDirectory()) copyDirectory(from, to);
+    else fs.copyFileSync(from, to);
+  }
+}
+
+function writeBackupConfig() {
+  const token = String(process.env.WANDER_BACKUP_SPACE_TOKEN || '').trim();
+  const endpoint = String(process.env.WANDER_BACKUP_ENDPOINT || 'https://wander-travel.pages.dev/api/backup').trim();
+  const payload = {
+    enabled: Boolean(token),
+    endpoint,
+    token,
+    channel: 'shared-test-v1',
+  };
+  const target = path.join(destination, 'backup', 'config.js');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, `window.WanderBackupConfig = Object.freeze(${JSON.stringify(payload)});\n`);
+}
+
 async function downloadAsset(asset) {
-  const response = await fetch(asset.url, { headers: { 'user-agent': 'WanderTravelBuild/0.108.0' } });
+  const response = await fetch(asset.url, { headers: { 'user-agent': 'WanderTravelBuild/0.109.0' } });
   if (!response.ok) throw new Error(`Could not download ${asset.url}: HTTP ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
   if (asset.sha256) {
@@ -52,7 +77,9 @@ function rewriteMobileIndex() {
 fs.rmSync(destination, { recursive: true, force: true });
 fs.mkdirSync(destination, { recursive: true });
 copyRootAssets();
+copyDirectory(path.join(root, 'backup'), path.join(destination, 'backup'));
+writeBackupConfig();
 await Promise.all(leafletAssets.map(downloadAsset));
 rewriteMobileIndex();
 
-console.log(`Prepared ${fs.readdirSync(destination).length} Wander web assets with Leaflet ${LEAFLET_VERSION} bundled for Android`);
+console.log(`Prepared ${fs.readdirSync(destination).length} Wander web assets with Leaflet ${LEAFLET_VERSION} bundled for Android and cloud backup ${process.env.WANDER_BACKUP_SPACE_TOKEN ? 'enabled' : 'disabled'}`);
