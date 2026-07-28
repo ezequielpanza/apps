@@ -39,10 +39,13 @@ addDynamicReferences(loaded, platform);
 addDynamicReferences(loaded, app);
 loaded.add('index.html');
 const cached = new Set([...serviceWorker.matchAll(/["']\.\/([^"']+)["']/g)].map((match) => match[1]));
+const onlineEnhancements = new Set(['runtime-cloud-backup.js', 'wander-cloud-backup.css']);
 
 for (const reference of loaded) {
   assert.equal(fs.existsSync(path.join(ROOT, reference)), true, `Missing shell asset: ${reference}`);
-  assert.equal(cached.has(reference), true, `Shell asset is not cached: ${reference}`);
+  if (!onlineEnhancements.has(reference)) {
+    assert.equal(cached.has(reference), true, `Shell asset is not cached: ${reference}`);
+  }
 }
 
 for (const file of fs.readdirSync(ROOT)) {
@@ -54,11 +57,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.108.0');
-assert.equal(manifest.start_url, './?app=v0.108.0');
-assert.equal(packageManifest.version, '0.108.0');
-assert.equal(androidVersion.versionName, '0.10.0');
-assert.equal(androidVersion.versionCode, 15);
+assert.equal(versionMatch[1], 'v0.109.0');
+assert.equal(manifest.start_url, './?app=v0.109.0');
+assert.equal(packageManifest.version, '0.109.0');
+assert.equal(androidVersion.versionName, '0.11.0');
+assert.equal(androidVersion.versionCode, 16);
 assert.equal(capacitorConfig.webDir, 'mobile-dist');
 assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
 assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
@@ -71,6 +74,7 @@ const tracks = read('runtime-tracks.js');
 const sessionEngine = read('runtime-session-engine.js');
 const notificationPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderNotificationPlugin.java');
 const offlineTilePlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderOfflineTilePlugin.java');
+const cloudIdentityPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderCloudIdentityPlugin.java');
 const mainActivity = read('android/app/src/main/java/app/wandertravel/mobile/MainActivity.java');
 const notificationRouter = read('runtime-notification-router.js');
 const interactionPanel = read('runtime-interaction-panel.js');
@@ -80,6 +84,9 @@ const mapCacheSettings = read('runtime-map-cache-settings.js');
 const mobileBuild = read('mobile/build-web.mjs');
 const travelLog = read('runtime-travel-log.js');
 const travelLogScreen = read('runtime-travel-log-screen.js');
+const cloudBackup = read('runtime-cloud-backup.js');
+const cloudBackupApi = read('functions/api/cloud-backup.js');
+const cloudProvisioner = read('scripts/ensure-cloudflare-backup-kv.mjs');
 
 assert.match(direction, /thresholdKmh: 0/);
 assert.match(direction, /magneticEnabled/);
@@ -143,6 +150,23 @@ assert.match(serviceWorker, /MAX_TILE_ENTRIES = 2500/);
 assert.match(serviceWorker, /WANDER_MAP_CACHE_CONFIG/);
 assert.match(serviceWorker, /WANDER_MAP_CACHE_CLEAR/);
 
+assert.match(cloudIdentityPlugin, /name = "WanderCloudIdentity"/);
+assert.match(cloudIdentityPlugin, /Settings\.Secure\.ANDROID_ID/);
+assert.match(cloudIdentityPlugin, /MessageDigest\.getInstance\("SHA-256"\)/);
+assert.match(mainActivity, /registerPlugin\(WanderCloudIdentityPlugin\.class\)/);
+assert.match(app, /loadCloudBackup/);
+assert.match(app, /WanderCloudBackup\?\.bootstrap/);
+assert.match(app, /WanderCloudBackup\?\.start/);
+assert.match(cloudBackup, /wander\.personalPOIs\.v1/);
+assert.match(cloudBackup, /wander\.sessions\.v1/);
+assert.match(cloudBackup, /wander\.travelLog\.entries\.v1/);
+assert.match(cloudBackup, /Empty reinstall must never overwrite remote backup|hasMeaningfulData/);
+assert.match(cloudBackup, /Backup en la nube/);
+assert.match(cloudBackupApi, /WANDER_BACKUPS/);
+assert.match(cloudBackupApi, /MAX_BODY_BYTES = 20 \* 1024 \* 1024/);
+assert.match(cloudProvisioner, /wander-travel-backups/);
+assert.match(cloudProvisioner, /kv_namespaces/);
+
 assert.match(travelLog, /window\.WanderTravelLog/);
 assert.match(travelLog, /contextChanges/);
 assert.match(travelLog, /sessionId/);
@@ -159,4 +183,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts locally and keeps OSM tiles on-device`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts locally and restores cloud backups per device`);

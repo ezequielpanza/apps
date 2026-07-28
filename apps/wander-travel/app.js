@@ -72,6 +72,12 @@
     });
   }
 
+  async function loadCloudBackup() {
+    ensureStyles('./wander-cloud-backup.css?v=20260727-01', 'wander-cloud-backup');
+    await loadScript('./runtime-cloud-backup.js?v=20260727-01', 'wander-cloud-backup');
+    return window.WanderCloudBackup?.bootstrap?.() || null;
+  }
+
   async function loadTravelMemory() {
     ensureStyles('./wander-travel-log.css?v=20260719-01', 'wander-travel-log');
     await loadScript('./runtime-travel-log.js?v=20260719-01', 'wander-travel-log');
@@ -94,6 +100,12 @@
   }
 
   async function initialize() {
+    try {
+      const cloudResult = await loadCloudBackup();
+      if (cloudResult?.reloading) return;
+    } catch (error) {
+      console.warn('Wander cloud backup could not be initialized', error);
+    }
     try { await loadTravelMemory(); }
     catch (error) { console.warn('Wander travel memory could not be loaded', error); }
     try { await loadDirectionIndicator(); }
@@ -117,6 +129,7 @@
     renderLocationQuality();
     window.WanderSituationEngine?.evaluate?.();
     window.WanderSessionEngine?.observe?.('app-ready');
+    window.WanderCloudBackup?.start?.();
 
     window.WanderAppReady = true;
     window.dispatchEvent(new CustomEvent('wander:app-ready', {

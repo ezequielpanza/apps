@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WanderDirectionPlugin.class);
         registerPlugin(WanderNotificationPlugin.class);
         registerPlugin(WanderOfflineTilePlugin.class);
+        registerPlugin(WanderCloudIdentityPlugin.class);
         super.onCreate(savedInstanceState);
         WanderNotificationPlugin.captureOpenIntent(getIntent());
     }
