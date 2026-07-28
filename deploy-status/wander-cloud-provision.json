@@ -1,0 +1,16 @@
+{
+  "ok": false,
+  "projectName": "wander-travel",
+  "namespaceTitle": "wander-travel-backups",
+  "bindingName": "WANDER_BACKUPS",
+  "error": "Cloudflare API 401: Authentication error",
+  "httpStatus": 401,
+  "apiPath": "/storage/kv/namespaces?per_page=100&order=title&direction=asc",
+  "details": [
+    {
+      "code": 10000,
+      "message": "Authentication error"
+    }
+  ],
+  "recordedAt": "2026-07-28T00:20:23.877Z"
+}
