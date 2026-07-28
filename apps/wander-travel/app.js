@@ -75,19 +75,19 @@
   async function loadCloudBackup() {
     ensureStyles('./wander-cloud-backup.css?v=20260727-01', 'wander-cloud-backup');
     await loadScript('./runtime-cloud-backup.js?v=20260727-01', 'wander-cloud-backup');
-    return window.WanderCloudBackup?.bootstrap?.() || null;
+    return window.WanderCloudBackup || null;
   }
 
   async function loadTravelMemory() {
-    ensureStyles('./wander-travel-log.css?v=20260719-01', 'wander-travel-log');
+    ensureStyles('./wander-travel-log.css?v=20260728-01', 'wander-travel-log');
     await loadScript('./runtime-travel-log.js?v=20260719-01', 'wander-travel-log');
-    await loadScript('./runtime-travel-log-screen.js?v=20260719-01', 'wander-travel-log-screen');
+    await loadScript('./runtime-travel-log-screen.js?v=20260728-01', 'wander-travel-log-screen');
     await loadScript('./runtime-morning-briefing.js?v=20260719-01', 'wander-morning-briefing');
   }
 
   async function loadDirectionIndicator() {
     ensureStyles('./wander-direction-indicator.css?v=20260722-01', 'wander-direction-indicator');
-    await loadScript('./runtime-direction-indicator.js?v=20260722-01', 'wander-direction-indicator');
+    await loadScript('./runtime-direction-indicator.js?v=20260728-01', 'wander-direction-indicator');
     await loadScript('./runtime-direction-indicator-settings.js?v=20260722-01', 'wander-direction-indicator-settings');
   }
 
@@ -96,24 +96,31 @@
   }
 
   async function loadMapCacheSettings() {
-    await loadScript('./runtime-map-cache-settings.js?v=20260723-01', 'wander-map-cache-settings');
+    await loadScript('./runtime-map-cache-settings.js?v=20260728-01', 'wander-map-cache-settings');
+  }
+
+  function reportLoadResult(label, result) {
+    if (result.status === 'rejected') console.warn(`${label} could not be loaded`, result.reason);
   }
 
   async function initialize() {
-    try {
-      const cloudResult = await loadCloudBackup();
-      if (cloudResult?.reloading) return;
-    } catch (error) {
-      console.warn('Wander cloud backup could not be initialized', error);
-    }
-    try { await loadTravelMemory(); }
-    catch (error) { console.warn('Wander travel memory could not be loaded', error); }
-    try { await loadDirectionIndicator(); }
-    catch (error) { console.warn('Wander direction indicator could not be loaded', error); }
-    try { await loadNotificationRouting(); }
-    catch (error) { console.warn('Wander notification routing could not be loaded', error); }
-    try { await loadMapCacheSettings(); }
-    catch (error) { console.warn('Wander map cache settings could not be loaded', error); }
+    const cloudBootstrap = loadCloudBackup()
+      .then((cloud) => cloud?.bootstrap?.() || null)
+      .catch((error) => {
+        console.warn('Wander cloud backup could not be initialized', error);
+        return { error };
+      });
+
+    const localResults = await Promise.allSettled([
+      loadDirectionIndicator(),
+      loadTravelMemory(),
+      loadMapCacheSettings(),
+      loadNotificationRouting(),
+    ]);
+    reportLoadResult('Wander direction indicator', localResults[0]);
+    reportLoadResult('Wander travel memory', localResults[1]);
+    reportLoadResult('Wander map cache settings', localResults[2]);
+    reportLoadResult('Wander notification routing', localResults[3]);
 
     window.WanderProviders?.nearby?.configure?.({
       sources: ['google-places', 'openstreetmap', 'wikidata'],
@@ -129,12 +136,16 @@
     renderLocationQuality();
     window.WanderSituationEngine?.evaluate?.();
     window.WanderSessionEngine?.observe?.('app-ready');
-    window.WanderCloudBackup?.start?.();
 
     window.WanderAppReady = true;
     window.dispatchEvent(new CustomEvent('wander:app-ready', {
       detail: { at: Date.now(), version: window.WanderVersion },
     }));
+
+    cloudBootstrap.then((cloudResult) => {
+      if (cloudResult?.reloading) return;
+      window.WanderCloudBackup?.start?.();
+    });
   }
 
   window.WanderContext?.subscribe((key) => {
