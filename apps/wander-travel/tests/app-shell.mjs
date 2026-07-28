@@ -57,11 +57,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.109.3');
-assert.equal(manifest.start_url, './?app=v0.109.3');
-assert.equal(packageManifest.version, '0.109.3');
-assert.equal(androidVersion.versionName, '0.11.3');
-assert.equal(androidVersion.versionCode, 19);
+assert.equal(versionMatch[1], 'v0.109.4');
+assert.equal(manifest.start_url, './?app=v0.109.4');
+assert.equal(packageManifest.version, '0.109.4');
+assert.equal(androidVersion.versionName, '0.11.4');
+assert.equal(androidVersion.versionCode, 20);
 assert.equal(capacitorConfig.webDir, 'mobile-dist');
 assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
 assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
@@ -75,6 +75,7 @@ const androidManifest = read('android/app/src/main/AndroidManifest.xml');
 const locationProvider = read('runtime-provider-location.js');
 const tracks = read('runtime-tracks.js');
 const sessionEngine = read('runtime-session-engine.js');
+const sensorMotionBridge = read('runtime-sensor-motion-bridge.js');
 const notificationPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderNotificationPlugin.java');
 const offlineTilePlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderOfflineTilePlugin.java');
 const cloudIdentityPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderCloudIdentityPlugin.java');
@@ -97,6 +98,13 @@ assert.match(app, /Promise\.allSettled\(\[/);
 assert.match(app, /loadDirectionIndicator\(\),\s*loadMapCrosshair\(\),\s*loadTravelMemory\(\)/s);
 assert.match(app, /cloudBootstrap\.then\(\(cloudResult\)/);
 assert.doesNotMatch(app, /await loadCloudBackup\(\)/);
+assert.match(app, /initializeStableDirectionMarker/);
+assert.match(app, /GPS_SWITCH_MS = 4000/);
+assert.match(app, /COMPASS_SWITCH_MS = 2500/);
+assert.match(app, /wander\.tracks\.recent\.window\.v1/);
+assert.match(app, /Mostrar en el mapa/);
+assert.match(app, /Últimas 24 horas/);
+assert.match(app, /segment\?\.type !== 'movement' \|\| !segment\.endedAt/);
 
 assert.match(direction, /thresholdKmh: 0/);
 assert.match(direction, /magneticEnabled/);
@@ -123,6 +131,12 @@ assert.match(dashboard, /function directionValue\(/);
 assert.match(dashboard, /context\.value\('direction\.heading'\)/);
 assert.match(dashboard, /label: 'Dirección'/);
 assert.match(dashboard, /cardinalDirection/);
+
+assert.match(sensorMotionBridge, /STARTUP_GUARD_MS = 20000/);
+assert.match(sensorMotionBridge, /corroborationRequired: true/);
+assert.match(sensorMotionBridge, /accelerometer_without_position_corroboration/);
+assert.match(sensorMotionBridge, /stable_movement_confirmed/);
+assert.match(sensorMotionBridge, /STOP_CONFIRM_MS = 10000/);
 
 assert.match(mapCrosshair, /bearingTo\(/);
 assert.match(mapCrosshair, /distanceLabel\(/);
@@ -216,4 +230,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts local-first with integrated travel tracks, crosshair metrics, compass, and offline zoom fallback`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts local-first with integrated travel tracks, stable direction, crosshair metrics, and offline zoom fallback`);
