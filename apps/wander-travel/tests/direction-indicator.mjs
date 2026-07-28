@@ -24,6 +24,9 @@ function createHarness(location = {}) {
   const values = new Map();
   const listeners = new Set();
   const nativeListeners = new Map();
+  const intervalCallbacks = new Map();
+  let intervalId = 0;
+  let sensorCommands = 0;
   let currentLocation = { lat: -34.6, lng: -58.4, accuracy: 8, updatedAt: new Date().toISOString(), ...location };
 
   const context = {
@@ -62,8 +65,11 @@ function createHarness(location = {}) {
       nativeListeners.set(name, callback);
       return { remove() { nativeListeners.delete(name); } };
     },
-    async setSensorEnabled({ enabled }) { return { available: true, enabled, running: enabled }; },
-    async getStatus() { return { available: true, running: false }; },
+    async setSensorEnabled({ enabled }) {
+      sensorCommands += 1;
+      return { available: true, enabled, running: enabled, independentFromLocation: true };
+    },
+    async getStatus() { return { available: true, running: false, independentFromLocation: true }; },
   };
 
   const documentTarget = new EventTarget();
@@ -94,6 +100,12 @@ function createHarness(location = {}) {
     Map,
     Promise,
     console,
+    setInterval(callback) {
+      const id = ++intervalId;
+      intervalCallbacks.set(id, callback);
+      return id;
+    },
+    clearInterval(id) { intervalCallbacks.delete(id); },
   };
   sandbox.globalThis = sandbox;
   vm.runInNewContext(source, sandbox, { filename: 'runtime-direction-indicator.js' });
@@ -104,10 +116,14 @@ function createHarness(location = {}) {
     values,
     map,
     arrow,
-    async compass(heading, confidence = 'high') {
+    sensorCommands: () => sensorCommands,
+    async compass(heading, confidence = 'high', timestamp = Date.now()) {
       await Promise.resolve();
-      nativeListeners.get('direction')?.({ heading, confidence, timestamp: Date.now() });
+      nativeListeners.get('direction')?.({ heading, confidence, timestamp });
       await Promise.resolve();
+    },
+    tick() {
+      intervalCallbacks.forEach((callback) => callback());
     },
     updateLocation(patch) {
       currentLocation = { ...currentLocation, ...patch, updatedAt: patch.updatedAt || new Date().toISOString() };
@@ -157,6 +173,17 @@ test('indicator can be disabled without changing location data', async () => {
   assert.equal(harness.api.getState().source, 'none');
   assert.equal(harness.map.layers.length, 0);
   assert.equal(harness.context.getEffectiveLocation().heading, 135);
+});
+
+test('stale compass data removes the frozen arrow and retries the sensor', async () => {
+  const harness = createHarness({ heading: null, speedMps: 0 });
+  await harness.compass(250, 'high', Date.now() - 10000);
+  const before = harness.sensorCommands();
+  harness.tick();
+  await Promise.resolve();
+  assert.equal(harness.api.getState().source, 'none');
+  assert.equal(harness.map.layers.length, 0);
+  assert.ok(harness.sensorCommands() >= before);
 });
 
 let passed = 0;
