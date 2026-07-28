@@ -64,6 +64,9 @@ jobs:
       - name: Run viewed map tile cache tests
         run: node apps/wander-travel/tests/map-cache.mjs
 
+      - name: Run local-first UI integration tests
+        run: node apps/wander-travel/tests/local-first-ui.mjs
+
       - name: Run cloud backup API tests
         run: node apps/wander-travel/tests/cloud-backup-api.mjs
 
