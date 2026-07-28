@@ -57,11 +57,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.109.4');
-assert.equal(manifest.start_url, './?app=v0.109.4');
-assert.equal(packageManifest.version, '0.109.4');
-assert.equal(androidVersion.versionName, '0.11.5');
-assert.equal(androidVersion.versionCode, 21);
+assert.equal(versionMatch[1], 'v0.109.5');
+assert.equal(manifest.start_url, './?app=v0.109.5');
+assert.equal(packageManifest.version, '0.109.5');
+assert.equal(androidVersion.versionName, '0.11.6');
+assert.equal(androidVersion.versionCode, 22);
 assert.equal(capacitorConfig.webDir, 'mobile-dist');
 assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
 assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
@@ -212,6 +212,12 @@ assert.match(cloudBackup, /wander\.personalPOIs\.v1/);
 assert.match(cloudBackup, /wander\.sessions\.v1/);
 assert.match(cloudBackup, /wander\.travelLog\.entries\.v1/);
 assert.match(cloudBackup, /hasMeaningfulData/);
+assert.match(cloudBackup, /LAST_SUCCESS_KEY/);
+assert.match(cloudBackup, /LAST_ATTEMPT_KEY/);
+assert.match(cloudBackup, /PENDING_KEY/);
+assert.match(cloudBackup, /Último backup confirmado/);
+assert.match(cloudBackup, /Crear backup ahora/);
+assert.match(cloudBackup, /result\.contentHash && result\.contentHash !== backup\.contentHash/);
 assert.match(cloudBackupApi, /WANDER_BACKUPS/);
 assert.match(cloudBackupApi, /MAX_BODY_BYTES = 20 \* 1024 \* 1024/);
 assert.match(cloudProvisioner, /wander-travel-backups/);
@@ -237,4 +243,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts local-first without native service-worker races, with integrated travel tracks, stable direction, crosshair metrics, and offline zoom fallback`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts local-first without native service-worker races, with persistent cloud backup status, integrated travel tracks, stable direction, crosshair metrics, and offline zoom fallback`);

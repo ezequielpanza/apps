@@ -73,6 +73,9 @@ jobs:
       - name: Run cloud backup restore tests
         run: node apps/wander-travel/tests/cloud-backup-runtime.mjs
 
+      - name: Run cloud sync status tests
+        run: node apps/wander-travel/tests/cloud-sync-status.mjs
+
       - name: Run context dashboard test
         run: node apps/wander-travel/tests/context-dashboard.mjs
 
