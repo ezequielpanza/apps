@@ -7,6 +7,8 @@
   const STOPPED_MAX_KMH = 0.8;
   const COMPASS_MAX_AGE_MS = 2500;
   const GPS_MAX_AGE_MS = 15000;
+  const SENSOR_RETRY_MS = 5000;
+  const HEALTHCHECK_INTERVAL_MS = 1000;
   const DEFAULT_CONFIG = Object.freeze({
     enabled: true,
     magneticEnabled: true,
@@ -23,6 +25,8 @@
   let directionListener = null;
   let directionErrorListener = null;
   let sensorCommand = Promise.resolve();
+  let lastSensorRetryAt = 0;
+  let healthTimer = null;
 
   function finite(value) {
     const number = Number(value);
@@ -178,7 +182,8 @@
   }
 
   function selectDirection(now = Date.now()) {
-    const speedKmh = gps?.speedKmh ?? finite(context.value('location.effective.speedMps')) * 3.6;
+    const contextSpeedMps = finite(context.value('location.effective.speedMps'));
+    const speedKmh = gps?.speedKmh ?? (contextSpeedMps === null ? null : contextSpeedMps * 3.6);
     if (!config.enabled) return { source: 'none', heading: null, confidence: 'disabled', speedKmh: Number.isFinite(speedKmh) ? speedKmh : null };
 
     const cutoff = compassCutoffKmh();
@@ -274,8 +279,8 @@
     window.dispatchEvent(new CustomEvent('wander:direction-change', { detail: state }));
   }
 
-  function evaluate() {
-    const selected = selectDirection();
+  function evaluate(now = Date.now()) {
+    const selected = selectDirection(now);
     const heading = smoothHeading(selected.heading, selected.source);
     const nextState = { ...selected, heading };
     renderMarker(nextState);
@@ -283,10 +288,23 @@
     return state;
   }
 
+  function retryStaleSensor(now = Date.now()) {
+    if (!sensorShouldRun() || compassFresh(now) || now - lastSensorRetryAt < SENSOR_RETRY_MS) return;
+    lastSensorRetryAt = now;
+    syncNativeSensor();
+  }
+
+  function healthcheck() {
+    const now = Date.now();
+    retryStaleSensor(now);
+    evaluate(now);
+  }
+
   function setConfig(patch = {}) {
     config = normalizeConfig({ ...config, ...patch });
     saveConfig();
     publishConfig();
+    lastSensorRetryAt = 0;
     syncNativeSensor();
     evaluate();
     window.dispatchEvent(new CustomEvent('wander:direction-settings-changed', { detail: { ...config } }));
@@ -304,6 +322,7 @@
         confidence: String(event?.confidence || 'low'),
         timestamp: Number(event?.timestamp) || Date.now(),
       };
+      lastSensorRetryAt = compass.timestamp;
       writeContext('direction.compass.heading', heading, compass.confidence === 'high' ? 1 : 0.7);
       writeContext('direction.compass.confidence', compass.confidence, compass.confidence === 'high' ? 1 : 0.7);
       evaluate();
@@ -328,15 +347,20 @@
     }
   });
 
-  document.addEventListener('visibilitychange', () => {
-    syncNativeSensor();
-    if (document.visibilityState === 'visible') evaluate();
-  });
-
-  window.addEventListener('pageshow', () => {
+  function resumeSensor() {
+    if (document.visibilityState === 'hidden') return;
+    lastSensorRetryAt = 0;
     syncNativeSensor();
     evaluate();
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    syncNativeSensor();
+    if (document.visibilityState === 'visible') resumeSensor();
   });
+  document.addEventListener('resume', resumeSensor);
+  window.addEventListener('pageshow', resumeSensor);
+  window.addEventListener('focus', resumeSensor);
 
   window.WanderDirectionIndicator = Object.freeze({
     getConfig: () => ({ ...config }),
@@ -350,6 +374,8 @@
       directionErrorListener?.remove?.();
       directionListener = null;
       directionErrorListener = null;
+      if (healthTimer) clearInterval(healthTimer);
+      healthTimer = null;
       removeMarker();
       plugin()?.setSensorEnabled?.({ enabled: false }).catch(() => {});
     },
@@ -358,5 +384,6 @@
   publishConfig();
   updateGpsState();
   installNativeListeners();
+  healthTimer = setInterval(healthcheck, HEALTHCHECK_INTERVAL_MS);
   evaluate();
 })();
