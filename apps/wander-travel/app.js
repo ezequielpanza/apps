@@ -80,6 +80,7 @@
 
   async function loadTravelMemory() {
     ensureStyles('./wander-travel-log.css?v=20260728-01', 'wander-travel-log');
+    ensureStyles('./wander-travel-timeline.css?v=20260728-01', 'wander-travel-timeline');
     await loadScript('./runtime-travel-log.js?v=20260719-01', 'wander-travel-log');
     await loadScript('./runtime-travel-log-screen.js?v=20260728-01', 'wander-travel-log-screen');
     await loadScript('./runtime-morning-briefing.js?v=20260719-01', 'wander-morning-briefing');
@@ -89,6 +90,11 @@
     ensureStyles('./wander-direction-indicator.css?v=20260722-01', 'wander-direction-indicator');
     await loadScript('./runtime-direction-indicator.js?v=20260728-01', 'wander-direction-indicator');
     await loadScript('./runtime-direction-indicator-settings.js?v=20260722-01', 'wander-direction-indicator-settings');
+  }
+
+  async function loadMapCrosshair() {
+    ensureStyles('./wander-map-crosshair.css?v=20260728-01', 'wander-map-crosshair');
+    await loadScript('./runtime-map-crosshair.js?v=20260728-01', 'wander-map-crosshair');
   }
 
   async function loadNotificationRouting() {
@@ -113,14 +119,16 @@
 
     const localResults = await Promise.allSettled([
       loadDirectionIndicator(),
+      loadMapCrosshair(),
       loadTravelMemory(),
       loadMapCacheSettings(),
       loadNotificationRouting(),
     ]);
     reportLoadResult('Wander direction indicator', localResults[0]);
-    reportLoadResult('Wander travel memory', localResults[1]);
-    reportLoadResult('Wander map cache settings', localResults[2]);
-    reportLoadResult('Wander notification routing', localResults[3]);
+    reportLoadResult('Wander map crosshair', localResults[1]);
+    reportLoadResult('Wander travel memory', localResults[2]);
+    reportLoadResult('Wander map cache settings', localResults[3]);
+    reportLoadResult('Wander notification routing', localResults[4]);
 
     window.WanderProviders?.nearby?.configure?.({
       sources: ['google-places', 'openstreetmap', 'wikidata'],
