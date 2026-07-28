@@ -85,6 +85,9 @@ jobs:
       - name: Verify travel log memory shell
         run: node apps/wander-travel/tests/travel-log-memory.mjs
 
+      - name: Run cloud backup restore and conflict tests
+        run: node apps/wander-travel/tests/cloud-backup.mjs
+
       - name: Run companion arrival tests
         run: node apps/wander-travel/tests/companion-arrival.mjs
 
@@ -111,5 +114,5 @@ jobs:
         with:
           name: wander-offline-shell-diagnostics
           path: app-shell-test.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 3
