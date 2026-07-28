@@ -1,5 +1,6 @@
 (() => {
   const TRANSPARENT_TILE = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" fill="transparent"/></svg>')}`;
+  const BASE_LAYER_KEY = 'wander.map.baseLayer.v1';
   const nativeTiles = window.Capacitor?.isNativePlatform?.() === true
     ? window.Capacitor?.Plugins?.WanderOfflineTiles || null
     : null;
@@ -116,12 +117,24 @@
     });
   }
 
+  function storedBaseLayer() {
+    try {
+      return localStorage.getItem(BASE_LAYER_KEY) === 'satellite' ? 'satellite' : 'streets';
+    } catch {
+      return 'streets';
+    }
+  }
+
+  function persistBaseLayer(name) {
+    try { localStorage.setItem(BASE_LAYER_KEY, name); } catch {}
+  }
+
   const baseLayers = {
     streets: createStreetLayer(),
     satellite: createSatelliteLayer(),
   };
 
-  let activeBaseLayer = 'streets';
+  let activeBaseLayer = storedBaseLayer();
   baseLayers[activeBaseLayer].addTo(map);
 
   const route = L.polyline([], {
@@ -148,6 +161,7 @@
     map.removeLayer(baseLayers[activeBaseLayer]);
     baseLayers[name].addTo(map);
     activeBaseLayer = name;
+    persistBaseLayer(activeBaseLayer);
     window.dispatchEvent(new CustomEvent('wander:base-layer-change', { detail: { name: activeBaseLayer } }));
     return activeBaseLayer;
   }
