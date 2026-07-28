@@ -22,7 +22,12 @@
   L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map);
   map.attributionControl.addAttribution('Place data &copy; OpenStreetMap contributors');
 
-  const NativeOsmTileLayer = L.GridLayer.extend({
+  const NativeStoredTileLayer = L.GridLayer.extend({
+    initialize(options = {}) {
+      L.GridLayer.prototype.initialize.call(this, options);
+      this.wanderSource = options.wanderSource || 'osm';
+    },
+
     createTile(coords, done) {
       const tile = document.createElement('img');
       tile.alt = '';
@@ -41,37 +46,51 @@
         finish();
       }, { once: true });
 
-      Promise.resolve(nativeTiles?.getTile?.({ z: coords.z, x: coords.x, y: coords.y }))
+      Promise.resolve(nativeTiles?.getTile?.({ source: this.wanderSource, z: coords.z, x: coords.x, y: coords.y }))
         .then((result) => {
           if (result?.ok && result.dataUrl) {
             tile.dataset.tileSource = result.cached ? 'native-cache' : 'network';
-            this.fire(result.cached ? 'tilecachehit' : 'tilecached', { coords, bytes: result.bytes || 0 });
+            tile.dataset.mapSource = this.wanderSource;
+            tile.dataset.stale = result.stale === true ? 'true' : 'false';
+            this.fire(result.cached ? 'tilecachehit' : 'tilecached', {
+              coords,
+              source: this.wanderSource,
+              stale: result.stale === true,
+              bytes: result.bytes || 0,
+            });
             tile.src = result.dataUrl;
             return;
           }
           tile.dataset.tileSource = 'missing';
-          this.fire('tilemissing', { coords, offline: result?.offline === true });
+          tile.dataset.mapSource = this.wanderSource;
+          this.fire('tilemissing', { coords, source: this.wanderSource, offline: result?.offline === true });
           tile.src = TRANSPARENT_TILE;
         })
         .catch((error) => {
           tile.dataset.tileSource = 'missing';
-          this.fire('tilemissing', { coords, offline: true, error });
+          tile.dataset.mapSource = this.wanderSource;
+          this.fire('tilemissing', { coords, source: this.wanderSource, offline: true, error });
           tile.src = TRANSPARENT_TILE;
         });
       return tile;
     },
   });
 
+  function nativeLayer(source, options = {}) {
+    return new NativeStoredTileLayer({
+      wanderSource: source,
+      minZoom: 0,
+      maxZoom: 19,
+      tileSize: 256,
+      updateWhenIdle: false,
+      keepBuffer: source === 'osm' ? 3 : 2,
+      ...options,
+    });
+  }
+
   function createStreetLayer() {
     if (typeof nativeTiles?.getTile === 'function') {
-      return new NativeOsmTileLayer({
-        minZoom: 0,
-        maxZoom: 19,
-        tileSize: 256,
-        updateWhenIdle: false,
-        keepBuffer: 3,
-        attribution: '&copy; OpenStreetMap',
-      });
+      return nativeLayer('osm', { attribution: '&copy; OpenStreetMap' });
     }
     return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -81,15 +100,25 @@
     });
   }
 
-  const baseLayers = {
-    streets: createStreetLayer(),
-    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  function createSatelliteLayer() {
+    if (typeof nativeTiles?.getTile === 'function') {
+      return nativeLayer('esri', {
+        maxNativeZoom: 18,
+        attribution: 'Tiles &copy; Esri',
+      });
+    }
+    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxNativeZoom: 18,
       maxZoom: 19,
       keepBuffer: 2,
       errorTileUrl: TRANSPARENT_TILE,
       attribution: 'Tiles &copy; Esri',
-    }),
+    });
+  }
+
+  const baseLayers = {
+    streets: createStreetLayer(),
+    satellite: createSatelliteLayer(),
   };
 
   let activeBaseLayer = 'streets';
@@ -133,6 +162,7 @@
     currentTrack,
     baseLayers,
     nativeTileCache: Boolean(nativeTiles?.getTile),
+    nativeTileSources: typeof nativeTiles?.getTile === 'function' ? ['osm', 'esri'] : [],
     setBaseLayer,
     toggleBaseLayer,
     getBaseLayer: () => activeBaseLayer,
