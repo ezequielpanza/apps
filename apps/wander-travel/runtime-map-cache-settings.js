@@ -66,7 +66,7 @@
   card.className = 'screen-card settings-group map-cache-settings';
   card.innerHTML = `
     <h3>Mapa local</h3>
-    <p class="panel-note">Wander conserva los sectores OSM que vas viendo y los vuelve a mostrar sin cobertura. El recorrido se registra y se dibuja incluso cuando no hay ningún tile disponible.</p>
+    <p class="panel-note">Wander conserva los sectores de calles y satélite que vas viendo y los vuelve a mostrar sin cobertura. El recorrido se registra y se dibuja incluso cuando no hay ningún tile disponible.</p>
     <div class="message-timeout-setting-row">
       <div>
         <strong>Conservar mapas</strong>
@@ -85,7 +85,7 @@
     <div class="simulator-state-row"><span>Espacio local</span><strong id="map-cache-size">—</strong></div>
     <div class="simulator-state-row"><span>Almacenamiento</span><strong id="map-cache-storage">—</strong></div>
     <div class="simulator-state-row"><span>Política activa</span><strong id="map-cache-policy">—</strong></div>
-    <p class="panel-note">Wander solo guarda mapas que abrís normalmente. La descarga anticipada de regiones requiere una fuente OSM propia o que autorice expresamente el uso offline.</p>
+    <p class="panel-note">Wander solo guarda mapas que abrís normalmente. La descarga anticipada de regiones requiere una fuente que autorice expresamente el uso offline.</p>
     <div class="button-row compact-actions screen-card-actions">
       <button id="map-cache-clear" type="button">Vaciar mapa local</button>
     </div>
