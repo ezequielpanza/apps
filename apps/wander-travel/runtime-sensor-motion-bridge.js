@@ -12,7 +12,7 @@
   const STARTUP_GUARD_MS = 20000;
   const MOVING_CONFIRM_MS = 6000;
   const STRONG_MOVING_CONFIRM_MS = 2500;
-  const STOP_CONFIRM_MS = 10000;
+  const STOP_CONFIRM_MS = 20000;
 
   const state = {
     startedAt: Date.now(),
