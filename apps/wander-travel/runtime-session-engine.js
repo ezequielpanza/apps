@@ -13,14 +13,14 @@
   const NIGHT_END_HOUR = 10;
   const MAX_ACCURACY_M = 120;
   const RECORDING_LIMITS = Object.freeze({
-    minimumIntervalSec: 2,
+    minimumIntervalSec: 1,
     maximumIntervalSec: 60,
     minimumDistanceM: 1,
     maximumDistanceM: 100,
   });
   const RECORDING_PROFILES = Object.freeze([
-    Object.freeze({ id: 'precise', label: 'Preciso', intervalSec: 2, distanceM: 2, description: 'Más detalle para caminar, giros y recorridos cortos.' }),
-    Object.freeze({ id: 'balanced', label: 'Equilibrado', intervalSec: 5, distanceM: 5, description: 'Buen detalle con consumo moderado. Perfil recomendado.' }),
+    Object.freeze({ id: 'precise', label: 'Preciso', intervalSec: 1, distanceM: 1, description: 'Un punto por segundo para caminar, giros y recorridos cortos.' }),
+    Object.freeze({ id: 'balanced', label: 'Equilibrado', intervalSec: 5, distanceM: 5, description: 'Buen detalle con consumo moderado.' }),
     Object.freeze({ id: 'vehicle', label: 'Vehículo', intervalSec: 3, distanceM: 10, description: 'Pensado para auto, barco o bicicleta a mayor velocidad.' }),
     Object.freeze({ id: 'saver', label: 'Ahorro', intervalSec: 15, distanceM: 20, description: 'Reduce puntos y consumo de batería en trayectos largos.' }),
     Object.freeze({ id: 'manual', label: 'Manual', intervalSec: null, distanceM: null, description: 'Permite definir tiempo y distancia mínimos.' }),
@@ -81,26 +81,26 @@
   }
 
   function normalizeRecordingSettings(raw = {}) {
-    const profileId = PROFILE_BY_ID[raw.profileId] ? raw.profileId : 'balanced';
+    const profileId = PROFILE_BY_ID[raw.profileId] ? raw.profileId : 'precise';
     return {
       profileId,
       manualIntervalSec: clampInteger(
         raw.manualIntervalSec,
         RECORDING_LIMITS.minimumIntervalSec,
         RECORDING_LIMITS.maximumIntervalSec,
-        5
+        1
       ),
       manualDistanceM: clampInteger(
         raw.manualDistanceM,
         RECORDING_LIMITS.minimumDistanceM,
         RECORDING_LIMITS.maximumDistanceM,
-        5
+        1
       ),
     };
   }
 
   function recordingProfile() {
-    return PROFILE_BY_ID[recordingSettings.profileId] || PROFILE_BY_ID.balanced;
+    return PROFILE_BY_ID[recordingSettings.profileId] || PROFILE_BY_ID.precise;
   }
 
   function recordingConfig() {
@@ -146,7 +146,7 @@
   }
 
   function setRecordingProfile(profileId) {
-    const normalized = PROFILE_BY_ID[profileId] ? profileId : 'balanced';
+    const normalized = PROFILE_BY_ID[profileId] ? profileId : 'precise';
     if (recordingSettings.profileId === normalized) return recordingState();
     recordingSettings = { ...recordingSettings, profileId: normalized };
     return persistRecordingSettings(true);
@@ -580,10 +580,22 @@
     if (motion === 'moving') {
       if (!active) startSession(position, at);
       const stay = openStay(active);
-      if (stay) closeStay(at);
+      let movement = openMovement(active);
+      if (stay) {
+        const closedStay = closeStay(at);
+        if (!movement) {
+          const anchor = {
+            ...position,
+            lat: finite(closedStay?.center?.lat) ?? position.lat,
+            lng: finite(closedStay?.center?.lng) ?? position.lng,
+            accuracy: finite(closedStay?.radiusM) ?? position.accuracy,
+          };
+          movement = createMovement(anchor, Number(closedStay?.endedAt || at));
+        }
+      }
       if (!attachedVehicleId) attachVehicleFromPOI(position, at);
-      if (!openMovement(active)) createMovement(position, at);
-      else addMovementPoint(openMovement(active), position, at);
+      if (!movement) movement = createMovement(position, at);
+      else addMovementPoint(movement, position, at, Boolean(stay));
       updateAttachedVehicle(position, motion, at);
       phase = 'moving';
     } else if (motion === 'stationary') {
@@ -591,7 +603,11 @@
         phase = 'waiting';
         updateAttachedVehicle(position, motion, at);
       } else {
-        if (openMovement(active)) closeMovement(at);
+        const movement = openMovement(active);
+        if (movement) {
+          addMovementPoint(movement, position, at, true);
+          closeMovement(at);
+        }
         const stay = reconcileStay(position, at);
         updateStay(stay, position);
         updateAttachedVehicle(position, motion, at);
