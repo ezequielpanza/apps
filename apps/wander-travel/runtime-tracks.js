@@ -249,15 +249,16 @@
       const download = document.createElement('button');
       download.type = 'button';
       download.className = 'travel-log-movement-download';
-      download.dataset.logMovementDownload = 'true';
-      download.dataset.sessionId = movement.dataset.sessionId || '';
-      download.dataset.segmentId = movement.dataset.segmentId || '';
+      const data = download.dataset;
+      data.logMovementDownload = 'true';
+      data.sessionId = movement.dataset.sessionId || '';
+      data.segmentId = movement.dataset.segmentId || '';
       download.setAttribute('aria-label', 'Descargar track en formato GPX');
       download.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="wander-icons.svg#export"></use></svg><span>GPX</span>';
       download.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        const { session, segment } = movementById(download.dataset.sessionId, download.dataset.segmentId);
+        const { session, segment } = movementById(data.sessionId, data.segmentId);
         exportSegment(session, segment);
       });
       wrapper.appendChild(download);
