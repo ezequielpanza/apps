@@ -44,7 +44,7 @@ import java.nio.charset.StandardCharsets;
 )
 public class WanderLocationPlugin extends Plugin {
     private static final String MESSAGE_CHANNEL_ID = "wander_companion_messages";
-    private static final int MAX_GPX_BYTES = 10 * 1024 * 1024;
+    private static final int MAX_GPX_BYTES = 50 * 1024 * 1024;
     private static WeakReference<WanderLocationPlugin> activePlugin = new WeakReference<>(null);
 
     @Override

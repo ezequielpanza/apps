@@ -75,7 +75,7 @@
       for (let sampleIndex = start; sampleIndex <= end; sampleIndex += 1) {
         const sample = raw[sampleIndex];
         const triangular = radius + 1 - Math.abs(sampleIndex - index);
-        const accuracy = Number(sample.accuracy);
+        const accuracy = sample.accuracy == null ? NaN : Number(sample.accuracy);
         const accuracyWeight = 1 / Math.max(4, Number.isFinite(accuracy) ? accuracy : 8);
         const weight = triangular * accuracyWeight;
         lat += Number(sample.lat) * weight;
@@ -180,9 +180,9 @@
 
   function pointExtensions(point) {
     const values = [];
-    if (Number.isFinite(Number(point?.accuracy))) values.push(`<wander:accuracy>${Number(point.accuracy).toFixed(1)}</wander:accuracy>`);
-    if (Number.isFinite(Number(point?.speedKmh))) values.push(`<wander:speedKmh>${Number(point.speedKmh).toFixed(2)}</wander:speedKmh>`);
-    if (Number.isFinite(Number(point?.heading))) values.push(`<wander:heading>${Number(point.heading).toFixed(1)}</wander:heading>`);
+    if (point?.accuracy != null && Number.isFinite(Number(point.accuracy))) values.push(`<wander:accuracy>${Number(point.accuracy).toFixed(1)}</wander:accuracy>`);
+    if (point?.speedKmh != null && Number.isFinite(Number(point.speedKmh))) values.push(`<wander:speedKmh>${Number(point.speedKmh).toFixed(2)}</wander:speedKmh>`);
+    if (point?.heading != null && Number.isFinite(Number(point.heading))) values.push(`<wander:heading>${Number(point.heading).toFixed(1)}</wander:heading>`);
     if (point?.source) values.push(`<wander:source>${xmlEscape(point.source)}</wander:source>`);
     if (point?.permissionPrecision) values.push(`<wander:permissionPrecision>${xmlEscape(point.permissionPrecision)}</wander:permissionPrecision>`);
     values.push('<wander:raw>true</wander:raw>');
@@ -194,7 +194,7 @@
     const lng = Number(point.lng).toFixed(7);
     const at = Number(point.at);
     const time = Number.isFinite(at) ? `<time>${new Date(at).toISOString()}</time>` : '';
-    const altitude = Number(point?.altitude);
+    const altitude = point?.altitude == null ? NaN : Number(point.altitude);
     const elevation = Number.isFinite(altitude) ? `<ele>${altitude.toFixed(2)}</ele>` : '';
     return `<trkpt lat="${lat}" lon="${lng}">${elevation}${time}${pointExtensions(point)}</trkpt>`;
   }

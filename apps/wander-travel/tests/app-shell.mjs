@@ -165,6 +165,7 @@ assert.match(sources.locationProvider, /wander:location-sample-rejected/);
 assert.match(sources.nativeLocationSource, /precise: Object\.freeze\(\{ intervalSec: 1, distanceM: 0 \}\)/);
 assert.match(sources.nativeLocationSource, /minimumIntervalMs: clampInteger\(config\?\.intervalSec, 1, 60, 1\) \* 1000/);
 assert.match(sources.locationPlugin, /Math\.max\(1000, call\.getInt\("minimumIntervalMs", 1000\)\)/);
+assert.match(sources.locationPlugin, /MAX_GPX_BYTES = 50 \* 1024 \* 1024/);
 assert.match(sources.locationService, /minimumIntervalMs = intent == null \? 1000/);
 assert.match(sources.locationService, /minimumDistanceM = intent == null \? 0/);
 
@@ -174,6 +175,9 @@ assert.match(sources.sessionEngine, /minimumIntervalSec: 1/);
 assert.match(sources.sessionEngine, /intervalSec: 1, distanceM: 0/);
 assert.match(sources.sessionEngine, /raw: true/);
 assert.match(sources.sessionEngine, /sessions\.map\(compactSession\)/);
+assert.match(sources.sessionEngine, /MOVEMENT_BACKFILL_MS = 12000/);
+assert.match(sources.sessionEngine, /function movementBackfill\(/);
+assert.match(sources.sessionEngine, /appendBackfill\(movement, backfill\.slice\(1\)\)/);
 assert.doesNotMatch(sources.sessionEngine, /elapsedMs < config\.intervalSec/);
 assert.doesNotMatch(sources.sessionEngine, /distance < config\.distanceM/);
 assert.match(sources.sessionEngine, /addMovementPoint\(movement, position, at, true\);\s*closeMovement\(at\)/s);

@@ -12,6 +12,8 @@
   const NIGHT_START_HOUR = 21;
   const NIGHT_END_HOUR = 10;
   const MAX_ACCURACY_M = 120;
+  const MOVEMENT_BACKFILL_MS = 12000;
+  const POSITION_BUFFER_MS = 30000;
   const RECORDING_LIMITS = Object.freeze({
     minimumIntervalSec: 1,
     maximumIntervalSec: 60,
@@ -53,6 +55,7 @@
   let lastObservedAt = 0;
   let attachedVehicleId = active?.attachedVehicleId || null;
   let parkedCandidate = active?.parkedCandidate || null;
+  let recentPositions = [];
 
   function loadArray(key) {
     try {
@@ -272,6 +275,38 @@
       at: Date.parse(location.updatedAt || '') || Date.now(),
       source: location.source || 'unknown',
     };
+  }
+
+  function rememberPosition(position) {
+    if (!validPosition(position)) return;
+    const previous = recentPositions[recentPositions.length - 1];
+    if (previous && Number(previous.at) === Number(position.at)
+      && Number(previous.lat) === Number(position.lat) && Number(previous.lng) === Number(position.lng)) return;
+    recentPositions.push({ ...position });
+    const cutoff = Number(position.at || Date.now()) - POSITION_BUFFER_MS;
+    recentPositions = recentPositions.filter((sample) => Number(sample.at || 0) >= cutoff).slice(-120);
+  }
+
+  function movementBackfill(stay, position) {
+    const at = Number(position?.at || Date.now());
+    const candidates = recentPositions.filter((sample) => Number(sample.at || 0) >= at - MOVEMENT_BACKFILL_MS && Number(sample.at || 0) <= at);
+    if (!candidates.length) return [position];
+    if (stay?.center) {
+      const firstOutside = candidates.findIndex((sample) => distanceMeters(stay.center, sample) > stayAllowance(stay, sample));
+      if (firstOutside >= 0) return candidates.slice(Math.max(0, firstOutside - 1));
+      return [position];
+    }
+    const latest = candidates[candidates.length - 1];
+    const accuracy = Math.max(3, finite(latest?.accuracy) || 10);
+    const movementRadius = Math.max(8, Math.min(25, accuracy * 1.5));
+    const firstSeparated = candidates.findIndex((sample) => distanceMeters(sample, latest) >= movementRadius);
+    const startIndex = firstSeparated >= 0 ? Math.max(0, firstSeparated - 1) : Math.max(0, candidates.length - 8);
+    return candidates.slice(startIndex);
+  }
+
+  function appendBackfill(segment, points) {
+    (points || []).forEach((point) => addMovementPoint(segment, point, Number(point?.at || Date.now()), true));
+    return segment;
   }
 
   function currentPOI() {
@@ -635,33 +670,35 @@
     const motion = String(context.value?.('motion.status') || 'pending').toLowerCase();
     const position = currentPosition();
     const at = position?.at || Date.now();
-    if (!position || motion === 'pending') {
+    if (!position) {
       phase = 'preparing';
       publishContext();
       return;
     }
     if (at === lastObservedAt && reason === 'location') return;
     lastObservedAt = at;
+    rememberPosition(position);
+    if (motion === 'pending') {
+      phase = 'preparing';
+      publishContext();
+      return;
+    }
 
     if (motion === 'moving') {
-      if (!active) startSession(position, at);
-      const stay = openStay(active);
+      const previousStay = active ? openStay(active) : null;
+      const backfill = movementBackfill(previousStay, position);
+      const firstPoint = backfill[0] || position;
+      if (!active) startSession(firstPoint, Number(firstPoint.at || at));
       let movement = openMovement(active);
-      if (stay) {
-        const closedStay = closeStay(at);
-        if (!movement) {
-          const anchor = {
-            ...position,
-            lat: finite(closedStay?.center?.lat) ?? position.lat,
-            lng: finite(closedStay?.center?.lng) ?? position.lng,
-            accuracy: finite(closedStay?.radiusM) ?? position.accuracy,
-          };
-          movement = createMovement(anchor, Number(closedStay?.endedAt || at));
-        }
-      }
+      const stay = openStay(active);
+      if (stay) closeStay(Number(firstPoint.at || at));
       if (!attachedVehicleId) attachVehicleFromPOI(position, at);
-      if (!movement) movement = createMovement(position, at);
-      else addMovementPoint(movement, position, at, Boolean(stay));
+      if (!movement) {
+        movement = createMovement(firstPoint, Number(firstPoint.at || at));
+        appendBackfill(movement, backfill.slice(1));
+      } else {
+        addMovementPoint(movement, position, at, Boolean(stay));
+      }
       updateAttachedVehicle(position, motion, at);
       phase = 'moving';
     } else if (motion === 'stationary') {
