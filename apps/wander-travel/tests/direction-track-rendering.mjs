@@ -108,6 +108,21 @@ assert.deepEqual(JSON.parse(JSON.stringify(segments)), [
   [[18.3545, -68.8202], [18.3548, -68.8198]],
 ]);
 assert.notDeepEqual(segments[0][segments[0].length - 1], segments[1][0]);
+assert.equal(sandbox.WanderTracks.isSmoothingEnabled(), false);
+const jitterPoints = [
+  { lat: 18.3500, lng: -68.8270, accuracy: 5 },
+  { lat: 18.3508, lng: -68.8262, accuracy: 18 },
+  { lat: 18.3502, lng: -68.8268, accuracy: 5 },
+  { lat: 18.3504, lng: -68.8266, accuracy: 5 },
+];
+const rawDisplay = sandbox.WanderTracks.displayLatLngs(jitterPoints);
+assert.deepEqual(JSON.parse(JSON.stringify(rawDisplay)), jitterPoints.map((point) => [point.lat, point.lng]));
+sandbox.WanderTracks.setSmoothingEnabled(true);
+const smoothedDisplay = sandbox.WanderTracks.displayLatLngs(jitterPoints);
+assert.notDeepEqual(JSON.parse(JSON.stringify(smoothedDisplay)), JSON.parse(JSON.stringify(rawDisplay)));
+assert.deepEqual(smoothedDisplay[0], rawDisplay[0]);
+assert.deepEqual(smoothedDisplay.at(-1), rawDisplay.at(-1));
+sandbox.WanderTracks.setSmoothingEnabled(false);
 assert.match(tracksSource, /line\.setLatLngs\(segments\)/);
 assert.doesNotMatch(tracksSource, /function currentLatLngs\(active\)[\s\S]{0,180}sessionPoints\(active\)/);
 
@@ -148,4 +163,4 @@ assert.equal((nativeSave.content.match(/<trkpt /g) || []).length, 2);
 assert.match(tracksSource, /data\.logMovementDownload/);
 assert.match(tracksSource, /Descargar track en formato GPX/);
 
-console.log('PASS dashboard uses hybrid direction, track segments remain disconnected, and Bitácora tracks export valid GPX files');
+console.log('PASS tracks retain raw points, optionally smooth only the map display, remain segmented at stops, and export raw GPX files');

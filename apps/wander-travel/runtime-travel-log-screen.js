@@ -149,7 +149,7 @@
             </div>
             <div class="travel-log-recorder-stats"><div><span>Distancia</span><strong id="travel-log-recording-distance">0 m</strong></div><div><span>Movimiento</span><strong id="travel-log-recording-moving">0 min</strong></div><div><span>Detenido</span><strong id="travel-log-recording-stays">0 min</strong></div></div>
             <div class="travel-log-recorder-actions"><button id="travel-log-finish-session" type="button">Finalizar viaje</button><button id="travel-log-export-session" type="button">Exportar último</button></div>
-            <details class="travel-log-recording-details"><summary>Configuración de grabación</summary><div class="travel-log-recording-grid"><label><span>Perfil</span><select id="travel-log-recording-profile">${recordingOptionsMarkup()}</select></label><label data-log-manual-field hidden><span>Tiempo mínimo (s)</span><input id="travel-log-recording-interval" type="number" min="2" max="60" step="1"></label><label data-log-manual-field hidden><span>Distancia mínima (m)</span><input id="travel-log-recording-min-distance" type="number" min="1" max="100" step="1"></label></div><p id="travel-log-recording-description" class="panel-note"></p></details>
+            <details class="travel-log-recording-details"><summary>Configuración de grabación</summary><div class="travel-log-recording-grid"><label><span>Perfil</span><select id="travel-log-recording-profile">${recordingOptionsMarkup()}</select></label><label data-log-manual-field hidden><span>Tiempo mínimo (s)</span><input id="travel-log-recording-interval" type="number" min="1" max="60" step="1"></label><label data-log-manual-field hidden><span>Distancia mínima (m)</span><input id="travel-log-recording-min-distance" type="number" min="0" max="100" step="1"></label></div><p id="travel-log-recording-description" class="panel-note"></p></details>
           </div>
           <div class="travel-log-toolbar">
             <button type="button" id="travel-log-note-button">Agregar nota</button>
@@ -224,9 +224,10 @@
     const snapshot = sessionSnapshot();
     const session = snapshot.active?.id === sessionId ? snapshot.active : (snapshot.sessions || []).find((item) => item.id === sessionId);
     const segment = (session?.segments || []).find((item) => item.id === segmentId && item.type === 'movement');
-    const latLngs = (segment?.points || [])
-      .filter((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)))
-      .map((point) => [Number(point.lat), Number(point.lng)]);
+    const rawPoints = (segment?.points || [])
+      .filter((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)));
+    const latLngs = window.WanderTracks?.displayLatLngs?.(rawPoints)
+      || rawPoints.map((point) => [Number(point.lat), Number(point.lng)]);
     if (latLngs.length < 2) {
       window.WanderUI?.showToast?.('Tramo', 'Todavía no tiene suficientes puntos para mostrar');
       return false;

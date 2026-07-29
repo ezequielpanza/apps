@@ -6,7 +6,7 @@
   const SYNC_BATCH_SIZE = 500;
   const MAX_SYNC_BATCHES = 20;
   const PRESETS = Object.freeze({
-    precise: Object.freeze({ intervalSec: 1, distanceM: 1 }),
+    precise: Object.freeze({ intervalSec: 1, distanceM: 0 }),
     balanced: Object.freeze({ intervalSec: 5, distanceM: 5 }),
     vehicle: Object.freeze({ intervalSec: 3, distanceM: 10 }),
     saver: Object.freeze({ intervalSec: 15, distanceM: 20 }),
@@ -39,7 +39,7 @@
         return {
           profileId,
           intervalSec: clampInteger(stored?.manualIntervalSec, 1, 60, 1),
-          distanceM: clampInteger(stored?.manualDistanceM, 1, 100, 1),
+          distanceM: clampInteger(stored?.manualDistanceM, 0, 100, 0),
         };
       }
       const preset = PRESETS[profileId] || PRESETS.precise;
@@ -174,7 +174,7 @@
     const options = activeOptions || {};
     return nativePlugin.start({
       minimumIntervalMs: clampInteger(config?.intervalSec, 1, 60, 1) * 1000,
-      minimumDistanceM: clampInteger(config?.distanceM, 1, 100, 1),
+      minimumDistanceM: clampInteger(config?.distanceM, 0, 100, 0),
       highAccuracy: options?.enableHighAccuracy !== false,
     }).catch((error) => {
       activeOnError?.(error?.code === 'PERMISSION_DENIED' ? 'denied' : 'unavailable');

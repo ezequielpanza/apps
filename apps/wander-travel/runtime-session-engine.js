@@ -15,11 +15,11 @@
   const RECORDING_LIMITS = Object.freeze({
     minimumIntervalSec: 1,
     maximumIntervalSec: 60,
-    minimumDistanceM: 1,
+    minimumDistanceM: 0,
     maximumDistanceM: 100,
   });
   const RECORDING_PROFILES = Object.freeze([
-    Object.freeze({ id: 'precise', label: 'Preciso', intervalSec: 1, distanceM: 1, description: 'Un punto por segundo para caminar, giros y recorridos cortos.' }),
+    Object.freeze({ id: 'precise', label: 'Preciso RAW', intervalSec: 1, distanceM: 0, description: 'Guarda cada posición aceptada, una vez por segundo, sin filtrar por distancia.' }),
     Object.freeze({ id: 'balanced', label: 'Equilibrado', intervalSec: 5, distanceM: 5, description: 'Buen detalle con consumo moderado.' }),
     Object.freeze({ id: 'vehicle', label: 'Vehículo', intervalSec: 3, distanceM: 10, description: 'Pensado para auto, barco o bicicleta a mayor velocidad.' }),
     Object.freeze({ id: 'saver', label: 'Ahorro', intervalSec: 15, distanceM: 20, description: 'Reduce puntos y consumo de batería en trayectos largos.' }),
@@ -28,8 +28,8 @@
   const PROFILE_BY_ID = Object.freeze(Object.fromEntries(RECORDING_PROFILES.map((profile) => [profile.id, profile])));
   const listeners = new Set();
 
-  let sessions = loadArray(SESSIONS_KEY);
-  let active = loadObject(ACTIVE_KEY);
+  let sessions = loadArray(SESSIONS_KEY).map(inflateSession).filter(Boolean);
+  let active = inflateSession(loadObject(ACTIVE_KEY));
   if (!active?.id) {
     active = null;
   } else {
@@ -68,6 +68,65 @@
     } catch { return {}; }
   }
 
+  function inflatePoint(point) {
+    if (!Array.isArray(point)) return point && typeof point === 'object' ? point : null;
+    const lat = Number(point[0]);
+    const lng = Number(point[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return {
+      lat: lat / 1e7,
+      lng: lng / 1e7,
+      at: Number(point[2]) || Date.now(),
+      accuracy: point[3] == null ? null : Number(point[3]),
+      speedKmh: point[4] == null ? null : Number(point[4]),
+      heading: point[5] == null ? null : Number(point[5]),
+      altitude: point[6] == null ? null : Number(point[6]),
+      source: point[7] || 'unknown',
+      permissionPrecision: point[8] || null,
+      raw: true,
+    };
+  }
+
+  function compactPoint(point) {
+    return [
+      Math.round(Number(point.lat) * 1e7),
+      Math.round(Number(point.lng) * 1e7),
+      Number(point.at) || Date.now(),
+      point.accuracy == null ? null : Number(point.accuracy),
+      point.speedKmh == null ? null : Number(point.speedKmh),
+      point.heading == null ? null : Number(point.heading),
+      point.altitude == null ? null : Number(point.altitude),
+      point.source || null,
+      point.permissionPrecision || null,
+    ];
+  }
+
+  function inflateSession(session) {
+    if (!session || typeof session !== 'object' || Array.isArray(session)) return null;
+    return {
+      ...session,
+      schemaVersion: Math.max(2, Number(session.schemaVersion || 1)),
+      segments: (Array.isArray(session.segments) ? session.segments : []).map((segment) => ({
+        ...segment,
+        raw: segment?.type === 'movement' ? true : segment?.raw,
+        points: (Array.isArray(segment?.points) ? segment.points : []).map(inflatePoint).filter(Boolean),
+      })),
+      stays: Array.isArray(session.stays) ? session.stays : [],
+      events: Array.isArray(session.events) ? session.events : [],
+    };
+  }
+
+  function compactSession(session) {
+    if (!session || typeof session !== 'object') return session;
+    return {
+      ...session,
+      schemaVersion: 2,
+      segments: (session.segments || []).map((segment) => segment?.type === 'movement'
+        ? { ...segment, raw: true, points: (segment.points || []).map(compactPoint) }
+        : { ...segment }),
+    };
+  }
+
   function finite(value) {
     if (value === null || value === undefined || value === '') return null;
     const number = Number(value);
@@ -94,7 +153,7 @@
         raw.manualDistanceM,
         RECORDING_LIMITS.minimumDistanceM,
         RECORDING_LIMITS.maximumDistanceM,
-        1
+        0
       ),
     };
   }
@@ -206,7 +265,10 @@
       lng: Number(location.lng),
       accuracy: finite(location.accuracy),
       speedKmh: finite(context.value?.('motion.speedKmh')),
+      altitude: finite(location.altitude),
       heading: finite(location.heading),
+      provider: location.provider || null,
+      permissionPrecision: location.permissionPrecision || null,
       at: Date.parse(location.updatedAt || '') || Date.now(),
       source: location.source || 'unknown',
     };
@@ -230,9 +292,9 @@
 
   function persist() {
     try {
-      localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+      localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.map(compactSession)));
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-      if (active) localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
+      if (active) localStorage.setItem(ACTIVE_KEY, JSON.stringify(compactSession(active)));
       else localStorage.removeItem(ACTIVE_KEY);
     } catch {}
     publishContext();
@@ -314,7 +376,7 @@
   function startSession(position, at = Date.now()) {
     if (active || !settings.autoEnabled || !validPosition(position)) return active;
     active = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: makeId('session'),
       name: `Sesión · ${new Date(at).toLocaleString('es-AR')}`,
       status: 'active',
@@ -344,6 +406,7 @@
       endedAt: null,
       method: mobilityMode(),
       recording: recordingConfig(),
+      raw: true,
       points: [],
       distanceM: 0,
     };
@@ -354,26 +417,29 @@
 
   function addMovementPoint(segment, position, at, force = false) {
     if (!segment || !validPosition(position)) return false;
-    const accuracy = finite(position.accuracy);
-    if (!force && accuracy !== null && accuracy > MAX_ACCURACY_M) return false;
     const point = {
       lat: Number(position.lat.toFixed(7)),
       lng: Number(position.lng.toFixed(7)),
       at,
-      accuracy,
+      accuracy: finite(position.accuracy),
       speedKmh: finite(position.speedKmh),
       heading: finite(position.heading),
+      altitude: finite(position.altitude),
+      source: position.provider || position.source || 'unknown',
+      permissionPrecision: position.permissionPrecision || null,
+      raw: true,
     };
     const last = segment.points[segment.points.length - 1];
     if (last) {
-      const config = recordingConfig();
+      const sameTimestamp = Number(last.at) === Number(point.at);
+      const sameCoordinate = Number(last.lat) === point.lat && Number(last.lng) === point.lng;
+      if (sameTimestamp && sameCoordinate) return false;
       const distance = distanceMeters(last, point);
       const elapsedMs = Math.max(1, at - Number(last.at || at));
       const plausibleSpeedKmh = (distance / 1000) / (elapsedMs / 3600000);
-      if (!force && elapsedMs < config.intervalSec * 1000) return false;
-      if (!force && distance < config.distanceM) return false;
-      if (!force && elapsedMs < 30000 && plausibleSpeedKmh > 250) return false;
-      segment.distanceM = Math.round(Number(segment.distanceM || 0) + distance);
+      if (elapsedMs >= 250 && plausibleSpeedKmh <= 250) {
+        segment.distanceM = Math.round(Number(segment.distanceM || 0) + distance);
+      }
     }
     segment.points.push(point);
     return true;

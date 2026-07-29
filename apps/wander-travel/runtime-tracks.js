@@ -6,7 +6,9 @@
   const line = base.route;
   const currentLine = base.currentTrack || null;
   const CURRENT_TRACK_VISIBLE_KEY = 'wander.tracks.current.visible.v1';
+  const TRACK_SMOOTHING_KEY = 'wander.tracks.display.smoothing.v1';
   let currentTrackVisible = loadCurrentTrackVisibility();
+  let smoothingEnabled = loadSmoothingEnabled();
   let initialized = false;
   let travelLogObserver = null;
 
@@ -33,6 +35,18 @@
     });
   }
 
+  function loadSmoothingEnabled() {
+    try { return localStorage.getItem(TRACK_SMOOTHING_KEY) === 'true'; }
+    catch { return false; }
+  }
+
+  function persistSmoothingEnabled() {
+    try { localStorage.setItem(TRACK_SMOOTHING_KEY, String(smoothingEnabled)); } catch {}
+    window.WanderContext?.set?.('sessions.trackSmoothingEnabled', smoothingEnabled, {
+      source: 'tracks-ui', kind: 'confirmed', confidence: 1, ttlMs: Infinity,
+    });
+  }
+
   function validPoint(point) {
     const lat = Number(point?.lat);
     const lng = Number(point?.lng);
@@ -46,9 +60,35 @@
       .filter((segment) => segment.points.length > 0);
   }
 
-  function sessionLatLngSegments(session) {
+  function displayLatLngs(points, options = {}) {
+    const raw = (points || []).filter(validPoint);
+    const smooth = options.smooth ?? smoothingEnabled;
+    if (!smooth || raw.length < 3) return raw.map((point) => [Number(point.lat), Number(point.lng)]);
+    const radius = 2;
+    return raw.map((point, index) => {
+      if (index === 0 || index === raw.length - 1) return [Number(point.lat), Number(point.lng)];
+      let lat = 0;
+      let lng = 0;
+      let total = 0;
+      const start = Math.max(0, index - radius);
+      const end = Math.min(raw.length - 1, index + radius);
+      for (let sampleIndex = start; sampleIndex <= end; sampleIndex += 1) {
+        const sample = raw[sampleIndex];
+        const triangular = radius + 1 - Math.abs(sampleIndex - index);
+        const accuracy = Number(sample.accuracy);
+        const accuracyWeight = 1 / Math.max(4, Number.isFinite(accuracy) ? accuracy : 8);
+        const weight = triangular * accuracyWeight;
+        lat += Number(sample.lat) * weight;
+        lng += Number(sample.lng) * weight;
+        total += weight;
+      }
+      return total > 0 ? [lat / total, lng / total] : [Number(point.lat), Number(point.lng)];
+    });
+  }
+
+  function sessionLatLngSegments(session, options = {}) {
     return sessionMovementSegments(session)
-      .map((segment) => segment.points.map((point) => [Number(point.lat), Number(point.lng)]));
+      .map((segment) => displayLatLngs(segment.points, options));
   }
 
   function currentLatLngs(active) {
@@ -71,6 +111,20 @@
     });
     syncCurrentTrack();
     return currentTrackVisible;
+  }
+
+  function setSmoothingEnabled(enabled) {
+    smoothingEnabled = Boolean(enabled);
+    persistSmoothingEnabled();
+    document.querySelectorAll?.('#travel-log-track-smoothing-toggle').forEach((toggle) => {
+      toggle.checked = smoothingEnabled;
+    });
+    syncCurrentTrack();
+    window.WanderRecentTracks?.refresh?.();
+    window.dispatchEvent(new CustomEvent('wander:track-smoothing-changed', {
+      detail: { enabled: smoothingEnabled, visualOnly: true },
+    }));
+    return smoothingEnabled;
   }
 
   function sessionById(id) {
@@ -129,6 +183,9 @@
     if (Number.isFinite(Number(point?.accuracy))) values.push(`<wander:accuracy>${Number(point.accuracy).toFixed(1)}</wander:accuracy>`);
     if (Number.isFinite(Number(point?.speedKmh))) values.push(`<wander:speedKmh>${Number(point.speedKmh).toFixed(2)}</wander:speedKmh>`);
     if (Number.isFinite(Number(point?.heading))) values.push(`<wander:heading>${Number(point.heading).toFixed(1)}</wander:heading>`);
+    if (point?.source) values.push(`<wander:source>${xmlEscape(point.source)}</wander:source>`);
+    if (point?.permissionPrecision) values.push(`<wander:permissionPrecision>${xmlEscape(point.permissionPrecision)}</wander:permissionPrecision>`);
+    values.push('<wander:raw>true</wander:raw>');
     return values.length ? `<extensions>${values.join('')}</extensions>` : '';
   }
 
@@ -137,7 +194,9 @@
     const lng = Number(point.lng).toFixed(7);
     const at = Number(point.at);
     const time = Number.isFinite(at) ? `<time>${new Date(at).toISOString()}</time>` : '';
-    return `<trkpt lat="${lat}" lon="${lng}">${time}${pointExtensions(point)}</trkpt>`;
+    const altitude = Number(point?.altitude);
+    const elevation = Number.isFinite(altitude) ? `<ele>${altitude.toFixed(2)}</ele>` : '';
+    return `<trkpt lat="${lat}" lon="${lng}">${elevation}${time}${pointExtensions(point)}</trkpt>`;
   }
 
   function buildGpx({ name = 'Track Wander', description = '', type = '', segments = [] } = {}) {
@@ -267,6 +326,23 @@
     return added;
   }
 
+  function ensureSmoothingControl() {
+    const toggles = document.querySelector?.('[data-app-screen="travel-log"] .travel-log-recorder-toggles');
+    if (!toggles || typeof document.createElement !== 'function') return false;
+    let control = toggles.querySelector?.('[data-track-smoothing-control]');
+    if (!control) {
+      control = document.createElement('label');
+      control.className = 'travel-log-recorder-toggle';
+      control.dataset.trackSmoothingControl = 'true';
+      control.innerHTML = '<span>Suavizar recorrido <small>Solo visual</small></span><span class="switch-control"><input id="travel-log-track-smoothing-toggle" type="checkbox" role="switch" aria-label="Suavizar recorrido solo en pantalla"><span class="switch-track"><span class="switch-thumb"></span></span></span>';
+      toggles.appendChild(control);
+      control.querySelector('input')?.addEventListener('change', (event) => setSmoothingEnabled(event.target.checked));
+    }
+    const input = control.querySelector?.('input');
+    if (input) input.checked = smoothingEnabled;
+    return true;
+  }
+
   function installTravelLogDownloads() {
     enhanceTravelLogDownloads();
     if (!travelLogObserver && typeof MutationObserver === 'function' && document.documentElement) {
@@ -274,19 +350,21 @@
       travelLogObserver.observe(document.documentElement, { childList: true, subtree: true });
     }
     ['wander:screen-change', 'wander:sessions-changed', 'wander:travel-log-change'].forEach((name) => {
-      window.addEventListener(name, () => setTimeout(enhanceTravelLogDownloads, 0));
+      window.addEventListener(name, () => setTimeout(() => { enhanceTravelLogDownloads(); ensureSmoothingControl(); }, 0));
     });
   }
 
   function render(state = null) {
     syncCurrentTrack(state);
     enhanceTravelLogDownloads();
+    ensureSmoothingControl();
   }
 
   function initialize() {
     if (initialized || !engine()) return;
     initialized = true;
     persistCurrentTrackVisibility();
+    persistSmoothingEnabled();
     engine().subscribe?.(render);
     installTravelLogDownloads();
     render();
@@ -309,6 +387,9 @@
     addPoint: () => engine()?.observe?.('legacy-add-point'),
     setCurrentTrackVisible,
     isCurrentTrackVisible: () => currentTrackVisible,
+    setSmoothingEnabled,
+    isSmoothingEnabled: () => smoothingEnabled,
+    displayLatLngs,
     segmentLatLngs: sessionLatLngSegments,
     enhanceTravelLogDownloads,
   });

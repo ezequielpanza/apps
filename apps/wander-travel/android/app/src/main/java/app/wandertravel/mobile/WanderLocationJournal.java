@@ -23,8 +23,8 @@ final class WanderLocationJournal {
     private static final String FILE_NAME = "wander-location-journal.jsonl";
     private static final String PREFERENCES = "wander-location-journal";
     private static final String NEXT_ID_KEY = "next-id";
-    private static final long MAX_BYTES = 12L * 1024L * 1024L;
-    private static final int RETAINED_ROWS = 40000;
+    private static final long MAX_BYTES = 32L * 1024L * 1024L;
+    private static final int RETAINED_ROWS = 100000;
     private static WanderLocationJournal instance;
 
     static synchronized WanderLocationJournal get(Context context) {

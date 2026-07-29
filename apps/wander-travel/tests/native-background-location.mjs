@@ -124,7 +124,7 @@ assert.equal(received.length, 2);
 assert.deepEqual(received.map((position) => position.journalId), [101, 102]);
 assert.deepEqual(acknowledged.slice(0, 2), [101, 102]);
 assert.equal(startedWith.minimumIntervalMs, 1000);
-assert.equal(startedWith.minimumDistanceM, 1);
+assert.equal(startedWith.minimumDistanceM, 0);
 assert.equal(contextValues.get('location.background.lastSyncedCount'), 2);
 
 listeners.get('location')?.({

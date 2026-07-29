@@ -338,9 +338,8 @@
     }).addTo(map);
 
     function validPoints(segment) {
-      return (segment?.points || [])
-        .filter((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)))
-        .map((point) => [Number(point.lat), Number(point.lng)]);
+      const points = (segment?.points || []).filter((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)));
+      return window.WanderTracks?.displayLatLngs?.(points) || points.map((point) => [Number(point.lat), Number(point.lng)]);
     }
 
     function recentSegments(snapshot = engine.snapshot?.()) {
@@ -395,6 +394,7 @@
 
     persist();
     engine.subscribe?.((snapshot) => refresh(snapshot));
+    window.addEventListener('wander:track-smoothing-changed', () => refresh());
     window.addEventListener('wander:screen-change', (event) => {
       if (event.detail?.to === 'travel-log') setTimeout(() => { ensureControl(); refresh(); }, 0);
     });
