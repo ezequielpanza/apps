@@ -42,4 +42,5 @@
   window.WanderContext?.set?.('app.version', VERSION, metadata);
   window.WanderContext?.set?.('app.webVersion', VERSION, metadata);
   window.WanderContext?.set?.('sessions.rawTrackSchema', 2, metadata);
+  window.WanderContext?.set?.('sessions.rawTrackPointFormat', 'latE7-array-v1', metadata);
 })();
