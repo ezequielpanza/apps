@@ -1,0 +1,29 @@
+name: Fix Wander App Shell Backfill Assertion
+
+on:
+  push:
+    branches: [feature/wander-raw-track-recording]
+    paths:
+      - "scripts/fix-wander-app-shell-backfill-assertion.py"
+      - ".github/workflows/fix-wander-app-shell-backfill-assertion.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/wander-raw-track-recording
+          fetch-depth: 0
+      - run: python scripts/fix-wander-app-shell-backfill-assertion.py
+      - run: |
+          rm scripts/fix-wander-app-shell-backfill-assertion.py
+          rm .github/workflows/fix-wander-app-shell-backfill-assertion.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Align app shell with raw movement backfill"
+          git push origin HEAD:feature/wander-raw-track-recording
