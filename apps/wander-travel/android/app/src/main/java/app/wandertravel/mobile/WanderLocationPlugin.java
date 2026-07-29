@@ -76,8 +76,8 @@ public class WanderLocationPlugin extends Plugin {
     private void startService(PluginCall call) {
         Intent intent = new Intent(getContext(), WanderLocationService.class);
         intent.setAction(WanderLocationService.ACTION_START);
-        intent.putExtra("minimumIntervalMs", Math.max(2000, call.getInt("minimumIntervalMs", 5000)));
-        intent.putExtra("minimumDistanceM", Math.max(0, call.getInt("minimumDistanceM", 5)));
+        intent.putExtra("minimumIntervalMs", Math.max(1000, call.getInt("minimumIntervalMs", 1000)));
+        intent.putExtra("minimumDistanceM", Math.max(0, call.getInt("minimumDistanceM", 1)));
         intent.putExtra("highAccuracy", call.getBoolean("highAccuracy", true));
         getContext().startForegroundService(intent);
         call.resolve();
@@ -319,17 +319,16 @@ public class WanderLocationPlugin extends Plugin {
         boolean precisePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.M
             || plugin.getContext().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         JSObject payload = new JSObject();
-        payload.put("journalId", journalId > 0 ? journalId : null);
         payload.put("latitude", location.getLatitude());
         payload.put("longitude", location.getLongitude());
         payload.put("accuracy", location.hasAccuracy() ? location.getAccuracy() : null);
         payload.put("altitude", location.hasAltitude() ? location.getAltitude() : null);
         payload.put("heading", location.hasBearing() ? location.getBearing() : null);
         payload.put("speed", location.hasSpeed() ? location.getSpeed() : null);
+        payload.put("timestamp", location.getTime() > 0 ? location.getTime() : System.currentTimeMillis());
         payload.put("provider", location.getProvider());
         payload.put("permissionPrecision", precisePermission ? "precise" : "approximate");
-        payload.put("timestamp", location.getTime());
-        payload.put("replayed", false);
+        if (journalId > 0) payload.put("journalId", journalId);
         plugin.notifyListeners("location", payload, true);
     }
 
@@ -341,7 +340,7 @@ public class WanderLocationPlugin extends Plugin {
         plugin.notifyListeners("locationError", payload, true);
     }
 
-    static void publishMotion(float x, float y, float z, float magnitude, float activity, boolean linear, long timestamp) {
+    static void publishMotion(float x, float y, float z, float magnitude, float activity, boolean linearAcceleration, long timestamp) {
         WanderLocationPlugin plugin = activePlugin.get();
         if (plugin == null) return;
         JSObject payload = new JSObject();
@@ -350,9 +349,9 @@ public class WanderLocationPlugin extends Plugin {
         payload.put("z", z);
         payload.put("magnitude", magnitude);
         payload.put("activity", activity);
-        payload.put("linear", linear);
+        payload.put("linearAcceleration", linearAcceleration);
         payload.put("timestamp", timestamp);
-        plugin.notifyListeners("motionSensor", payload, true);
+        plugin.notifyListeners("motion", payload, true);
     }
 
     static void publishMotionUnavailable() {
@@ -360,6 +359,6 @@ public class WanderLocationPlugin extends Plugin {
         if (plugin == null) return;
         JSObject payload = new JSObject();
         payload.put("status", "unavailable");
-        plugin.notifyListeners("motionSensorError", payload, true);
+        plugin.notifyListeners("motionError", payload, true);
     }
 }
