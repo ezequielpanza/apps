@@ -97,7 +97,8 @@ const sources = {
 };
 
 assert.match(versionRuntime, /LAST_24_HOURS_MS = 24 \* 60 \* 60 \* 1000/);
-assert.match(versionRuntime, /localStorage\.getItem\(RECENT_TRACKS_KEY\) === null/);
+assert.match(versionRuntime, /RECENT_TRACKS_MIGRATION_KEY/);
+assert.match(versionRuntime, /stored === null \|\| stored === '0'/);
 assert.match(versionRuntime, /stored\.profileId === 'balanced'/);
 
 assert.match(app, /const cloudBootstrap = loadCloudBackup\(\)/);
