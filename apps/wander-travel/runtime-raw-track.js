@@ -8,16 +8,19 @@
   const ACTIVE_KEY = 'wander.rawTrack.active.v1';
   const HISTORY_KEY = 'wander.rawTracks.sessions.v1';
   const SETTINGS_KEY = 'wander.rawTracks.settings.v1';
+  const MIGRATION_KEY = 'wander.rawTracks.segmentMigration.v1';
   const DEFAULT_SETTINGS = Object.freeze({ smoothingEnabled: false });
   const MAX_ACCURACY_M = 120;
   const MIN_INTERVAL_MS = 750;
   const MAX_POINTS_PER_SESSION = 200000;
+  const PERSIST_DELAY_MS = 1500;
   const listeners = new Set();
 
   let settings = loadObject(SETTINGS_KEY, DEFAULT_SETTINGS);
   let active = loadObject(ACTIVE_KEY, null);
   let history = loadArray(HISTORY_KEY);
   let lastSessionSnapshot = sessionsEngine.snapshot?.() || { active: null, sessions: [] };
+  let persistTimer = null;
 
   function loadObject(key, fallback) {
     try {
@@ -42,43 +45,146 @@
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
 
+  function validPoint(point) {
+    const lat = finite(point?.lat);
+    const lng = finite(point?.lng);
+    return lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  }
+
+  function normalizedPoint(point, fallback = {}) {
+    if (!validPoint(point)) return null;
+    return {
+      lat: Number(Number(point.lat).toFixed(7)),
+      lng: Number(Number(point.lng).toFixed(7)),
+      at: Number(point.at) || Number(fallback.at) || Date.now(),
+      accuracy: finite(point.accuracy),
+      speedKmh: finite(point.speedKmh),
+      heading: finite(point.heading),
+      motion: String(point.motion || fallback.motion || 'unknown').toLowerCase(),
+      source: point.source || fallback.source || 'legacy',
+    };
+  }
+
   function effectivePoint() {
     const location = context.getEffectiveLocation?.();
-    const lat = finite(location?.lat);
-    const lng = finite(location?.lng);
-    if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
     const accuracy = finite(location?.accuracy);
     if (accuracy !== null && accuracy > MAX_ACCURACY_M) return null;
-    const at = Date.parse(location?.updatedAt || '') || Date.now();
-    return {
-      lat: Number(lat.toFixed(7)),
-      lng: Number(lng.toFixed(7)),
-      at,
+    return normalizedPoint({
+      lat: location?.lat,
+      lng: location?.lng,
+      at: Date.parse(location?.updatedAt || '') || Date.now(),
       accuracy,
       speedKmh: finite(context.value?.('motion.speedKmh')),
       heading: finite(location?.heading),
-      motion: String(context.value?.('motion.status') || 'pending').toLowerCase(),
+      motion: context.value?.('motion.status'),
       source: location?.source || 'unknown',
-    };
+    });
+  }
+
+  function legacyPoints(session) {
+    const points = [];
+    (session?.segments || []).forEach((segment) => {
+      if (segment?.type !== 'movement') return;
+      (segment.points || []).forEach((point) => {
+        const normalized = normalizedPoint(point, { motion: 'moving', source: 'legacy-segment' });
+        if (normalized) points.push(normalized);
+      });
+    });
+    return points.sort((a, b) => a.at - b.at).filter((point, index, values) => {
+      if (!index) return true;
+      const previous = values[index - 1];
+      return point.at !== previous.at || point.lat !== previous.lat || point.lng !== previous.lng;
+    });
+  }
+
+  function migrateLegacySessions(snapshot) {
+    try {
+      if (localStorage.getItem(MIGRATION_KEY) === 'done') return;
+      const known = new Set(history.map((track) => track.sessionId));
+      for (const session of snapshot?.sessions || []) {
+        if (!session?.id || known.has(session.id)) continue;
+        const points = legacyPoints(session);
+        if (!points.length) continue;
+        history.push({
+          schemaVersion: 1,
+          id: `raw-${session.id}`,
+          sessionId: session.id,
+          name: session.name || 'Recorrido Wander',
+          startedAt: Number(session.startedAt) || points[0].at,
+          endedAt: Number(session.endedAt) || points[points.length - 1].at,
+          points,
+          migratedFromSegments: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        known.add(session.id);
+      }
+      if (!active && snapshot?.active?.id) {
+        const points = legacyPoints(snapshot.active);
+        active = {
+          schemaVersion: 1,
+          id: `raw-${snapshot.active.id}`,
+          sessionId: snapshot.active.id,
+          name: snapshot.active.name || 'Recorrido Wander',
+          startedAt: Number(snapshot.active.startedAt) || points[0]?.at || Date.now(),
+          endedAt: null,
+          points,
+          migratedFromSegments: points.length > 0,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+      }
+      history = history.slice(-500);
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      persistNow();
+    } catch {}
   }
 
   function ensureActive(session) {
     if (!session?.id) return null;
     if (active?.sessionId === session.id) return active;
     if (active?.sessionId) finalizeActive(active.sessionId, active.endedAt || Date.now());
+    const seeded = legacyPoints(session);
     active = {
       schemaVersion: 1,
       id: `raw-${session.id}`,
       sessionId: session.id,
       name: session.name || `Recorrido ${new Date(session.startedAt || Date.now()).toLocaleString('es-AR')}`,
-      startedAt: Number(session.startedAt) || Date.now(),
+      startedAt: Number(session.startedAt) || seeded[0]?.at || Date.now(),
       endedAt: null,
-      points: [],
+      points: seeded,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    persist();
+    persistNow();
     return active;
+  }
+
+  function notify() {
+    const snapshot = apiSnapshot();
+    listeners.forEach((listener) => { try { listener(snapshot); } catch {} });
+    window.dispatchEvent(new CustomEvent('wander:raw-track-changed', { detail: snapshot }));
+  }
+
+  function schedulePersist() {
+    if (persistTimer) return;
+    persistTimer = setTimeout(() => {
+      persistTimer = null;
+      persistNow();
+    }, PERSIST_DELAY_MS);
+  }
+
+  function persistNow() {
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = null;
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      if (active) localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
+      else localStorage.removeItem(ACTIVE_KEY);
+    } catch {}
+    notify();
+    window.dispatchEvent(new CustomEvent('wander:cloud-data-changed', { detail: { source: 'raw-track' } }));
   }
 
   function appendPoint(point) {
@@ -89,12 +195,12 @@
     if (last) {
       if (point.at <= Number(last.at || 0)) return false;
       if (point.at - Number(last.at || 0) < MIN_INTERVAL_MS) return false;
-      if (point.lat === last.lat && point.lng === last.lng && point.at - Number(last.at || 0) < 5000) return false;
     }
     track.points.push(point);
     if (track.points.length > MAX_POINTS_PER_SESSION) track.points.splice(0, track.points.length - MAX_POINTS_PER_SESSION);
     track.updatedAt = Date.now();
-    persist();
+    notify();
+    schedulePersist();
     return true;
   }
 
@@ -106,7 +212,7 @@
     history = history.slice(-500);
     const completed = active;
     active = null;
-    persist();
+    persistNow();
     return clone(completed);
   }
 
@@ -120,19 +226,6 @@
       finalizeActive(previousActiveId, completed?.endedAt || Date.now());
     }
     lastSessionSnapshot = snapshot;
-  }
-
-  function persist() {
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-      if (active) localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
-      else localStorage.removeItem(ACTIVE_KEY);
-    } catch {}
-    const snapshot = apiSnapshot();
-    listeners.forEach((listener) => { try { listener(snapshot); } catch {} });
-    window.dispatchEvent(new CustomEvent('wander:raw-track-changed', { detail: snapshot }));
-    window.dispatchEvent(new CustomEvent('wander:cloud-data-changed', { detail: { source: 'raw-track' } }));
   }
 
   function smoothPoints(points) {
@@ -161,7 +254,7 @@
 
   function setSmoothingEnabled(enabled) {
     settings = { ...settings, smoothingEnabled: Boolean(enabled) };
-    persist();
+    persistNow();
     return settings.smoothingEnabled;
   }
 
@@ -177,8 +270,12 @@
     if (key === 'location.effective' || key.startsWith('location.effective.')) appendPoint(effectivePoint());
   });
   sessionsEngine.subscribe?.((snapshot) => reconcileSessions(snapshot));
-  window.addEventListener('pagehide', persist);
+  window.addEventListener('pagehide', persistNow);
+  document.addEventListener?.('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') persistNow();
+  });
 
+  migrateLegacySessions(lastSessionSnapshot);
   reconcileSessions(lastSessionSnapshot);
   appendPoint(effectivePoint());
 
@@ -198,6 +295,7 @@
     smoothPoints,
     setSmoothingEnabled,
     isSmoothingEnabled: () => Boolean(settings.smoothingEnabled),
+    persist: persistNow,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     storageKeys: Object.freeze({ active: ACTIVE_KEY, sessions: HISTORY_KEY, settings: SETTINGS_KEY }),
   });
