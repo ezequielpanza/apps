@@ -5,24 +5,22 @@
   const map = base.map;
   const line = base.route;
   const currentLine = base.currentTrack || null;
-  const LEGACY_KEY = 'wander.tracks';
   const CURRENT_TRACK_VISIBLE_KEY = 'wander.tracks.current.visible.v1';
-  const $ = (selector) => document.querySelector(selector);
-  const icon = (name, className = 'button-icon') => `<svg class="${className}" aria-hidden="true"><use href="wander-icons.svg#${name}"></use></svg>`;
-  let legacyTracks = [];
-  let initialized = false;
   let currentTrackVisible = loadCurrentTrackVisibility();
+  let initialized = false;
+  let travelLogObserver = null;
 
-  try {
-    const stored = JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]');
-    legacyTracks = Array.isArray(stored) ? stored : [];
-  } catch { legacyTracks = []; }
+  function engine() {
+    return window.WanderSessionEngine || null;
+  }
 
   function loadCurrentTrackVisibility() {
     try {
       const stored = localStorage.getItem(CURRENT_TRACK_VISIBLE_KEY);
       return stored == null ? true : stored === 'true';
-    } catch { return true; }
+    } catch {
+      return true;
+    }
   }
 
   function persistCurrentTrackVisibility() {
@@ -35,193 +33,22 @@
     });
   }
 
-  function engine() {
-    return window.WanderSessionEngine || null;
+  function validPoint(point) {
+    const lat = Number(point?.lat);
+    const lng = Number(point?.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
   }
 
-  function durationLabel(ms) {
-    const minutes = Math.max(0, Math.round(Number(ms || 0) / 60000));
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours} h ${minutes % 60} min`;
-  }
-
-  function distanceLabel(meters) {
-    const value = Math.max(0, Math.round(Number(meters || 0)));
-    return value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)} km` : `${value} m`;
-  }
-
-  function dateLabel(value) {
-    if (!value) return 'Sin fecha';
-    return new Date(value).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  }
-
-  function phaseLabel(state) {
-    const labels = {
-      disabled: 'Registro automático desactivado',
-      preparing: 'Preparando contexto',
-      waiting: 'Esperando movimiento',
-      moving: 'Registrando movimiento',
-      staying: 'Registrando permanencia',
-      'confirming-overnight': 'Confirmando permanencia nocturna',
-    };
-    return labels[state?.phase] || 'Preparando sesiones';
-  }
-
-  function routeCard() {
-    return $('#track-list')?.closest('.screen-card') || $('[data-app-screen="routes"] .screen-card');
-  }
-
-  function recordingOptionsMarkup() {
-    const profiles = engine()?.recordingProfiles?.() || [];
-    return profiles.map((profile) => {
-      const detail = profile.id === 'manual' ? '' : ` · ${profile.intervalSec} s / ${profile.distanceM} m`;
-      return `<option value="${profile.id}">${profile.label}${detail}</option>`;
-    }).join('');
-  }
-
-  function buildScreen() {
-    const card = routeCard();
-    if (!card || card.dataset.sessionUi === 'true') return Boolean(card);
-    card.dataset.sessionUi = 'true';
-    card.innerHTML = `
-      <h3>${icon('route', 'section-icon')}Sesiones</h3>
-      <div class="session-auto-card">
-        <div><strong>Registro automático</strong><span>Wander registra movimiento y permanencias sin usar un botón de grabación.</span></div>
-        <label class="switch-control"><input id="session-auto-toggle" type="checkbox" role="switch" aria-label="Registro automático"><span class="switch-track"><span class="switch-thumb"></span></span></label>
-      </div>
-      <div class="session-auto-card">
-        <div><strong>Mostrar recorrido actual</strong><span>Dibuja en el mapa el trayecto acumulado de la sesión activa.</span></div>
-        <label class="switch-control"><input id="session-map-toggle" type="checkbox" role="switch" aria-label="Mostrar recorrido actual en el mapa"><span class="switch-track"><span class="switch-thumb"></span></span></label>
-      </div>
-      <div class="session-recording-card">
-        <div class="session-recording-heading">
-          <div><strong>Perfil de grabación</strong><span id="session-recording-summary">Equilibrado · 5 s · 5 m</span></div>
-        </div>
-        <label class="session-recording-field">
-          <span>Perfil</span>
-          <select id="session-recording-profile" aria-label="Perfil de grabación del recorrido">${recordingOptionsMarkup()}</select>
-        </label>
-        <div id="session-recording-manual" class="session-recording-manual" hidden>
-          <label class="session-recording-field"><span>Tiempo mínimo</span><div><input id="session-recording-interval" type="number" inputmode="numeric" min="2" max="60" step="1"><small>segundos</small></div></label>
-          <label class="session-recording-field"><span>Distancia mínima</span><div><input id="session-recording-distance" type="number" inputmode="numeric" min="1" max="100" step="1"><small>metros</small></div></label>
-        </div>
-        <p id="session-recording-description" class="panel-note">Buen detalle con consumo moderado.</p>
-      </div>
-      <div class="session-current-card">
-        <span id="session-phase">Preparando contexto</span>
-        <strong id="track-summary">Sin sesión activa</strong>
-        <div class="session-stats">
-          <div><span>Distancia</span><b id="session-distance">0 m</b></div>
-          <div><span>Movimiento</span><b id="session-moving-time">0 min</b></div>
-          <div><span>Permanencias</span><b id="session-stay-time">0 min</b></div>
-        </div>
-      </div>
-      <div class="button-row compact-actions session-actions">
-        <button id="session-finish-button" type="button">${icon('stop')}<span>Finalizar sesión</span></button>
-        <button id="export-track-button" type="button">${icon('export')}<span>Exportar</span></button>
-        <button id="clear-panel-button" type="button">${icon('clear')}<span>Limpiar mapa</span></button>
-      </div>
-      <div class="session-history-heading"><strong>Historial</strong><span id="session-history-count">0 finalizadas</span></div>
-      <div id="track-list" class="track-list session-list"></div>`;
-
-    $('#session-auto-toggle')?.addEventListener('change', (event) => {
-      engine()?.setAutoEnabled?.(event.target.checked);
-      render();
-    });
-    $('#session-map-toggle')?.addEventListener('change', (event) => {
-      setCurrentTrackVisible(event.target.checked);
-    });
-    $('#session-recording-profile')?.addEventListener('change', (event) => {
-      engine()?.setRecordingProfile?.(event.target.value);
-      renderRecordingControls();
-    });
-    const updateManual = () => {
-      const intervalSec = Number($('#session-recording-interval')?.value);
-      const distanceM = Number($('#session-recording-distance')?.value);
-      engine()?.setManualRecordingConfig?.({ intervalSec, distanceM });
-      renderRecordingControls();
-    };
-    $('#session-recording-interval')?.addEventListener('change', updateManual);
-    $('#session-recording-distance')?.addEventListener('change', updateManual);
-    $('#session-finish-button')?.addEventListener('click', () => {
-      const completed = engine()?.finishSession?.('manual');
-      if (completed) window.WanderUI?.showToast?.('Sesión finalizada', 'Esperando el próximo movimiento');
-      render();
-    });
-    $('#export-track-button')?.addEventListener('click', exportLast);
-    $('#clear-panel-button')?.addEventListener('click', () => {
-      line.setLatLngs([]);
-      setCurrentTrackVisible(false);
-      window.WanderUI?.showToast?.('Vista limpia', 'Las sesiones siguen guardadas');
-    });
-    $('#track-list')?.addEventListener('click', handleListClick);
-    return true;
-  }
-
-  function renderRecordingControls(state = null) {
-    const recording = state?.recording || engine()?.getRecordingState?.();
-    if (!recording?.config) return;
-    const config = recording.config;
-    const profileSelect = $('#session-recording-profile');
-    if (profileSelect) profileSelect.value = recording.profileId;
-    const manual = $('#session-recording-manual');
-    if (manual) manual.hidden = recording.profileId !== 'manual';
-    const interval = $('#session-recording-interval');
-    if (interval) interval.value = String(recording.manualIntervalSec);
-    const distance = $('#session-recording-distance');
-    if (distance) distance.value = String(recording.manualDistanceM);
-    window.WanderUI?.setText?.('#session-recording-summary', `${config.label} · ${config.intervalSec} s · ${config.distanceM} m`);
-    window.WanderUI?.setText?.('#session-recording-description', config.description || 'Configuración de grabación activa.');
-  }
-
-  function activeSummary(active) {
-    if (!active) return 'Sin sesión activa · Wander espera el próximo movimiento';
-    const stay = active.currentStay;
-    if (stay) {
-      const place = stay.poiName ? ` en ${stay.poiName}` : '';
-      return `En permanencia${place} desde ${new Date(stay.startedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
-    }
-    return `Sesión activa desde ${new Date(active.startedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
-  }
-
-  function historyCountLabel(active, history) {
-    const finished = history.length;
-    const finishedLabel = `${finished} ${finished === 1 ? 'finalizada' : 'finalizadas'}`;
-    return active ? `1 activa · ${finishedLabel}` : finishedLabel;
-  }
-
-  function rowMarkup(session, active = false) {
-    const duration = Math.max(0, Number(session.endedAt || Date.now()) - Number(session.startedAt || Date.now()));
-    const details = `${dateLabel(session.startedAt)} · ${durationLabel(duration)} · ${distanceLabel(session.distanceM)}`;
-    return `<div class="track-row session-row${active ? ' is-active' : ''}" data-session-id="${session.id}">
-      <button class="track-main" type="button" data-session-view="${session.id}">
-        <div><strong>${session.name || 'Sesión'}</strong><span>${details}${active ? ' · Activa' : ''}</span></div>${icon('eye', 'ui-icon track-eye')}
-      </button>
-      ${active ? '' : `<button class="track-delete" type="button" data-session-delete="${session.id}" aria-label="Eliminar sesión">${icon('clear', 'ui-icon')}</button>`}
-    </div>`;
-  }
-
-  function legacyRowMarkup(track) {
-    const points = Array.isArray(track.points) ? track.points : [];
-    return `<div class="track-row session-row is-legacy" data-legacy-id="${track.id}">
-      <button class="track-main" type="button" data-legacy-view="${track.id}">
-        <div><strong>${track.name || 'Recorrido anterior'}</strong><span>Recorrido anterior · ${points.length} puntos · Sin permanencias</span></div>${icon('eye', 'ui-icon track-eye')}
-      </button>
-    </div>`;
-  }
-
-  function sessionPoints(session) {
-    return (session?.segments || []).filter((segment) => segment.type === 'movement').flatMap((segment) => segment.points || []);
+  function sessionMovementSegments(session) {
+    return (session?.segments || [])
+      .filter((segment) => segment?.type === 'movement')
+      .map((segment) => ({ ...segment, points: (segment.points || []).filter(validPoint) }))
+      .filter((segment) => segment.points.length > 0);
   }
 
   function sessionLatLngSegments(session) {
-    return (session?.segments || [])
-      .filter((segment) => segment.type === 'movement')
-      .map((segment) => (segment.points || [])
-        .filter((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)))
-        .map((point) => [Number(point.lat), Number(point.lng)]))
-      .filter((points) => points.length > 0);
+    return sessionMovementSegments(session)
+      .map((segment) => segment.points.map((point) => [Number(point.lat), Number(point.lng)]));
   }
 
   function currentLatLngs(active) {
@@ -239,46 +66,23 @@
   function setCurrentTrackVisible(visible) {
     currentTrackVisible = Boolean(visible);
     persistCurrentTrackVisibility();
-    const toggle = $('#session-map-toggle');
-    if (toggle) toggle.checked = currentTrackVisible;
+    document.querySelectorAll?.('#session-map-toggle, #travel-log-map-toggle').forEach((toggle) => {
+      toggle.checked = currentTrackVisible;
+    });
     syncCurrentTrack();
     return currentTrackVisible;
   }
 
-  function render(state = null) {
-    if (!buildScreen()) return;
-    const snapshot = state || engine()?.snapshot?.() || { autoEnabled: true, phase: 'preparing', active: null, sessions: [] };
-    const active = snapshot.active;
-    const live = window.WanderContext?.value?.('sessions.active') || active;
-    const history = Array.isArray(snapshot.sessions) ? snapshot.sessions : [];
-    const toggle = $('#session-auto-toggle');
-    if (toggle) toggle.checked = Boolean(snapshot.autoEnabled);
-    const mapToggle = $('#session-map-toggle');
-    if (mapToggle) mapToggle.checked = currentTrackVisible;
-    const finish = $('#session-finish-button');
-    if (finish) finish.disabled = !active;
-    renderRecordingControls(snapshot);
-    window.WanderUI?.setText('#session-phase', phaseLabel(snapshot));
-    window.WanderUI?.setText('#track-summary', activeSummary(live));
-    window.WanderUI?.setText('#session-distance', distanceLabel(live?.distanceM || 0));
-    window.WanderUI?.setText('#session-moving-time', durationLabel(live?.movingDurationMs || 0));
-    window.WanderUI?.setText('#session-stay-time', durationLabel(live?.stationaryDurationMs || 0));
-    window.WanderUI?.setText('#session-history-count', historyCountLabel(active, history));
-    syncCurrentTrack(snapshot);
-
-    const list = $('#track-list');
-    if (!list) return;
-    const rows = [];
-    if (active) rows.push(rowMarkup({ ...active, ...live }, true));
-    history.slice().reverse().slice(0, 20).forEach((session) => rows.push(rowMarkup(session)));
-    legacyTracks.slice().reverse().slice(0, 10).forEach((track) => rows.push(legacyRowMarkup(track)));
-    list.innerHTML = rows.length ? rows.join('') : '<div class="track-row"><div><strong>Sin sesiones</strong><span>El registro automático comenzará cuando Wander confirme movimiento.</span></div></div>';
+  function sessionById(id) {
+    const snapshot = engine()?.snapshot?.();
+    if (snapshot?.active?.id === id) return snapshot.active;
+    return snapshot?.sessions?.find((session) => session.id === id) || null;
   }
 
-  function sessionById(id) {
-    const state = engine()?.snapshot?.();
-    if (state?.active?.id === id) return state.active;
-    return state?.sessions?.find((session) => session.id === id) || null;
+  function movementById(sessionId, segmentId) {
+    const session = sessionById(sessionId);
+    const segment = (session?.segments || []).find((item) => item?.id === segmentId && item.type === 'movement') || null;
+    return { session, segment };
   }
 
   function showSession(id) {
@@ -286,54 +90,197 @@
     const session = state?.active?.id === id ? state.active : state?.sessions?.find((item) => item.id === id);
     const segments = sessionLatLngSegments(session);
     const latLngs = segments.flat();
-    if (!session || !latLngs.length) return window.WanderUI?.showToast?.('Sesión', 'Todavía no tiene recorrido visible');
-    if (!(state?.active?.id === id && currentTrackVisible)) line.setLatLngs(segments);
-    map.fitBounds(latLngs, { padding: [40, 40], maxZoom: 16 });
-    const distance = session.distanceM || window.WanderContext?.value?.('sessions.active')?.distanceM || 0;
-    window.WanderUI?.showToast?.('Sesión', distanceLabel(distance));
-  }
-
-  function showLegacy(id) {
-    const track = legacyTracks.find((item) => item.id === id);
-    const points = Array.isArray(track?.points) ? track.points : [];
-    if (!points.length) return;
-    const latLngs = points.map((point) => [point.lat, point.lng]);
-    line.setLatLngs(latLngs);
-    map.fitBounds(latLngs, { padding: [40, 40], maxZoom: 16 });
-  }
-
-  function handleListClick(event) {
-    const removeButton = event.target.closest('[data-session-delete]');
-    if (removeButton) {
-      const id = removeButton.dataset.sessionDelete;
-      const session = sessionById(id);
-      if (session && window.confirm(`¿Eliminar ${session.name}?`)) engine()?.deleteSession?.(id);
-      render();
-      return;
+    if (!session || !latLngs.length) {
+      window.WanderUI?.showToast?.('Recorrido', 'Todavía no tiene puntos suficientes para mostrar');
+      return false;
     }
-    const view = event.target.closest('[data-session-view]');
-    if (view) return showSession(view.dataset.sessionView);
-    const legacy = event.target.closest('[data-legacy-view]');
-    if (legacy) showLegacy(legacy.dataset.legacyView);
+    if (!(state?.active?.id === id && currentTrackVisible)) line.setLatLngs(segments);
+    map.fitBounds?.(latLngs, { padding: [40, 40], maxZoom: 16 });
+    return true;
   }
 
-  function exportSession(session) {
-    if (!session) return;
-    const payload = { format: 'wander-session', exportedAt: new Date().toISOString(), session };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  function xmlEscape(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&apos;');
+  }
+
+  function safeFilenamePart(value, fallback = 'track') {
+    const normalized = String(value || fallback)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 72);
+    return normalized || fallback;
+  }
+
+  function timestampPart(value = Date.now()) {
+    const date = new Date(Number(value) || value || Date.now());
+    const safe = Number.isFinite(date.getTime()) ? date : new Date();
+    return safe.toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+  }
+
+  function pointExtensions(point) {
+    const values = [];
+    if (Number.isFinite(Number(point?.accuracy))) values.push(`<wander:accuracy>${Number(point.accuracy).toFixed(1)}</wander:accuracy>`);
+    if (Number.isFinite(Number(point?.speedKmh))) values.push(`<wander:speedKmh>${Number(point.speedKmh).toFixed(2)}</wander:speedKmh>`);
+    if (Number.isFinite(Number(point?.heading))) values.push(`<wander:heading>${Number(point.heading).toFixed(1)}</wander:heading>`);
+    return values.length ? `<extensions>${values.join('')}</extensions>` : '';
+  }
+
+  function gpxPoint(point) {
+    const lat = Number(point.lat).toFixed(7);
+    const lng = Number(point.lng).toFixed(7);
+    const at = Number(point.at);
+    const time = Number.isFinite(at) ? `<time>${new Date(at).toISOString()}</time>` : '';
+    return `<trkpt lat="${lat}" lon="${lng}">${time}${pointExtensions(point)}</trkpt>`;
+  }
+
+  function buildGpx({ name = 'Track Wander', description = '', type = '', segments = [] } = {}) {
+    const validSegments = segments
+      .map((segment) => (segment?.points || segment || []).filter(validPoint))
+      .filter((points) => points.length > 0);
+    if (!validSegments.length) return null;
+    const exportedAt = new Date().toISOString();
+    const segmentMarkup = validSegments.map((points) => `<trkseg>${points.map(gpxPoint).join('')}</trkseg>`).join('');
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Wander Travel ${xmlEscape(window.WanderVersion || '')}" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:wander="https://wander-travel.pages.dev/gpx/1" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"><metadata><name>${xmlEscape(name)}</name>${description ? `<desc>${xmlEscape(description)}</desc>` : ''}<time>${exportedAt}</time></metadata><trk><name>${xmlEscape(name)}</name>${description ? `<desc>${xmlEscape(description)}</desc>` : ''}${type ? `<type>${xmlEscape(type)}</type>` : ''}${segmentMarkup}</trk></gpx>`;
+  }
+
+  async function saveGpx(content, filename) {
+    if (!content) throw new Error('El track no contiene puntos válidos.');
+    const nativePlugin = window.Capacitor?.Plugins?.WanderLocation;
+    if (window.Capacitor?.isNativePlatform?.() === true && typeof nativePlugin?.saveGpx === 'function') {
+      return nativePlugin.saveGpx({ content, filename });
+    }
+    const blob = new Blob([content], { type: 'application/gpx+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${session.id}.wander-session.json`;
+    link.download = filename;
+    link.rel = 'noopener';
+    document.body?.appendChild?.(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove?.();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return { cancelled: false, filename, native: false };
   }
 
-  function exportLast() {
-    const state = engine()?.snapshot?.();
-    const session = state?.active || state?.sessions?.[state.sessions.length - 1];
-    if (!session) return window.WanderUI?.showToast?.('Exportar', 'Todavía no hay sesiones');
-    exportSession(session);
+  function stayLabel(stay, fallback) {
+    if (stay?.poiName) return stay.poiName;
+    if (stay?.startedAt) {
+      return `Detención ${new Date(stay.startedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    return fallback;
+  }
+
+  function movementLabels(session, segment) {
+    const stays = [...(session?.stays || [])].sort((a, b) => Number(a.startedAt || 0) - Number(b.startedAt || 0));
+    const startedAt = Number(segment?.startedAt || 0);
+    const endedAt = Number(segment?.endedAt || Date.now());
+    const previousStay = [...stays].reverse().find((stay) => Number(stay.endedAt || Infinity) <= startedAt + 1500) || null;
+    const nextStay = stays.find((stay) => Number(stay.startedAt || 0) >= endedAt - 1500) || null;
+    return {
+      from: stayLabel(previousStay, 'Inicio'),
+      to: segment?.endedAt ? stayLabel(nextStay, 'Punto detenido') : 'En movimiento',
+    };
+  }
+
+  async function exportSegment(session, segment, options = {}) {
+    const points = (segment?.points || []).filter(validPoint);
+    if (!session || !segment || !points.length) {
+      window.WanderUI?.showToast?.('Descargar track', 'El tramo todavía no tiene puntos válidos');
+      return { skipped: true, reason: 'empty' };
+    }
+    const labels = movementLabels(session, segment);
+    const name = options.name || `${labels.from} → ${labels.to}`;
+    const description = options.description || `${points.length} puntos · ${Math.round(Number(segment.distanceM || 0))} m`;
+    const filename = options.filename || `Wander_${timestampPart(segment.startedAt)}_${safeFilenamePart(labels.from)}-${safeFilenamePart(labels.to)}.gpx`;
+    const content = buildGpx({ name, description, type: segment.method || 'movement', segments: [segment] });
+    try {
+      const result = await saveGpx(content, filename);
+      if (result?.cancelled) return result;
+      window.WanderUI?.showToast?.('Track GPX', 'Archivo preparado correctamente');
+      return { ...result, filename, content };
+    } catch (error) {
+      window.WanderUI?.showToast?.('No se pudo descargar', error?.message || 'Error al crear el archivo GPX');
+      return { error };
+    }
+  }
+
+  async function exportSession(session) {
+    const segments = sessionMovementSegments(session);
+    if (!session || !segments.length) {
+      window.WanderUI?.showToast?.('Exportar', 'Todavía no hay recorridos con puntos');
+      return { skipped: true, reason: 'empty' };
+    }
+    const filename = `Wander_${timestampPart(session.startedAt)}_${safeFilenamePart(session.name, 'sesion')}.gpx`;
+    const content = buildGpx({
+      name: session.name || 'Sesión Wander',
+      description: `${segments.length} tramos · ${Math.round(Number(session.distanceM || 0))} m`,
+      type: 'wander-session',
+      segments,
+    });
+    try {
+      const result = await saveGpx(content, filename);
+      if (result?.cancelled) return result;
+      window.WanderUI?.showToast?.('Sesión GPX', 'Archivo preparado correctamente');
+      return { ...result, filename, content };
+    } catch (error) {
+      window.WanderUI?.showToast?.('No se pudo exportar', error?.message || 'Error al crear el archivo GPX');
+      return { error };
+    }
+  }
+
+  function enhanceTravelLogDownloads() {
+    const content = document.querySelector?.('#travel-log-content');
+    if (!content?.querySelectorAll || typeof document.createElement !== 'function') return 0;
+    let added = 0;
+    content.querySelectorAll('button.travel-log-movement[data-log-movement]:not([data-gpx-enhanced])').forEach((movement) => {
+      movement.dataset.gpxEnhanced = 'true';
+      const wrapper = document.createElement('div');
+      wrapper.className = 'travel-log-movement-download-row';
+      movement.before(wrapper);
+      wrapper.appendChild(movement);
+
+      const download = document.createElement('button');
+      download.type = 'button';
+      download.className = 'travel-log-movement-download';
+      const data = download.dataset;
+      data.logMovementDownload = 'true';
+      data.sessionId = movement.dataset.sessionId || '';
+      data.segmentId = movement.dataset.segmentId || '';
+      download.setAttribute('aria-label', 'Descargar track en formato GPX');
+      download.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="wander-icons.svg#export"></use></svg><span>GPX</span>';
+      download.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const { session, segment } = movementById(data.sessionId, data.segmentId);
+        exportSegment(session, segment);
+      });
+      wrapper.appendChild(download);
+      added += 1;
+    });
+    return added;
+  }
+
+  function installTravelLogDownloads() {
+    enhanceTravelLogDownloads();
+    if (!travelLogObserver && typeof MutationObserver === 'function' && document.documentElement) {
+      travelLogObserver = new MutationObserver(() => enhanceTravelLogDownloads());
+      travelLogObserver.observe(document.documentElement, { childList: true, subtree: true });
+    }
+    ['wander:screen-change', 'wander:sessions-changed', 'wander:travel-log-change'].forEach((name) => {
+      window.addEventListener(name, () => setTimeout(enhanceTravelLogDownloads, 0));
+    });
+  }
+
+  function render(state = null) {
+    syncCurrentTrack(state);
+    enhanceTravelLogDownloads();
   }
 
   function initialize() {
@@ -341,21 +288,20 @@
     initialized = true;
     persistCurrentTrackVisibility();
     engine().subscribe?.(render);
-    buildScreen();
+    installTravelLogDownloads();
     render();
   }
 
   window.addEventListener('wander:session-engine-ready', initialize);
-  window.addEventListener('wander:recording-profile-changed', () => renderRecordingControls());
-  document.addEventListener('click', (event) => {
-    if (event.target.closest('[data-screen-target="routes"]')) setTimeout(render, 0);
-  });
 
-  window.WanderTracks = {
+  window.WanderTracks = Object.freeze({
     render,
-    manage: () => window.WanderScreen?.open?.('routes'),
+    manage: () => window.WanderTravelLogScreen?.open?.() || window.WanderScreen?.open?.('travel-log'),
     showTrack: showSession,
     exportTrack: exportSession,
+    exportSegment,
+    buildGpx,
+    saveGpx,
     list: () => engine()?.list?.() || [],
     isRecording: () => Boolean(engine()?.isAutoEnabled?.()),
     start: () => engine()?.setAutoEnabled?.(true),
@@ -364,7 +310,8 @@
     setCurrentTrackVisible,
     isCurrentTrackVisible: () => currentTrackVisible,
     segmentLatLngs: sessionLatLngSegments,
-  };
+    enhanceTravelLogDownloads,
+  });
 
   initialize();
 })();
