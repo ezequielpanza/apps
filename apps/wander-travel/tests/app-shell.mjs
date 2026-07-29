@@ -12,6 +12,7 @@ const app = read('app.js');
 const serviceWorker = read('sw.js');
 const platform = read('runtime-platform.js');
 const versionRuntime = read('runtime-version.js');
+const directionStyles = read('wander-direction-indicator.css');
 const manifest = JSON.parse(read('manifest.webmanifest'));
 const packageManifest = JSON.parse(read('package.json'));
 const androidVersion = JSON.parse(read('android-version.json'));
@@ -55,11 +56,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.109.6');
-assert.equal(manifest.start_url, './?app=v0.109.6');
-assert.equal(packageManifest.version, '0.109.6');
-assert.equal(androidVersion.versionName, '0.11.7');
-assert.equal(androidVersion.versionCode, 23);
+assert.equal(versionMatch[1], 'v0.109.7');
+assert.equal(manifest.start_url, './?app=v0.109.7');
+assert.equal(packageManifest.version, '0.109.7');
+assert.equal(androidVersion.versionName, '0.11.8');
+assert.equal(androidVersion.versionCode, 24);
 assert.equal(capacitorConfig.webDir, 'mobile-dist');
 assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
 assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
@@ -69,7 +70,9 @@ const sources = {
   direction: read('runtime-direction-indicator.js'),
   directionSettings: read('runtime-direction-indicator-settings.js'),
   directionPlugin: read('android/app/src/main/java/app/wandertravel/mobile/WanderDirectionPlugin.java'),
+  locationPlugin: read('android/app/src/main/java/app/wandertravel/mobile/WanderLocationPlugin.java'),
   locationService: read('android/app/src/main/java/app/wandertravel/mobile/WanderLocationService.java'),
+  nativeLocationSource: read('runtime-native-location-source.js'),
   androidManifest: read('android/app/src/main/AndroidManifest.xml'),
   locationProvider: read('runtime-provider-location.js'),
   tracks: read('runtime-tracks.js'),
@@ -93,6 +96,10 @@ const sources = {
   cloudProvisioner: read('scripts/ensure-cloudflare-backup-kv.mjs'),
 };
 
+assert.match(versionRuntime, /LAST_24_HOURS_MS = 24 \* 60 \* 60 \* 1000/);
+assert.match(versionRuntime, /localStorage\.getItem\(RECENT_TRACKS_KEY\) === null/);
+assert.match(versionRuntime, /stored\.profileId === 'balanced'/);
+
 assert.match(app, /const cloudBootstrap = loadCloudBackup\(\)/);
 assert.match(app, /Promise\.allSettled\(\[/);
 assert.match(app, /loadDirectionIndicator\(\),\s*loadMapCrosshair\(\),\s*loadTravelMemory\(\)/s);
@@ -106,6 +113,7 @@ assert.match(app, /Mostrar en el mapa/);
 assert.match(app, /Últimas 24 horas/);
 assert.match(app, /segment\?\.type !== 'movement' \|\| !segment\.endedAt/);
 
+assert.doesNotMatch(directionStyles, /transition:transform/);
 assert.match(sources.direction, /thresholdKmh: 0/);
 assert.match(sources.direction, /magneticEnabled/);
 assert.match(sources.direction, /source: 'gps'/);
@@ -135,7 +143,7 @@ assert.match(sources.sensorMotionBridge, /STARTUP_GUARD_MS = 20000/);
 assert.match(sources.sensorMotionBridge, /corroborationRequired: true/);
 assert.match(sources.sensorMotionBridge, /accelerometer_without_position_corroboration/);
 assert.match(sources.sensorMotionBridge, /stable_movement_confirmed/);
-assert.match(sources.sensorMotionBridge, /STOP_CONFIRM_MS = 10000/);
+assert.match(sources.sensorMotionBridge, /STOP_CONFIRM_MS = 20000/);
 
 assert.match(sources.mapCrosshair, /bearingTo\(/);
 assert.match(sources.mapCrosshair, /distanceLabel\(/);
@@ -149,10 +157,17 @@ assert.match(sources.locationProvider, /reason: 'isolated-jump'/);
 assert.match(sources.locationProvider, /reason: 'confirmed-relocation'/);
 assert.match(sources.locationProvider, /location\.validation\.rejectedJumpCount/);
 assert.match(sources.locationProvider, /wander:location-sample-rejected/);
+assert.match(sources.nativeLocationSource, /precise: Object\.freeze\(\{ intervalSec: 1, distanceM: 1 \}\)/);
+assert.match(sources.nativeLocationSource, /minimumIntervalMs: clampInteger\(config\?\.intervalSec, 1, 60, 1\) \* 1000/);
+assert.match(sources.locationPlugin, /Math\.max\(1000, call\.getInt\("minimumIntervalMs", 1000\)\)/);
+assert.match(sources.locationService, /minimumIntervalMs = intent == null \? 1000/);
 
 assert.match(sources.sessionEngine, /type: 'movement'/);
 assert.match(sources.sessionEngine, /segments: \[\]/);
-assert.match(sources.sessionEngine, /if \(openMovement\(active\)\) closeMovement\(at\)/);
+assert.match(sources.sessionEngine, /minimumIntervalSec: 1/);
+assert.match(sources.sessionEngine, /intervalSec: 1, distanceM: 1/);
+assert.match(sources.sessionEngine, /addMovementPoint\(movement, position, at, true\);\s*closeMovement\(at\)/s);
+assert.match(sources.sessionEngine, /lat: finite\(closedStay\?\.center\?\.lat\) \?\? position\.lat/);
 assert.match(sources.sessionEngine, /const stay = reconcileStay\(position, at\)/);
 assert.match(sources.tracks, /function sessionLatLngSegments\(/);
 assert.match(sources.tracks, /currentLine\.setLatLngs\(latLngs\)/);
@@ -249,4 +264,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} starts local-first with persistent cloud backup, downloadable GPX tracks, stable direction, crosshair metrics, and offline zoom fallback`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} records every second with continuous stops, 24-hour recent tracks, stable direction, cloud backup, GPX downloads, and offline zoom fallback`);

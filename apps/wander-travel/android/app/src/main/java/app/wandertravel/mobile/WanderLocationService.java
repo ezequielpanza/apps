@@ -64,8 +64,8 @@ public class WanderLocationService extends Service implements LocationListener, 
         }
 
         startForeground(NOTIFICATION_ID, buildNotification());
-        long minimumIntervalMs = intent == null ? 5000 : intent.getIntExtra("minimumIntervalMs", 5000);
-        float minimumDistanceM = intent == null ? 5 : intent.getIntExtra("minimumDistanceM", 5);
+        long minimumIntervalMs = intent == null ? 1000 : intent.getIntExtra("minimumIntervalMs", 1000);
+        float minimumDistanceM = intent == null ? 1 : intent.getIntExtra("minimumDistanceM", 1);
         boolean highAccuracy = intent == null || intent.getBooleanExtra("highAccuracy", true);
         startTracking(minimumIntervalMs, minimumDistanceM, highAccuracy);
         return START_STICKY;

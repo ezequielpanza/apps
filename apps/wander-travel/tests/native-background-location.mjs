@@ -123,8 +123,8 @@ assert.equal(errors.length, 0);
 assert.equal(received.length, 2);
 assert.deepEqual(received.map((position) => position.journalId), [101, 102]);
 assert.deepEqual(acknowledged.slice(0, 2), [101, 102]);
-assert.equal(startedWith.minimumIntervalMs, 5000);
-assert.equal(startedWith.minimumDistanceM, 5);
+assert.equal(startedWith.minimumIntervalMs, 1000);
+assert.equal(startedWith.minimumDistanceM, 1);
 assert.equal(contextValues.get('location.background.lastSyncedCount'), 2);
 
 listeners.get('location')?.({
@@ -157,4 +157,4 @@ listeners.get('location')?.({
 await new Promise((resolve) => setTimeout(resolve, 20));
 assert.equal(received.length, 3, 'A journaled location must not be applied twice');
 
-console.log('PASS native background locations are persisted, replayed and acknowledged exactly once');
+console.log('PASS native background locations are persisted, replayed and acknowledged every second exactly once');
