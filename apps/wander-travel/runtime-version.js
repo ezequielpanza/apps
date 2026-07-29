@@ -41,4 +41,5 @@
   };
   window.WanderContext?.set?.('app.version', VERSION, metadata);
   window.WanderContext?.set?.('app.webVersion', VERSION, metadata);
+  window.WanderContext?.set?.('sessions.rawTrackSchema', 2, metadata);
 })();
