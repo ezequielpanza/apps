@@ -182,7 +182,7 @@ assert.match(sources.sessionEngine, /appendBackfill\(movement, backfill\.slice\(
 assert.doesNotMatch(sources.sessionEngine, /elapsedMs < config\.intervalSec/);
 assert.doesNotMatch(sources.sessionEngine, /distance < config\.distanceM/);
 assert.match(sources.sessionEngine, /addMovementPoint\(movement, position, at, true\);\s*closeMovement\(at\)/s);
-assert.match(sources.sessionEngine, /lat: finite\(closedStay\?\.center\?\.lat\) \?\? position\.lat/);
+assert.match(sources.sessionEngine, /if \(stay\) closeStay\(Number\(firstPoint\.at \|\| at\)\)/);
 assert.match(sources.sessionEngine, /const stay = reconcileStay\(position, at\)/);
 assert.match(sources.tracks, /function sessionLatLngSegments\(/);
 assert.match(sources.tracks, /TRACK_SMOOTHING_KEY/);
