@@ -44,7 +44,7 @@ import java.nio.charset.StandardCharsets;
 )
 public class WanderLocationPlugin extends Plugin {
     private static final String MESSAGE_CHANNEL_ID = "wander_companion_messages";
-    private static final int MAX_GPX_BYTES = 10 * 1024 * 1024;
+    private static final int MAX_GPX_BYTES = 50 * 1024 * 1024;
     private static WeakReference<WanderLocationPlugin> activePlugin = new WeakReference<>(null);
 
     @Override
@@ -77,7 +77,7 @@ public class WanderLocationPlugin extends Plugin {
         Intent intent = new Intent(getContext(), WanderLocationService.class);
         intent.setAction(WanderLocationService.ACTION_START);
         intent.putExtra("minimumIntervalMs", Math.max(1000, call.getInt("minimumIntervalMs", 1000)));
-        intent.putExtra("minimumDistanceM", Math.max(0, call.getInt("minimumDistanceM", 1)));
+        intent.putExtra("minimumDistanceM", Math.max(0, call.getInt("minimumDistanceM", 0)));
         intent.putExtra("highAccuracy", call.getBoolean("highAccuracy", true));
         getContext().startForegroundService(intent);
         call.resolve();

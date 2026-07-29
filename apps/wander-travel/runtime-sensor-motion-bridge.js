@@ -13,6 +13,11 @@
   const MOVING_CONFIRM_MS = 6000;
   const STRONG_MOVING_CONFIRM_MS = 2500;
   const STOP_CONFIRM_MS = 20000;
+  const STOP_MIN_RADIUS_M = 8;
+  const STOP_MAX_RADIUS_M = 25;
+  const STOP_MAX_ACCURACY_M = 40;
+  const WALK_STOP_SPEED_KMH = 1.5;
+  const VEHICLE_STOP_SPEED_KMH = 3;
 
   const state = {
     startedAt: Date.now(),
@@ -114,14 +119,25 @@
     };
   }
 
+  function stopSpeedThresholdKmh() {
+    const mode = String(context.value('mobility.methodId') || context.value('mobility.mode') || '').toLowerCase();
+    return ['car', 'driving', 'vehicle', 'boat', 'sailing', 'motorboat', 'cycling', 'bicycle', 'bus', 'train'].includes(mode)
+      ? VEHICLE_STOP_SPEED_KMH
+      : WALK_STOP_SPEED_KMH;
+  }
+
   function stationaryEvidence(result) {
     const evidence = result?.motionEvidence || {};
     const motionStatus = String(result?.motion?.status || '').toLowerCase();
     const speed = finite(result?.speedKmh) || 0;
     const spread = finite(evidence.stationaryWindowSpreadM);
-    const accuracy = Math.max(5, finite(evidence.accuracyM) || 10);
-    const stableCluster = Number.isFinite(spread) && spread <= Math.max(10, Math.min(30, accuracy * 1.2));
-    return motionStatus === 'stationary' || (speed <= .5 && stableCluster);
+    const accuracy = Math.max(3, finite(evidence.accuracyM) || 10);
+    if (accuracy > STOP_MAX_ACCURACY_M) return false;
+    const radiusM = Math.max(STOP_MIN_RADIUS_M, Math.min(STOP_MAX_RADIUS_M, accuracy * 1.5));
+    const stableCluster = Number.isFinite(spread) && spread <= radiusM;
+    const lowSpeed = speed <= stopSpeedThresholdKmh();
+    const sensorQuiet = !state.active;
+    return stableCluster && (motionStatus === 'stationary' || (lowSpeed && sensorQuiet));
   }
 
   function applyStableMotion(result, status, extraEvidence = []) {
@@ -261,6 +277,11 @@
       MOVING_CONFIRM_MS,
       STRONG_MOVING_CONFIRM_MS,
       STOP_CONFIRM_MS,
+      STOP_MIN_RADIUS_M,
+      STOP_MAX_RADIUS_M,
+      STOP_MAX_ACCURACY_M,
+      WALK_STOP_SPEED_KMH,
+      VEHICLE_STOP_SPEED_KMH,
     },
   });
 })();
