@@ -6,7 +6,7 @@
   const SYNC_BATCH_SIZE = 500;
   const MAX_SYNC_BATCHES = 20;
   const PRESETS = Object.freeze({
-    precise: Object.freeze({ intervalSec: 2, distanceM: 2 }),
+    precise: Object.freeze({ intervalSec: 1, distanceM: 1 }),
     balanced: Object.freeze({ intervalSec: 5, distanceM: 5 }),
     vehicle: Object.freeze({ intervalSec: 3, distanceM: 10 }),
     saver: Object.freeze({ intervalSec: 15, distanceM: 20 }),
@@ -34,18 +34,18 @@
   function storedRecordingConfig() {
     try {
       const stored = JSON.parse(localStorage.getItem(RECORDING_KEY) || 'null');
-      const profileId = typeof stored?.profileId === 'string' ? stored.profileId : 'balanced';
+      const profileId = typeof stored?.profileId === 'string' ? stored.profileId : 'precise';
       if (profileId === 'manual') {
         return {
           profileId,
-          intervalSec: clampInteger(stored?.manualIntervalSec, 2, 60, 5),
-          distanceM: clampInteger(stored?.manualDistanceM, 1, 100, 5),
+          intervalSec: clampInteger(stored?.manualIntervalSec, 1, 60, 1),
+          distanceM: clampInteger(stored?.manualDistanceM, 1, 100, 1),
         };
       }
-      const preset = PRESETS[profileId] || PRESETS.balanced;
-      return { profileId: PRESETS[profileId] ? profileId : 'balanced', ...preset };
+      const preset = PRESETS[profileId] || PRESETS.precise;
+      return { profileId: PRESETS[profileId] ? profileId : 'precise', ...preset };
     } catch {
-      return { profileId: 'balanced', ...PRESETS.balanced };
+      return { profileId: 'precise', ...PRESETS.precise };
     }
   }
 
@@ -173,8 +173,8 @@
     if (typeof nativePlugin?.start !== 'function') return Promise.reject(Object.assign(new Error('Native location plugin unavailable'), { code: 'PLUGIN_UNAVAILABLE' }));
     const options = activeOptions || {};
     return nativePlugin.start({
-      minimumIntervalMs: clampInteger(config?.intervalSec, 2, 60, 5) * 1000,
-      minimumDistanceM: clampInteger(config?.distanceM, 1, 100, 5),
+      minimumIntervalMs: clampInteger(config?.intervalSec, 1, 60, 1) * 1000,
+      minimumDistanceM: clampInteger(config?.distanceM, 1, 100, 1),
       highAccuracy: options?.enableHighAccuracy !== false,
     }).catch((error) => {
       activeOnError?.(error?.code === 'PERMISSION_DENIED' ? 'denied' : 'unavailable');
