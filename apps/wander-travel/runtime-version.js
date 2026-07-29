@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.7';
+  const VERSION = 'v0.109.8';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -7,13 +7,18 @@
   if (typeof document === 'undefined') return;
 
   const RECENT_TRACKS_KEY = 'wander.tracks.recent.window.v1';
+  const RECENT_TRACKS_MIGRATION_KEY = 'wander.tracks.recent.default.24h.v2';
   const RECORDING_KEY = 'wander.recording.profile.v1';
   const RECORDING_MIGRATION_KEY = 'wander.recording.default.1s.v1';
   const LAST_24_HOURS_MS = 24 * 60 * 60 * 1000;
 
   try {
-    if (localStorage.getItem(RECENT_TRACKS_KEY) === null) {
-      localStorage.setItem(RECENT_TRACKS_KEY, String(LAST_24_HOURS_MS));
+    if (localStorage.getItem(RECENT_TRACKS_MIGRATION_KEY) !== 'done') {
+      const stored = localStorage.getItem(RECENT_TRACKS_KEY);
+      if (stored === null || stored === '0') {
+        localStorage.setItem(RECENT_TRACKS_KEY, String(LAST_24_HOURS_MS));
+      }
+      localStorage.setItem(RECENT_TRACKS_MIGRATION_KEY, 'done');
     }
   } catch {}
 
