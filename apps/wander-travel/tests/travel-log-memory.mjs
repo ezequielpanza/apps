@@ -12,6 +12,7 @@ const versionRuntime = fs.readFileSync(path.join(ROOT, 'runtime-version.js'), 'u
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
 const packageManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const travelLogScreen = fs.readFileSync(path.join(ROOT, 'runtime-travel-log-screen.js'), 'utf8');
+const tracksRuntime = fs.readFileSync(path.join(ROOT, 'runtime-tracks.js'), 'utf8');
 
 class CustomEventPolyfill extends Event {
   constructor(type, options = {}) {
@@ -116,9 +117,9 @@ windowObject.dispatchEvent(new CustomEventPolyfill('wander:sessions-changed', {
 assert.ok(log.listEntries().some((entry) => entry.title === 'Comenzó un recorrido' && entry.sessionId === 'session-1'));
 assert.ok(log.listEntries().some((entry) => entry.title === 'Recorrido finalizado' && entry.sessionId === 'session-1'));
 
-assert.match(versionRuntime, /const VERSION = 'v0\.109\.5'/);
-assert.equal(manifest.start_url, './?app=v0.109.5');
-assert.equal(packageManifest.version, '0.109.5');
+assert.match(versionRuntime, /const VERSION = 'v0\.109\.6'/);
+assert.equal(manifest.start_url, './?app=v0.109.6');
+assert.equal(packageManifest.version, '0.109.6');
 for (const asset of ['wander-travel-log.css', 'wander-travel-timeline.css', 'runtime-travel-log.js', 'runtime-travel-log-screen.js', 'runtime-morning-briefing.js']) {
   assert.ok(appRuntime.includes(asset), `${asset} must load at runtime`);
   assert.ok(serviceWorker.includes(`'./${asset}'`), `${asset} must be cached for offline use`);
@@ -132,5 +133,11 @@ assert.doesNotMatch(travelLogScreen, /open\?\.\('routes'\)/);
 assert.match(appRuntime, /wander\.tracks\.recent\.window\.v1/);
 assert.match(appRuntime, /Recorridos finalizados dentro del período elegido/);
 assert.match(appRuntime, /segment\?\.type !== 'movement' \|\| !segment\.endedAt/);
+assert.match(tracksRuntime, /function exportSegment\(/);
+assert.match(tracksRuntime, /application\/gpx\+xml/);
+assert.match(tracksRuntime, /WanderLocation/);
+assert.match(tracksRuntime, /saveGpx/);
+assert.match(tracksRuntime, /data\.logMovementDownload/);
+assert.match(tracksRuntime, /Descargar track en formato GPX/);
 
-console.log('PASS travel log stores contextual memory, exposes movement tracks between stops, and configures recent tracks on the map');
+console.log('PASS travel log stores contextual memory, exposes movement tracks between stops, downloads them as GPX, and configures recent tracks on the map');
