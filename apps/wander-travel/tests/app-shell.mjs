@@ -56,11 +56,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.109.8');
-assert.equal(manifest.start_url, './?app=v0.109.8');
-assert.equal(packageManifest.version, '0.109.8');
-assert.equal(androidVersion.versionName, '0.11.9');
-assert.equal(androidVersion.versionCode, 25);
+assert.equal(versionMatch[1], 'v0.109.9');
+assert.equal(manifest.start_url, './?app=v0.109.9');
+assert.equal(packageManifest.version, '0.109.9');
+assert.equal(androidVersion.versionName, '0.11.10');
+assert.equal(androidVersion.versionCode, 26);
 assert.equal(capacitorConfig.webDir, 'mobile-dist');
 assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
 assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
@@ -94,6 +94,7 @@ const sources = {
   cloudBackup: read('runtime-cloud-backup.js'),
   cloudBackupApi: read('functions/api/cloud-backup.js'),
   cloudProvisioner: read('scripts/ensure-cloudflare-backup-kv.mjs'),
+  discovery: read('runtime-engine-discovery.js'),
 };
 
 assert.match(versionRuntime, /LAST_24_HOURS_MS = 24 \* 60 \* 60 \* 1000/);
@@ -199,6 +200,10 @@ assert.match(sources.tracks, /data\.logMovementDownload/);
 assert.match(sources.tracks, /Descargar track en formato GPX/);
 assert.match(sources.tracks, /http:\/\/www\.topografix\.com\/GPX\/1\/1/);
 
+assert.match(sources.discovery, /GENERIC_DESCRIPTION_PATTERN/);
+assert.match(sources.discovery, /if \(!note\) return null/);
+assert.match(sources.discovery, /no_meaningful_poi_description/);
+
 assert.match(sources.notificationPlugin, /EXTRA_NOTIFICATION_ID/);
 assert.match(sources.notificationPlugin, /void consumePendingOpen\(PluginCall call\)/);
 assert.match(sources.notificationPlugin, /notifyListeners\("notificationOpened"/);
@@ -285,4 +290,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} records every second with continuous stops, 24-hour recent tracks, stable direction, cloud backup, GPX downloads, and offline zoom fallback`);
+console.log(`PASS Wander Web ${versionMatch[1]} / APK ${androidVersion.versionName} records every second, rejects undescribed POIs, keeps continuous stops, 24-hour tracks, cloud backup, GPX downloads, and offline zoom fallback`);

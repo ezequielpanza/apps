@@ -1,6 +1,8 @@
 (() => {
   const TOURISM_PATTERN = /historic|museum|attraction|monument|castle|fort|archae|heritage|gallery|viewpoint|artwork|memorial|ruins|landmark|beach|natural|park/;
   const UTILITY_PATTERN = /pharmacy|hospital|atm|bank|fuel|parking|toilet|supermarket/;
+  const GENERIC_DESCRIPTION_PATTERN = /^(tourist attraction|point of interest|tourist attraction,? point of interest|attraction|poi|place|sitio|lugar|punto de inter[eé]s|atracci[oó]n tur[ií]stica)([.,;:\s-].*)?$/i;
+  const DESCRIPTION_MIN_LENGTH = 24;
 
   function finite(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -14,10 +16,33 @@
       .join(' ');
   }
 
+  function normalizeDescription(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function meaningfulDescription(value) {
+    const text = normalizeDescription(value);
+    if (text.length < DESCRIPTION_MIN_LENGTH) return null;
+    if (GENERIC_DESCRIPTION_PATTERN.test(text)) return null;
+    const meaningfulWords = text
+      .toLowerCase()
+      .replace(/[^a-záéíóúüñ0-9\s]/gi, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length >= 3);
+    if (new Set(meaningfulWords).size < 4) return null;
+    return text.slice(0, 320);
+  }
+
   function noteText(poi) {
     const notes = Array.isArray(poi?.notes) ? poi.notes : [];
-    const note = notes.find((item) => item?.text && finite(item.confidence) !== 0);
-    return note ? String(note.text).replace(/\s+/g, ' ').trim().slice(0, 240) : null;
+    for (const item of notes) {
+      if (!item?.text || finite(item.confidence) === 0) continue;
+      const description = meaningfulDescription(item.text);
+      if (description) return description;
+    }
+    return meaningfulDescription(poi?.description)
+      || meaningfulDescription(poi?.summary)
+      || meaningfulDescription(poi?.editorialSummary);
   }
 
   function preferenceFor(poi, categoryPreferences = {}) {
@@ -57,8 +82,8 @@
 
     const categories = categoryText(poi);
     const note = noteText(poi);
-    const touristInterest = TOURISM_PATTERN.test(categories);
-    if (UTILITY_PATTERN.test(categories) || (!touristInterest && !note)) return null;
+    if (!note) return null;
+    if (UTILITY_PATTERN.test(categories) || !TOURISM_PATTERN.test(categories)) return null;
     const preference = preferenceFor(poi, categoryPreferences);
     if (preference <= -2.5) return null;
 
@@ -72,7 +97,7 @@
     if (relevance < 0.52) return null;
     const distanceScore = 1 - Math.min(1, distanceM / distanceLimit(situation));
     const preferenceAdjustment = Math.max(-0.1, Math.min(0.1, preference * 0.03));
-    const priority = Math.min(0.84, 0.48 + relevance * 0.22 + distanceScore * 0.1 + (note ? 0.04 : 0) + preferenceAdjustment);
+    const priority = Math.min(0.84, 0.52 + relevance * 0.22 + distanceScore * 0.1 + preferenceAdjustment);
 
     return {
       id: poi.id,
@@ -105,11 +130,11 @@
 
     return {
       candidate: candidates[0] || null,
-      reason: candidates.length ? 'relevant_poi_nearby' : 'no_relevant_poi',
+      reason: candidates.length ? 'relevant_poi_nearby' : 'no_meaningful_poi_description',
       consideredCount: Array.isArray(items) ? items.length : 0,
       eligibleCount: candidates.length,
     };
   }
 
-  window.WanderEngineDiscovery = { evaluate, relativeDirection };
+  window.WanderEngineDiscovery = { evaluate, relativeDirection, meaningfulDescription };
 })();

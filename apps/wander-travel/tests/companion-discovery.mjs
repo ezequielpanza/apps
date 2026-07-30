@@ -112,6 +112,21 @@ const runtime = load([
 }
 
 {
+  const generic = monument({
+    id: 'poi:magallan-bayahibe',
+    name: 'Magallan Bayahibe',
+    distanceM: 25,
+    categories: [{ id: 'tourist-attraction', label: 'Tourist attraction' }],
+    notes: [{ text: 'Tourist attraction, point of interest.', confidence: 0.95 }],
+  });
+  const discovery = runtime.WanderEngineDiscovery.evaluate({ situation: situation(), items: [generic] });
+  assert.equal(discovery.candidate, null);
+  assert.equal(discovery.reason, 'no_meaningful_poi_description');
+  assert.equal(runtime.WanderEngineDiscovery.meaningfulDescription('Tourist attraction, point of interest.'), null);
+  console.log('PASS generic POI labels are never presented as recommendations');
+}
+
+{
   const museum = monument({
     id: 'poi:museum',
     name: 'Museo de la Ciudad',
@@ -135,4 +150,4 @@ const runtime = load([
   console.log('PASS learned category preferences change future discovery relevance');
 }
 
-console.log('\n6/6 companion discovery tests passed');
+console.log('\n7/7 companion discovery tests passed');
