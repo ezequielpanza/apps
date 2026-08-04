@@ -3,8 +3,8 @@
   "version": "0.3.1",
   "url": "https://contextum.pages.dev",
   "mcp_url": "https://contextum.pages.dev/mcp",
-  "verified": true,
-  "bridge": "ready",
-  "mcp": "ready",
-  "verified_at": "2026-07-10T14:23:08Z"
+  "verified": false,
+  "bridge": "deploy-or-verification-error",
+  "mcp": "deploy-or-verification-error",
+  "verified_at": "2026-08-04T15:14:30Z"
 }
