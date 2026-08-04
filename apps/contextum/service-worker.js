@@ -1,11 +1,11 @@
-const CACHE_NAME = "contextum-v0.3.1";
+const CACHE_NAME = "contextum-v0.4.0";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/styles.css?v=0.3.0",
-  "/app.js?v=0.3.0",
-  "/cloud-sync.js?v=0.3.1",
-  "/copy-code.js?v=0.3.0",
+  "/styles.css?v=0.4.0",
+  "/app.js?v=0.4.0",
+  "/cloud-sync.js?v=0.4.0",
+  "/copy-code.js?v=0.4.0",
   "/manifest.webmanifest",
   "/icons/icon.svg"
 ];
@@ -25,7 +25,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  if (url.origin === self.location.origin && (url.pathname.startsWith("/api/") || url.pathname === "/mcp")) return;
+  if (url.origin === self.location.origin && (url.pathname.startsWith("/api/") || url.pathname === "/mcp" || url.pathname === "/health")) return;
 
   event.respondWith(
     fetch(event.request)
