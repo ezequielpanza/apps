@@ -1,21 +1,21 @@
-name: Validate Contextum Plugin
+name: Validate Contextum
 
 on:
   pull_request:
     paths:
-      - "apps/contextum/functions/mcp.js"
-      - "apps/contextum/functions/health.js"
+      - "apps/contextum/**"
       - "plugins/contextum/**"
       - ".agents/plugins/marketplace.json"
+      - ".github/workflows/deploy-contextum.yml"
       - ".github/workflows/validate-contextum-plugin.yml"
   push:
     branches:
       - main
     paths:
-      - "apps/contextum/functions/mcp.js"
-      - "apps/contextum/functions/health.js"
+      - "apps/contextum/**"
       - "plugins/contextum/**"
       - ".agents/plugins/marketplace.json"
+      - ".github/workflows/deploy-contextum.yml"
       - ".github/workflows/validate-contextum-plugin.yml"
 
 permissions:
@@ -30,8 +30,43 @@ jobs:
 
       - name: Validate JavaScript
         run: |
+          node --check apps/contextum/app.js
+          node --check apps/contextum/cloud-sync.js
+          node --check apps/contextum/copy-code.js
+          node --check apps/contextum/service-worker.js
           node --check apps/contextum/functions/mcp.js
           node --check apps/contextum/functions/health.js
+
+      - name: Validate unified version
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const version = fs.readFileSync("apps/contextum/VERSION", "utf8").trim();
+          const index = fs.readFileSync("apps/contextum/index.html", "utf8");
+          const serviceWorker = fs.readFileSync("apps/contextum/service-worker.js", "utf8");
+          const cloudSync = fs.readFileSync("apps/contextum/cloud-sync.js", "utf8");
+          const mcp = fs.readFileSync("apps/contextum/functions/mcp.js", "utf8");
+          const health = fs.readFileSync("apps/contextum/functions/health.js", "utf8");
+          const manifest = JSON.parse(fs.readFileSync("plugins/contextum/.codex-plugin/plugin.json", "utf8"));
+
+          if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("VERSION must be strict semver");
+          const required = [
+            [index, `Contextum v${version}`, "index title"],
+            [index, `Context layer · v${version}`, "visible version"],
+            [index, `styles.css?v=${version}`, "styles cache key"],
+            [index, `app.js?v=${version}`, "app cache key"],
+            [index, `cloud-sync.js?v=${version}`, "cloud sync cache key"],
+            [index, `copy-code.js?v=${version}`, "copy code cache key"],
+            [serviceWorker, `contextum-v${version}`, "service worker cache"],
+            [cloudSync, `appVersion: "${version}"`, "snapshot version"],
+            [mcp, `MCP_VERSION = "${version}"`, "MCP version"],
+            [health, `SERVICE_VERSION = "${version}"`, "health version"]
+          ];
+          for (const [content, expected, label] of required) {
+            if (!content.includes(expected)) throw new Error(`${label} is not synchronized to ${version}`);
+          }
+          if (manifest.version !== version) throw new Error("Plugin version is not synchronized");
+          NODE
 
       - name: Validate plugin JSON
         run: |
