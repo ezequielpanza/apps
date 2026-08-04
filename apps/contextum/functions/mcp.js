@@ -1,12 +1,14 @@
-const MCP_VERSION = "0.3.0";
+const MCP_VERSION = "0.4.0";
 const DEFAULT_PROTOCOL = "2025-03-26";
 const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{8}$/;
+const LIVE_SECONDS = 120;
+const RECENT_SECONDS = 600;
 
 function corsHeaders(extra = {}) {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, GET, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type, accept, mcp-session-id",
+    "Access-Control-Allow-Headers": "content-type, accept, authorization, mcp-session-id",
     "Access-Control-Expose-Headers": "Mcp-Session-Id",
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
@@ -31,33 +33,49 @@ function rpcError(id, code, message, data) {
   return json({ jsonrpc: "2.0", id: id ?? null, error });
 }
 
-const getContextTool = {
-  name: "get_context",
+const contextInputSchema = {
+  type: "object",
+  properties: {
+    code: {
+      type: "string",
+      description: "Temporary 8-character pairing code shown by Contextum.",
+      minLength: 8,
+      maxLength: 8,
+      pattern: "^[A-HJ-NP-Z2-9]{8}$"
+    }
+  },
+  required: ["code"],
+  additionalProperties: false
+};
+
+const contextOutputSchema = {
+  type: "object",
+  properties: {
+    source: { type: "string" },
+    access: { type: "string" },
+    freshness: {
+      type: "object",
+      properties: {
+        basedOn: { type: ["string", "null"] },
+        ageSeconds: { type: ["integer", "null"] },
+        status: { type: "string", enum: ["live", "recent", "stale", "unknown"] },
+        isStale: { type: "boolean" }
+      },
+      required: ["basedOn", "ageSeconds", "status", "isStale"],
+      additionalProperties: false
+    },
+    context: { type: "object", additionalProperties: true }
+  },
+  required: ["source", "access", "freshness", "context"],
+  additionalProperties: false
+};
+
+const getCurrentContextTool = {
+  name: "get_current_context",
   title: "Get current Contextum context",
-  description: "Reads the latest temporary read-only Contextum snapshot for a user-provided 8-character pairing code. Use when the user asks about current location, movement, active note, or Contextum runtime state.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      code: {
-        type: "string",
-        description: "Temporary 8-character Contextum pairing code shown by the Contextum app.",
-        minLength: 8,
-        maxLength: 8
-      }
-    },
-    required: ["code"],
-    additionalProperties: false
-  },
-  outputSchema: {
-    type: "object",
-    properties: {
-      source: { type: "string" },
-      access: { type: "string" },
-      context: { type: "object", additionalProperties: true }
-    },
-    required: ["source", "access", "context"],
-    additionalProperties: false
-  },
+  description: "Reads the latest Contextum snapshot associated with a temporary pairing code. Use for the user's current coordinates, GPS accuracy, movement data, active note, and runtime state. Always tell the user how fresh the snapshot is and warn when it is stale.",
+  inputSchema: contextInputSchema,
+  outputSchema: contextOutputSchema,
   annotations: {
     readOnlyHint: true,
     destructiveHint: false,
@@ -65,6 +83,34 @@ const getContextTool = {
     openWorldHint: false
   }
 };
+
+const legacyGetContextTool = {
+  ...getCurrentContextTool,
+  name: "get_context",
+  title: "Get Contextum context (legacy)",
+  description: "Legacy alias for get_current_context. Prefer get_current_context for new calls."
+};
+
+function freshnessFor(snapshot) {
+  const timestamp = snapshot?.receivedAt || snapshot?.capturedAt || snapshot?.location?.timestamp || null;
+  if (!timestamp) {
+    return { basedOn: null, ageSeconds: null, status: "unknown", isStale: true };
+  }
+
+  const parsed = Date.parse(timestamp);
+  if (!Number.isFinite(parsed)) {
+    return { basedOn: timestamp, ageSeconds: null, status: "unknown", isStale: true };
+  }
+
+  const ageSeconds = Math.max(0, Math.floor((Date.now() - parsed) / 1000));
+  if (ageSeconds <= LIVE_SECONDS) {
+    return { basedOn: timestamp, ageSeconds, status: "live", isStale: false };
+  }
+  if (ageSeconds <= RECENT_SECONDS) {
+    return { basedOn: timestamp, ageSeconds, status: "recent", isStale: false };
+  }
+  return { basedOn: timestamp, ageSeconds, status: "stale", isStale: true };
+}
 
 async function readContextByCode(env, rawCode) {
   const code = String(rawCode || "").trim().toUpperCase();
@@ -83,17 +129,34 @@ async function readContextByCode(env, rawCode) {
   }
 
   try {
+    const context = JSON.parse(value);
     return {
       ok: true,
       value: {
         source: "contextum",
         access: "temporary-read-only",
-        context: JSON.parse(value)
+        freshness: freshnessFor(context),
+        context
       }
     };
   } catch (_) {
     return { ok: false, error: "invalid_context", message: "The stored Contextum snapshot is invalid." };
   }
+}
+
+async function callContextTool(id, env, args) {
+  const result = await readContextByCode(env, args?.code);
+  if (!result.ok) {
+    return rpcResult(id, {
+      isError: true,
+      content: [{ type: "text", text: `${result.error}: ${result.message}` }]
+    });
+  }
+
+  return rpcResult(id, {
+    structuredContent: result.value,
+    content: [{ type: "text", text: JSON.stringify(result.value) }]
+  });
 }
 
 async function handleRpc(request, env) {
@@ -126,7 +189,7 @@ async function handleRpc(request, env) {
       protocolVersion: requestedProtocol,
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: "contextum", version: MCP_VERSION },
-      instructions: "Contextum provides temporary read-only access to live personal context. Ask the user for a current pairing code before calling get_context."
+      instructions: "Contextum provides temporary read-only access to live personal context. Ask for a current 8-character pairing code when one is not already present. Prefer get_current_context and always report snapshot freshness."
     });
   }
 
@@ -135,26 +198,14 @@ async function handleRpc(request, env) {
   }
 
   if (method === "tools/list") {
-    return rpcResult(id, { tools: [getContextTool] });
+    return rpcResult(id, { tools: [getCurrentContextTool, legacyGetContextTool] });
   }
 
   if (method === "tools/call") {
-    if (params.name !== "get_context") {
-      return rpcError(id, -32602, "Unknown tool");
+    if (params.name === "get_current_context" || params.name === "get_context") {
+      return callContextTool(id, env, params.arguments);
     }
-
-    const result = await readContextByCode(env, params.arguments?.code);
-    if (!result.ok) {
-      return rpcResult(id, {
-        isError: true,
-        content: [{ type: "text", text: `${result.error}: ${result.message}` }]
-      });
-    }
-
-    return rpcResult(id, {
-      structuredContent: result.value,
-      content: [{ type: "text", text: JSON.stringify(result.value) }]
-    });
+    return rpcError(id, -32602, "Unknown tool");
   }
 
   return rpcError(id, -32601, "Method not found");
@@ -175,7 +226,7 @@ export async function onRequest({ request, env }) {
       version: MCP_VERSION,
       transport: "streamable-http",
       endpoint: "/mcp",
-      tools: ["get_context"]
+      tools: ["get_current_context", "get_context"]
     });
   }
 
