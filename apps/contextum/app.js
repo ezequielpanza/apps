@@ -112,7 +112,7 @@
     state.lastPosition = { coords: { latitude: coords.latitude, longitude: coords.longitude }, timestamp: position.timestamp };
     state.lastGpsAt = new Date(position.timestamp);
     setGpsBadge("Activo", "active");
-    ui.gpsMessage.textContent = "GPS activo. En v0.1.0 los datos se guardan solo en este dispositivo.";
+    ui.gpsMessage.textContent = "GPS activo. La lectura se guarda localmente y se sincroniza solo cuando la nube está activada.";
     saveLastPosition({
       latitude: coords.latitude,
       longitude: coords.longitude,
