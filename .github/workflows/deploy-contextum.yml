@@ -45,6 +45,7 @@ jobs:
           test -f apps/contextum/functions/api/pair.js
           test -f 'apps/contextum/functions/api/pair/[code].js'
           test -f apps/contextum/functions/mcp.js
+          test -f apps/contextum/functions/health.js
 
       - name: Create Cloudflare Pages project
         env:
@@ -86,25 +87,25 @@ jobs:
             ')"
           fi
 
-          if [ -z "${KV_ID}" ]; then
-            echo "ready=false" >> "${GITHUB_OUTPUT}"
-            echo "KV namespace unavailable with current Cloudflare token permissions."
-            exit 0
-          fi
-
-          echo "ready=true" >> "${GITHUB_OUTPUT}"
-          cat > apps/contextum/wrangler.toml <<EOF
+          if [ -n "${KV_ID}" ]; then
+            echo "mode=resolved" >> "${GITHUB_OUTPUT}"
+            cat > apps/contextum/wrangler.toml <<EOF
           name = "contextum"
           pages_build_output_dir = "."
-          compatibility_date = "2026-07-10"
+          compatibility_date = "2026-08-04"
 
           [[kv_namespaces]]
           binding = "CONTEXTUM_KV"
           id = "${KV_ID}"
           EOF
+          else
+            echo "mode=existing-project-binding" >> "${GITHUB_OUTPUT}"
+            echo "KV namespace could not be listed or created; deploying with the existing Pages project binding."
+          fi
 
       - name: Deploy to Cloudflare Pages
-        if: steps.kv.outputs.ready == 'true'
+        id: deploy
+        continue-on-error: true
         working-directory: apps/contextum
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -115,19 +116,25 @@ jobs:
 
       - name: Verify public app, bridge and MCP
         id: verify
-        if: steps.kv.outputs.ready == 'true'
+        if: always()
         env:
           APP_VERSION: ${{ steps.version.outputs.value }}
         run: |
           APP_OK=false
+          HEALTH_OK=false
           API_OK=false
           MCP_INIT_OK=false
           MCP_TOOLS_OK=false
           MCP_CALL_OK=false
 
-          for attempt in {1..30}; do
+          for attempt in {1..40}; do
             if curl --fail --silent --show-error https://contextum.pages.dev/ | grep -q "Contextum v${APP_VERSION}"; then
               APP_OK=true
+            fi
+
+            HEALTH_BODY="$(curl --silent --show-error https://contextum.pages.dev/health || true)"
+            if printf '%s' "${HEALTH_BODY}" | grep -q "\"version\":\"${APP_VERSION}\"" && printf '%s' "${HEALTH_BODY}" | grep -q 'get_current_context'; then
+              HEALTH_OK=true
             fi
 
             API_BODY="$(curl --silent --show-error https://contextum.pages.dev/api/pair/ABCDEFGH || true)"
@@ -141,7 +148,7 @@ jobs:
               --header 'Accept: application/json, text/event-stream' \
               --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"contextum-ci","version":"1.0.0"}}}' \
               https://contextum.pages.dev/mcp || true)"
-            if printf '%s' "${MCP_INIT}" | grep -q '"name":"contextum"'; then
+            if printf '%s' "${MCP_INIT}" | grep -q '"name":"contextum"' && printf '%s' "${MCP_INIT}" | grep -q "\"version\":\"${APP_VERSION}\""; then
               MCP_INIT_OK=true
             fi
 
@@ -151,7 +158,7 @@ jobs:
               --header 'Accept: application/json, text/event-stream' \
               --data '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
               https://contextum.pages.dev/mcp || true)"
-            if printf '%s' "${MCP_TOOLS}" | grep -q '"name":"get_context"'; then
+            if printf '%s' "${MCP_TOOLS}" | grep -q '"name":"get_current_context"'; then
               MCP_TOOLS_OK=true
             fi
 
@@ -159,13 +166,13 @@ jobs:
               --request POST \
               --header 'Content-Type: application/json' \
               --header 'Accept: application/json, text/event-stream' \
-              --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_context","arguments":{"code":"ABCDEFGH"}}}' \
+              --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_current_context","arguments":{"code":"ABCDEFGH"}}}' \
               https://contextum.pages.dev/mcp || true)"
             if printf '%s' "${MCP_CALL}" | grep -q 'expired_or_unknown'; then
               MCP_CALL_OK=true
             fi
 
-            if [ "${APP_OK}" = true ] && [ "${API_OK}" = true ] && [ "${MCP_INIT_OK}" = true ] && [ "${MCP_TOOLS_OK}" = true ] && [ "${MCP_CALL_OK}" = true ]; then
+            if [ "${APP_OK}" = true ] && [ "${HEALTH_OK}" = true ] && [ "${API_OK}" = true ] && [ "${MCP_INIT_OK}" = true ] && [ "${MCP_TOOLS_OK}" = true ] && [ "${MCP_CALL_OK}" = true ]; then
               echo "verified=true" >> "${GITHUB_OUTPUT}"
               exit 0
             fi
@@ -173,18 +180,19 @@ jobs:
           done
 
           echo "verified=false" >> "${GITHUB_OUTPUT}"
-          echo "APP_OK=${APP_OK} API_OK=${API_OK} MCP_INIT_OK=${MCP_INIT_OK} MCP_TOOLS_OK=${MCP_TOOLS_OK} MCP_CALL_OK=${MCP_CALL_OK}"
+          echo "APP_OK=${APP_OK} HEALTH_OK=${HEALTH_OK} API_OK=${API_OK} MCP_INIT_OK=${MCP_INIT_OK} MCP_TOOLS_OK=${MCP_TOOLS_OK} MCP_CALL_OK=${MCP_CALL_OK}"
 
       - name: Record deployment result
         if: always()
         env:
           APP_VERSION: ${{ steps.version.outputs.value }}
-          KV_READY: ${{ steps.kv.outputs.ready }}
+          BINDING_MODE: ${{ steps.kv.outputs.mode }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
           DEPLOY_VERIFIED: ${{ steps.verify.outputs.verified }}
         run: |
           mkdir -p deploy-status
           VERIFIED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          if [ "${KV_READY}" = "true" ] && [ "${DEPLOY_VERIFIED}" = "true" ]; then
+          if [ "${DEPLOY_OUTCOME}" = "success" ] && [ "${DEPLOY_VERIFIED}" = "true" ]; then
             VERIFIED=true
             BRIDGE_STATUS="ready"
             MCP_STATUS="ready"
@@ -199,9 +207,11 @@ jobs:
             "version": "${APP_VERSION}",
             "url": "https://contextum.pages.dev",
             "mcp_url": "https://contextum.pages.dev/mcp",
+            "health_url": "https://contextum.pages.dev/health",
             "verified": ${VERIFIED},
             "bridge": "${BRIDGE_STATUS}",
             "mcp": "${MCP_STATUS}",
+            "kv_binding": "${BINDING_MODE:-unknown}",
             "verified_at": "${VERIFIED_AT}"
           }
           EOF
@@ -214,7 +224,7 @@ jobs:
           fi
 
       - name: Fail when deployment is unavailable
-        if: steps.kv.outputs.ready != 'true' || steps.verify.outputs.verified != 'true'
+        if: always() && (steps.deploy.outcome != 'success' || steps.verify.outputs.verified != 'true')
         run: |
           echo "Contextum deployment or MCP verification failed."
           exit 1
