@@ -1,0 +1,20 @@
+{
+  "name": "chez-team",
+  "interface": {
+    "displayName": "Chez Team"
+  },
+  "plugins": [
+    {
+      "name": "contextum",
+      "source": {
+        "source": "local",
+        "path": "./plugins/contextum"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
