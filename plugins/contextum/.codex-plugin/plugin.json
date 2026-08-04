@@ -1,0 +1,31 @@
+{
+  "name": "contextum",
+  "version": "0.4.0",
+  "description": "Brings opt-in live device context into ChatGPT and Codex through Contextum.",
+  "author": {
+    "name": "Chez Team",
+    "url": "https://contextum.pages.dev"
+  },
+  "homepage": "https://contextum.pages.dev",
+  "repository": "https://github.com/ezequielpanza/apps",
+  "license": "UNLICENSED",
+  "keywords": ["context", "location", "gps", "personal-assistant", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Contextum",
+    "shortDescription": "Live opt-in context from your device",
+    "longDescription": "Contextum lets ChatGPT and Codex read a temporary, user-authorized snapshot from the user's device, including coordinates, GPS accuracy, movement data, an active note, runtime state, and snapshot freshness.",
+    "developerName": "Chez Team",
+    "category": "Productivity",
+    "capabilities": ["Read"],
+    "websiteURL": "https://contextum.pages.dev",
+    "privacyPolicyURL": "https://contextum.pages.dev/privacy.html",
+    "defaultPrompt": [
+      "Según Contextum, ¿dónde estoy ahora?",
+      "Consultá mi contexto actual y decime qué tan reciente es.",
+      "Usá Contextum para leer mi ubicación y estado actual."
+    ],
+    "brandColor": "#6BD5FF"
+  }
+}

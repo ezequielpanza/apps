@@ -1,0 +1,57 @@
+name: Validate Contextum Plugin
+
+on:
+  pull_request:
+    paths:
+      - "apps/contextum/functions/mcp.js"
+      - "apps/contextum/functions/health.js"
+      - "plugins/contextum/**"
+      - ".agents/plugins/marketplace.json"
+      - ".github/workflows/validate-contextum-plugin.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/contextum/functions/mcp.js"
+      - "apps/contextum/functions/health.js"
+      - "plugins/contextum/**"
+      - ".agents/plugins/marketplace.json"
+      - ".github/workflows/validate-contextum-plugin.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate JavaScript
+        run: |
+          node --check apps/contextum/functions/mcp.js
+          node --check apps/contextum/functions/health.js
+
+      - name: Validate plugin JSON
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const manifest = JSON.parse(fs.readFileSync("plugins/contextum/.codex-plugin/plugin.json", "utf8"));
+          const mcp = JSON.parse(fs.readFileSync("plugins/contextum/.mcp.json", "utf8"));
+          const marketplace = JSON.parse(fs.readFileSync(".agents/plugins/marketplace.json", "utf8"));
+
+          if (manifest.name !== "contextum") throw new Error("Invalid plugin name");
+          if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) throw new Error("Version must be strict semver");
+          if (manifest.mcpServers !== "./.mcp.json") throw new Error("MCP manifest path is invalid");
+          if (mcp.mcpServers?.contextum?.type !== "http") throw new Error("Contextum MCP must use HTTP");
+          if (mcp.mcpServers?.contextum?.url !== "https://contextum.pages.dev/mcp") throw new Error("Unexpected MCP URL");
+          if (!Array.isArray(manifest.interface?.defaultPrompt) || manifest.interface.defaultPrompt.length > 3) throw new Error("Invalid default prompts");
+          if (!marketplace.plugins?.some((plugin) => plugin.name === "contextum")) throw new Error("Contextum is missing from marketplace");
+          NODE
+
+      - name: Validate skill
+        run: |
+          test -f plugins/contextum/skills/current-context/SKILL.md
+          grep -q '^name: contextum-current-context$' plugins/contextum/skills/current-context/SKILL.md
+          grep -q 'get_current_context' plugins/contextum/skills/current-context/SKILL.md

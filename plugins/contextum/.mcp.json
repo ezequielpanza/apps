@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "contextum": {
+      "type": "http",
+      "url": "https://contextum.pages.dev/mcp"
+    }
+  }
+}
