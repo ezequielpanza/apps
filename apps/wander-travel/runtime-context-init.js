@@ -45,4 +45,12 @@
 
   context.updateTime();
   setInterval(context.updateTime, 30000);
+
+  if (!document.querySelector('script[data-wander-raw-recorder]')) {
+    const script = document.createElement('script');
+    script.src = 'runtime-raw-location-recorder.js?v=20260805-01';
+    script.async = false;
+    script.dataset.wanderRawRecorder = 'true';
+    document.head.appendChild(script);
+  }
 })();
