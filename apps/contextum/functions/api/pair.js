@@ -1,3 +1,5 @@
+import { resolveLocation } from "../lib/location.js";
+
 const encoder = new TextEncoder();
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -29,8 +31,27 @@ export async function onRequestPost({ request, env }) {
   const hash = await keyHash(request);
   if (!hash) return json({ error: "unauthorized" }, 401);
 
-  const context = await env.CONTEXTUM_KV.get(`context:${hash}`);
-  if (!context) return json({ error: "context_required" }, 409);
+  const rawContext = await env.CONTEXTUM_KV.get(`context:${hash}`);
+  if (!rawContext) return json({ error: "context_required" }, 409);
+
+  let context;
+  try {
+    context = JSON.parse(rawContext);
+  } catch (_) {
+    return json({ error: "invalid_context" }, 500);
+  }
+
+  if (context.location) {
+    try {
+      const resolvedLocation = await resolveLocation(env, context.location);
+      if (resolvedLocation) {
+        context.resolvedLocation = resolvedLocation;
+        await env.CONTEXTUM_KV.put(`context:${hash}`, JSON.stringify(context), { expirationTtl: 2592000 });
+      }
+    } catch (_) {
+      context.resolvedLocation = { provider: "google-maps", confidence: "unresolved", error: "location_resolution_failed" };
+    }
+  }
 
   let code = makeCode();
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -41,7 +62,7 @@ export async function onRequestPost({ request, env }) {
 
   const expiresIn = 600;
   await env.CONTEXTUM_KV.put(`pair:${code}`, hash, { expirationTtl: expiresIn });
-  return json({ code, expiresIn });
+  return json({ code, expiresIn, resolvedLocation: context.resolvedLocation || null });
 }
 
 export function onRequest() {
