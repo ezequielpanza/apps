@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.10';
+  const VERSION = 'v0.109.11';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -43,4 +43,6 @@
   window.WanderContext?.set?.('app.webVersion', VERSION, metadata);
   window.WanderContext?.set?.('sessions.rawTrackSchema', 2, metadata);
   window.WanderContext?.set?.('sessions.rawTrackPointFormat', 'latE7-array-v1', metadata);
+  window.WanderContext?.set?.('sessions.constantRawRecording', true, metadata);
+  window.WanderContext?.set?.('sessions.constantRawRecordingIntervalMs', 1000, metadata);
 })();
