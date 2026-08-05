@@ -117,9 +117,9 @@ windowObject.dispatchEvent(new CustomEventPolyfill('wander:sessions-changed', {
 assert.ok(log.listEntries().some((entry) => entry.title === 'Comenzó un recorrido' && entry.sessionId === 'session-1'));
 assert.ok(log.listEntries().some((entry) => entry.title === 'Recorrido finalizado' && entry.sessionId === 'session-1'));
 
-assert.match(versionRuntime, /const VERSION = 'v0\.109\.9'/);
-assert.equal(manifest.start_url, './?app=v0.109.9');
-assert.equal(packageManifest.version, '0.109.9');
+assert.match(versionRuntime, /const VERSION = 'v0\.109\.10'/);
+assert.equal(manifest.start_url, './?app=v0.109.10');
+assert.equal(packageManifest.version, '0.109.10');
 for (const asset of ['wander-travel-log.css', 'wander-travel-timeline.css', 'runtime-travel-log.js', 'runtime-travel-log-screen.js', 'runtime-morning-briefing.js']) {
   assert.ok(appRuntime.includes(asset), `${asset} must load at runtime`);
   assert.ok(serviceWorker.includes(`'./${asset}'`), `${asset} must be cached for offline use`);
