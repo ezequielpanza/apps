@@ -1,4 +1,4 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   title: Chez YouTube Tool
   version: 1.0.1
@@ -108,16 +108,18 @@ components:
         status:
           type: string
         proposal_id:
-          nullable: true
           oneOf:
             - type: integer
             - type: string
+            - type: 'null'
         proposed_text:
-          type: string
-          nullable: true
+          type:
+            - string
+            - 'null'
         proposal_status:
-          type: string
-          nullable: true
+          type:
+            - string
+            - 'null'
       additionalProperties: true
     PendingCommentsResponse:
       type: object
