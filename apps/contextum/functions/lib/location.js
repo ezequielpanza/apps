@@ -1,4 +1,5 @@
 const EARTH_RADIUS_M = 6371000;
+const CACHE_VERSION = "v2";
 
 function toRadians(value) {
   return value * Math.PI / 180;
@@ -23,6 +24,15 @@ function confidenceFor(distanceM, accuracyM) {
   if (distanceM <= accuracy) return "high";
   if (distanceM <= Math.max(accuracy * 2, 30)) return "medium";
   return "low";
+}
+
+function extractPlaceId(place) {
+  if (typeof place?.id === "string" && place.id.trim()) return place.id.trim();
+  if (typeof place?.name === "string") {
+    const match = place.name.match(/^places\/(.+)$/);
+    if (match?.[1]) return match[1];
+  }
+  return null;
 }
 
 async function reverseGeocode(apiKey, location) {
@@ -53,7 +63,7 @@ async function nearbyPlaces(apiKey, location, radiusM) {
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.types,places.googleMapsUri"
+      "X-Goog-FieldMask": "places.id,places.name,places.displayName,places.formattedAddress,places.location,places.primaryType,places.types,places.googleMapsUri"
     },
     body: JSON.stringify({
       maxResultCount: 10,
@@ -73,14 +83,16 @@ async function nearbyPlaces(apiKey, location, radiusM) {
     const distanceM = Number.isFinite(point.latitude) && Number.isFinite(point.longitude)
       ? distanceMeters(location, point)
       : null;
+    const placeId = extractPlaceId(place);
     return {
       name: place.displayName?.text || null,
-      placeId: place.id || null,
+      placeId,
+      resourceName: typeof place.name === "string" ? place.name : null,
       address: place.formattedAddress || null,
       distanceM,
       type: place.primaryType || place.types?.[0] || null,
       types: Array.isArray(place.types) ? place.types.slice(0, 8) : [],
-      googleMapsUrl: place.googleMapsUri || (place.id ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(place.id)}` : null)
+      googleMapsUrl: place.googleMapsUri || (placeId ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(placeId)}` : null)
     };
   }).filter((place) => place.name);
 }
@@ -88,7 +100,7 @@ async function nearbyPlaces(apiKey, location, radiusM) {
 export async function resolveLocation(env, location) {
   if (!env.GOOGLE_MAPS_API_KEY || !location || !Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) return null;
 
-  const cacheKey = `resolved:${location.latitude.toFixed(4)}:${location.longitude.toFixed(4)}`;
+  const cacheKey = `resolved:${CACHE_VERSION}:${location.latitude.toFixed(4)}:${location.longitude.toFixed(4)}`;
   const cached = await env.CONTEXTUM_KV.get(cacheKey);
   if (cached) {
     try { return JSON.parse(cached); } catch (_) {}
