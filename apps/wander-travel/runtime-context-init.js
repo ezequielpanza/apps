@@ -34,6 +34,7 @@
   loadScript('runtime-raw-location-recorder.js?v=20260805-02', 'data-wander-raw-recorder')
     .then(() => loadScript('runtime-track-intelligence.js?v=20260805-01', 'data-wander-track-intelligence'))
     .then(() => loadScript('runtime-track-intelligence-poller.js?v=20260805-01', 'data-wander-track-intelligence-poller'))
+    .then(() => loadScript('runtime-track-review-ui.js?v=20260805-01', 'data-wander-track-review-ui'))
     .catch(() => {
       context.set('sessions.trackIntelligenceStatus', 'error', {
         source: 'context-init', kind: 'observed', ttlMs: 60000, confidence: 1,
