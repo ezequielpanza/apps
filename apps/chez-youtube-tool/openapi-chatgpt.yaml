@@ -1,0 +1,163 @@
+openapi: 3.1.0
+info:
+  title: Chez YouTube Tool
+  version: 1.0.2
+  description: Permite a ChatGPT leer comentarios pendientes del canal Chez Team, consultar el perfil de estilo y guardar propuestas de respuesta para revisión.
+servers:
+  - url: https://chez-youtube-tool.ezequielpanza.workers.dev
+security:
+  - bearerAuth: []
+paths:
+  /api/gpt/pending-comments:
+    get:
+      operationId: listPendingYouTubeComments
+      summary: Listar comentarios pendientes
+      description: Devuelve comentarios principales pendientes junto con el video y las propuestas existentes.
+      responses:
+        '200':
+          description: Comentarios pendientes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: [integer, string]
+                        youtube_comment_id:
+                          type: string
+                        video_id:
+                          type: string
+                        video_title:
+                          type: string
+                        author_name:
+                          type: string
+                        text_original:
+                          type: string
+                        published_at:
+                          type: string
+                        status:
+                          type: string
+                        proposal_id:
+                          type: [integer, string, 'null']
+                        proposed_text:
+                          type: [string, 'null']
+                        proposal_status:
+                          type: [string, 'null']
+                      additionalProperties: true
+                required: [items]
+                additionalProperties: true
+        '401':
+          description: Credencial inválida
+        '409':
+          description: YouTube todavía no está conectado
+  /api/gpt/style-profile:
+    get:
+      operationId: getChezTeamReplyStyle
+      summary: Consultar el perfil de estilo
+      description: Devuelve reglas, métricas y ejemplos aprendidos de respuestas aprobadas o editadas.
+      responses:
+        '200':
+          description: Perfil de estilo de Chez Team
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metrics:
+                    type: object
+                    properties: {}
+                    additionalProperties: true
+                  rules:
+                    type: array
+                    items:
+                      type: object
+                      properties: {}
+                      additionalProperties: true
+                  examples:
+                    type: array
+                    items:
+                      type: object
+                      properties: {}
+                      additionalProperties: true
+                required: [metrics, rules, examples]
+                additionalProperties: true
+        '401':
+          description: Credencial inválida
+  /api/gpt/proposals/batch:
+    post:
+      operationId: createYouTubeReplyProposals
+      summary: Guardar propuestas de respuesta
+      description: Guarda propuestas preparadas por ChatGPT. No publica respuestas en YouTube; la publicación requiere revisión y aprobación explícita.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [comment_id, proposed_text]
+                    properties:
+                      comment_id:
+                        type: [integer, string]
+                      proposed_text:
+                        type: string
+                        minLength: 1
+                      model_label:
+                        type: string
+                      confidence:
+                        type: number
+                        minimum: 0
+                        maximum: 1
+                      rationale:
+                        type: string
+                      knowledge_used:
+                        type: array
+                        items:
+                          type: string
+                    additionalProperties: false
+              additionalProperties: false
+      responses:
+        '200':
+          description: Propuestas guardadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        comment_id:
+                          type: [integer, string]
+                        proposal_id:
+                          type: [integer, string]
+                        status:
+                          type: string
+                      additionalProperties: true
+                  created:
+                    type: integer
+                additionalProperties: true
+        '400':
+          description: Solicitud inválida
+        '401':
+          description: Credencial inválida
+components:
+  schemas: {}
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
