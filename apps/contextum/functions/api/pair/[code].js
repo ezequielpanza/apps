@@ -1,3 +1,5 @@
+import { resolveLocation } from "../../lib/location.js";
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -27,9 +29,26 @@ export async function onRequestGet({ params, env }) {
     return json({ error: "invalid_context" }, 500);
   }
 
+  let resolutionStatus = "not-requested";
+  if (context.location) {
+    try {
+      const resolvedLocation = await resolveLocation(env, context.location);
+      if (resolvedLocation) {
+        context.resolvedLocation = resolvedLocation;
+        resolutionStatus = resolvedLocation.confidence === "unresolved" ? "unresolved" : "resolved";
+      } else {
+        resolutionStatus = env.GOOGLE_MAPS_API_KEY ? "unresolved" : "missing-api-key";
+      }
+    } catch (error) {
+      resolutionStatus = "google-api-error";
+      console.error("Contextum location resolution failed", error);
+    }
+  }
+
   return json({
     source: "contextum",
     access: "temporary-read-only",
+    resolutionStatus,
     context
   });
 }
