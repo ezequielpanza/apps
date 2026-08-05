@@ -7,7 +7,7 @@
   const map = core.map;
   const CENTER_MODE_KEY = 'wander.map.centerMode.v1';
   let centerButton = null;
-  let centerMode = loadCenterMode();
+  let centerMode = 'middle';
   let followSuspendedByDrag = false;
   let anchorFrame = 0;
   let pinchActive = false;
@@ -304,4 +304,5 @@
 
   persistCenterMode();
   syncZoomAnchorMode();
+  setFollowMode(true, { centerNow: true });
 })();

@@ -56,11 +56,11 @@ for (const file of fs.readdirSync(ROOT)) {
 
 const versionMatch = versionRuntime.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
 assert.ok(versionMatch, 'runtime-version.js must define a semantic web version');
-assert.equal(versionMatch[1], 'v0.109.9');
-assert.equal(manifest.start_url, './?app=v0.109.9');
-assert.equal(packageManifest.version, '0.109.9');
-assert.equal(androidVersion.versionName, '0.11.10');
-assert.equal(androidVersion.versionCode, 26);
+assert.equal(versionMatch[1], 'v0.109.10');
+assert.equal(manifest.start_url, './?app=v0.109.10');
+assert.equal(packageManifest.version, '0.109.10');
+assert.equal(androidVersion.versionName, '0.11.11');
+assert.equal(androidVersion.versionCode, 27);
 assert.equal(capacitorConfig.webDir, 'mobile-dist');
 assert.equal(capacitorConfig.server, undefined, 'Android must start from bundled assets instead of a remote URL');
 assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
@@ -86,6 +86,7 @@ const sources = {
   interactionPanel: read('runtime-interaction-panel.js'),
   roomCompanion: read('runtime-room-companion.js'),
   mapCore: read('runtime-map-core.js'),
+  mapControls: read('runtime-map-controls.js'),
   mapCrosshair: read('runtime-map-crosshair.js'),
   mapCacheSettings: read('runtime-map-cache-settings.js'),
   mobileBuild: read('mobile/build-web.mjs'),
@@ -158,6 +159,8 @@ assert.match(sources.mapCrosshair, /position\.isFollowingPosition/);
 assert.match(sources.mapCrosshair, /map\.getCenter\(\)/);
 assert.match(sources.mapCrosshair, /map\.distance\(here, target\)/);
 assert.match(sources.mapCrosshair, /map-point-marker/);
+assert.match(sources.mapControls, /let centerMode = 'middle'/);
+assert.match(sources.mapControls, /setFollowMode\(true, \{ centerNow: true \}\)/);
 
 assert.match(sources.locationProvider, /function validateSample\(/);
 assert.match(sources.locationProvider, /reason: 'isolated-jump'/);
