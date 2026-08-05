@@ -1,12 +1,12 @@
 {
   "app": "contextum",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "url": "https://contextum.pages.dev",
   "mcp_url": "https://contextum.pages.dev/mcp",
   "health_url": "https://contextum.pages.dev/health",
-  "verified": true,
-  "bridge": "ready",
-  "mcp": "ready",
+  "verified": false,
+  "bridge": "deploy-or-verification-error",
+  "mcp": "deploy-or-verification-error",
   "kv_binding": "existing-project-binding",
-  "verified_at": "2026-08-05T12:01:37Z"
+  "verified_at": "2026-08-05T12:08:17Z"
 }
