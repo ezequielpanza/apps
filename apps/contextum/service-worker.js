@@ -1,11 +1,13 @@
-const CACHE_NAME = "contextum-v0.4.0";
+const CACHE_NAME = "contextum-v0.4.0-mcp-test";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/styles.css?v=0.4.0",
+  "/mcp-test.css?v=0.4.0",
   "/app.js?v=0.4.0",
   "/cloud-sync.js?v=0.4.0",
   "/copy-code.js?v=0.4.0",
+  "/mcp-test.js?v=0.4.0",
   "/manifest.webmanifest",
   "/icons/icon.svg"
 ];
