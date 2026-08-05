@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.11';
+  const VERSION = 'v0.109.12';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -15,9 +15,7 @@
   try {
     if (localStorage.getItem(RECENT_TRACKS_MIGRATION_KEY) !== 'done') {
       const stored = localStorage.getItem(RECENT_TRACKS_KEY);
-      if (stored === null || stored === '0') {
-        localStorage.setItem(RECENT_TRACKS_KEY, String(LAST_24_HOURS_MS));
-      }
+      if (stored === null || stored === '0') localStorage.setItem(RECENT_TRACKS_KEY, String(LAST_24_HOURS_MS));
       localStorage.setItem(RECENT_TRACKS_MIGRATION_KEY, 'done');
     }
   } catch {}
@@ -34,15 +32,13 @@
   document.title = 'Wander Travel ' + VERSION;
   const drawerVersion = document.querySelector('#drawer-version');
   if (drawerVersion) drawerVersion.textContent = 'Web ' + VERSION;
-  const metadata = {
-    source: 'runtime-version',
-    ttlMs: Infinity,
-    confidence: 1,
-  };
+  const metadata = { source: 'runtime-version', ttlMs: Infinity, confidence: 1 };
   window.WanderContext?.set?.('app.version', VERSION, metadata);
   window.WanderContext?.set?.('app.webVersion', VERSION, metadata);
   window.WanderContext?.set?.('sessions.rawTrackSchema', 2, metadata);
   window.WanderContext?.set?.('sessions.rawTrackPointFormat', 'latE7-array-v1', metadata);
   window.WanderContext?.set?.('sessions.constantRawRecording', true, metadata);
   window.WanderContext?.set?.('sessions.constantRawRecordingIntervalMs', 1000, metadata);
+  window.WanderContext?.set?.('sessions.trackIntelligenceSchema', 1, metadata);
+  window.WanderContext?.set?.('sessions.inconsistencyFilterEnabled', true, metadata);
 })();
