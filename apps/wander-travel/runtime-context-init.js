@@ -37,6 +37,7 @@
     .then(() => loadScript('runtime-track-review-ui.js?v=20260805-01', 'data-wander-track-review-ui'))
     .then(() => loadScript('runtime-track-tree-ui.js?v=20260806-01', 'data-wander-track-tree-ui'))
     .then(() => loadScript('runtime-track-tree-bitacora-bridge.js?v=20260806-01', 'data-wander-track-tree-bitacora-bridge'))
+    .then(() => loadScript('runtime-unified-travel-log.js?v=20260806-01', 'data-wander-unified-travel-log'))
     .catch(() => {
       context.set('sessions.trackIntelligenceStatus', 'error', {
         source: 'context-init', kind: 'observed', ttlMs: 60000, confidence: 1,
