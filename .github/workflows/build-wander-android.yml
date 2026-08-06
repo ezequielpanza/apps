@@ -51,4 +51,4 @@ jobs:
           path: apps/wander-travel/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-# Build trigger: Wander Travel 0.11.18
+# Build trigger: Wander Travel 0.11.19
