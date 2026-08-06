@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.16';
+  const VERSION = 'v0.109.17';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -47,4 +47,5 @@
   window.WanderContext?.set?.('sessions.gpsStabilizationRequired', false, metadata);
   window.WanderContext?.set?.('sessions.immediateGpsCapture', true, metadata);
   window.WanderContext?.set?.('direction.simulatorThresholdFix', true, metadata);
+  window.WanderContext?.set?.('map.zoomButtonsEnabled', true, metadata);
 })();
