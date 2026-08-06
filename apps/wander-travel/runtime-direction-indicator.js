@@ -26,6 +26,7 @@
   let healthTimer = null;
 
   function finite(value) {
+    if (value === null || value === undefined || value === '') return null;
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
   }
@@ -57,12 +58,7 @@
   }
 
   function writeContext(key, value, confidence = 1) {
-    context.set(key, value, {
-      source: 'direction-indicator',
-      kind: 'derived',
-      ttlMs: Infinity,
-      confidence,
-    });
+    context.set(key, value, { source: 'direction-indicator', kind: 'derived', ttlMs: Infinity, confidence });
   }
 
   function publishConfig() {
@@ -93,15 +89,33 @@
     return normalizeHeading(degrees(Math.atan2(y, x)));
   }
 
+  function effectiveLocation() {
+    return context.getEffectiveLocation?.() || null;
+  }
+
+  function effectiveSpeedKmh(location = effectiveLocation()) {
+    const directMps = finite(location?.speedMps);
+    if (directMps !== null) return Math.max(0, directMps * 3.6);
+
+    const motionSpeed = finite(context.value('motion.speedKmh'));
+    if (motionSpeed !== null) return Math.max(0, motionSpeed);
+
+    const providerSpeed = finite(context.value('mobility.provider.speedKmh'));
+    return providerSpeed === null ? null : Math.max(0, providerSpeed);
+  }
+
+  function simulatorActive(location = effectiveLocation()) {
+    return location?.source === 'simulator' || context.value('location.override.enabled', false) === true;
+  }
+
   function updateGpsState() {
-    const location = context.getEffectiveLocation?.();
+    const location = effectiveLocation();
     const lat = finite(location?.lat);
     const lng = finite(location?.lng);
     if (lat === null || lng === null) return;
 
     const timestamp = Date.parse(location.updatedAt || '') || Date.now();
-    let speedKmh = finite(location.speedMps);
-    speedKmh = speedKmh === null ? null : Math.max(0, speedKmh * 3.6);
+    let speedKmh = effectiveSpeedKmh(location);
     let heading = normalizeHeading(location.heading);
     let derived = false;
     const point = { lat, lng, timestamp };
@@ -118,17 +132,20 @@
     }
     previousPoint = point;
 
-    if (heading !== null) {
-      const accuracy = finite(location.accuracy);
-      let confidence = 'medium';
-      if (speedKmh !== null && speedKmh >= 5 && (accuracy === null || accuracy <= 25)) confidence = 'high';
-      else if (speedKmh !== null && speedKmh < 1.5) confidence = 'low';
-      gps = { heading, speedKmh, timestamp, confidence, derived };
-    } else if (gps) {
-      gps = { ...gps, speedKmh, timestamp };
-    } else {
-      gps = { heading: null, speedKmh, timestamp, confidence: 'unavailable', derived: false };
-    }
+    const accuracy = finite(location.accuracy);
+    let confidence = 'medium';
+    if (simulatorActive(location)) confidence = 'high';
+    else if (speedKmh !== null && speedKmh >= 5 && (accuracy === null || accuracy <= 25)) confidence = 'high';
+    else if (speedKmh !== null && speedKmh < 1.5) confidence = 'low';
+
+    gps = {
+      heading,
+      speedKmh,
+      timestamp,
+      confidence: heading === null ? 'unavailable' : confidence,
+      derived,
+      simulated: simulatorActive(location),
+    };
   }
 
   function plugin() {
@@ -136,9 +153,6 @@
   }
 
   function sensorShouldRun() {
-    // Android's native plugin already pauses and resumes the physical sensor.
-    // Keeping this as the logical preference avoids permanently disabling the
-    // compass when a WebView starts or pauses with visibilityState="hidden".
     return config.enabled && config.magneticEnabled && typeof plugin()?.setSensorEnabled === 'function';
   }
 
@@ -171,19 +185,33 @@
   }
 
   function selectDirection(now = Date.now()) {
-    const contextSpeedMps = finite(context.value('location.effective.speedMps'));
-    const speedKmh = gps?.speedKmh ?? (contextSpeedMps === null ? null : contextSpeedMps * 3.6);
+    const location = effectiveLocation();
+    const speedKmh = effectiveSpeedKmh(location) ?? gps?.speedKmh ?? null;
     const safeSpeed = Number.isFinite(speedKmh) ? speedKmh : null;
     if (!config.enabled) return { source: 'none', heading: null, confidence: 'disabled', speedKmh: safeSpeed };
 
     const cutoff = config.thresholdKmh === 0 ? STOPPED_MAX_KMH : config.thresholdKmh;
     const belowThreshold = safeSpeed === null || safeSpeed <= cutoff;
-    const moving = safeSpeed !== null && safeSpeed > STOPPED_MAX_KMH;
 
     if (config.magneticEnabled && belowThreshold && compassFresh(now)) {
       return { source: 'compass', heading: compass.heading, confidence: compass.confidence, speedKmh: safeSpeed };
     }
-    if (moving && gpsFresh(now)) {
+
+    // Above the configured threshold the compass must never win. This is
+    // especially important in the simulator, whose heading and speed already
+    // represent a valid GPS-like course.
+    if (!belowThreshold) {
+      const directHeading = normalizeHeading(location?.heading);
+      if (simulatorActive(location) && directHeading !== null) {
+        return { source: 'gps', heading: directHeading, confidence: 'high', speedKmh: safeSpeed };
+      }
+      if (gpsFresh(now)) {
+        return { source: 'gps', heading: gps.heading, confidence: gps.confidence, speedKmh: safeSpeed };
+      }
+      return { source: 'none', heading: null, confidence: 'unavailable', speedKmh: safeSpeed };
+    }
+
+    if (gpsFresh(now)) {
       return { source: 'gps', heading: gps.heading, confidence: gps.confidence, speedKmh: safeSpeed };
     }
     if (config.magneticEnabled && compassFresh(now)) {
@@ -217,7 +245,7 @@
   }
 
   function effectiveLatLng() {
-    const location = context.getEffectiveLocation?.();
+    const location = effectiveLocation();
     const lat = finite(location?.lat);
     const lng = finite(location?.lng);
     return lat === null || lng === null ? null : L.latLng(lat, lng);
@@ -318,6 +346,7 @@
     const now = Date.now();
     if (!directionListener && !listenersInstalling) installNativeListeners();
     retryStaleSensor(now);
+    updateGpsState();
     evaluate(now);
   }
 
@@ -327,6 +356,7 @@
     publishConfig();
     lastSensorRetryAt = 0;
     syncNativeSensor();
+    updateGpsState();
     evaluate();
     window.dispatchEvent(new CustomEvent('wander:direction-settings-changed', { detail: { ...config } }));
     return { ...config };
@@ -336,11 +366,12 @@
     lastSensorRetryAt = 0;
     installNativeListeners();
     syncNativeSensor();
+    updateGpsState();
     evaluate();
   }
 
   context.subscribe((key) => {
-    if (key === 'location.effective' || key.startsWith('location.effective.')) {
+    if (key === 'location.effective' || key.startsWith('location.effective.') || key === 'motion.speedKmh' || key === 'mobility.provider.speedKmh') {
       updateGpsState();
       evaluate();
     }
