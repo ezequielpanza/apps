@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.14';
+  const VERSION = 'v0.109.15';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -44,4 +44,6 @@
   window.WanderContext?.set?.('sessions.unifiedTravelLog', true, metadata);
   window.WanderContext?.set?.('sessions.offlineFirstTravelLog', true, metadata);
   window.WanderContext?.set?.('sessions.activeTrackVisibleInTravelLog', true, metadata);
+  window.WanderContext?.set?.('sessions.gpsStabilizationRequired', false, metadata);
+  window.WanderContext?.set?.('sessions.immediateGpsCapture', true, metadata);
 })();
