@@ -9,6 +9,19 @@
     }
   } catch {}
 
+  // app.js still contains the retired stable-marker implementation for backwards
+  // compatibility. Reserve its global before app initialization so it can never
+  // create a second direction arrow. WanderDirectionIndicator is the sole owner
+  // of the visible direction marker.
+  if (!window.WanderStableDirectionMarker) {
+    window.WanderStableDirectionMarker = Object.freeze({
+      disabled: true,
+      render() {},
+      destroy() {},
+      getState: () => ({ source: 'disabled', disabled: true }),
+    });
+  }
+
   context.set('simulation.status', 'inactive', {
     source: 'init', kind: 'observed', ttlMs: Infinity, confidence: 1,
   });
@@ -39,14 +52,14 @@
   }
 
   loadScript('runtime-map-zoom-buttons.js?v=20260806-01', 'data-wander-map-zoom-buttons').catch(() => {});
-  loadScript('runtime-resilience-fixes.js?v=20260806-01', 'data-wander-runtime-resilience').catch(() => {});
+  loadScript('runtime-resilience-fixes.js?v=20260806-02', 'data-wander-runtime-resilience').catch(() => {});
 
   loadScript('runtime-raw-location-recorder.js?v=20260805-02', 'data-wander-raw-recorder')
     .then(() => loadScript('runtime-track-intelligence.js?v=20260805-01', 'data-wander-track-intelligence'))
     .then(() => loadScript('runtime-track-intelligence-poller.js?v=20260805-01', 'data-wander-track-intelligence-poller'))
     .then(() => loadScript('runtime-track-review-ui.js?v=20260805-01', 'data-wander-track-review-ui'))
     .then(() => loadScript('runtime-track-tree-ui.js?v=20260806-01', 'data-wander-track-tree-ui'))
-    .then(() => loadScript('runtime-track-tree-bitacora-bridge.js?v=20260806-01', 'data-wander-track-tree-bitacora-bridge'))
+    .then(() => loadScript('runtime-bitacora-tree-mode.js?v=20260806-01', 'data-wander-bitacora-tree-mode'))
     .then(() => loadScript('runtime-unified-travel-log.js?v=20260806-01', 'data-wander-unified-travel-log'))
     .then(() => loadScript('runtime-active-track-log-bridge.js?v=20260806-01', 'data-wander-active-track-log-bridge'))
     .catch(() => {
