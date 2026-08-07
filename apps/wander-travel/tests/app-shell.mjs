@@ -26,9 +26,9 @@ function localReferences(source) {
 
 function addDynamicReferences(target, source) {
   const patterns = [
-    /(?:script\.src|link\.href)\s*=\s*["']\.\/?([^"']+)["']/g,
-    /loadScript\(\s*["']\.\/?([^"']+)["']/g,
-    /ensureStyles\(\s*["']\.\/?([^"']+)["']/g,
+    /(?:script\.src|link\.href)\s*=\s*["'](?:\.\/)?([^"']+)["']/g,
+    /loadScript\(\s*["'](?:\.\/)?([^"']+)["']/g,
+    /ensureStyles\(\s*["'](?:\.\/)?([^"']+)["']/g,
   ];
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) target.add(match[1].split(/[?#]/)[0]);
@@ -94,6 +94,7 @@ assert.match(simulator, /session recording gate owns/);
 assert.match(bitacoraMode, /WanderUnifiedTravelLog/);
 assert.match(bitacoraMode, /content\.hidden = false/);
 assert.doesNotMatch(bitacoraMode, /appendChild\(trackList\)/);
+assert.match(unifiedLog, /utl-tree/);
 assert.match(unifiedLog, /utl-day/);
 assert.match(unifiedLog, /utl-episode/);
 assert.match(unifiedLog, /utl-elements/);
