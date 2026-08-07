@@ -70,6 +70,9 @@ jobs:
       - name: Run cloud backup API tests
         run: node apps/wander-travel/tests/cloud-backup-api.mjs
 
+      - name: Run track history sync API tests
+        run: node apps/wander-travel/tests/track-sync-api.mjs
+
       - name: Run cloud backup restore tests
         run: node apps/wander-travel/tests/cloud-backup-runtime.mjs
 
