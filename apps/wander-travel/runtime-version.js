@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.18';
+  const VERSION = 'v0.109.19';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -51,4 +51,5 @@
   window.WanderContext?.set?.('direction.unifiedMotionSource', true, metadata);
   window.WanderContext?.set?.('map.zoomButtonsEnabled', true, metadata);
   window.WanderContext?.set?.('map.resumeRecoveryEnabled', true, metadata);
+  window.WanderContext?.set?.('companion.startupSilenceMs', 120000, metadata);
 })();
