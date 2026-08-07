@@ -2,6 +2,13 @@
   const context = window.WanderContext;
   if (!context?.recomputeEffectiveLocation) return;
 
+  try {
+    const key = 'wander.direction.indicator.v1';
+    if (localStorage.getItem(key) === null) {
+      localStorage.setItem(key, JSON.stringify({ enabled: true, magneticEnabled: true, thresholdKmh: 5 }));
+    }
+  } catch {}
+
   context.set('simulation.status', 'inactive', {
     source: 'init', kind: 'observed', ttlMs: Infinity, confidence: 1,
   });
@@ -32,6 +39,7 @@
   }
 
   loadScript('runtime-map-zoom-buttons.js?v=20260806-01', 'data-wander-map-zoom-buttons').catch(() => {});
+  loadScript('runtime-resilience-fixes.js?v=20260806-01', 'data-wander-runtime-resilience').catch(() => {});
 
   loadScript('runtime-raw-location-recorder.js?v=20260805-02', 'data-wander-raw-recorder')
     .then(() => loadScript('runtime-track-intelligence.js?v=20260805-01', 'data-wander-track-intelligence'))
