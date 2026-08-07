@@ -14,6 +14,7 @@ const packageManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json
 const travelLogScreen = fs.readFileSync(path.join(ROOT, 'runtime-travel-log-screen.js'), 'utf8');
 const treeMode = fs.readFileSync(path.join(ROOT, 'runtime-bitacora-tree-mode.js'), 'utf8');
 const unifiedTravelLog = fs.readFileSync(path.join(ROOT, 'runtime-unified-travel-log.js'), 'utf8');
+const trackCloudSync = fs.readFileSync(path.join(ROOT, 'runtime-track-cloud-sync.js'), 'utf8');
 const tracksRuntime = fs.readFileSync(path.join(ROOT, 'runtime-tracks.js'), 'utf8');
 
 class CustomEventPolyfill extends Event {
@@ -141,7 +142,14 @@ assert.doesNotMatch(treeMode, /appendChild\(trackList\)/);
 assert.match(unifiedTravelLog, /utl-tree/);
 assert.match(unifiedTravelLog, /utl-day/);
 assert.match(unifiedTravelLog, /utl-episode/);
-assert.match(unifiedTravelLog, /utl-activity/);
+assert.match(unifiedTravelLog, /utl-elements/);
+assert.match(unifiedTravelLog, /hierarchy: 'day-episode-elements'/);
+assert.match(unifiedTravelLog, /conversation/);
+assert.match(unifiedTravelLog, /decision/);
+assert.match(trackCloudSync, /wander-track-history/);
+assert.match(trackCloudSync, /trackName\(/);
+assert.match(trackCloudSync, /\/api\/track-sync/);
+assert.match(trackCloudSync, /mirrorLocalSessions/);
 assert.match(appRuntime, /wander\.tracks\.recent\.window\.v1/);
 assert.match(appRuntime, /Recorridos finalizados dentro del período elegido/);
 assert.match(appRuntime, /segment\?\.type !== 'movement' \|\| !segment\.endedAt/);
@@ -152,4 +160,4 @@ assert.match(tracksRuntime, /saveGpx/);
 assert.match(tracksRuntime, /data\.logMovementDownload/);
 assert.match(tracksRuntime, /Descargar track en formato GPX/);
 
-console.log('PASS travel log stores contextual memory, renders the unified Day/Episode/Activity/Track tree, downloads tracks as GPX, and keeps release versions aligned');
+console.log('PASS travel log stores contextual memory, renders Day/Episode/Elements, names tracks by start time and keeps cloud history sync available');
