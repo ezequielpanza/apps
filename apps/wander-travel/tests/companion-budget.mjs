@@ -9,7 +9,7 @@ const source = fs.readFileSync(path.join(ROOT, 'runtime-companion-policy.js'), '
 const sandbox = { window: {}, Date };
 vm.runInNewContext(source, sandbox, { filename: 'runtime-companion-policy.js' });
 const policy = sandbox.window.WanderCompanionPolicy;
-const now = Date.parse('2026-07-17T16:00:00Z');
+const now = Date.now() + policy.constants.STARTUP_SILENCE_MS + 1000;
 
 function discovery() {
   return {
@@ -55,7 +55,7 @@ const recentInterventions = [5, 15, 25].map((minutesAgo, index) => ({
   };
   const result = policy.decide({ evaluation: arrival, at: now, recentInterventions });
   assert.equal(result.disposition, 'present');
-  console.log('PASS discovery budget does not suppress a new-city welcome');
+  console.log('PASS discovery budget does not suppress a new-city welcome after startup silence');
 }
 
 {
