@@ -1,6 +1,6 @@
 importScripts('./runtime-version.js');
 
-const SHELL_REVISION = '20260728-03';
+const SHELL_REVISION = '20260807-01';
 const CACHE_NAME = 'wander-travel-' + self.WanderVersion + '-' + SHELL_REVISION;
 const TILE_CACHE_NAME = 'wander-map-tiles-v1';
 const TILE_META_DB = 'wander-map-cache-meta-v1';
@@ -45,6 +45,8 @@ const APP_SHELL = [
   './runtime-map-position.js',
   './runtime-map-controls.js',
   './runtime-map.js',
+  './runtime-map-zoom-buttons.js',
+  './runtime-resilience-fixes.js',
   './runtime-source-policy.js',
   './runtime-source-policy-google-places.js',
   './runtime-poi-normalized.js',
@@ -89,6 +91,14 @@ const APP_SHELL = [
   './runtime-context-panel.js',
   './runtime-place-hierarchy-panel.js',
   './runtime-tracks.js',
+  './runtime-raw-location-recorder.js',
+  './runtime-track-intelligence.js',
+  './runtime-track-intelligence-poller.js',
+  './runtime-track-review-ui.js',
+  './runtime-track-tree-ui.js',
+  './runtime-bitacora-tree-mode.js',
+  './runtime-unified-travel-log.js',
+  './runtime-active-track-log-bridge.js',
   './runtime-provider-simulator.js',
   './runtime-current-poi-motion-guard.js',
   './runtime-coordinate-format-ui.js',
