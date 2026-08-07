@@ -32,7 +32,7 @@ function refs(source) {
 const loaded = new Set(['index.html']);
 for (const source of [html, platform, app, contextInit]) for (const ref of refs(source)) loaded.add(ref);
 const cached = new Set([...serviceWorker.matchAll(/["']\.\/([^"']+)["']/g)].map((m) => m[1]));
-const onlineOnly = new Set(['runtime-cloud-backup.js', 'wander-cloud-backup.css']);
+const onlineOnly = new Set(['runtime-cloud-backup.js', 'wander-cloud-backup.css', 'runtime-track-cloud-sync.js']);
 for (const ref of loaded) {
   assert.ok(fs.existsSync(path.join(ROOT, ref)), `Missing shell asset: ${ref}`);
   if (!onlineOnly.has(ref)) assert.ok(cached.has(ref), `Shell asset is not cached: ${ref}`);
@@ -56,6 +56,7 @@ const rawRecorder = read('runtime-raw-location-recorder.js');
 const tree = read('runtime-track-tree-ui.js');
 const treeMode = read('runtime-bitacora-tree-mode.js');
 const unifiedLog = read('runtime-unified-travel-log.js');
+const trackCloudSync = read('runtime-track-cloud-sync.js');
 const recordingSettings = read('runtime-map-cache-settings.js');
 const ui = read('runtime-ui.js');
 const mainActivity = read('android/app/src/main/java/app/wandertravel/mobile/MainActivity.java');
@@ -76,6 +77,7 @@ assert.doesNotMatch(simulator, /WanderTracks\?\.addPoint/);
 assert.match(contextInit, /wanderRecordingGateInstalled/);
 assert.match(contextInit, /elapsedMs < 1000/);
 assert.match(contextInit, /balanced: \{ intervalSec: 5, distanceM: 5 \}/);
+assert.match(contextInit, /runtime-track-cloud-sync\.js/);
 assert.match(resilience, /function enforceSimulatorAuthority\(/);
 assert.match(resilience, /entry\?\.source !== 'simulator'/);
 assert.match(rawRecorder, /context\.getEffectiveLocation/);
@@ -86,18 +88,30 @@ assert.match(location, /accepted-suspicious/);
 assert.doesNotMatch(location, /isolated-jump/);
 
 assert.match(tree, /Días → Episodios → Actividades → Tracks/);
+assert.match(treeMode, /Día → Episodio → Elementos/);
 assert.match(treeMode, /WanderUnifiedTravelLog/);
 assert.match(treeMode, /content\.hidden = false/);
 assert.doesNotMatch(treeMode, /appendChild\(trackList\)/);
 assert.match(unifiedLog, /utl-day/);
 assert.match(unifiedLog, /utl-episode/);
-assert.match(unifiedLog, /utl-activity/);
+assert.match(unifiedLog, /utl-elements/);
+assert.doesNotMatch(unifiedLog, /utl-activity/);
+assert.match(unifiedLog, /hierarchy: 'day-episode-elements'/);
+assert.match(unifiedLog, /trackName\(/);
+assert.match(unifiedLog, /indexedDB\.open\(name\)/);
+assert.match(trackCloudSync, /wander-track-history/);
+assert.match(trackCloudSync, /\/api\/track-sync/);
+assert.match(trackCloudSync, /mirrorLocalSessions/);
+assert.match(trackCloudSync, /trackName\(/);
 assert.match(recordingSettings, /Grabación y Bitácora/);
 assert.match(recordingSettings, /wander-clean-bitacora-style/);
 
 assert.match(ui, /DEFAULT_MESSAGE_TIMEOUT_MS = 5000/);
 assert.match(versionRuntime, /MESSAGE_TIMEOUT_MIGRATION_KEY/);
 assert.match(versionRuntime, /localStorage\.setItem\(MESSAGE_TIMEOUT_KEY, '5000'\)/);
+assert.match(versionRuntime, /travelLog\.hierarchy', 'day-episode-elements'/);
+assert.match(versionRuntime, /tracks\.cloudHistoryBidirectional', true/);
+assert.match(versionRuntime, /tracks\.defaultNameFromStartedAt', true/);
 
 assert.match(directionSettings, /window\.WanderTTS/);
 assert.match(directionSettings, /wander-tts-map-action/);
@@ -113,4 +127,4 @@ for (const asset of [
   'runtime-active-track-log-bridge.js',
 ]) assert.ok(cached.has(asset), `Offline shell must cache ${asset}`);
 
-console.log(`PASS Wander Web ${version} / APK ${androidVersion.versionName}: one direction marker, balanced ≤1 Hz recording, smooth simulator, unified Bitácora, 5-second messages and TTS map control`);
+console.log(`PASS Wander Web ${version} / APK ${androidVersion.versionName}: two-level Bitácora, bidirectional cloud track history, balanced ≤1 Hz recording, 5-second messages and TTS`);
