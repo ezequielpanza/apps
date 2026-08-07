@@ -1,7 +1,8 @@
 (() => {
   const context = window.WanderContext;
   const map = window.WanderMapCore?.map;
-  if (!context || !map || !window.L) return;
+  const L = window.L;
+  if (!context || !map || !L || window.WanderDirectionIndicator) return;
 
   const STORAGE_KEY = 'wander.direction.indicator.v1';
   const STOPPED_MAX_KMH = 0.8;
@@ -9,15 +10,15 @@
   const GPS_MAX_AGE_MS = 15000;
   const SENSOR_RETRY_MS = 5000;
   const HEALTHCHECK_INTERVAL_MS = 1000;
-  const DEFAULT_CONFIG = Object.freeze({ enabled: true, magneticEnabled: true, thresholdKmh: 0 });
+  const DEFAULT_CONFIG = Object.freeze({ enabled: true, magneticEnabled: true, thresholdKmh: 5 });
 
   let config = loadConfig();
   let compass = null;
   let gps = null;
   let previousPoint = null;
+  let marker = null;
   let state = Object.freeze({ source: 'none', heading: null, confidence: 'unavailable', speedKmh: null });
   let smoothedHeading = null;
-  let directionMarker = null;
   let directionListener = null;
   let directionErrorListener = null;
   let listenersInstalling = false;
@@ -41,13 +42,14 @@
     return {
       enabled: value.enabled !== false,
       magneticEnabled: value.magneticEnabled !== false,
-      thresholdKmh: threshold === null ? 0 : Math.max(0, Math.min(50, Math.round(threshold * 2) / 2)),
+      thresholdKmh: threshold === null ? DEFAULT_CONFIG.thresholdKmh : Math.max(0, Math.min(50, Math.round(threshold * 2) / 2)),
     };
   }
 
   function loadConfig() {
     try {
-      return normalizeConfig(JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || DEFAULT_CONFIG);
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      return normalizeConfig(stored || DEFAULT_CONFIG);
     } catch {
       return { ...DEFAULT_CONFIG };
     }
@@ -67,6 +69,23 @@
     writeContext('direction.thresholdKmh', config.thresholdKmh);
   }
 
+  function effectiveLocation() {
+    return context.getEffectiveLocation?.() || null;
+  }
+
+  function simulatorActive(location = effectiveLocation()) {
+    return location?.source === 'simulator' || context.value('location.override.enabled', false) === true;
+  }
+
+  function effectiveSpeedKmh(location = effectiveLocation()) {
+    const directMps = finite(location?.speedMps);
+    if (directMps !== null) return Math.max(0, directMps * 3.6);
+    const motionSpeed = finite(context.value('motion.speedKmh'));
+    if (motionSpeed !== null) return Math.max(0, motionSpeed);
+    const providerSpeed = finite(context.value('mobility.provider.speedKmh'));
+    return providerSpeed === null ? null : Math.max(0, providerSpeed);
+  }
+
   function distanceMeters(a, b) {
     const radians = (degrees) => degrees * Math.PI / 180;
     const radius = 6371008.8;
@@ -74,8 +93,8 @@
     const dLng = radians(b.lng - a.lng);
     const lat1 = radians(a.lat);
     const lat2 = radians(b.lat);
-    const value = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-    return radius * 2 * Math.asin(Math.min(1, Math.sqrt(value)));
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return radius * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
   }
 
   function bearingDegrees(a, b) {
@@ -89,30 +108,14 @@
     return normalizeHeading(degrees(Math.atan2(y, x)));
   }
 
-  function effectiveLocation() {
-    return context.getEffectiveLocation?.() || null;
-  }
-
-  function effectiveSpeedKmh(location = effectiveLocation()) {
-    const directMps = finite(location?.speedMps);
-    if (directMps !== null) return Math.max(0, directMps * 3.6);
-
-    const motionSpeed = finite(context.value('motion.speedKmh'));
-    if (motionSpeed !== null) return Math.max(0, motionSpeed);
-
-    const providerSpeed = finite(context.value('mobility.provider.speedKmh'));
-    return providerSpeed === null ? null : Math.max(0, providerSpeed);
-  }
-
-  function simulatorActive(location = effectiveLocation()) {
-    return location?.source === 'simulator' || context.value('location.override.enabled', false) === true;
-  }
-
   function updateGpsState() {
     const location = effectiveLocation();
     const lat = finite(location?.lat);
     const lng = finite(location?.lng);
-    if (lat === null || lng === null) return;
+    if (lat === null || lng === null) {
+      gps = null;
+      return;
+    }
 
     const timestamp = Date.parse(location.updatedAt || '') || Date.now();
     let speedKmh = effectiveSpeedKmh(location);
@@ -123,8 +126,7 @@
     if (previousPoint && timestamp > previousPoint.timestamp) {
       const distanceM = distanceMeters(previousPoint, point);
       const elapsedSec = (timestamp - previousPoint.timestamp) / 1000;
-      const derivedSpeedKmh = elapsedSec > 0 ? distanceM / elapsedSec * 3.6 : null;
-      if (speedKmh === null && Number.isFinite(derivedSpeedKmh)) speedKmh = derivedSpeedKmh;
+      if (speedKmh === null && elapsedSec > 0) speedKmh = distanceM / elapsedSec * 3.6;
       if (heading === null && distanceM >= 2 && elapsedSec <= 120) {
         heading = bearingDegrees(previousPoint, point);
         derived = heading !== null;
@@ -177,11 +179,11 @@
   }
 
   function compassFresh(now = Date.now()) {
-    return compass && compass.heading !== null && now - compass.timestamp <= COMPASS_MAX_AGE_MS && compass.confidence !== 'unreliable';
+    return Boolean(compass && compass.heading !== null && now - compass.timestamp <= COMPASS_MAX_AGE_MS && compass.confidence !== 'unreliable');
   }
 
   function gpsFresh(now = Date.now()) {
-    return gps && gps.heading !== null && now - gps.timestamp <= GPS_MAX_AGE_MS;
+    return Boolean(gps && gps.heading !== null && now - gps.timestamp <= GPS_MAX_AGE_MS);
   }
 
   function selectDirection(now = Date.now()) {
@@ -193,17 +195,15 @@
     const cutoff = config.thresholdKmh === 0 ? STOPPED_MAX_KMH : config.thresholdKmh;
     const belowThreshold = safeSpeed === null || safeSpeed <= cutoff;
 
-    if (config.magneticEnabled && belowThreshold && compassFresh(now)) {
-      return { source: 'compass', heading: compass.heading, confidence: compass.confidence, speedKmh: safeSpeed };
-    }
-
-    // Above the configured threshold the compass must never win. This is
-    // especially important in the simulator, whose heading and speed already
-    // represent a valid GPS-like course.
-    if (!belowThreshold) {
-      const directHeading = normalizeHeading(location?.heading);
-      if (simulatorActive(location) && directHeading !== null) {
-        return { source: 'gps', heading: directHeading, confidence: 'high', speedKmh: safeSpeed };
+    if (belowThreshold) {
+      if (config.magneticEnabled && compassFresh(now)) {
+        return { source: 'compass', heading: compass.heading, confidence: compass.confidence, speedKmh: safeSpeed };
+      }
+      // When magnetic mode is disabled there is intentionally no stationary
+      // arrow. GPS course becomes authoritative only once speed exceeds the
+      // configured threshold.
+      if (!config.magneticEnabled) {
+        return { source: 'none', heading: null, confidence: 'unavailable', speedKmh: safeSpeed };
       }
       if (gpsFresh(now)) {
         return { source: 'gps', heading: gps.heading, confidence: gps.confidence, speedKmh: safeSpeed };
@@ -211,11 +211,12 @@
       return { source: 'none', heading: null, confidence: 'unavailable', speedKmh: safeSpeed };
     }
 
+    const directHeading = normalizeHeading(location?.heading);
+    if (simulatorActive(location) && directHeading !== null) {
+      return { source: 'gps', heading: directHeading, confidence: 'high', speedKmh: safeSpeed };
+    }
     if (gpsFresh(now)) {
       return { source: 'gps', heading: gps.heading, confidence: gps.confidence, speedKmh: safeSpeed };
-    }
-    if (config.magneticEnabled && compassFresh(now)) {
-      return { source: 'compass', heading: compass.heading, confidence: compass.confidence, speedKmh: safeSpeed };
     }
     return { source: 'none', heading: null, confidence: 'unavailable', speedKmh: safeSpeed };
   }
@@ -252,9 +253,9 @@
   }
 
   function removeMarker() {
-    if (!directionMarker) return;
-    map.removeLayer(directionMarker);
-    directionMarker = null;
+    if (!marker) return;
+    map.removeLayer(marker);
+    marker = null;
   }
 
   function renderMarker(nextState) {
@@ -263,17 +264,17 @@
       removeMarker();
       return;
     }
-    if (!directionMarker) {
-      directionMarker = L.marker(point, {
+    if (!marker) {
+      marker = L.marker(point, {
         icon: directionIcon(),
         interactive: false,
         keyboard: false,
         zIndexOffset: 950,
       }).addTo(map);
     } else {
-      directionMarker.setLatLng(point);
+      marker.setLatLng(point);
     }
-    const element = directionMarker.getElement();
+    const element = marker.getElement?.();
     const arrow = element?.querySelector?.('.wander-direction-arrow');
     if (arrow) arrow.style.transform = `rotate(${nextState.heading}deg)`;
     if (element) {
