@@ -48,6 +48,7 @@ const runtime = load([
   'runtime-engine-decision.js',
   'runtime-companion-policy.js',
 ]);
+const afterStartup = Date.now() + runtime.WanderCompanionPolicy.constants.STARTUP_SILENCE_MS + 1000;
 
 {
   const discovery = runtime.WanderEngineDiscovery.evaluate({ situation: situation(), items: [monument()] });
@@ -59,13 +60,13 @@ const runtime = load([
   assert.equal(action.type, 'discover_poi');
   assert.equal(action.contentMode, 'grounded_fact');
 
-  const intervention = runtime.WanderCompanionPolicy.decide({ evaluation: action, at: Date.now() });
+  const intervention = runtime.WanderCompanionPolicy.decide({ evaluation: action, at: afterStartup });
   assert.equal(intervention.disposition, 'present');
   assert.match(intervention.intervention.message, /90 metros/);
   assert.match(intervention.intervention.message, /más adelante/);
   assert.match(intervention.intervention.message, /siglo XVI/);
   assert.equal(intervention.intervention.action.label, 'Llévame');
-  console.log('PASS a nearby landmark becomes a grounded human-direction discovery');
+  console.log('PASS a nearby landmark becomes a grounded human-direction discovery after startup silence');
 }
 
 {
