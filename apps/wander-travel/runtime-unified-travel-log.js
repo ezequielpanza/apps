@@ -1,15 +1,10 @@
 (() => {
   if (window.WanderUnifiedTravelLog) return;
 
-  const TYPE_LABELS = {
-    track: 'Track', event: 'Evento', note: 'Nota',
-    walking: 'Caminata', running: 'Carrera', cycling: 'Bicicleta', driving: 'Vehículo',
-    sailing: 'Navegación', train: 'Tren', bus: 'Autobús', stationary: 'Estadía', unknown: 'Actividad',
-  };
-  const DB_NAME = 'wander-track-intelligence';
+  const INTELLIGENCE_DB = 'wander-track-intelligence';
+  const HISTORY_DB = 'wander-track-history';
   const DB_VERSION = 1;
   const EPISODE_MATCH_TOLERANCE_MS = 30 * 60 * 1000;
-  const ACTIVITY_JOIN_GAP_MS = 5 * 60 * 1000;
   let rendering = false;
   let lastSignature = '';
   let observer = null;
@@ -22,7 +17,7 @@
   function engine() { return window.WanderSessionEngine || null; }
   function todayKey() { return log()?.dayKey?.() || localDay(Date.now()); }
   function localDay(at) {
-    const d = new Date(at);
+    const d = new Date(Number(at || Date.now()));
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
   function atValue(value, fallback = Date.now()) {
@@ -38,118 +33,109 @@
   function timeLabel(at) {
     return new Date(atValue(at)).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
   }
+  function rangeLabel(startedAt, endedAt, active = false) {
+    const start = timeLabel(startedAt);
+    return `${start}–${active ? 'Ahora' : timeLabel(endedAt || startedAt)}`;
+  }
   function duration(ms) {
     const min = Math.max(0, Math.round(Number(ms || 0) / 60000));
+    if (min < 1) return '< 1 min';
     return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${min % 60} min`;
   }
   function distance(m) {
     const value = Math.max(0, Number(m || 0));
     return value < 1000 ? `${Math.round(value)} m` : `${(value / 1000).toFixed(1)} km`;
   }
-  function openDb() {
+  function trackName(at) {
+    const d = new Date(Number(at || Date.now()));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+
+  function openDb(name, storeName) {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(name, DB_VERSION);
       request.onerror = () => reject(request.error);
+      request.onupgradeneeded = () => {
+        if (name !== HISTORY_DB) return;
+        const db = request.result;
+        if (!db.objectStoreNames.contains(storeName)) {
+          const store = db.createObjectStore(storeName, { keyPath: 'id' });
+          store.createIndex('startedAt', 'startedAt');
+        }
+      };
       request.onsuccess = () => resolve(request.result);
     });
   }
-  async function all(store) {
+  async function allFrom(name, storeName) {
     try {
-      const db = await openDb();
+      const db = await openDb(name, storeName);
+      if (!db.objectStoreNames.contains(storeName)) return [];
       return await new Promise((resolve, reject) => {
-        if (!db.objectStoreNames.contains(store)) return resolve([]);
-        const req = db.transaction(store).objectStore(store).getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
+        const request = db.transaction(storeName).objectStore(storeName).getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
       });
     } catch { return []; }
   }
 
-  function sessionSnapshot() {
-    return engine()?.snapshot?.() || {};
-  }
+  function snapshot() { return engine()?.snapshot?.() || {}; }
   function sessions() {
-    const snapshot = sessionSnapshot();
-    const rows = [...(snapshot.sessions || [])];
-    if (snapshot.active) rows.push(snapshot.active);
+    const state = snapshot();
+    const rows = [...(state.sessions || [])];
+    if (state.active) rows.push(state.active);
     const seen = new Set();
-    return rows.filter((session) => {
-      const id = session?.id;
-      if (!id || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
+    return rows.filter((session) => session?.id && !seen.has(session.id) && seen.add(session.id));
   }
-  function activeSessionId() {
-    return sessionSnapshot().active?.id || null;
+  function activeSessionId() { return snapshot().active?.id || null; }
+
+  function movementTitle(method) {
+    const value = String(method || 'unknown').toLowerCase();
+    if (['walking', 'walk', 'on-foot', 'foot', 'caminando'].includes(value)) return 'Caminando';
+    if (['running', 'run'].includes(value)) return 'Corriendo';
+    if (['cycling', 'bicycle', 'bike'].includes(value)) return 'En bicicleta';
+    if (['boat', 'sailing', 'motorboat'].includes(value)) return 'Navegando';
+    if (value === 'train') return 'Viajando en tren';
+    if (value === 'bus') return 'Viajando en autobús';
+    if (['car', 'driving', 'vehicle'].includes(value)) return 'Viajando';
+    return 'Viajando';
   }
-  function sessionStart(session) {
-    const segmentStarts = (session?.segments || []).map((segment) => Number(segment?.startedAt)).filter(Number.isFinite);
-    return atValue(session?.startedAt || session?.createdAt || Math.min(...segmentStarts), Date.now());
+  function stayTitle(episode) {
+    const text = episode.elements.map((item) => `${item.title || ''} ${item.summary || ''}`).join(' ').toLowerCase();
+    if (episode.overnight && Number(episode.endedAt || Date.now()) - Number(episode.startedAt || 0) >= 3 * 60 * 60 * 1000) return 'Durmiendo';
+    if (/\b(desayun|almuerz|cen|comiend|comer|restaurant|café|cafe)\b/i.test(text)) return 'Comiendo';
+    if (/\b(descans|pausa|relaj)\b/i.test(text)) return 'Descansando';
+    if (episode.placeName) return `En ${episode.placeName}`;
+    return 'Permanencia';
   }
-  function sessionEnd(session) {
-    if (session?.id === activeSessionId() || session?.status === 'active' || !session?.endedAt) {
-      const segmentEnds = (session?.segments || []).map((segment) => Number(segment?.endedAt || segment?.startedAt)).filter(Number.isFinite);
-      return Math.max(sessionStart(session), ...segmentEnds, Date.now());
-    }
-    return atValue(session.endedAt || session.updatedAt, sessionStart(session));
-  }
-  function sessionTracks() {
-    const rows = [];
-    sessions().forEach((session) => (session.segments || []).forEach((segment) => {
-      if (segment?.type !== 'movement') return;
-      rows.push({
-        id: segment.id || `segment-${segment.startedAt}`,
-        day: localDay(segment.startedAt),
-        episodeId: session.id || `session-${segment.startedAt}`,
-        startedAt: Number(segment.startedAt || Date.now()),
-        endedAt: Number(segment.endedAt || Date.now()),
-        durationMs: Math.max(0, Number(segment.endedAt || Date.now()) - Number(segment.startedAt || Date.now())),
-        distanceM: Number(segment.distanceM || 0),
-        activity: segment.method || 'unknown',
-        relevance: 'valid',
-        status: segment.endedAt ? 'closed' : 'active',
-        source: 'session-engine',
-      });
-    }));
-    return rows;
-  }
-  function activeIntelligenceTrack() {
-    const active = window.WanderTrackIntelligence?.status?.()?.active;
-    if (!active?.id || !Number.isFinite(Number(active.startedAt))) return null;
-    return {
-      ...active,
-      day: active.day || localDay(active.startedAt),
-      episodeId: active.episodeId || activeSessionId() || null,
-      endedAt: Date.now(),
-      durationMs: Math.max(0, Date.now() - Number(active.startedAt)),
-      status: 'active',
-      source: 'track-intelligence-live',
-    };
+  function episodeTitle(episode) {
+    if (episode.kind === 'movement') return movementTitle(episode.activity);
+    if (episode.kind === 'stay') return stayTitle(episode);
+    if (episode.activity && episode.activity !== 'unknown') return movementTitle(episode.activity);
+    return episode.active ? 'Episodio en curso' : 'Episodio';
   }
 
-  function entries() {
-    const source = log()?.listEntries?.() || [];
-    return source.filter((item) => item.kind !== 'session-link').map((item) => ({
-      id: item.id,
-      type: item.kind === 'note' ? 'note' : 'event',
-      day: item.day || localDay(item.at),
-      at: atValue(item.at),
-      title: item.title || TYPE_LABELS[item.kind] || 'Evento',
-      summary: item.summary || '',
-      placeName: item.placeName || '',
-      source: item.source || 'local',
-      sessionId: item.sessionId || null,
-      trackId: item.trackId || null,
-      raw: item,
-    }));
-  }
-  function activityLabel(activity) {
-    return TYPE_LABELS[String(activity || 'unknown').toLowerCase()] || activity || 'Actividad';
+  function entryRows() {
+    return (log()?.listEntries?.() || [])
+      .filter((item) => item.kind !== 'session-link')
+      .map((item) => ({
+        id: item.id,
+        type: 'event',
+        entryKind: item.kind || 'event',
+        day: item.day || localDay(item.at),
+        at: atValue(item.at),
+        title: item.title || 'Evento',
+        summary: item.summary || '',
+        placeName: item.placeName || '',
+        source: item.source || 'local',
+        sessionId: item.sessionId || null,
+        interactionId: item.interactionId || null,
+        raw: item,
+      }));
   }
 
   function trackEquivalent(a, b) {
     if (!a || !b || localDay(a.startedAt) !== localDay(b.startedAt)) return false;
+    if (a.id && b.id && a.id === b.id) return true;
     const aStart = Number(a.startedAt || 0);
     const bStart = Number(b.startedAt || 0);
     const aEnd = Number(a.endedAt || aStart);
@@ -160,27 +146,120 @@
     const overlapRatio = overlap / shorter;
     const aDistance = Math.max(0, Number(a.distanceM || 0));
     const bDistance = Math.max(0, Number(b.distanceM || 0));
-    const distanceClose = Math.abs(aDistance - bDistance) <= Math.max(30, Math.max(aDistance, bDistance) * 0.25);
-    return distanceClose && (startClose || overlapRatio >= 0.8);
+    return (startClose || overlapRatio >= .8) && Math.abs(aDistance - bDistance) <= Math.max(30, Math.max(aDistance, bDistance) * .3);
   }
-  function mergeTracks(dbTracks) {
-    const merged = dbTracks.filter((track) => track.status !== 'deleted').map((track) => ({ ...track }));
-    sessionTracks().forEach((track) => {
-      if (!merged.some((existing) => existing.id === track.id || trackEquivalent(existing, track))) merged.push(track);
+
+  function sessionTracks() {
+    const rows = [];
+    sessions().forEach((session) => (session.segments || []).forEach((segment) => {
+      if (segment?.type !== 'movement') return;
+      const startedAt = Number(segment.startedAt || Date.now());
+      const endedAt = Number(segment.endedAt || Date.now());
+      rows.push({
+        id: segment.id || `movement-${startedAt}`,
+        name: segment.name || trackName(startedAt),
+        type: 'track',
+        day: localDay(startedAt),
+        sessionId: session.id || null,
+        startedAt,
+        endedAt,
+        durationMs: Math.max(0, endedAt - startedAt),
+        distanceM: Number(segment.distanceM || 0),
+        activity: segment.method || 'unknown',
+        relevance: 'valid',
+        status: segment.endedAt ? 'closed' : 'active',
+        points: Array.isArray(segment.points) ? segment.points : [],
+        source: 'session-engine',
+      });
+    }));
+    return rows;
+  }
+
+  function mergeTracks(...sources) {
+    const merged = [];
+    sources.flat().filter(Boolean).forEach((raw) => {
+      if (raw.status === 'deleted') return;
+      const track = {
+        ...raw,
+        type: 'track',
+        name: raw.name || trackName(raw.startedAt),
+        day: raw.day || localDay(raw.startedAt),
+      };
+      const existing = merged.find((candidate) => trackEquivalent(candidate, track));
+      if (!existing) {
+        merged.push(track);
+        return;
+      }
+      const incomingPoints = Array.isArray(track.points) ? track.points.length : 0;
+      const existingPoints = Array.isArray(existing.points) ? existing.points.length : 0;
+      if (incomingPoints > existingPoints || Number(track.updatedAt || track.endedAt || 0) > Number(existing.updatedAt || existing.endedAt || 0)) {
+        Object.assign(existing, track);
+      }
     });
-    const live = activeIntelligenceTrack();
-    if (live && !merged.some((existing) => existing.id === live.id || trackEquivalent(existing, live))) merged.push(live);
     return merged;
   }
 
-  function itemMarkup(item) {
-    if (item.type === 'track') {
-      const active = item.status === 'active' ? ' · En curso' : '';
-      const pending = item.enrichmentStatus === 'pending' || !navigator.onLine;
-      return `<article class="utl-item utl-track" data-track-id="${esc(item.id)}"><span class="utl-dot relevance-${esc(item.relevance || 'valid')}"></span><div><strong>${esc(timeLabel(item.startedAt))} · ${esc(duration(item.durationMs))}</strong><p>${esc(distance(item.distanceM))}${active}</p><small>${pending ? 'Datos locales · ubicación pendiente de enriquecer' : 'Datos locales enriquecidos'}</small></div></article>`;
+  function ensureDay(map, day) {
+    if (!map.has(day)) map.set(day, { day, episodes: new Map() });
+    return map.get(day);
+  }
+  function ensureEpisode(dayNode, id, seed = {}) {
+    if (!dayNode.episodes.has(id)) {
+      dayNode.episodes.set(id, {
+        id,
+        sessionId: seed.sessionId || null,
+        kind: seed.kind || 'inferred',
+        activity: seed.activity || 'unknown',
+        startedAt: Number(seed.startedAt || Date.now()),
+        endedAt: Number(seed.endedAt || seed.startedAt || Date.now()),
+        active: seed.active === true,
+        placeName: seed.placeName || '',
+        overnight: seed.overnight === true,
+        elements: [],
+      });
     }
-    const when = timeLabel(item.at);
-    return `<article class="utl-item utl-${esc(item.type)} utl-event"><span class="utl-symbol">${item.type === 'note' ? '✎' : '•'}</span><div><strong>${esc(item.title)}</strong><p>${esc(when)}${item.placeName ? ` · ${esc(item.placeName)}` : ''}</p>${item.summary ? `<small>${esc(item.summary)}</small>` : ''}</div></article>`;
+    const episode = dayNode.episodes.get(id);
+    episode.startedAt = Math.min(episode.startedAt, Number(seed.startedAt || episode.startedAt));
+    episode.endedAt = Math.max(episode.endedAt, Number(seed.endedAt || seed.startedAt || episode.endedAt));
+    if (seed.active) episode.active = true;
+    if (seed.placeName) episode.placeName = seed.placeName;
+    if (seed.activity && episode.activity === 'unknown') episode.activity = seed.activity;
+    return episode;
+  }
+
+  function sessionEpisodes(dayMap) {
+    const activeId = activeSessionId();
+    sessions().forEach((session) => {
+      const activeSession = session.id === activeId || session.status === 'active';
+      (session.segments || []).forEach((segment) => {
+        if (segment?.type !== 'movement') return;
+        const startedAt = Number(segment.startedAt || Date.now());
+        const endedAt = Number(segment.endedAt || Date.now());
+        const dayNode = ensureDay(dayMap, localDay(startedAt));
+        ensureEpisode(dayNode, `movement:${segment.id || startedAt}`, {
+          sessionId: session.id,
+          kind: 'movement',
+          activity: segment.method || 'unknown',
+          startedAt,
+          endedAt,
+          active: activeSession && !segment.endedAt,
+        });
+      });
+      (session.stays || []).forEach((stay) => {
+        const startedAt = Number(stay.startedAt || Date.now());
+        const endedAt = Number(stay.endedAt || Date.now());
+        const dayNode = ensureDay(dayMap, localDay(startedAt));
+        ensureEpisode(dayNode, `stay:${stay.id || startedAt}`, {
+          sessionId: session.id,
+          kind: 'stay',
+          startedAt,
+          endedAt,
+          active: activeSession && !stay.endedAt,
+          placeName: stay.poiName || '',
+          overnight: stay.overnight === true || stay.overnightCandidate === true,
+        });
+      });
+    });
   }
 
   function intervalDistance(start, end, episode) {
@@ -189,174 +268,97 @@
     if (end >= eStart && start <= eEnd) return 0;
     return start > eEnd ? start - eEnd : eStart - end;
   }
-  function matchingEpisode(dayNode, start, end = start) {
+  function matchingEpisode(dayNode, start, end = start, sessionId = null) {
     const candidates = [...dayNode.episodes.values()]
-      .map((episode) => ({ episode, distance: intervalDistance(start, end, episode) }))
+      .map((episode) => ({
+        episode,
+        distance: intervalDistance(start, end, episode),
+        sameSession: Boolean(sessionId && episode.sessionId === sessionId),
+      }))
       .filter(({ distance }) => distance <= EPISODE_MATCH_TOLERANCE_MS)
-      .sort((a, b) => a.distance - b.distance || Number(a.episode.startedAt) - Number(b.episode.startedAt));
+      .sort((a, b) => Number(b.sameSession) - Number(a.sameSession) || a.distance - b.distance || a.episode.startedAt - b.episode.startedAt);
     return candidates[0]?.episode || null;
   }
 
   async function buildDays() {
-    const [dbTracks, dbEpisodes] = await Promise.all([all('tracks'), all('episodes')]);
-    const mergedTracks = mergeTracks(dbTracks);
+    const [intelligenceTracks, historyTracks] = await Promise.all([
+      allFrom(INTELLIGENCE_DB, 'tracks'),
+      allFrom(HISTORY_DB, 'tracks'),
+    ]);
+    const tracks = mergeTracks(historyTracks, sessionTracks(), intelligenceTracks);
     const dayMap = new Map();
-    const ensureDay = (day) => {
-      if (!dayMap.has(day)) dayMap.set(day, { day, episodes: new Map() });
-      return dayMap.get(day);
-    };
-    const ensureEpisode = (dayNode, id, seed = {}) => {
-      if (!dayNode.episodes.has(id)) {
-        dayNode.episodes.set(id, {
-          id,
-          title: seed.title || 'Episodio',
-          startedAt: Number(seed.startedAt || Date.now()),
-          endedAt: Number(seed.endedAt || seed.startedAt || Date.now()),
-          active: seed.active === true,
-          tracks: [],
-          events: [],
-        });
-      }
-      const episode = dayNode.episodes.get(id);
-      episode.startedAt = Math.min(Number(episode.startedAt || seed.startedAt || Date.now()), Number(seed.startedAt || episode.startedAt || Date.now()));
-      episode.endedAt = Math.max(Number(episode.endedAt || 0), Number(seed.endedAt || seed.startedAt || episode.endedAt || 0));
-      if (seed.active) episode.active = true;
-      if (seed.title && episode.title === 'Episodio') episode.title = seed.title;
-      return episode;
-    };
+    sessionEpisodes(dayMap);
 
-    const activeId = activeSessionId();
-    sessions().forEach((session) => {
-      const startedAt = sessionStart(session);
-      const endedAt = sessionEnd(session);
-      const dayNode = ensureDay(localDay(startedAt));
-      const active = session.id === activeId || session.status === 'active';
-      ensureEpisode(dayNode, session.id, {
-        startedAt,
-        endedAt,
-        active,
-        title: active ? 'Episodio en curso' : 'Episodio',
-      });
-    });
-
-    dbEpisodes.forEach((stored) => {
-      const startedAt = Number(stored.startedAt || Date.now());
-      const endedAt = Number(stored.endedAt || startedAt);
-      const dayNode = ensureDay(stored.day || localDay(startedAt));
-      const matched = matchingEpisode(dayNode, startedAt, endedAt);
-      if (matched) {
-        if (!matched.active && stored.title && stored.title !== 'Episodio sin nombre') matched.title = stored.title;
-        matched.startedAt = Math.min(matched.startedAt, startedAt);
-        matched.endedAt = Math.max(matched.endedAt, endedAt);
-      } else {
-        ensureEpisode(dayNode, stored.id, {
-          startedAt,
-          endedAt,
-          title: stored.title && stored.title !== 'Episodio sin nombre' ? stored.title : 'Episodio',
-        });
-      }
-    });
-
-    mergedTracks.forEach((track) => {
-      const startedAt = Number(track.startedAt || Date.now());
-      const endedAt = Number(track.endedAt || startedAt);
-      const dayNode = ensureDay(track.day || localDay(startedAt));
-      let episode = track.episodeId ? dayNode.episodes.get(track.episodeId) : null;
-      if (!episode) episode = matchingEpisode(dayNode, startedAt, endedAt);
+    tracks.forEach((track) => {
+      const start = Number(track.startedAt || Date.now());
+      const end = Number(track.endedAt || start);
+      const dayNode = ensureDay(dayMap, track.day || localDay(start));
+      let episode = matchingEpisode(dayNode, start, end, track.sessionId || null);
       if (!episode) {
-        const id = track.episodeId || `episode-${dayNode.day}-${startedAt}`;
-        episode = ensureEpisode(dayNode, id, {
-          startedAt,
-          endedAt,
+        episode = ensureEpisode(dayNode, `track:${track.id || start}`, {
+          sessionId: track.sessionId || null,
+          kind: 'movement',
+          activity: track.activity || 'unknown',
+          startedAt: start,
+          endedAt: end,
           active: track.status === 'active',
-          title: track.status === 'active' ? 'Episodio en curso' : 'Episodio',
         });
       }
-      episode.startedAt = Math.min(episode.startedAt, startedAt);
-      episode.endedAt = Math.max(episode.endedAt, endedAt);
-      if (track.status === 'active') {
-        episode.active = true;
-        episode.title = 'Episodio en curso';
-      }
-      if (!episode.tracks.some((existing) => existing.id === track.id || trackEquivalent(existing, track))) {
-        episode.tracks.push({ ...track, type: 'track' });
-      }
+      episode.startedAt = Math.min(episode.startedAt, start);
+      episode.endedAt = Math.max(episode.endedAt, end);
+      if (track.status === 'active') episode.active = true;
+      if (!episode.elements.some((item) => item.type === 'track' && trackEquivalent(item, track))) episode.elements.push(track);
     });
 
-    entries().forEach((item) => {
-      const dayNode = ensureDay(item.day);
-      let episode = item.sessionId ? dayNode.episodes.get(item.sessionId) : null;
-      if (!episode) episode = matchingEpisode(dayNode, item.at, item.at);
+    entryRows().forEach((event) => {
+      const dayNode = ensureDay(dayMap, event.day);
+      let episode = matchingEpisode(dayNode, event.at, event.at, event.sessionId);
       if (!episode) {
-        const id = `episode-events-${item.day}`;
-        episode = ensureEpisode(dayNode, id, {
-          startedAt: item.at,
-          endedAt: item.at,
-          title: 'Episodio',
+        episode = ensureEpisode(dayNode, `event:${event.id}`, {
+          sessionId: event.sessionId,
+          kind: 'event',
+          startedAt: event.at,
+          endedAt: event.at,
         });
       }
-      episode.startedAt = Math.min(episode.startedAt, item.at);
-      episode.endedAt = Math.max(episode.endedAt, item.at);
-      if (!episode.events.some((existing) => existing.id === item.id)) episode.events.push(item);
+      if (!episode.elements.some((item) => item.type === 'event' && item.id === event.id)) episode.elements.push(event);
+      if (event.placeName && !episode.placeName) episode.placeName = event.placeName;
     });
 
-    ensureDay(todayKey());
+    ensureDay(dayMap, todayKey());
     return [...dayMap.values()].sort((a, b) => b.day.localeCompare(a.day));
   }
 
-  function activityNodes(episode) {
-    const tracks = [...episode.tracks].sort((a, b) => Number(a.startedAt) - Number(b.startedAt));
-    const events = [...episode.events].sort((a, b) => Number(a.at) - Number(b.at));
-    const groups = [];
-    tracks.forEach((track) => {
-      const activity = track.activity || 'unknown';
-      const previous = groups[groups.length - 1];
-      const start = Number(track.startedAt || 0);
-      const previousEnd = Number(previous?.endedAt || 0);
-      const eventBetween = previous && events.some((event) => Number(event.at) > previousEnd && Number(event.at) < start);
-      if (previous && previous.activity === activity && !eventBetween && start - previousEnd <= ACTIVITY_JOIN_GAP_MS) {
-        previous.tracks.push(track);
-        previous.endedAt = Math.max(previous.endedAt, Number(track.endedAt || start));
-      } else {
-        groups.push({
-          id: `activity-${episode.id}-${start}-${activity}`,
-          activity,
-          startedAt: start,
-          endedAt: Number(track.endedAt || start),
-          tracks: [track],
-        });
-      }
-    });
-    return groups;
+  function eventIcon(kind) {
+    if (kind === 'conversation') return 'W';
+    if (kind === 'decision') return '✓';
+    if (kind === 'note') return '✎';
+    if (kind === 'place') return '⌖';
+    if (kind === 'weather') return '☁';
+    return '•';
   }
-
-  function activityMarkup(activity) {
-    const tracks = [...activity.tracks].sort((a, b) => Number(a.startedAt) - Number(b.startedAt));
-    return `<details class="utl-folder utl-activity" data-tree-key="activity:${esc(activity.id)}"><summary><span>▱</span><strong>${esc(activityLabel(activity.activity))}</strong><small>${tracks.length} track${tracks.length === 1 ? '' : 's'}</small></summary><div>${tracks.map(itemMarkup).join('')}</div></details>`;
+  function itemMarkup(item) {
+    if (item.type === 'track') {
+      const active = item.status === 'active';
+      const points = Array.isArray(item.points) ? item.points.length : Number(item.pointCount || 0);
+      return `<article class="utl-item utl-track" data-track-id="${esc(item.id)}"><time class="utl-time">${esc(timeLabel(item.startedAt))}</time><span class="utl-item-icon utl-track-icon">↝</span><div class="utl-item-copy"><strong>${esc(item.name || trackName(item.startedAt))}</strong><p>${esc(rangeLabel(item.startedAt, item.endedAt, active))} · ${esc(duration(item.durationMs || (Number(item.endedAt || Date.now()) - Number(item.startedAt || Date.now()))))}</p><small>${esc(distance(item.distanceM))}${active ? ' · En curso' : ''}${points ? ` · ${points} puntos` : ''}</small></div></article>`;
+    }
+    return `<article class="utl-item utl-event"><time class="utl-time">${esc(timeLabel(item.at))}</time><span class="utl-item-icon">${esc(eventIcon(item.entryKind))}</span><div class="utl-item-copy"><strong>${esc(item.title)}</strong>${item.summary ? `<p>${esc(item.summary)}</p>` : ''}${item.placeName ? `<small>${esc(item.placeName)}</small>` : ''}</div></article>`;
   }
 
   function episodeMarkup(episode) {
-    const activities = activityNodes(episode);
-    const timeline = [
-      ...activities.map((activity) => ({ kind: 'activity', at: activity.startedAt, value: activity })),
-      ...episode.events.map((event) => ({ kind: 'event', at: event.at, value: event })),
-    ].sort((a, b) => Number(a.at) - Number(b.at));
-    const children = timeline.map((item) => item.kind === 'activity' ? activityMarkup(item.value) : itemMarkup(item.value)).join('');
-    const eventCount = episode.events.length;
-    const metaParts = [];
-    if (activities.length) metaParts.push(`${activities.length} actividad${activities.length === 1 ? '' : 'es'}`);
-    if (eventCount) metaParts.push(`${eventCount} evento${eventCount === 1 ? '' : 's'}`);
-    const meta = episode.active ? 'En curso' : (metaParts.join(' · ') || 'Sin actividad');
-    const title = episode.active ? 'Episodio en curso' : (episode.title || 'Episodio');
-    return `<details class="utl-folder utl-episode" data-episode-id="${esc(episode.id)}" data-tree-key="episode:${esc(episode.id)}"><summary><span>▰</span><strong>${esc(title)}</strong><small>${esc(meta)}</small></summary><div>${children || '<div class="utl-empty">Sin actividad registrada.</div>'}</div></details>`;
+    const elements = [...episode.elements].sort((a, b) => Number(a.startedAt || a.at || 0) - Number(b.startedAt || b.at || 0));
+    const title = episodeTitle({ ...episode, elements });
+    const end = episode.active ? Date.now() : episode.endedAt;
+    const meta = `${rangeLabel(episode.startedAt, end, episode.active)} · ${duration(Number(end || Date.now()) - Number(episode.startedAt || Date.now()))}`;
+    const place = episode.placeName ? `<span class="utl-episode-place">${esc(episode.placeName)}</span>` : '';
+    return `<details class="utl-episode${episode.active ? ' is-active' : ''}" data-tree-key="episode:${esc(episode.id)}" data-episode-kind="${esc(episode.kind)}"><summary><span class="utl-chevron" aria-hidden="true">›</span><div class="utl-episode-heading"><strong>${esc(title)}</strong><span>${esc(meta)}</span>${place}</div><small>${elements.length} elemento${elements.length === 1 ? '' : 's'}</small></summary><div class="utl-elements">${elements.map(itemMarkup).join('') || '<div class="utl-empty">Sin elementos registrados.</div>'}</div></details>`;
   }
 
   function dayMarkup(node) {
     const episodes = [...node.episodes.values()].sort((a, b) => Number(a.startedAt || 0) - Number(b.startedAt || 0));
     const current = node.day === todayKey();
-    const episodeHtml = episodes.map(episodeMarkup).join('');
-    const empty = !episodeHtml ? '<div class="utl-empty">Sin actividad registrada todavía.</div>' : '';
-    return `<details class="utl-folder utl-day"${current ? ' open' : ''} data-day="${esc(node.day)}" data-tree-key="day:${esc(node.day)}"><summary><span>▰</span><strong>${esc(dayLabel(node.day))}</strong><small>${episodes.length} episodio${episodes.length === 1 ? '' : 's'}</small></summary><div>${episodeHtml}${empty}</div></details>`;
+    return `<details class="utl-day"${current ? ' open' : ''} data-day="${esc(node.day)}" data-tree-key="day:${esc(node.day)}"><summary><span class="utl-chevron" aria-hidden="true">›</span><strong>${esc(dayLabel(node.day))}</strong><small>${episodes.length} episodio${episodes.length === 1 ? '' : 's'}</small></summary><div class="utl-day-body">${episodes.map(episodeMarkup).join('') || '<div class="utl-empty">Sin actividad registrada todavía.</div>'}</div></details>`;
   }
 
   function injectStyles() {
@@ -368,9 +370,27 @@
       [data-app-screen="travel-log"][data-unified-bitacora="true"] .travel-log-summary,
       [data-app-screen="travel-log"][data-unified-bitacora="true"] .travel-log-toolbar,
       [data-app-screen="travel-log"][data-unified-bitacora="true"] #travel-log-add-form{display:none!important}
-      .utl-tree{display:flex;flex-direction:column;gap:8px}.utl-folder{border:1px solid rgba(148,163,184,.23);border-radius:12px;background:rgba(15,23,42,.42);overflow:hidden}.utl-folder .utl-folder{margin:7px;background:rgba(30,41,59,.35)}
-      .utl-folder summary{display:flex;align-items:center;gap:8px;padding:11px;list-style:none;cursor:pointer}.utl-folder summary::-webkit-details-marker{display:none}.utl-folder summary strong{flex:1}.utl-folder summary small{opacity:.67;font-size:11px}.utl-folder>div{padding:0 5px 6px}
-      .utl-item{display:grid;grid-template-columns:14px 1fr;gap:8px;margin:6px;padding:9px;border-radius:9px;background:rgba(2,6,23,.42)}.utl-item p,.utl-item small{margin:3px 0 0;display:block}.utl-item p{font-size:12px}.utl-item small{font-size:11px;opacity:.68}.utl-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;background:#14b8a6}.utl-dot.relevance-suspect{background:#f59e0b}.utl-dot.relevance-irrelevant{background:#ef4444}.utl-symbol{opacity:.8}.utl-event{margin-left:8px;margin-right:8px}.utl-empty{padding:12px 11px 14px;opacity:.65;font-size:12px}
+      [data-app-screen="travel-log"] #travel-log-content{color:#0f172a}
+      .utl-tree{display:flex;flex-direction:column;gap:18px;padding:2px 0 24px}
+      .utl-day{border:0;background:transparent;overflow:visible}
+      .utl-day>summary{display:flex;align-items:center;gap:10px;padding:8px 2px 13px;border-bottom:1px solid #dfe5ea;list-style:none;cursor:pointer;color:#0f172a}
+      .utl-day>summary::-webkit-details-marker,.utl-episode>summary::-webkit-details-marker{display:none}
+      .utl-day>summary strong{flex:1;font-size:20px;letter-spacing:-.02em}.utl-day>summary small{font-size:12px;color:#64748b;font-weight:600}
+      .utl-day-body{display:grid;gap:12px;padding-top:12px}
+      .utl-chevron{display:inline-grid;place-items:center;width:20px;height:20px;color:#64748b;font-size:23px;line-height:1;transition:transform .16s ease;transform-origin:center}
+      details[open]>summary>.utl-chevron{transform:rotate(90deg)}
+      .utl-episode{border:1px solid #e3e8ed;border-radius:18px;background:#fff;box-shadow:0 3px 14px rgba(15,23,42,.055);overflow:hidden}
+      .utl-episode.is-active{border-color:rgba(1,224,203,.62);box-shadow:0 4px 18px rgba(1,224,203,.12)}
+      .utl-episode>summary{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:10px;padding:15px 15px 14px;list-style:none;cursor:pointer;color:#0f172a}
+      .utl-episode-heading{display:grid;gap:3px;min-width:0}.utl-episode-heading strong{font-size:17px;letter-spacing:-.015em}.utl-episode-heading>span{font-size:12px;color:#64748b}.utl-episode-place{color:#0f766e!important;font-weight:650}
+      .utl-episode>summary>small{align-self:start;padding:4px 8px;border-radius:999px;background:#f1f5f9;color:#64748b;font-size:10px;font-weight:700;white-space:nowrap}.utl-episode.is-active>summary>small{background:#e6fffb;color:#0f766e}
+      .utl-elements{border-top:1px solid #edf0f2;padding:3px 14px 7px}
+      .utl-item{display:grid;grid-template-columns:48px 30px minmax(0,1fr);align-items:start;gap:8px;padding:12px 0;border-bottom:1px solid #f0f2f4;background:transparent}.utl-item:last-child{border-bottom:0}
+      .utl-time{padding-top:4px;font-size:11px;font-weight:700;color:#64748b;font-variant-numeric:tabular-nums}
+      .utl-item-icon{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#f1f5f9;color:#475569;font-size:12px;font-weight:800}.utl-track-icon{background:#e6fffb;color:#0f766e;font-size:16px}
+      .utl-item-copy{min-width:0}.utl-item-copy strong{display:block;font-size:14px;color:#172033}.utl-item-copy p,.utl-item-copy small{display:block;margin:3px 0 0;line-height:1.3}.utl-item-copy p{font-size:12px;color:#475569}.utl-item-copy small{font-size:11px;color:#7b8796}
+      .utl-empty{padding:16px;border:1px dashed #d8dee5;border-radius:14px;background:#fafbfc;color:#7b8796;font-size:12px;text-align:center}
+      @media(max-width:430px){.utl-episode>summary{grid-template-columns:20px minmax(0,1fr)}.utl-episode>summary>small{grid-column:2;justify-self:start}.utl-item{grid-template-columns:44px 28px minmax(0,1fr)}}
     `;
     document.head.appendChild(style);
   }
@@ -384,37 +404,29 @@
   }
 
   function signatureFor(days) {
-    return JSON.stringify({
-      online: navigator.onLine,
-      days: days.map((day) => [
-        day.day,
-        [...day.episodes.values()].map((episode) => [
-          episode.id,
-          episode.active,
-          episode.tracks.map((track) => [track.id, track.status, Math.round(Number(track.distanceM || 0)), Number(track.endedAt || 0)]),
-          episode.events.map((event) => [event.id, Number(event.at || 0)]),
-        ]),
+    return JSON.stringify(days.map((day) => [
+      day.day,
+      [...day.episodes.values()].map((episode) => [
+        episode.id,
+        episode.active,
+        Number(episode.startedAt || 0),
+        Number(episode.endedAt || 0),
+        episode.elements.map((item) => [item.id, item.type, item.status || '', Number(item.endedAt || item.at || 0), Math.round(Number(item.distanceM || 0))]),
       ]),
-    });
+    ]));
   }
-
   function expansionState(content) {
     const state = new Set();
-    content.querySelectorAll('.utl-folder[data-tree-key]').forEach((node) => {
-      if (node.open) state.add(node.dataset.treeKey);
-    });
+    content.querySelectorAll('[data-tree-key]').forEach((node) => { if (node.open) state.add(node.dataset.treeKey); });
     return state;
   }
   function restoreExpansion(content, state) {
     if (!state) return;
-    content.querySelectorAll('.utl-folder[data-tree-key]').forEach((node) => {
-      node.open = state.has(node.dataset.treeKey);
-    });
+    content.querySelectorAll('[data-tree-key]').forEach((node) => { node.open = state.has(node.dataset.treeKey); });
   }
 
   async function render(options = {}) {
     if (rendering) return;
-    const resetExpansion = options?.resetExpansion === true;
     const screen = document.querySelector('[data-app-screen="travel-log"]');
     const content = screen?.querySelector('#travel-log-content');
     if (!screen || !content) return;
@@ -424,11 +436,11 @@
       cleanLegacyChrome(screen);
       const days = await buildDays();
       const signature = signatureFor(days);
-      if (signature !== lastSignature || !content.querySelector('.utl-tree') || resetExpansion) {
-        const expanded = resetExpansion ? null : expansionState(content);
+      if (signature !== lastSignature || !content.querySelector('.utl-tree') || options.resetExpansion === true) {
+        const expanded = options.resetExpansion === true ? null : expansionState(content);
         lastSignature = signature;
         content.innerHTML = `<div class="utl-tree">${days.map(dayMarkup).join('')}</div>`;
-        restoreExpansion(content, expanded);
+        if (expanded) restoreExpansion(content, expanded);
       }
     } finally {
       rendering = false;
@@ -447,6 +459,7 @@
   window.addEventListener('offline', refresh);
   window.addEventListener('wander:sessions-changed', refresh);
   window.addEventListener('wander:track-finalized', refresh);
+  window.addEventListener('wander:track-cloud-sync', refresh);
   window.addEventListener('wander:travel-log-change', refresh);
   window.addEventListener('wander:screen-change', (event) => {
     if (event.detail?.to === 'travel-log') {
@@ -469,6 +482,7 @@
     render,
     setFilter: () => { lastSignature = ''; render({ resetExpansion: true }); },
     queueEnrichment,
+    hierarchy: 'day-episode-elements',
   });
   start();
 })();
