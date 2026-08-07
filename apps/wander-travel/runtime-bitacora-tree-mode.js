@@ -1,10 +1,10 @@
 (() => {
   if (window.WanderBitacoraTreeMode) return;
 
-  // UnifiedTravelLog is now the single renderer for Bitácora. Older versions
-  // moved the Recorridos #track-list into Bitácora and hid #travel-log-content;
-  // that competed with the unified Day → Episode → Activity → Track renderer
-  // and could leave the screen completely blank.
+  // UnifiedTravelLog is the single Bitácora renderer. The visible hierarchy is
+  // Día → Episodio → Elementos. Tracks, conversations, decisions, arrivals and
+  // notes are chronological elements of the episode instead of a third nested
+  // activity layer.
   function mount() {
     const screen = document.querySelector('[data-app-screen="travel-log"]');
     const content = screen?.querySelector('#travel-log-content');
@@ -20,6 +20,7 @@
   });
   window.addEventListener('wander:sessions-changed', () => setTimeout(mount, 0));
   window.addEventListener('wander:track-finalized', () => setTimeout(mount, 0));
+  window.addEventListener('wander:track-cloud-sync', () => setTimeout(mount, 0));
 
   const observer = new MutationObserver(() => {
     const screen = document.querySelector('[data-app-screen="travel-log"]');
