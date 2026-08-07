@@ -13,6 +13,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifes
 const packageManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const travelLogScreen = fs.readFileSync(path.join(ROOT, 'runtime-travel-log-screen.js'), 'utf8');
 const treeMode = fs.readFileSync(path.join(ROOT, 'runtime-bitacora-tree-mode.js'), 'utf8');
+const unifiedTravelLog = fs.readFileSync(path.join(ROOT, 'runtime-unified-travel-log.js'), 'utf8');
 const tracksRuntime = fs.readFileSync(path.join(ROOT, 'runtime-tracks.js'), 'utf8');
 
 class CustomEventPolyfill extends Event {
@@ -134,9 +135,13 @@ assert.match(travelLogScreen, /Track entre detenciones/);
 assert.match(travelLogScreen, /data-screen-target="routes"/);
 assert.match(travelLogScreen, /button\.dataset\.screenTarget = 'travel-log'/);
 assert.doesNotMatch(travelLogScreen, /open\?\.\('routes'\)/);
-assert.match(treeMode, /travel-log-tree-host/);
-assert.match(treeMode, /WanderTrackTreeUI\?\.render/);
-assert.match(treeMode, /Lo que pasó hoy/);
+assert.match(treeMode, /WanderUnifiedTravelLog/);
+assert.match(treeMode, /content\.hidden = false/);
+assert.doesNotMatch(treeMode, /appendChild\(trackList\)/);
+assert.match(unifiedTravelLog, /utl-tree/);
+assert.match(unifiedTravelLog, /utl-day/);
+assert.match(unifiedTravelLog, /utl-episode/);
+assert.match(unifiedTravelLog, /utl-activity/);
 assert.match(appRuntime, /wander\.tracks\.recent\.window\.v1/);
 assert.match(appRuntime, /Recorridos finalizados dentro del período elegido/);
 assert.match(appRuntime, /segment\?\.type !== 'movement' \|\| !segment\.endedAt/);
@@ -147,4 +152,4 @@ assert.match(tracksRuntime, /saveGpx/);
 assert.match(tracksRuntime, /data\.logMovementDownload/);
 assert.match(tracksRuntime, /Descargar track en formato GPX/);
 
-console.log('PASS travel log stores contextual memory, uses hierarchical track intelligence for the bitácora, downloads tracks as GPX, and keeps release versions aligned');
+console.log('PASS travel log stores contextual memory, renders the unified Day/Episode/Activity/Track tree, downloads tracks as GPX, and keeps release versions aligned');
