@@ -143,6 +143,7 @@ const test = (name, run) => tests.push({ name, run });
 
 test('threshold zero uses compass only while stopped and GPS during movement', async () => {
   const harness = createHarness({ heading: 82, speedMps: 0 });
+  harness.api.setConfig({ thresholdKmh: 0 });
   await harness.compass(210);
   assert.equal(harness.api.getConfig().thresholdKmh, 0);
   assert.equal(harness.api.getState().source, 'compass');
@@ -153,9 +154,9 @@ test('threshold zero uses compass only while stopped and GPS during movement', a
   assert.ok(Math.abs(harness.api.getState().heading - 84) < 1);
 });
 
-test('configurable threshold keeps compass below threshold and GPS above it', async () => {
+test('default threshold is 5 km/h and remains configurable', async () => {
   const harness = createHarness({ heading: 45, speedMps: 1 });
-  harness.api.setConfig({ thresholdKmh: 5 });
+  assert.equal(harness.api.getConfig().thresholdKmh, 5);
   await harness.compass(120);
   assert.equal(harness.api.getState().source, 'compass');
 
@@ -171,7 +172,7 @@ test('magnetic mode can be disabled independently', async () => {
   assert.equal(harness.api.getState().source, 'none');
   assert.equal(harness.sensorStates().at(-1), false);
 
-  harness.updateLocation({ heading: 72, speedMps: 1.2, updatedAt: new Date(Date.now() + 1000).toISOString() });
+  harness.updateLocation({ heading: 72, speedMps: 2, updatedAt: new Date(Date.now() + 1000).toISOString() });
   assert.equal(harness.api.getState().source, 'gps');
 });
 
