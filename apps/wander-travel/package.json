@@ -1,7 +1,7 @@
 {
   "name": "wander-travel-mobile",
   "private": true,
-  "version": "0.109.20",
+  "version": "0.109.21",
   "type": "module",
   "scripts": {
     "build": "node mobile/build-web.mjs",

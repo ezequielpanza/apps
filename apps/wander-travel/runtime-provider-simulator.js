@@ -6,6 +6,7 @@
   const providers = window.WanderProviders || (window.WanderProviders = {});
   const $ = (selector) => document.querySelector(selector);
   const MAX_SPEED_KMH = 40;
+  const VISUAL_TICK_MS = 200;
   let enabled = false;
   let timer = null;
   let heading = null;
@@ -45,14 +46,12 @@
 
   function writeOverride(lat, lng) {
     const moving = speedKmh > 0.25;
-    const written = context.setLocationOverride({
+    return context.setLocationOverride({
       lat,
       lng,
       heading: moving ? normalizedHeading(heading) : null,
       speedMps: Math.max(0, speedKmh) / 3.6,
     });
-    publishMotion();
-    return written;
   }
 
   function seedFromReal() {
@@ -61,6 +60,7 @@
     speedKmh = 0;
     heading = null;
     if (!writeOverride(real.lat, real.lng)) return null;
+    publishMotion();
     base.map.setView(real, Math.max(base.map.getZoom(), 15));
     return real;
   }
@@ -103,7 +103,7 @@
     if (knob) knob.style.transform = 'translate(0px, 0px)';
     const current = enabled ? currentPosition() : null;
     if (current) writeOverride(current.lat, current.lng);
-    else if (enabled) publishMotion();
+    if (enabled) publishMotion();
     resetHud();
   }
 
@@ -150,7 +150,7 @@
   function tick() {
     const now = performance.now();
     if (lastTickAt == null) return void (lastTickAt = now);
-    const elapsedMs = Math.min(Math.max(0, now - lastTickAt), 250);
+    const elapsedMs = Math.min(Math.max(0, now - lastTickAt), 400);
     lastTickAt = now;
     if (!enabled || !Number.isFinite(heading) || speedKmh <= 0 || elapsedMs <= 0) return;
 
@@ -162,8 +162,10 @@
       current.lat + Math.cos(radians) * meters / 111320,
       current.lng + Math.sin(radians) * meters / (111320 * Math.max(0.15, Math.cos(current.lat * Math.PI / 180)))
     );
+    // The simulator updates the effective location for the whole app. It does
+    // not write directly into WanderTracks: the session recording gate owns
+    // point sampling exactly as it does for a real GPS source.
     writeOverride(next.lat, next.lng);
-    window.WanderTracks?.addPoint(next);
     const hud = $('#simulation-hud-value');
     if (hud) hud.textContent = speedKmh.toFixed(1) + ' km/h · ' + Math.round(heading) + '°';
   }
@@ -185,7 +187,7 @@
     speedKmh = (max ? limited / max : 0) * MAX_SPEED_KMH;
     heading = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
     publishMotion();
-    if (!timer) { lastTickAt = performance.now(); timer = setInterval(tick, 100); }
+    if (!timer) { lastTickAt = performance.now(); timer = setInterval(tick, VISUAL_TICK_MS); }
   }
 
   function release(event) {
