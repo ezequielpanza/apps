@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.22';
+  const VERSION = 'v0.109.23';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -75,9 +75,16 @@
   window.WanderContext?.set?.('travelLog.filtersEnabled', false, metadata);
   window.WanderContext?.set?.('travelLog.summaryCountersEnabled', false, metadata);
   window.WanderContext?.set?.('travelLog.quickAddEnabled', false, metadata);
+  window.WanderContext?.set?.('travelLog.hierarchy', 'day-episode-activity-or-event-track', metadata);
+  window.WanderContext?.set?.('travelLog.episodesCollapsedByDefault', true, metadata);
+  window.WanderContext?.set?.('travelLog.activitiesCollapsedByDefault', true, metadata);
+  window.WanderContext?.set?.('travelLog.activeTrackSingleRepresentation', true, metadata);
   window.WanderContext?.set?.('messages.defaultTimeoutMs', 5000, metadata);
   window.WanderContext?.set?.('tts.mapToggle', true, metadata);
   window.WanderContext?.set?.('map.zoomButtonsEnabled', true, metadata);
   window.WanderContext?.set?.('map.resumeRecoveryEnabled', true, metadata);
   window.WanderContext?.set?.('companion.startupSilenceMs', 120000, metadata);
+  window.WanderContext?.set?.('companion.morningBriefingStartupSilenceMs', 120000, metadata);
+  window.WanderContext?.set?.('companion.morningBriefingRequiresUsefulContext', true, metadata);
+  window.WanderContext?.set?.('companion.invalidWeatherOmitted', true, metadata);
 })();
