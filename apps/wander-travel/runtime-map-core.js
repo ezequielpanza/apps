@@ -193,6 +193,29 @@
     return setBaseLayer(activeBaseLayer === 'streets' ? 'satellite' : 'streets');
   }
 
+  // Android WebView can resume with Leaflet still using the pre-background
+  // viewport state. A finger drag causes Leaflet to recompute it, which is why
+  // the map suddenly reappears. Reproduce that recomputation automatically and
+  // ask the active tile layer to repaint, including from the native offline cache.
+  function refreshAfterResume() {
+    if (!map) return;
+    const repaint = () => {
+      try { map.invalidateSize({ pan: false, animate: false }); } catch {}
+      const layer = baseLayers[activeBaseLayer];
+      try { layer?.redraw?.(); } catch {}
+      try { map.fire('moveend'); } catch {}
+    };
+    repaint();
+    setTimeout(repaint, 120);
+    setTimeout(repaint, 450);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshAfterResume();
+  });
+  window.addEventListener('pageshow', refreshAfterResume);
+  window.addEventListener('focus', refreshAfterResume);
+
   window.WanderMapCore = {
     map,
     route,
@@ -202,6 +225,7 @@
     nativeTileSources: typeof nativeTiles?.getTile === 'function' ? ['osm', 'esri'] : [],
     setBaseLayer,
     toggleBaseLayer,
+    refreshAfterResume,
     getBaseLayer: () => activeBaseLayer,
   };
 })();
