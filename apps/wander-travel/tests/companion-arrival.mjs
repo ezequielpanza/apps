@@ -8,6 +8,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const policySource = fs.readFileSync(path.join(ROOT, 'runtime-companion-policy.js'), 'utf8');
 const runtimeSource = fs.readFileSync(path.join(ROOT, 'runtime-companion.js'), 'utf8');
 
+let clockNow = Date.now();
+class ClockDate extends Date {
+  constructor(...args) { super(...(args.length ? args : [clockNow])); }
+  static now() { return clockNow; }
+}
+
 function evaluation(overrides = {}) {
   return {
     type: 'introduce_place',
@@ -19,13 +25,22 @@ function evaluation(overrides = {}) {
 }
 
 function loadPolicy() {
-  const sandbox = { window: {}, Date };
+  const sandbox = { window: {}, Date: ClockDate };
   vm.runInNewContext(policySource, sandbox, { filename: 'runtime-companion-policy.js' });
   return sandbox.window.WanderCompanionPolicy;
 }
 
 const policy = loadPolicy();
-const at = new Date('2026-07-17T10:00:00-04:00').getTime();
+
+{
+  const result = policy.decide({ evaluation: evaluation(), at: clockNow });
+  assert.equal(result.disposition, 'ignore');
+  assert.equal(result.reason, 'startup_silence');
+  console.log('PASS opening Wander stays silent during initial place resolution');
+}
+
+clockNow += policy.constants.STARTUP_SILENCE_MS + 1000;
+const at = clockNow;
 
 {
   const result = policy.decide({ evaluation: evaluation(), at });
@@ -33,7 +48,7 @@ const at = new Date('2026-07-17T10:00:00-04:00').getTime();
   assert.equal(result.intervention.kind, 'place_intro');
   assert.equal(result.intervention.contentId, 'place-intro:city:santo-domingo');
   assert.match(result.intervention.message, /primera visita a Santo Domingo/);
-  console.log('PASS new city produces a contextual arrival intervention');
+  console.log('PASS new city produces a contextual arrival intervention after startup silence');
 }
 
 {
@@ -111,7 +126,7 @@ const at = new Date('2026-07-17T10:00:00-04:00').getTime();
       addEventListener() {},
     },
     document,
-    Date,
+    Date: ClockDate,
     setTimeout,
     clearTimeout,
   };
@@ -136,4 +151,4 @@ const at = new Date('2026-07-17T10:00:00-04:00').getTime();
   console.log('PASS arrival is presented, remembered, and accepts a contextual correction');
 }
 
-console.log('\n6/6 companion arrival tests passed');
+console.log('\n7/7 companion arrival tests passed');
