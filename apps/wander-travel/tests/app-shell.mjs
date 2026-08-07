@@ -41,7 +41,7 @@ addDynamicReferences(loaded, app);
 addDynamicReferences(loaded, contextInit);
 loaded.add('index.html');
 const cached = new Set([...serviceWorker.matchAll(/["']\.\/([^"']+)["']/g)].map((match) => match[1]));
-const onlineEnhancements = new Set(['runtime-cloud-backup.js', 'wander-cloud-backup.css']);
+const onlineEnhancements = new Set(['runtime-cloud-backup.js', 'wander-cloud-backup.css', 'runtime-track-cloud-sync.js']);
 
 for (const reference of loaded) {
   assert.equal(fs.existsSync(path.join(ROOT, reference)), true, `Missing shell asset: ${reference}`);
@@ -69,6 +69,7 @@ assert.equal(capacitorConfig.plugins?.CapacitorHttp?.enabled, true);
 const simulator = read('runtime-provider-simulator.js');
 const bitacoraMode = read('runtime-bitacora-tree-mode.js');
 const unifiedLog = read('runtime-unified-travel-log.js');
+const trackCloudSync = read('runtime-track-cloud-sync.js');
 const mapCacheSettings = read('runtime-map-cache-settings.js');
 const directionSettings = read('runtime-direction-indicator-settings.js');
 const ui = read('runtime-ui.js');
@@ -80,6 +81,7 @@ assert.match(contextInit, /wanderRecordingGateInstalled/);
 assert.match(contextInit, /elapsedMs < 1000/);
 assert.match(contextInit, /balanced: \{ intervalSec: 5, distanceM: 5 \}/);
 assert.match(contextInit, /distanceReached/);
+assert.match(contextInit, /runtime-track-cloud-sync\.js/);
 assert.match(versionRuntime, /recordingProfileDefault', 'balanced'/);
 assert.match(versionRuntime, /recordingDefaultIntervalSec', 5/);
 assert.match(versionRuntime, /recordingDefaultDistanceM', 5/);
@@ -94,8 +96,14 @@ assert.match(bitacoraMode, /content\.hidden = false/);
 assert.doesNotMatch(bitacoraMode, /appendChild\(trackList\)/);
 assert.match(unifiedLog, /utl-day/);
 assert.match(unifiedLog, /utl-episode/);
-assert.match(unifiedLog, /utl-activity/);
-assert.match(unifiedLog, /sessionTracks\(\)/);
+assert.match(unifiedLog, /utl-elements/);
+assert.doesNotMatch(unifiedLog, /class=\\?"utl-folder utl-activity/);
+assert.match(unifiedLog, /hierarchy: 'day-episode-elements'/);
+assert.match(unifiedLog, /trackName\(/);
+assert.match(trackCloudSync, /wander-track-history/);
+assert.match(trackCloudSync, /\/api\/track-sync/);
+assert.match(trackCloudSync, /trackName\(/);
+assert.match(trackCloudSync, /mirrorLocalSessions/);
 assert.match(mapCacheSettings, /Grabación y Bitácora/);
 assert.match(mapCacheSettings, /wander-clean-bitacora-style/);
 assert.match(mapCacheSettings, /máximo 1 punto\/s/);
@@ -125,4 +133,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${webVersion} / APK ${androidVersion.versionName}: balanced recording gate, smooth simulator, unified Bitácora, 5-second messages and TTS map control`);
+console.log(`PASS Wander Web ${webVersion} / APK ${androidVersion.versionName}: balanced recording, two-level Bitácora, cloud track history, 5-second messages and TTS`);
