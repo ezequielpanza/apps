@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.21';
+  const VERSION = 'v0.109.22';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -71,6 +71,10 @@
   window.WanderContext?.set?.('simulation.visualTickMs', 200, metadata);
   window.WanderContext?.set?.('travelLog.treeViewDefault', true, metadata);
   window.WanderContext?.set?.('travelLog.cleanScreen', true, metadata);
+  window.WanderContext?.set?.('travelLog.singleTreeOnly', true, metadata);
+  window.WanderContext?.set?.('travelLog.filtersEnabled', false, metadata);
+  window.WanderContext?.set?.('travelLog.summaryCountersEnabled', false, metadata);
+  window.WanderContext?.set?.('travelLog.quickAddEnabled', false, metadata);
   window.WanderContext?.set?.('messages.defaultTimeoutMs', 5000, metadata);
   window.WanderContext?.set?.('tts.mapToggle', true, metadata);
   window.WanderContext?.set?.('map.zoomButtonsEnabled', true, metadata);
