@@ -53,7 +53,7 @@
 
   function openDb(name, storeName) {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(name, DB_VERSION);
+      const request = name === HISTORY_DB ? indexedDB.open(name, DB_VERSION) : indexedDB.open(name);
       request.onerror = () => reject(request.error);
       request.onupgradeneeded = () => {
         if (name !== HISTORY_DB) return;
