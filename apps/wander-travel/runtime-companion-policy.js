@@ -1,5 +1,7 @@
 (() => {
   const GLOBAL_COOLDOWN_MS = 120000;
+  const STARTUP_SILENCE_MS = 2 * 60 * 1000;
+  const STARTED_AT = Date.now();
   const FAST_MOVEMENT_KMH = 6;
   const DISCOVERY_WINDOW_MS = 30 * 60 * 1000;
   const MAX_DISCOVERIES_PER_WINDOW = 3;
@@ -117,6 +119,14 @@
       return { disposition: 'ignore', reason: 'unsupported_action' };
     }
 
+    // Opening or returning to Wander should be quiet. Initial place resolution,
+    // cache hydration and provider startup can generate several evaluations that
+    // are not real context changes. Drop those instead of greeting/questioning
+    // the traveler merely because the app was opened.
+    if (at - STARTED_AT < STARTUP_SILENCE_MS) {
+      return { disposition: 'ignore', reason: 'startup_silence' };
+    }
+
     const intervention = evaluation.type === 'introduce_place'
       ? placeIntro(evaluation, at)
       : evaluation.type === 'discover_poi'
@@ -173,6 +183,6 @@
   window.WanderCompanionPolicy = {
     decide,
     greeting,
-    constants: { GLOBAL_COOLDOWN_MS, FAST_MOVEMENT_KMH, DISCOVERY_WINDOW_MS, MAX_DISCOVERIES_PER_WINDOW },
+    constants: { GLOBAL_COOLDOWN_MS, STARTUP_SILENCE_MS, FAST_MOVEMENT_KMH, DISCOVERY_WINDOW_MS, MAX_DISCOVERIES_PER_WINDOW },
   };
 })();
