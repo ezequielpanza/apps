@@ -118,7 +118,7 @@ jobs:
       - name: Verify Wander app shell
         run: |
           set -o pipefail
-          node apps/wander-travel/tests/app-shell.mjs 2>&1 | tee app-shell-test.log
+          node apps/wander-travel/tests/app-shell-current.mjs 2>&1 | tee app-shell-test.log
 
       - name: Upload offline shell diagnostics
         if: failure()
