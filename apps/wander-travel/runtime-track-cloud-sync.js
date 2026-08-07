@@ -171,8 +171,8 @@
 
   async function waitForIdentity() {
     if (identity?.deviceKey) return identity;
-    const plugin = window.Capacitor?.Plugins?.WanderCloudIdentity;
     for (let attempt = 0; attempt < 24; attempt += 1) {
+      const plugin = window.Capacitor?.Plugins?.WanderCloudIdentity;
       if (typeof plugin?.getIdentity === 'function') {
         const result = await plugin.getIdentity();
         if (/^[a-f0-9]{64}$/.test(String(result?.deviceKey || ''))) {
