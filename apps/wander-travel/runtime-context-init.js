@@ -146,6 +146,9 @@
 
   loadScript('runtime-map-zoom-buttons.js?v=20260807-01', 'data-wander-map-zoom-buttons').catch(() => {});
   loadScript('runtime-resilience-fixes.js?v=20260807-01', 'data-wander-runtime-resilience').catch(() => {});
+  // Track history is a separate offline repository. Its cloud transport only
+  // activates when connectivity and the native stable identity are available.
+  loadScript('runtime-track-cloud-sync.js?v=20260807-01', 'data-wander-track-cloud-sync').catch(() => {});
 
   loadScript('runtime-raw-location-recorder.js?v=20260805-02', 'data-wander-raw-recorder')
     .then(() => loadScript('runtime-track-intelligence.js?v=20260805-01', 'data-wander-track-intelligence'))
@@ -153,7 +156,7 @@
     .then(() => loadScript('runtime-track-review-ui.js?v=20260805-01', 'data-wander-track-review-ui'))
     .then(() => loadScript('runtime-track-tree-ui.js?v=20260806-01', 'data-wander-track-tree-ui'))
     .then(() => loadScript('runtime-bitacora-tree-mode.js?v=20260807-01', 'data-wander-bitacora-tree-mode'))
-    .then(() => loadScript('runtime-unified-travel-log.js?v=20260807-01', 'data-wander-unified-travel-log'))
+    .then(() => loadScript('runtime-unified-travel-log.js?v=20260807-02', 'data-wander-unified-travel-log'))
     .then(() => loadScript('runtime-active-track-log-bridge.js?v=20260807-01', 'data-wander-active-track-log-bridge'))
     .catch(() => {
       context.set('sessions.trackIntelligenceStatus', 'error', {
