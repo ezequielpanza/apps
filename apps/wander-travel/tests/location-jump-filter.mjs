@@ -66,12 +66,13 @@ sandbox.globalThis = sandbox;
 vm.runInNewContext(source, sandbox, { filename: 'runtime-provider-location.js' });
 assert.ok(callbacks?.onPosition, 'Location provider must start and expose onPosition');
 
-function position({ lat, lng, at, accuracy = 8, speedMps = 0, heading = 0 }) {
+function position({ lat, lng, at, accuracy = 8, speedMps = 0, heading = 0, replayed = false }) {
   return {
     coords: { latitude: lat, longitude: lng, accuracy, speed: speedMps, heading, altitude: null },
     provider: 'gps',
     permissionPrecision: 'precise',
     timestamp: at,
+    replayed,
   };
 }
 
@@ -80,21 +81,28 @@ callbacks.onPosition(position({ lat: 18.3500000, lng: -68.8300000, at: baseAt })
 assert.equal(accepted.length, 1);
 
 callbacks.onPosition(position({ lat: 18.3530000, lng: -68.8270000, at: baseAt + 5000, speedMps: 0, accuracy: 10 }));
-assert.equal(accepted.length, 1, 'A single stationary jump must not replace the accepted position');
-assert.equal(windowTarget.WanderProviders.location.getValidationState().rejectedJumpCount, 1);
-assert.equal(contextValues.get('location.validation.status'), 'rejected');
+assert.equal(accepted.length, 2, 'Every valid current GPS fix must be captured immediately');
+assert.equal(windowTarget.WanderProviders.location.getValidationState().rejectedJumpCount, 0);
+assert.equal(windowTarget.WanderProviders.location.getValidationState().stabilizationRequired, false);
+assert.match(String(contextValues.get('location.validation.status')), /^accepted/);
 
 callbacks.onPosition(position({ lat: 18.3500150, lng: -68.8299900, at: baseAt + 10000, speedMps: 0.4, accuracy: 9 }));
-assert.equal(accepted.length, 2, 'Returning to the original cluster must be accepted');
+assert.equal(accepted.length, 3, 'Returning toward a previous cluster must also be captured immediately');
 assert.ok(Math.abs(accepted.at(-1).lat - 18.3500150) < 1e-9);
 
 callbacks.onPosition(position({ lat: 18.3500600, lng: -68.8299900, at: baseAt + 15000, speedMps: 1.1, accuracy: 8, heading: 4 }));
-assert.equal(accepted.length, 3, 'Normal walking movement must remain accepted');
+assert.equal(accepted.length, 4, 'Normal walking movement must remain accepted');
 
 callbacks.onPosition(position({ lat: 18.3560000, lng: -68.8240000, at: baseAt + 20000, speedMps: 0, accuracy: 9 }));
-assert.equal(accepted.length, 3);
-callbacks.onPosition(position({ lat: 18.3560100, lng: -68.8240100, at: baseAt + 25000, speedMps: 0, accuracy: 8 }));
-assert.equal(accepted.length, 4, 'A second consistent fix may confirm a genuine relocation');
-assert.equal(contextValues.get('location.validation.status'), 'relocated');
+assert.equal(accepted.length, 5, 'A large but valid fix is retained raw for later inconsistency filtering');
+assert.equal(contextValues.get('location.validation.rejectedJumpCount'), 0);
 
-console.log('PASS isolated GPS jumps are quarantined while real movement and confirmed relocations are accepted');
+const staleAt = Date.now() - 3 * 60 * 1000;
+callbacks.onPosition(position({ lat: 18.3600000, lng: -68.8200000, at: staleAt, speedMps: 0 }));
+assert.equal(accepted.length, 5, 'Old non-replayed fixes remain rejected as stale input');
+assert.equal(contextValues.get('location.validation.status'), 'rejected');
+
+callbacks.onPosition(position({ lat: 18.3600000, lng: -68.8200000, at: staleAt, speedMps: 0, replayed: true }));
+assert.equal(accepted.length, 6, 'Persisted background fixes may be replayed even when older than the live freshness window');
+
+console.log('PASS valid GPS fixes are captured immediately while only invalid/stale live input is rejected');
