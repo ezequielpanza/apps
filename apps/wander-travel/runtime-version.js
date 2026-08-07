@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.23';
+  const VERSION = 'v0.109.24';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -75,10 +75,14 @@
   window.WanderContext?.set?.('travelLog.filtersEnabled', false, metadata);
   window.WanderContext?.set?.('travelLog.summaryCountersEnabled', false, metadata);
   window.WanderContext?.set?.('travelLog.quickAddEnabled', false, metadata);
-  window.WanderContext?.set?.('travelLog.hierarchy', 'day-episode-activity-or-event-track', metadata);
+  window.WanderContext?.set?.('travelLog.hierarchy', 'day-episode-elements', metadata);
+  window.WanderContext?.set?.('travelLog.activityLayerEnabled', false, metadata);
   window.WanderContext?.set?.('travelLog.episodesCollapsedByDefault', true, metadata);
-  window.WanderContext?.set?.('travelLog.activitiesCollapsedByDefault', true, metadata);
   window.WanderContext?.set?.('travelLog.activeTrackSingleRepresentation', true, metadata);
+  window.WanderContext?.set?.('tracks.cloudHistorySync', true, metadata);
+  window.WanderContext?.set?.('tracks.cloudHistoryBidirectional', true, metadata);
+  window.WanderContext?.set?.('tracks.historyDatabase', 'wander-track-history', metadata);
+  window.WanderContext?.set?.('tracks.defaultNameFromStartedAt', true, metadata);
   window.WanderContext?.set?.('messages.defaultTimeoutMs', 5000, metadata);
   window.WanderContext?.set?.('tts.mapToggle', true, metadata);
   window.WanderContext?.set?.('map.zoomButtonsEnabled', true, metadata);
