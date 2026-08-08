@@ -2,6 +2,7 @@ package app.wandertravel.mobile;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -15,6 +16,28 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WanderTTSPlugin.class);
         super.onCreate(savedInstanceState);
         WanderNotificationPlugin.captureOpenIntent(getIntent());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        redrawWebViewAfterResume();
+    }
+
+    private void redrawWebViewAfterResume() {
+        if (getBridge() == null) return;
+        final WebView webView = getBridge().getWebView();
+        if (webView == null) return;
+        webView.post(() -> {
+            webView.onResume();
+            webView.requestLayout();
+            webView.postInvalidateOnAnimation();
+        });
+        webView.postDelayed(() -> {
+            webView.requestLayout();
+            webView.postInvalidateOnAnimation();
+        }, 120);
+        webView.postDelayed(webView::postInvalidateOnAnimation, 450);
     }
 
     @Override
