@@ -10,14 +10,16 @@
   const MIN_SAMPLE_COUNT = 8;
   const MIN_WINDOW_MS = 3500;
   const STARTUP_GUARD_MS = 20000;
-  const MOVING_CONFIRM_MS = 6000;
-  const STRONG_MOVING_CONFIRM_MS = 2500;
+  const MOVING_CONFIRM_MS = 45000;
+  const STRONG_MOVING_CONFIRM_MS = 10000;
   const STOP_CONFIRM_MS = 20000;
   const STOP_MIN_RADIUS_M = 8;
   const STOP_MAX_RADIUS_M = 25;
   const STOP_MAX_ACCURACY_M = 40;
   const WALK_STOP_SPEED_KMH = 1.5;
   const VEHICLE_STOP_SPEED_KMH = 3;
+  const MIN_MOVEMENT_DISPLACEMENT_M = 40;
+  const MAX_ACCURACY_SCALED_DISPLACEMENT_M = 70;
 
   const state = {
     startedAt: Date.now(),
@@ -101,20 +103,39 @@
     const segmentCount = finite(evidence.segmentCount) || 0;
     const providerSpeed = finite(evidence.providerSpeedKmh) || 0;
     const rawMedian = finite(evidence.rawSpeedMedianKmh) || 0;
-    const minimumDisplacement = Math.max(12, Math.min(35, accuracy * 1.4));
-    const multiSegment = segmentCount >= 2 && adjusted >= 8 && displacement >= minimumDisplacement &&
-      (derived >= 1.4 || segmentMedian >= 1.4);
-    const fastMovement = segmentCount >= 2 && adjusted >= 10 && (segmentMedian >= 8 || derived >= 8);
-    const providerConfirmed = segmentCount >= 1 && adjusted >= 8 && providerSpeed >= 6;
-    const rawConfirmed = segmentCount >= 2 && adjusted >= 8 && rawMedian >= 4;
+    const minimumDisplacement = Math.max(
+      MIN_MOVEMENT_DISPLACEMENT_M,
+      Math.min(MAX_ACCURACY_SCALED_DISPLACEMENT_M, accuracy * 2)
+    );
+    const meaningfulAdjustedDisplacement = Math.max(25, minimumDisplacement * .6);
+    const multiSegment = segmentCount >= 3
+      && adjusted >= meaningfulAdjustedDisplacement
+      && displacement >= minimumDisplacement
+      && (derived >= 1.4 || segmentMedian >= 1.4);
+    const fastMovement = segmentCount >= 2
+      && adjusted >= Math.max(35, meaningfulAdjustedDisplacement)
+      && displacement >= minimumDisplacement
+      && (segmentMedian >= 8 || derived >= 8);
+    const providerConfirmed = segmentCount >= 2
+      && adjusted >= Math.max(35, meaningfulAdjustedDisplacement)
+      && displacement >= minimumDisplacement
+      && providerSpeed >= 6;
+    const rawConfirmed = segmentCount >= 3
+      && adjusted >= Math.max(30, meaningfulAdjustedDisplacement)
+      && displacement >= minimumDisplacement
+      && rawMedian >= 4;
     return {
       confirmed: multiSegment || fastMovement || providerConfirmed || rawConfirmed,
       strong: fastMovement || providerConfirmed,
+      minimumDisplacement,
       evidence: [
         ...(multiSegment ? ['multi_segment_displacement_confirmed'] : []),
         ...(fastMovement ? ['fast_position_movement_confirmed'] : []),
         ...(providerConfirmed ? ['provider_speed_with_displacement_confirmed'] : []),
         ...(rawConfirmed ? ['raw_speed_with_displacement_confirmed'] : []),
+        ...(!multiSegment && !fastMovement && !providerConfirmed && !rawConfirmed && displacement < minimumDisplacement
+          ? ['gps_jitter_inside_stationary_radius']
+          : []),
       ],
     };
   }
@@ -282,6 +303,8 @@
       STOP_MAX_ACCURACY_M,
       WALK_STOP_SPEED_KMH,
       VEHICLE_STOP_SPEED_KMH,
+      MIN_MOVEMENT_DISPLACEMENT_M,
+      MAX_ACCURACY_SCALED_DISPLACEMENT_M,
     },
   });
 })();
