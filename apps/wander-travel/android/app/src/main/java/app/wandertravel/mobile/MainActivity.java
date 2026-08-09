@@ -6,6 +6,8 @@ import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private boolean hasBeenPaused = false;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(WanderLocationPlugin.class);
@@ -19,9 +21,17 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onPause() {
+        hasBeenPaused = true;
+        super.onPause();
+    }
+
+    @Override
     public void onResume() {
+        final boolean returningFromBackground = hasBeenPaused;
+        hasBeenPaused = false;
         super.onResume();
-        redrawWebViewAfterResume();
+        if (returningFromBackground) redrawWebViewAfterResume();
     }
 
     private void redrawWebViewAfterResume() {
@@ -29,7 +39,6 @@ public class MainActivity extends BridgeActivity {
         final WebView webView = getBridge().getWebView();
         if (webView == null) return;
         webView.post(() -> {
-            webView.onResume();
             webView.requestLayout();
             webView.postInvalidateOnAnimation();
         });
