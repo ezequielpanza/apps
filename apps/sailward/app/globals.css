@@ -882,6 +882,132 @@ input:focus-visible {
   width: 240px;
 }
 
+.engine-window {
+  top: 525px;
+  right: 288px;
+  width: 250px;
+}
+
+.engine-window.is-minimized {
+  width: 305px;
+}
+
+.engine-window-content {
+  display: grid;
+  gap: 12px;
+}
+
+.engine-state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.engine-state > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(244, 240, 229, 0.22);
+}
+
+.engine-state > span.is-running {
+  background: var(--teal);
+  box-shadow: 0 0 10px rgba(78, 211, 202, 0.8);
+}
+
+.engine-state strong {
+  color: var(--paper-bright);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.engine-state button {
+  min-height: 28px;
+  margin-left: auto;
+  padding: 0 9px;
+  border: 1px solid rgba(232, 196, 118, 0.45);
+  border-radius: 6px;
+  color: var(--brass);
+  background: rgba(232, 196, 118, 0.07);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.engine-state button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.engine-gauges {
+  display: grid;
+  gap: 9px;
+}
+
+.engine-gauges > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 7px;
+}
+
+.engine-gauges span,
+.engine-throttle > span {
+  color: rgba(244, 240, 229, 0.48);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+}
+
+.engine-gauges strong {
+  color: var(--paper-bright);
+  font-family: Consolas, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.engine-gauges strong small {
+  color: rgba(244, 240, 229, 0.45);
+  font-size: 9px;
+}
+
+.engine-gauges i {
+  grid-column: 1 / -1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.engine-gauges i b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #63b7ae, #e8c476, #e25b50);
+}
+
+.engine-throttle {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.engine-throttle strong {
+  color: var(--brass);
+  font: 800 13px Consolas, monospace;
+}
+
+.engine-throttle input {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.engine-throttle input:disabled {
+  opacity: 0.36;
+}
+
 .depth-window.is-minimized {
   width: 315px;
 }
@@ -2391,6 +2517,16 @@ input[type="range"]::-moz-range-thumb {
 
   .depth-window.is-minimized {
     width: min(315px, calc(100vw - 20px));
+  }
+
+  .engine-window {
+    top: 510px;
+    right: 10px;
+    width: min(250px, calc(100vw - 20px));
+  }
+
+  .engine-window.is-minimized {
+    width: min(305px, calc(100vw - 20px));
   }
 
   .gps-window {

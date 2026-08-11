@@ -153,6 +153,10 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /floating-window-bar/);
   assert.match(page, /settings-danger-zone/);
   assert.match(page, /FINALIZAR SIMULACIÓN/);
+  assert.match(page, /data-floating-panel="engine"/);
+  assert.match(page, /PRESIÓN DE ACEITE/);
+  assert.match(page, /Acelerador del motor/);
+  assert.match(page, /engineRunning/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);
