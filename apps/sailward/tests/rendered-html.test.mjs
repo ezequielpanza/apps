@@ -92,6 +92,9 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /VIENTO REAL/);
   assert.match(page, /VIENTO APARENTE/);
   assert.match(page, /HEADING/);
+  assert.match(page, /minimized-summary/);
+  assert.match(page, /COG \{Math\.round\(gps\.course\)/);
+  assert.match(page, /R \{conditions\.windKn\.toFixed\(1\)\} kn\//);
   assert.match(page, /beginPanelDrag/);
   assert.match(page, /setPointerCapture/);
   assert.match(page, /Mover ventana del timón/);

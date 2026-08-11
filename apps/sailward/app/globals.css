@@ -938,6 +938,40 @@ input:focus-visible {
   display: none;
 }
 
+.minimized-summary {
+  display: none;
+}
+
+.instrument-window.is-minimized > .floating-window-bar {
+  border-bottom: 0;
+}
+
+.instrument-window.is-minimized .minimized-summary {
+  display: inline;
+  color: var(--paper-bright);
+  font-family: Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.instrument-window.is-minimized .instrument-refresh {
+  display: none;
+}
+
+.compass-window.is-minimized {
+  width: 210px;
+}
+
+.gps-window.is-minimized {
+  width: 280px;
+}
+
+.wind-window.is-minimized {
+  width: 320px;
+}
+
 .control-dock.is-minimized {
   width: 260px;
 }
@@ -1766,6 +1800,18 @@ input[type="range"]::-moz-range-thumb {
     top: 350px;
     left: 10px;
     width: min(240px, calc(50vw - 10px));
+  }
+
+  .compass-window.is-minimized {
+    width: min(210px, calc(100vw - 20px));
+  }
+
+  .gps-window.is-minimized {
+    width: min(280px, calc(100vw - 20px));
+  }
+
+  .wind-window.is-minimized {
+    width: min(320px, calc(100vw - 20px));
   }
 
   .instrument-window-content {
