@@ -156,6 +156,7 @@ export default function Home() {
   // Helm, sails and motor are commands. They must never run the geographic
   // simulation for every pixel crossed by a range input; the 1 Hz loop does that.
   const updateVoyage = useCallback((change: (current: Voyage) => Voyage) => setVoyage((current) => current ? change(current) : current), []);
+  useEffect(() => { followRef.current = followBoat; }, [followBoat]);
   useEffect(() => { const onKeyDown = (event: KeyboardEvent) => { if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return; if (event.key.toLowerCase() === "a") { event.preventDefault(); updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder - 2, -35, 35) })); } if (event.key.toLowerCase() === "d") { event.preventDefault(); updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder + 2, -35, 35) })); } }; window.addEventListener("keydown", onKeyDown); return () => window.removeEventListener("keydown", onKeyDown); }, [updateVoyage]);
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return; let disposed = false;
@@ -235,7 +236,8 @@ export default function Home() {
     setVoyage(next); setFollowBoat(true); window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     mapRef.current?.flyTo({ center: [next.lon, next.lat], zoom: 10.5, duration: 1500 });
   };
-  const centerBoat = () => { if (!voyage) return; setFollowBoat(true); mapRef.current?.flyTo({ center: [voyage.lon, voyage.lat], zoom: Math.max(mapRef.current.getZoom(), 9.5) }); };
+  const centerBoat = () => { if (!voyage) return; mapRef.current?.flyTo({ center: [voyage.lon, voyage.lat], zoom: Math.max(mapRef.current.getZoom(), 9.5) }); };
+  const toggleFollowBoat = () => { const next = !followBoat; setFollowBoat(next); if (next) centerBoat(); };
   const resetVoyage = () => { if (!window.confirm("¿Finalizar este viaje y volver a elegir puerto?")) return; window.localStorage.removeItem(STORAGE_KEY); setVoyage(null); setFollowBoat(true); };
   const utcTime = now ? new Date(now).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC" }) : "--:--:--";
   return <main className={`game-shell ${voyage ? "is-sailing" : "is-docked"}`}><div ref={mapContainerRef} className="world-map" aria-label="Mapa mundial interactivo de Sailward" /><div className="ocean-vignette" aria-hidden="true" />
@@ -272,7 +274,7 @@ export default function Home() {
     <div className="map-tools">
       <button className={satelliteLayer ? "is-active" : ""} onClick={() => setSatelliteLayer((value) => !value)}>Satélite</button>
       <button className={nauticalLayer ? "is-active" : ""} onClick={() => setNauticalLayer((value) => !value)}>Carta náutica</button>
-      {voyage && <button onClick={centerBoat}>Seguir barco</button>}
+      {voyage && <button className={followBoat ? "is-active" : ""} aria-pressed={followBoat} onClick={toggleFollowBoat}>{followBoat ? "Dejar de seguir" : "Seguir barco"}</button>}
     </div>{mapError && <div className="map-notice">No se pudo cargar una capa del mapa. El simulador sigue disponible.</div>}<div className="version-tag">SAILWARD · v{APP_VERSION} · ALPHA</div>
   </main>;
 }

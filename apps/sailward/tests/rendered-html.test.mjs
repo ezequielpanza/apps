@@ -67,6 +67,9 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /mainSail: 0, genoaSail: 0, mainSheet: 0, genoaSheet: 0, motor: 0/);
   assert.match(page, /const updateVoyage = useCallback\([\s\S]*change\(current\)/);
   assert.match(page, /lastMapCenterRef\.current !== centerKey/);
+  assert.match(page, /followRef\.current = followBoat/);
+  assert.match(page, /Dejar de seguir/);
+  assert.match(page, /aria-pressed=\{followBoat\}/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);
