@@ -953,6 +953,12 @@ input[type="range"]::-moz-range-thumb {
 
 .step-buttons button { min-width: 47px; }
 
+.step-buttons .center-helm-button {
+  min-width: 100px;
+  border-color: rgba(232, 196, 118, 0.5);
+  color: var(--brass);
+}
+
 .autopilot-button {
   width: 100%;
   margin-top: 8px;
