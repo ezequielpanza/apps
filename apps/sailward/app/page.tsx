@@ -233,6 +233,7 @@ export default function Home() {
   const [conditions, setConditions] = useState(DEFAULT_CONDITIONS);
   const [followBoat, setFollowBoat] = useState(true);
   const [nauticalLayer, setNauticalLayer] = useState(true);
+  const [isometricView, setIsometricView] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [conditionsBusy, setConditionsBusy] = useState(false);
@@ -398,6 +399,9 @@ export default function Home() {
         style: BASE_STYLE,
         center: [selectedPort.lon, selectedPort.lat],
         zoom: 8.2,
+        pitch: 56,
+        bearing: -34,
+        maxPitch: 70,
         attributionControl: false,
       });
       map.addControl(
@@ -500,6 +504,16 @@ export default function Home() {
       nauticalLayer ? "visible" : "none",
     );
   }, [mapReady, nauticalLayer]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    map.easeTo({
+      pitch: isometricView ? 56 : 0,
+      bearing: isometricView ? -34 : 0,
+      duration: 850,
+    });
+  }, [isometricView, mapReady]);
 
   const startVoyage = () => {
     const timestamp = Date.now();
@@ -807,6 +821,15 @@ export default function Home() {
       )}
 
       <div className="map-tools">
+        <button
+          type="button"
+          className={isometricView ? "is-active" : ""}
+          onClick={() => setIsometricView((enabled) => !enabled)}
+          aria-pressed={isometricView}
+          title="Alternar entre cámara isométrica y vista cenital"
+        >
+          {isometricView ? "Vista isométrica" : "Vista cenital"}
+        </button>
         <button
           type="button"
           className={nauticalLayer ? "is-active" : ""}
