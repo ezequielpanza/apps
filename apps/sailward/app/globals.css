@@ -349,6 +349,39 @@ input:focus-visible {
   cursor: pointer;
 }
 
+.settings-range {
+  display: grid;
+  gap: 10px;
+  margin-top: 17px;
+  padding: 13px 14px;
+  border: 1px solid rgba(232, 196, 118, 0.2);
+  border-radius: 11px;
+  background: rgba(232, 196, 118, 0.045);
+}
+
+.settings-range > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-range strong {
+  color: var(--paper-bright);
+  font-size: 12px;
+}
+
+.settings-range small {
+  color: rgba(244, 240, 229, 0.48);
+  font-size: 10px;
+  text-align: right;
+}
+
+.settings-range input {
+  width: 100%;
+  margin: 0;
+}
+
 .settings-danger-zone {
   display: flex;
   align-items: center;

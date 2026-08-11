@@ -157,6 +157,9 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /PRESIÓN DE ACEITE/);
   assert.match(page, /Acelerador del motor/);
   assert.match(page, /engineRunning/);
+  assert.match(page, /rudderSensitivity/);
+  assert.match(page, /Sensibilidad de timón/);
+  assert.match(page, /\* voyage\.rudderSensitivity/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);
