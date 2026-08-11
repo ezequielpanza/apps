@@ -838,12 +838,59 @@ input:focus-visible {
   cursor: pointer;
 }
 
+.autopilot-window {
+  top: auto;
+  bottom: 36px;
+  left: 24px;
+  width: 220px;
+}
+
+.autopilot-window.is-minimized {
+  width: 300px;
+}
+
+.autopilot-window-content {
+  display: grid;
+  gap: 11px;
+  padding: 14px 15px 15px;
+}
+
+.autopilot-status {
+  display: grid;
+  gap: 3px;
+}
+
+.autopilot-status > span {
+  color: rgba(244, 240, 229, 0.48);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.autopilot-status strong {
+  color: var(--paper-bright);
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.autopilot-status small,
+.autopilot-note {
+  color: rgba(244, 240, 229, 0.52);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.autopilot-window .autopilot-button {
+  margin-top: 0;
+}
+
 .control-dock {
   position: absolute;
   z-index: 7;
   left: 50%;
   bottom: 36px;
-  width: min(920px, calc(100vw - 48px));
+  width: min(520px, calc(100vw - 48px));
   min-height: 0;
   display: block;
   transform: translateX(-50%);
@@ -856,9 +903,9 @@ input:focus-visible {
 }
 
 .helm-window-content {
-  min-height: 160px;
+  min-height: 205px;
   display: grid;
-  grid-template-columns: 1fr 230px;
+  grid-template-columns: 1fr 190px;
 }
 
 .floating-window-bar {
@@ -1521,11 +1568,46 @@ input[type="range"]::-moz-range-thumb {
   transform: rotate(calc((50% - var(--genoa-sheet)) * 0.52)) skewY(6deg);
 }
 
-.helm-row {
-  display: flex;
+.helm-layout {
+  display: grid;
+  grid-template-columns: 54px 94px 54px;
   align-items: center;
-  gap: 12px;
-  margin-top: 5px;
+  justify-content: center;
+  gap: 10px;
+  margin: 9px auto 5px;
+}
+
+.helm-step-column,
+.helm-center {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+}
+
+.helm-step-column button,
+.center-helm-button {
+  width: 100%;
+  padding: 7px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.helm-step-column button:hover,
+.center-helm-button:hover {
+  border-color: rgba(78, 211, 202, 0.6);
+  background: rgba(78, 211, 202, 0.13);
+}
+
+.center-helm-button {
+  border-color: rgba(232, 196, 118, 0.5);
+  color: var(--brass);
+  font-size: 9px;
 }
 
 .helm {
@@ -1585,19 +1667,6 @@ input[type="range"]::-moz-range-thumb {
 
 .helm span::before { transform: rotate(60deg); }
 .helm span::after { transform: rotate(-60deg); }
-
-.step-buttons {
-  flex-wrap: wrap;
-  margin: 0;
-}
-
-.step-buttons button { min-width: 47px; }
-
-.step-buttons .center-helm-button {
-  min-width: 100px;
-  border-color: rgba(232, 196, 118, 0.5);
-  color: var(--brass);
-}
 
 .autopilot-button {
   width: 100%;
@@ -1814,6 +1883,16 @@ input[type="range"]::-moz-range-thumb {
     width: min(320px, calc(100vw - 20px));
   }
 
+  .autopilot-window {
+    left: 10px;
+    bottom: 335px;
+    width: min(220px, calc(100vw - 20px));
+  }
+
+  .autopilot-window.is-minimized {
+    width: min(300px, calc(100vw - 20px));
+  }
+
   .instrument-window-content {
     padding: 10px 11px 12px;
   }
@@ -1844,7 +1923,7 @@ input[type="range"]::-moz-range-thumb {
   .control-dock {
     bottom: 24px;
     width: calc(100vw - 20px);
-    max-height: 285px;
+    max-height: min(360px, calc(100dvh - 90px));
     border-radius: 16px 16px 4px 4px;
   }
 
