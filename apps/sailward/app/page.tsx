@@ -130,7 +130,7 @@ export default function Home() {
   const mapContainerRef = useRef<HTMLDivElement>(null); const mapRef = useRef<MapInstance | null>(null); const boatMarkerRef = useRef<MarkerInstance | null>(null);
   const voyageRef = useRef<Voyage | null>(null); const conditionsRef = useRef(DEFAULT_CONDITIONS); const followRef = useRef(true); const lastMapCenterRef = useRef<string | null>(null);
   const [hydrated, setHydrated] = useState(false); const [selectedPortId, setSelectedPortId] = useState(PORTS[0].id); const [developerLatitude, setDeveloperLatitude] = useState(""); const [developerLongitude, setDeveloperLongitude] = useState(""); const [voyage, setVoyage] = useState<Voyage | null>(null);
-  const [conditions, setConditions] = useState(DEFAULT_CONDITIONS); const [followBoat, setFollowBoat] = useState(true); const [satelliteLayer, setSatelliteLayer] = useState(true); const [nauticalLayer, setNauticalLayer] = useState(true); const [isometricView, setIsometricView] = useState(true);
+  const [conditions, setConditions] = useState(DEFAULT_CONDITIONS); const [followBoat, setFollowBoat] = useState(true); const [satelliteLayer, setSatelliteLayer] = useState(true); const [nauticalLayer, setNauticalLayer] = useState(true); const isometricView = true;
   const [mapReady, setMapReady] = useState(false); const [mapError, setMapError] = useState(false); const [conditionsBusy, setConditionsBusy] = useState(false); const [now, setNow] = useState(0);
   const selectedPort = useMemo(() => PORTS.find((port) => port.id === selectedPortId) ?? PORTS[0], [selectedPortId]);
   const developerStart = useMemo(() => {
@@ -266,7 +266,6 @@ export default function Home() {
         <div className="telemetry"><div className="speed-readout"><span>VEL. SOBRE FONDO</span><strong>{voyage.speedKn.toFixed(1)}</strong><small>NUDOS</small></div><div className="position-readout"><span>{formatCoordinate(voyage.lat, "N", "S")}</span><span>{formatCoordinate(voyage.lon, "E", "O")}</span><span>Rumbo {Math.round(voyage.heading)}° · Vela {voyage.sailSpeedKn.toFixed(1)} kn</span>{voyage.grounded && <span className="grounded">TIERRA: SIN AVANCE</span>}</div><div className="dock-actions"><button onClick={centerBoat}>CENTRAR BARCO</button><button onClick={resetVoyage}>FINALIZAR</button></div></div></section></>}
     <div className="map-tools">
       <button className={satelliteLayer ? "is-active" : ""} onClick={() => setSatelliteLayer((value) => !value)}>Satélite</button>
-      <button className={isometricView ? "is-active" : ""} onClick={() => setIsometricView((value) => !value)}>Vista isométrica</button>
       <button className={nauticalLayer ? "is-active" : ""} onClick={() => setNauticalLayer((value) => !value)}>Carta náutica</button>
       {voyage && <button onClick={centerBoat}>Seguir barco</button>}
     </div>{mapError && <div className="map-notice">No se pudo cargar una capa del mapa. El simulador sigue disponible.</div>}<div className="version-tag">SAILWARD · v{APP_VERSION} · ALPHA</div>
