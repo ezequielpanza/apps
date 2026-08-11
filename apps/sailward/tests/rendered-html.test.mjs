@@ -74,6 +74,12 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /map-tool-icon--satellite/);
   assert.match(page, /map-tool-icon--nautical/);
   assert.match(page, /map-tool-icon--follow/);
+  assert.match(page, /sailsPanelOpen/);
+  assert.match(page, /helmPanelOpen/);
+  assert.match(page, /sail-drawer-tab/);
+  assert.match(page, /helm-drawer-tab/);
+  assert.match(page, /Abrir controles de velas/);
+  assert.match(page, /Abrir tablero del timón/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);
