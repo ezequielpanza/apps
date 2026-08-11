@@ -1380,6 +1380,36 @@ input:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.conditions-title {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.floating-window {
+  min-width: 160px;
+  min-height: 46px;
+}
+
+.floating-window::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 10px;
+  height: 10px;
+  opacity: 0.52;
+  background: repeating-linear-gradient(135deg, transparent 0 2px, rgba(232, 196, 118, 0.9) 2px 3px, transparent 3px 5px);
+  pointer-events: none;
+}
+
+.floating-window.is-minimized::after {
+  display: none;
 }
 
 .floating-window-bar > span {

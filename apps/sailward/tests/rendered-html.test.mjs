@@ -148,6 +148,9 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /RECURSOS Y BODEGA/);
   assert.match(page, /Reservas y mercancía próximamente/);
   assert.match(page, /waterReserveL/);
+  assert.match(page, /sailward\.panelSizes\.v1/);
+  assert.match(page, /panelResizeRef/);
+  assert.match(page, /floating-window-bar/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);

@@ -15,6 +15,7 @@ const STORAGE_KEY = "sailward.voyage";
 const LEGACY_STORAGE_KEY = "sailward.voyage.0.1.0";
 const KEY_BINDINGS_STORAGE_KEY = "sailward.keybindings.v1";
 const PANEL_POSITIONS_STORAGE_KEY = "sailward.panelPositions.v1";
+const PANEL_SIZES_STORAGE_KEY = "sailward.panelSizes.v1";
 const MINIMIZED_PANELS_STORAGE_KEY = "sailward.minimizedPanels.v1";
 const DEPTH_ALARM_STORAGE_KEY = "sailward.depthAlarm.v1";
 const BASE_STYLE = "https://tiles.openfreemap.org/styles/liberty";
@@ -46,8 +47,11 @@ const FLOATING_PANELS = ["voyage", "conditions", "sails", "helm", "autopilot", "
 type FloatingPanelName = (typeof FLOATING_PANELS)[number];
 type PanelPosition = { x: number; y: number };
 type PanelPositions = Partial<Record<FloatingPanelName, PanelPosition>>;
+type PanelSize = { width: number; height: number };
+type PanelSizes = Partial<Record<FloatingPanelName, PanelSize>>;
 type MinimizedPanels = Partial<Record<FloatingPanelName, boolean>>;
 type PanelDrag = { panel: FloatingPanelName; offsetX: number; offsetY: number; width: number; height: number };
+type PanelResize = { panel: FloatingPanelName; edge: string; startX: number; startY: number; width: number; height: number; left: number; top: number };
 type AnchorWinchDrag = { pointerId: number; lastAngle: number };
 
 const DEFAULT_KEY_BINDINGS: KeyBindings = { rudderLeft: "KeyA", rudderRight: "KeyD" };
@@ -199,6 +203,11 @@ function parsePanelPositions(raw: string, viewportWidth: number, viewportHeight:
   for (const panel of FLOATING_PANELS) { const position = saved[panel]; if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) next[panel] = { x: clamp(position.x, 8, Math.max(8, viewportWidth - 80)), y: clamp(position.y, 8, Math.max(8, viewportHeight - 50)) }; }
   return next;
 }
+function parsePanelSizes(raw: string, viewportWidth: number, viewportHeight: number): PanelSizes {
+  const saved = JSON.parse(raw) as PanelSizes; const next: PanelSizes = {};
+  for (const panel of FLOATING_PANELS) { const size = saved[panel]; if (size && Number.isFinite(size.width) && Number.isFinite(size.height)) next[panel] = { width: clamp(size.width, 160, Math.max(160, viewportWidth - 16)), height: clamp(size.height, 46, Math.max(46, viewportHeight - 16)) }; }
+  return next;
+}
 function parseMinimizedPanels(raw: string): MinimizedPanels {
   const saved = JSON.parse(raw) as MinimizedPanels; const next: MinimizedPanels = {};
   for (const panel of FLOATING_PANELS) if (saved[panel] === true) next[panel] = true;
@@ -208,11 +217,11 @@ function parseMinimizedPanels(raw: string): MinimizedPanels {
 export default function Home() {
   const mapContainerRef = useRef<HTMLDivElement>(null); const mapRef = useRef<MapInstance | null>(null); const boatMarkerRef = useRef<MarkerInstance | null>(null);
   const voyageRef = useRef<Voyage | null>(null); const conditionsRef = useRef(DEFAULT_CONDITIONS); const followRef = useRef(true); const lastMapCenterRef = useRef<string | null>(null);
-  const panelPositionsRef = useRef<PanelPositions>({}); const panelDragRef = useRef<PanelDrag | null>(null); const anchorWinchDragRef = useRef<AnchorWinchDrag | null>(null);
+  const panelPositionsRef = useRef<PanelPositions>({}); const panelSizesRef = useRef<PanelSizes>({}); const panelDragRef = useRef<PanelDrag | null>(null); const panelResizeRef = useRef<PanelResize | null>(null); const anchorWinchDragRef = useRef<AnchorWinchDrag | null>(null);
   const [hydrated, setHydrated] = useState(false); const [selectedPortId, setSelectedPortId] = useState(PORTS[0].id); const [developerLatitude, setDeveloperLatitude] = useState(""); const [developerLongitude, setDeveloperLongitude] = useState(""); const [voyage, setVoyage] = useState<Voyage | null>(null);
   const [conditions, setConditions] = useState(DEFAULT_CONDITIONS); const [followBoat, setFollowBoat] = useState(true); const [satelliteLayer, setSatelliteLayer] = useState(true); const [nauticalLayer, setNauticalLayer] = useState(true); const isometricView = true;
   const [mapReady, setMapReady] = useState(false); const [mapError, setMapError] = useState(false); const [conditionsBusy, setConditionsBusy] = useState(false); const [now, setNow] = useState(0);
-  const [panelPositions, setPanelPositions] = useState<PanelPositions>({}); const [activePanel, setActivePanel] = useState<FloatingPanelName>("helm");
+  const [panelPositions, setPanelPositions] = useState<PanelPositions>({}); const [panelSizes, setPanelSizes] = useState<PanelSizes>({}); const [activePanel, setActivePanel] = useState<FloatingPanelName>("helm");
   const [minimizedPanels, setMinimizedPanels] = useState<MinimizedPanels>({});
   const [anchorWinchRotation, setAnchorWinchRotation] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false); const [capturingKey, setCapturingKey] = useState<KeyBindingName | null>(null); const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
@@ -234,7 +243,7 @@ export default function Home() {
       setConditions({ windKn: numeric(weather.current?.wind_speed_10m, 13), windDirection: numeric(weather.current?.wind_direction_10m, 65), waveHeight: numeric(marine.current?.wave_height, 0.9), currentKn: numeric(marine.current?.ocean_current_velocity, 0.4), currentDirection: numeric(marine.current?.ocean_current_direction, 110), depthM, source: "live", updatedAt: Date.now() });
     } catch { setConditions((current) => ({ ...current, depthM, source: "estimated", updatedAt: Date.now() })); } finally { setConditionsBusy(false); }
   }, []);
-  useEffect(() => { const timer = window.setTimeout(() => { const timestamp = Date.now(); setNow(timestamp); try { const raw = window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY); if (raw) { const restored = advanceVoyage(normalizeVoyage(JSON.parse(raw) as Partial<Voyage>), conditionsRef.current, timestamp); voyageRef.current = restored; setVoyage(restored); setSelectedPortId(restored.portId); } } catch { window.localStorage.removeItem(STORAGE_KEY); } try { const raw = window.localStorage.getItem(KEY_BINDINGS_STORAGE_KEY); if (raw) { const saved = JSON.parse(raw) as Partial<KeyBindings>; if (typeof saved.rudderLeft === "string" && typeof saved.rudderRight === "string") setKeyBindings({ rudderLeft: saved.rudderLeft, rudderRight: saved.rudderRight }); } } catch { window.localStorage.removeItem(KEY_BINDINGS_STORAGE_KEY); } try { const raw = window.localStorage.getItem(PANEL_POSITIONS_STORAGE_KEY); if (raw) { const saved = parsePanelPositions(raw, window.innerWidth, window.innerHeight); panelPositionsRef.current = saved; setPanelPositions(saved); } } catch { window.localStorage.removeItem(PANEL_POSITIONS_STORAGE_KEY); } try { const raw = window.localStorage.getItem(MINIMIZED_PANELS_STORAGE_KEY); if (raw) setMinimizedPanels(parseMinimizedPanels(raw)); } catch { window.localStorage.removeItem(MINIMIZED_PANELS_STORAGE_KEY); } try { const raw = window.localStorage.getItem(DEPTH_ALARM_STORAGE_KEY); if (raw) { const saved = JSON.parse(raw) as Partial<DepthAlarm>; if (typeof saved.armed === "boolean" || typeof saved.thresholdM === "number") setDepthAlarm({ armed: typeof saved.armed === "boolean" ? saved.armed : DEFAULT_DEPTH_ALARM.armed, thresholdM: clamp(numeric(saved.thresholdM, DEFAULT_DEPTH_ALARM.thresholdM), 1, 100) }); } } catch { window.localStorage.removeItem(DEPTH_ALARM_STORAGE_KEY); } setHydrated(true); }, 0); return () => window.clearTimeout(timer); }, []);
+  useEffect(() => { const timer = window.setTimeout(() => { const timestamp = Date.now(); setNow(timestamp); try { const raw = window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY); if (raw) { const restored = advanceVoyage(normalizeVoyage(JSON.parse(raw) as Partial<Voyage>), conditionsRef.current, timestamp); voyageRef.current = restored; setVoyage(restored); setSelectedPortId(restored.portId); } } catch { window.localStorage.removeItem(STORAGE_KEY); } try { const raw = window.localStorage.getItem(KEY_BINDINGS_STORAGE_KEY); if (raw) { const saved = JSON.parse(raw) as Partial<KeyBindings>; if (typeof saved.rudderLeft === "string" && typeof saved.rudderRight === "string") setKeyBindings({ rudderLeft: saved.rudderLeft, rudderRight: saved.rudderRight }); } } catch { window.localStorage.removeItem(KEY_BINDINGS_STORAGE_KEY); } try { const raw = window.localStorage.getItem(PANEL_POSITIONS_STORAGE_KEY); if (raw) { const saved = parsePanelPositions(raw, window.innerWidth, window.innerHeight); panelPositionsRef.current = saved; setPanelPositions(saved); } } catch { window.localStorage.removeItem(PANEL_POSITIONS_STORAGE_KEY); } try { const raw = window.localStorage.getItem(PANEL_SIZES_STORAGE_KEY); if (raw) { const saved = parsePanelSizes(raw, window.innerWidth, window.innerHeight); panelSizesRef.current = saved; setPanelSizes(saved); } } catch { window.localStorage.removeItem(PANEL_SIZES_STORAGE_KEY); } try { const raw = window.localStorage.getItem(MINIMIZED_PANELS_STORAGE_KEY); if (raw) setMinimizedPanels(parseMinimizedPanels(raw)); } catch { window.localStorage.removeItem(MINIMIZED_PANELS_STORAGE_KEY); } try { const raw = window.localStorage.getItem(DEPTH_ALARM_STORAGE_KEY); if (raw) { const saved = JSON.parse(raw) as Partial<DepthAlarm>; if (typeof saved.armed === "boolean" || typeof saved.thresholdM === "number") setDepthAlarm({ armed: typeof saved.armed === "boolean" ? saved.armed : DEFAULT_DEPTH_ALARM.armed, thresholdM: clamp(numeric(saved.thresholdM, DEFAULT_DEPTH_ALARM.thresholdM), 1, 100) }); } } catch { window.localStorage.removeItem(DEPTH_ALARM_STORAGE_KEY); } setHydrated(true); }, 0); return () => window.clearTimeout(timer); }, []);
   useEffect(() => { const onResize = () => { const next: PanelPositions = {}; for (const panel of FLOATING_PANELS) { const position = panelPositionsRef.current[panel]; if (position) next[panel] = { x: clamp(position.x, 8, Math.max(8, window.innerWidth - 80)), y: clamp(position.y, 8, Math.max(8, window.innerHeight - 50)) }; } panelPositionsRef.current = next; setPanelPositions(next); }; window.addEventListener("resize", onResize); return () => window.removeEventListener("resize", onResize); }, []);
   useEffect(() => { if (!hydrated) return; const refresh = () => { const target = voyageRef.current ?? selectedPort; void refreshConditions(target.lat, target.lon); }; refresh(); const interval = window.setInterval(refresh, 15 * 60 * 1000); return () => window.clearInterval(interval); }, [hydrated, refreshConditions, selectedPort]);
   useEffect(() => { const interval = window.setInterval(() => { const timestamp = Date.now(); setNow(timestamp); setVoyage((current) => current ? advanceVoyage(current, conditionsRef.current, timestamp) : current); }, 1000); return () => window.clearInterval(interval); }, []);
@@ -350,6 +359,48 @@ export default function Home() {
     const next = { ...panelPositionsRef.current, [drag.panel]: position }; panelPositionsRef.current = next; setPanelPositions(next);
   };
   const endPanelDrag = (event: ReactPointerEvent<HTMLElement>) => { if (!panelDragRef.current) return; panelDragRef.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); window.localStorage.setItem(PANEL_POSITIONS_STORAGE_KEY, JSON.stringify(panelPositionsRef.current)); };
+  useEffect(() => {
+    const panelFromTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return null;
+      const element = target.closest<HTMLElement>("[data-floating-panel]"); const panel = element?.dataset.floatingPanel as FloatingPanelName | undefined;
+      return element && panel && FLOATING_PANELS.includes(panel) ? { element, panel } : null;
+    };
+    const saveLayout = () => { window.localStorage.setItem(PANEL_POSITIONS_STORAGE_KEY, JSON.stringify(panelPositionsRef.current)); window.localStorage.setItem(PANEL_SIZES_STORAGE_KEY, JSON.stringify(panelSizesRef.current)); };
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0 || !(event.target instanceof HTMLElement) || event.target.closest("button, input, select, label, a")) return;
+      const found = panelFromTarget(event.target); if (!found) return;
+      const { element, panel } = found; const rect = element.getBoundingClientRect(); const edgeMargin = 10;
+      const edge = `${event.clientY - rect.top < edgeMargin ? "t" : ""}${rect.bottom - event.clientY < edgeMargin ? "b" : ""}${event.clientX - rect.left < edgeMargin ? "l" : ""}${rect.right - event.clientX < edgeMargin ? "r" : ""}`;
+      if (edge) {
+        const positions = { ...panelPositionsRef.current, [panel]: { x: rect.left, y: rect.top } }; panelPositionsRef.current = positions; setPanelPositions(positions);
+        panelResizeRef.current = { panel, edge, startX: event.clientX, startY: event.clientY, width: rect.width, height: rect.height, left: rect.left, top: rect.top };
+      } else if (event.target.closest(".floating-window-bar, .conditions-title")) {
+        panelDragRef.current = { panel, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, width: rect.width, height: rect.height };
+      } else return;
+      setActivePanel(panel); element.setPointerCapture(event.pointerId); event.preventDefault();
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      const resize = panelResizeRef.current;
+      if (resize) {
+        const minWidth = 160; const minHeight = 46; let left = resize.left; let top = resize.top; let width = resize.width; let height = resize.height;
+        if (resize.edge.includes("r")) width = clamp(resize.width + event.clientX - resize.startX, minWidth, window.innerWidth - left - 8);
+        if (resize.edge.includes("b")) height = clamp(resize.height + event.clientY - resize.startY, minHeight, window.innerHeight - top - 8);
+        if (resize.edge.includes("l")) { left = clamp(resize.left + event.clientX - resize.startX, 8, resize.left + resize.width - minWidth); width = resize.width - (left - resize.left); }
+        if (resize.edge.includes("t")) { top = clamp(resize.top + event.clientY - resize.startY, 8, resize.top + resize.height - minHeight); height = resize.height - (top - resize.top); }
+        const positions = { ...panelPositionsRef.current, [resize.panel]: { x: left, y: top } }; const sizes = { ...panelSizesRef.current, [resize.panel]: { width, height } };
+        panelPositionsRef.current = positions; panelSizesRef.current = sizes; setPanelPositions(positions); setPanelSizes(sizes); return;
+      }
+      const drag = panelDragRef.current; if (!drag) return;
+      const positions = { ...panelPositionsRef.current, [drag.panel]: { x: clamp(event.clientX - drag.offsetX, 8, Math.max(8, window.innerWidth - drag.width - 8)), y: clamp(event.clientY - drag.offsetY, 8, Math.max(8, window.innerHeight - drag.height - 8)) } }; panelPositionsRef.current = positions; setPanelPositions(positions);
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      if (!panelResizeRef.current && !panelDragRef.current) return;
+      const found = panelFromTarget(event.target); if (found?.element.hasPointerCapture(event.pointerId)) found.element.releasePointerCapture(event.pointerId);
+      panelResizeRef.current = null; panelDragRef.current = null; saveLayout();
+    };
+    document.addEventListener("pointerdown", onPointerDown); document.addEventListener("pointermove", onPointerMove); document.addEventListener("pointerup", onPointerUp); document.addEventListener("pointercancel", onPointerUp);
+    return () => { document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("pointermove", onPointerMove); document.removeEventListener("pointerup", onPointerUp); document.removeEventListener("pointercancel", onPointerUp); };
+  }, []);
   const beginAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     const rect = event.currentTarget.getBoundingClientRect(); const angle = toDegrees(Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2)));
@@ -366,7 +417,7 @@ export default function Home() {
   const endAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => { if (!anchorWinchDragRef.current) return; anchorWinchDragRef.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); };
   const resetPanelPosition = (panel: FloatingPanelName) => { const next = { ...panelPositionsRef.current }; delete next[panel]; panelPositionsRef.current = next; setPanelPositions(next); window.localStorage.setItem(PANEL_POSITIONS_STORAGE_KEY, JSON.stringify(next)); };
   const togglePanelMinimized = (panel: FloatingPanelName) => { setMinimizedPanels((current) => { const next = { ...current, [panel]: !current[panel] }; window.localStorage.setItem(MINIMIZED_PANELS_STORAGE_KEY, JSON.stringify(next)); return next; }); setActivePanel(panel); };
-  const floatingPanelStyle = (panel: FloatingPanelName): CSSProperties => { const position = panelPositions[panel]; return { ...(position ? { left: position.x, top: position.y, right: "auto", bottom: "auto", transform: "none" } : {}), zIndex: activePanel === panel ? 12 : 7 }; };
+  const floatingPanelStyle = (panel: FloatingPanelName): CSSProperties => { const position = panelPositions[panel]; const size = panelSizes[panel]; return { ...(position ? { left: position.x, top: position.y, right: "auto", bottom: "auto", transform: "none" } : {}), ...(size ? { width: size.width, height: size.height } : {}), zIndex: activePanel === panel ? 12 : 7 }; };
   const resetVoyage = () => { if (!window.confirm("¿Finalizar este viaje y volver a elegir puerto?")) return; window.localStorage.removeItem(STORAGE_KEY); setVoyage(null); setFollowBoat(true); };
   const utcTime = now ? new Date(now).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC" }) : "--:--:--";
   const gps = voyage ? gpsNavigation(voyage, conditions) : { course: 0, speedKn: 0 };
