@@ -639,6 +639,62 @@ input[type="range"]::-moz-range-thumb {
   gap: 7px;
 }
 
+.north-indicator {
+  position: absolute;
+  z-index: 6;
+  left: 24px;
+  bottom: 215px;
+  width: 64px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  background: rgba(4, 25, 33, 0.88);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(12px);
+}
+
+.north-indicator strong {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  color: #f2d39b;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.north-indicator small {
+  position: absolute;
+  bottom: 7px;
+  color: rgba(244, 240, 229, 0.6);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.north-indicator__needle {
+  position: absolute;
+  top: 10px;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 36px;
+  transform: rotate(-34deg);
+  transform-origin: 50% 100%;
+  background: linear-gradient(to top, rgba(242, 211, 155, 0.35) 0 44%, #e25b50 44% 100%);
+}
+
+.north-indicator__needle::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  border-right: 4px solid transparent;
+  border-bottom: 7px solid #e25b50;
+  border-left: 4px solid transparent;
+}
+
 .map-tools button {
   min-height: 34px;
   padding: 0 12px;
@@ -649,6 +705,10 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .is-docked .map-tools {
+  bottom: 26px;
+}
+
+.is-docked .north-indicator {
   bottom: 26px;
 }
 
@@ -1183,8 +1243,17 @@ input[type="range"]::-moz-range-thumb {
     align-items: flex-end;
   }
 
+  .north-indicator {
+    left: 10px;
+    bottom: 318px;
+  }
+
   .is-docked .map-tools {
     display: none;
+  }
+
+  .is-docked .north-indicator {
+    bottom: 14px;
   }
 
   .maplibregl-ctrl-top-right {
