@@ -741,6 +741,101 @@ input:focus-visible {
   width: 420px;
 }
 
+.resources-window {
+  top: 380px;
+  left: 24px;
+  width: 258px;
+}
+
+.resources-window.is-minimized {
+  width: 385px;
+}
+
+.resources-window-content {
+  display: grid;
+  gap: 13px;
+}
+
+.resource-list {
+  display: grid;
+  gap: 10px;
+}
+
+.resource-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+}
+
+.resource-row > span,
+.cargo-summary span {
+  color: rgba(244, 240, 229, 0.5);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.resource-row strong,
+.cargo-summary strong {
+  color: var(--paper-bright);
+  font-family: Consolas, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.resource-row strong small,
+.cargo-summary strong small {
+  color: rgba(244, 240, 229, 0.45);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.resource-row i,
+.cargo-summary > i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.resource-row i b,
+.cargo-summary > i b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #a7d9d4, #e8c476);
+}
+
+.resource-row em {
+  grid-column: 1 / -1;
+  color: rgba(244, 240, 229, 0.46);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.cargo-summary {
+  display: grid;
+  gap: 7px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cargo-summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.cargo-summary > small {
+  color: rgba(244, 240, 229, 0.45);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
 .depth-window {
   top: 380px;
   right: 288px;
@@ -2262,6 +2357,16 @@ input[type="range"]::-moz-range-thumb {
 
   .rigging-window.is-minimized {
     width: min(420px, calc(100vw - 20px));
+  }
+
+  .resources-window {
+    top: 640px;
+    left: 10px;
+    width: min(258px, calc(100vw - 20px));
+  }
+
+  .resources-window.is-minimized {
+    width: min(385px, calc(100vw - 20px));
   }
 
   .depth-window {
