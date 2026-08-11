@@ -186,6 +186,7 @@ export default function Home() {
         }
         setMapReady(true);
       });
+      map.on("dragstart", () => { if (!followRef.current) return; followRef.current = false; setFollowBoat(false); });
       map.on("error", () => setMapError(true)); mapRef.current = map; boatMarkerRef.current = marker;
     }); return () => { disposed = true; boatMarkerRef.current?.remove(); mapRef.current?.remove(); boatMarkerRef.current = null; mapRef.current = null; };
   }, [selectedPort.lat, selectedPort.lon]);
@@ -272,9 +273,9 @@ export default function Home() {
       <small>NORTE</small>
     </div>
     <div className="map-tools">
-      <button className={satelliteLayer ? "is-active" : ""} onClick={() => setSatelliteLayer((value) => !value)}>Satélite</button>
-      <button className={nauticalLayer ? "is-active" : ""} onClick={() => setNauticalLayer((value) => !value)}>Carta náutica</button>
-      {voyage && <button className={followBoat ? "is-active" : ""} aria-pressed={followBoat} onClick={toggleFollowBoat}>{followBoat ? "Dejar de seguir" : "Seguir barco"}</button>}
+      <button className={satelliteLayer ? "is-active" : ""} aria-label="Alternar vista satelital" aria-pressed={satelliteLayer} title="Vista satelital" onClick={() => setSatelliteLayer((value) => !value)}><span className="map-tool-icon map-tool-icon--satellite" aria-hidden="true">◉</span></button>
+      <button className={nauticalLayer ? "is-active" : ""} aria-label="Alternar carta náutica" aria-pressed={nauticalLayer} title="Carta náutica" onClick={() => setNauticalLayer((value) => !value)}><span className="map-tool-icon map-tool-icon--nautical" aria-hidden="true">⚓</span></button>
+      {voyage && <button className={followBoat ? "is-active" : ""} aria-label={followBoat ? "Desactivar seguimiento del barco" : "Seguir barco"} aria-pressed={followBoat} title={followBoat ? "Desactivar seguimiento" : "Seguir barco"} onClick={toggleFollowBoat}><span className="map-tool-icon map-tool-icon--follow" aria-hidden="true">⌖</span></button>}
     </div>{mapError && <div className="map-notice">No se pudo cargar una capa del mapa. El simulador sigue disponible.</div>}<div className="version-tag">SAILWARD · v{APP_VERSION} · ALPHA</div>
   </main>;
 }
