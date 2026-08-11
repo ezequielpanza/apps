@@ -57,6 +57,7 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /GPS de arranque temporal/);
   assert.match(page, /developerLatitude/);
   assert.match(page, /const updateVoyage = useCallback\([\s\S]*change\(current\)/);
+  assert.match(page, /lastMapCenterRef\.current !== centerKey/);
   assert.match(page, /Vista isométrica/);
   assert.equal(JSON.parse(packageJson).version, version.trim());
   assert.equal(JSON.parse(publicVersion).version, version.trim());

@@ -125,7 +125,7 @@ function formatCoordinate(value: number, positive: string, negative: string) { r
 
 export default function Home() {
   const mapContainerRef = useRef<HTMLDivElement>(null); const mapRef = useRef<MapInstance | null>(null); const boatMarkerRef = useRef<MarkerInstance | null>(null);
-  const voyageRef = useRef<Voyage | null>(null); const conditionsRef = useRef(DEFAULT_CONDITIONS); const followRef = useRef(true);
+  const voyageRef = useRef<Voyage | null>(null); const conditionsRef = useRef(DEFAULT_CONDITIONS); const followRef = useRef(true); const lastMapCenterRef = useRef<string | null>(null);
   const [hydrated, setHydrated] = useState(false); const [selectedPortId, setSelectedPortId] = useState(PORTS[0].id); const [developerLatitude, setDeveloperLatitude] = useState(""); const [developerLongitude, setDeveloperLongitude] = useState(""); const [voyage, setVoyage] = useState<Voyage | null>(null);
   const [conditions, setConditions] = useState(DEFAULT_CONDITIONS); const [followBoat, setFollowBoat] = useState(true); const [nauticalLayer, setNauticalLayer] = useState(true); const [isometricView, setIsometricView] = useState(true);
   const [mapReady, setMapReady] = useState(false); const [mapError, setMapError] = useState(false); const [conditionsBusy, setConditionsBusy] = useState(false); const [now, setNow] = useState(0);
@@ -186,8 +186,14 @@ export default function Home() {
       vessel.style.setProperty("--main-sail", `${voyage?.mainSail ?? 0}%`);
       vessel.style.setProperty("--genoa-sail", `${voyage?.genoaSail ?? 0}%`);
     }
-    if (voyage && followRef.current) map.easeTo({ center: [voyage.lon, voyage.lat], duration: 750 });
-    else if (!voyage) map.flyTo({ center: [selectedPort.lon, selectedPort.lat], zoom: 8.2 });
+    const centerKey = `${position.lat.toFixed(6)},${position.lon.toFixed(6)}`;
+    if (voyage && followRef.current && lastMapCenterRef.current !== centerKey) {
+      lastMapCenterRef.current = centerKey;
+      map.easeTo({ center: [voyage.lon, voyage.lat], duration: 750 });
+    } else if (!voyage) {
+      lastMapCenterRef.current = null;
+      map.flyTo({ center: [selectedPort.lon, selectedPort.lat], zoom: 8.2 });
+    }
   }, [isometricView, selectedPort, voyage]);
   useEffect(() => { const map = mapRef.current; if (!mapReady || !map) return; if (map.getLayer("open-seamap")) map.setLayoutProperty("open-seamap", "visibility", nauticalLayer ? "visible" : "none"); map.easeTo({ pitch: isometricView ? 56 : 0, bearing: isometricView ? -34 : 0, duration: 850 }); }, [mapReady, nauticalLayer, isometricView]);
   useEffect(() => { const map = mapRef.current; if (!mapReady || !map) return; const coordinates = voyage?.trail.map((entry) => [entry.lon, entry.lat]) ?? []; const source = map.getSource("voyage-trail") as { setData?: (data: object) => void } | undefined; const data = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates } }; if (source?.setData) source.setData(data); else { map.addSource("voyage-trail", { type: "geojson", data }); map.addLayer({ id: "voyage-trail", type: "line", source: "voyage-trail", paint: { "line-color": "#e8c476", "line-width": 2.4, "line-opacity": 0.82 } }); } }, [mapReady, voyage?.trail]);
