@@ -80,6 +80,13 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /helm-drawer-tab/);
   assert.match(page, /Abrir controles de velas/);
   assert.match(page, /Abrir tablero del timón/);
+  assert.match(page, /sailward\.keybindings\.v1/);
+  assert.match(page, /DEFAULT_KEY_BINDINGS[\s\S]*KeyA[\s\S]*KeyD/);
+  assert.match(page, /event\.code === keyBindings\.rudderLeft/);
+  assert.match(page, /event\.code === keyBindings\.rudderRight/);
+  assert.match(page, /Abrir ajustes de Sailward/);
+  assert.match(page, /Cambiar tecla para/);
+  assert.match(page, /RESTAURAR A \/ D/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);
