@@ -230,7 +230,7 @@ export default function Home() {
     if (developerStart === undefined) return;
     const timestamp = Date.now();
     const launchPoint = developerStart ?? selectedPort;
-    const base: Voyage = { portId: selectedPort.id, lat: launchPoint.lat, lon: launchPoint.lon, heading: selectedPort.heading, rudder: 0, mainSail: 72, genoaSail: 72, mainSheet: 70, genoaSheet: 70, motor: 0, autopilot: false, targetHeading: null, speedKn: 0, sailSpeedKn: 0, distanceNm: 0, grounded: false, trail: [{ lat: launchPoint.lat, lon: launchPoint.lon }], startedAt: timestamp, updatedAt: timestamp };
+    const base: Voyage = { portId: selectedPort.id, lat: launchPoint.lat, lon: launchPoint.lon, heading: selectedPort.heading, rudder: 0, mainSail: 0, genoaSail: 0, mainSheet: 0, genoaSheet: 0, motor: 0, autopilot: false, targetHeading: null, speedKn: 0, sailSpeedKn: 0, distanceNm: 0, grounded: false, trail: [{ lat: launchPoint.lat, lon: launchPoint.lon }], startedAt: timestamp, updatedAt: timestamp };
     const next = advanceVoyage(base, conditions, timestamp);
     setVoyage(next); setFollowBoat(true); window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     mapRef.current?.flyTo({ center: [next.lon, next.lat], zoom: 10.5, duration: 1500 });
