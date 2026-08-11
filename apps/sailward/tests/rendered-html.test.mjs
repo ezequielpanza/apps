@@ -44,11 +44,15 @@ test("keeps product version and offline voyage contract aligned", async () => {
     readFile(new URL("../public/version.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /const APP_VERSION = "0\.1\.0"/);
+  assert.match(page, /const APP_VERSION = "0\.2\.0"/);
   assert.match(page, /sailward\.voyage/);
   assert.match(page, /open-meteo\.com/);
   assert.match(page, /tiles\.openseamap\.org/);
   assert.match(page, /pitch: 56/);
+  assert.match(page, /autopilot/);
+  assert.match(page, /polarEfficiency/);
+  assert.match(page, /isOnLand/);
+  assert.match(page, /sailboat-hull\.png/);
   assert.match(page, /Vista isométrica/);
   assert.equal(JSON.parse(packageJson).version, version.trim());
   assert.equal(JSON.parse(publicVersion).version, version.trim());

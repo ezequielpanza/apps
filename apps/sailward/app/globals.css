@@ -739,6 +739,156 @@ input[type="range"]::-moz-range-thumb {
   background: var(--brass);
 }
 
+/* The hull is an independent sprite; the two sails remain live game elements. */
+.brand-lockup strong em {
+  margin-left: 5px;
+  color: var(--brass);
+  font-family: inherit;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+
+.boat-marker {
+  width: 94px;
+  height: 94px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.boat-marker::after {
+  inset: 13px;
+  border-color: rgba(78, 211, 202, 0.48);
+}
+
+.boat-marker__vessel {
+  width: 94px;
+  height: 94px;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  transition: transform 360ms linear;
+}
+
+.boat-marker__vessel::before,
+.boat-marker__vessel::after {
+  display: none;
+}
+
+.boat-marker__vessel > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.boat-sail {
+  position: absolute;
+  display: block;
+  transform-origin: 50% 100%;
+  opacity: 0;
+  filter: drop-shadow(1px 2px 1px rgba(3, 16, 22, 0.28));
+  transition: opacity 280ms ease, transform 280ms ease;
+}
+
+.boat-sail--main {
+  left: 45px;
+  top: 12px;
+  width: 24px;
+  height: 50px;
+  clip-path: polygon(5% 100%, 60% 2%, 100% 100%);
+  background: linear-gradient(100deg, #e5e0d1 0%, #fffdf3 65%, #b8c4bf 100%);
+  opacity: calc(var(--main-sail) / 100);
+  transform: rotate(calc((var(--main-sheet) - 50%) * 0.42)) skewY(-5deg);
+}
+
+.boat-sail--genoa {
+  left: 23px;
+  top: 17px;
+  width: 26px;
+  height: 39px;
+  clip-path: polygon(95% 100%, 12% 7%, 0% 100%);
+  background: linear-gradient(70deg, #d8e4e2, #fffdf3 65%, #b9c8c4);
+  opacity: calc(var(--genoa-sail) / 100);
+  transform: rotate(calc((50% - var(--genoa-sheet)) * 0.52)) skewY(6deg);
+}
+
+.helm-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 5px;
+}
+
+.helm {
+  position: relative;
+  flex: 0 0 74px;
+  width: 74px;
+  height: 74px;
+  border: 6px solid var(--brass);
+  border-radius: 50%;
+  background: radial-gradient(circle, #193e48 0 16%, transparent 17%), rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 2px rgba(3, 12, 17, 0.6);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.helm::before,
+.helm::after,
+.helm span {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 62px;
+  border-radius: 4px;
+  background: var(--brass);
+  transform-origin: 50% 50%;
+  transition: transform 150ms ease-out;
+}
+
+.helm::before { transform: translate(-50%, -50%) rotate(60deg); }
+.helm::after { transform: translate(-50%, -50%) rotate(-60deg); }
+.helm span { transform: translate(-50%, -50%); }
+
+.step-buttons {
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.step-buttons button { min-width: 47px; }
+
+.autopilot-button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px;
+  border: 1px solid rgba(232, 196, 118, 0.45);
+  border-radius: 7px;
+  color: var(--brass);
+  background: rgba(232, 196, 118, 0.08);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.sail-control { overflow-y: auto; }
+.sail-row { display: grid; grid-template-columns: 52px 1fr; gap: 1px 9px; margin-top: 4px; }
+.sail-row label,
+.motor-row label { color: rgba(244, 240, 229, 0.68); font-size: 10px; }
+.sail-row b,
+.motor-row b { float: right; color: var(--brass); }
+.sheet-label { font-size: 9px !important; color: rgba(244, 240, 229, 0.45) !important; }
+.sail-row input { margin: 0; height: 12px; }
+.motor-row { margin-top: 5px; }
+.motor-row input { height: 13px; margin: 0; }
+.grounded { color: #f3a36f; font-weight: 800; }
+
 @keyframes markerPulse {
   to {
     opacity: 0;
