@@ -37,10 +37,11 @@ test("server-renders the Sailward game shell", async () => {
 });
 
 test("keeps product version and offline voyage contract aligned", async () => {
-  const [page, packageJson, version] = await Promise.all([
+  const [page, packageJson, version, publicVersion] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../VERSION", import.meta.url), "utf8"),
+    readFile(new URL("../public/version.json", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /const APP_VERSION = "0\.1\.0"/);
@@ -50,4 +51,5 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /pitch: 56/);
   assert.match(page, /Vista isométrica/);
   assert.equal(JSON.parse(packageJson).version, version.trim());
+  assert.equal(JSON.parse(publicVersion).version, version.trim());
 });

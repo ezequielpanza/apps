@@ -51,6 +51,12 @@ jobs:
             --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain" \
             | node -e 'let input=""; process.stdin.on("data", chunk => input += chunk); process.stdin.on("end", () => process.stdout.write(JSON.parse(input).result.subdomain));')"
-          curl --fail --silent --show-error --location \
-            "https://sailward.${subdomain}.workers.dev/version.json" \
-            | grep -Fq '"version": "0.1.0"'
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl --fail --silent --show-error --location \
+              "https://sailward.${subdomain}.workers.dev/version.json?probe=${GITHUB_RUN_ID}-${attempt}" \
+              | grep -Fq '"version": "0.1.0"'; then
+              exit 0
+            fi
+            sleep 6
+          done
+          exit 1
