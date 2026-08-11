@@ -1684,6 +1684,26 @@ input:focus-visible {
   min-height: 46px;
 }
 
+.floating-window.resize-cursor--ns,
+.floating-window.resize-cursor--ns * {
+  cursor: ns-resize !important;
+}
+
+.floating-window.resize-cursor--ew,
+.floating-window.resize-cursor--ew * {
+  cursor: ew-resize !important;
+}
+
+.floating-window.resize-cursor--nwse,
+.floating-window.resize-cursor--nwse * {
+  cursor: nwse-resize !important;
+}
+
+.floating-window.resize-cursor--nesw,
+.floating-window.resize-cursor--nesw * {
+  cursor: nesw-resize !important;
+}
+
 .floating-window::after {
   content: "";
   position: absolute;

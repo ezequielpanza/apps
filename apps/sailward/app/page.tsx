@@ -374,20 +374,26 @@ export default function Home() {
       return element && panel && FLOATING_PANELS.includes(panel) ? { element, panel } : null;
     };
     const saveLayout = () => { window.localStorage.setItem(PANEL_POSITIONS_STORAGE_KEY, JSON.stringify(panelPositionsRef.current)); window.localStorage.setItem(PANEL_SIZES_STORAGE_KEY, JSON.stringify(panelSizesRef.current)); };
+    const edgeAt = (element: HTMLElement, event: PointerEvent) => { const rect = element.getBoundingClientRect(); const edgeMargin = 10; return `${event.clientY - rect.top < edgeMargin ? "t" : ""}${rect.bottom - event.clientY < edgeMargin ? "b" : ""}${event.clientX - rect.left < edgeMargin ? "l" : ""}${rect.right - event.clientX < edgeMargin ? "r" : ""}`; };
+    const resizeCursor = (edge: string) => edge === "tl" || edge === "br" ? "nwse-resize" : edge === "tr" || edge === "bl" ? "nesw-resize" : edge.includes("l") || edge.includes("r") ? "ew-resize" : "ns-resize";
+    const resizeCursorClasses = ["resize-cursor--ns", "resize-cursor--ew", "resize-cursor--nwse", "resize-cursor--nesw"];
+    let cursorPanel: HTMLElement | null = null;
+    const setResizeCursor = (element: HTMLElement | null, edge = "") => { if (cursorPanel) cursorPanel.classList.remove(...resizeCursorClasses); cursorPanel = element; if (cursorPanel && edge) cursorPanel.classList.add(`resize-cursor--${resizeCursor(edge).replace("-resize", "")}`); };
+    const updateResizeCursor = (event: PointerEvent) => { if (event.pointerType !== "mouse" || !(event.target instanceof HTMLElement) || event.target.closest("button, input, select, label, a")) { setResizeCursor(null); return; } const found = panelFromTarget(event.target); if (!found || found.element.classList.contains("is-minimized")) { setResizeCursor(null); return; } const edge = edgeAt(found.element, event); setResizeCursor(edge ? found.element : null, edge); };
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0 || !(event.target instanceof HTMLElement) || event.target.closest("button, input, select, label, a")) return;
       const found = panelFromTarget(event.target); if (!found) return;
-      const { element, panel } = found; const rect = element.getBoundingClientRect(); const edgeMargin = 10;
-      const edge = `${event.clientY - rect.top < edgeMargin ? "t" : ""}${rect.bottom - event.clientY < edgeMargin ? "b" : ""}${event.clientX - rect.left < edgeMargin ? "l" : ""}${rect.right - event.clientX < edgeMargin ? "r" : ""}`;
+      const { element, panel } = found; const rect = element.getBoundingClientRect(); const edge = edgeAt(element, event);
       if (edge) {
         const positions = { ...panelPositionsRef.current, [panel]: { x: rect.left, y: rect.top } }; panelPositionsRef.current = positions; setPanelPositions(positions);
-        panelResizeRef.current = { panel, edge, startX: event.clientX, startY: event.clientY, width: rect.width, height: rect.height, left: rect.left, top: rect.top };
+        panelResizeRef.current = { panel, edge, startX: event.clientX, startY: event.clientY, width: rect.width, height: rect.height, left: rect.left, top: rect.top }; setResizeCursor(element, edge);
       } else if (event.target.closest(".floating-window-bar, .conditions-title")) {
         panelDragRef.current = { panel, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, width: rect.width, height: rect.height };
       } else return;
       setActivePanel(panel); element.setPointerCapture(event.pointerId); event.preventDefault();
     };
     const onPointerMove = (event: PointerEvent) => {
+      if (!panelResizeRef.current && !panelDragRef.current) updateResizeCursor(event);
       const resize = panelResizeRef.current;
       if (resize) {
         const minWidth = 160; const minHeight = 46; let left = resize.left; let top = resize.top; let width = resize.width; let height = resize.height;
@@ -404,10 +410,10 @@ export default function Home() {
     const onPointerUp = (event: PointerEvent) => {
       if (!panelResizeRef.current && !panelDragRef.current) return;
       const found = panelFromTarget(event.target); if (found?.element.hasPointerCapture(event.pointerId)) found.element.releasePointerCapture(event.pointerId);
-      panelResizeRef.current = null; panelDragRef.current = null; saveLayout();
+      panelResizeRef.current = null; panelDragRef.current = null; setResizeCursor(null); saveLayout();
     };
     document.addEventListener("pointerdown", onPointerDown); document.addEventListener("pointermove", onPointerMove); document.addEventListener("pointerup", onPointerUp); document.addEventListener("pointercancel", onPointerUp);
-    return () => { document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("pointermove", onPointerMove); document.removeEventListener("pointerup", onPointerUp); document.removeEventListener("pointercancel", onPointerUp); };
+    return () => { setResizeCursor(null); document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("pointermove", onPointerMove); document.removeEventListener("pointerup", onPointerUp); document.removeEventListener("pointercancel", onPointerUp); };
   }, []);
   const beginAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
