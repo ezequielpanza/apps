@@ -665,55 +665,67 @@ input:focus-visible {
   position: absolute;
   z-index: 7;
   left: 50%;
-  bottom: 0;
+  bottom: 36px;
   width: min(920px, calc(100vw - 48px));
   min-height: 160px;
   display: grid;
   grid-template-columns: 1.15fr 1fr;
-  transform: translate(-50%, calc(100% + 2px));
-  overflow: visible;
+  transform: translateX(-50%);
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.21);
-  border-radius: 18px 18px 0 0;
+  border-radius: 18px;
   background: rgba(4, 25, 33, 0.94);
   box-shadow: 0 26px 80px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(18px);
-  transition: transform 240ms ease;
 }
 
-.control-dock.is-open {
-  transform: translate(-50%, 0);
-}
-
-.helm-drawer-tab {
-  position: absolute;
-  top: -42px;
-  left: 50%;
-  width: 118px;
-  height: 42px;
+.floating-window-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.21);
-  border-bottom: 0;
-  border-radius: 12px 12px 0 0;
-  color: var(--paper);
-  background: rgba(4, 25, 33, 0.94);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.22);
-  cursor: pointer;
-  backdrop-filter: blur(18px);
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.helm-drawer-tab strong {
-  font-size: 10px;
-  letter-spacing: 0.12em;
+.floating-window-bar > span {
+  color: rgba(244, 240, 229, 0.58);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
 }
 
-.helm-drawer-tab span {
-  color: var(--brass);
-  font-size: 18px;
+.floating-window-bar--helm {
+  grid-column: 1 / -1;
+  padding: 7px 10px 4px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.window-drag-handle {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  color: rgba(244, 240, 229, 0.58);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 17px;
   line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.window-drag-handle:active {
+  cursor: grabbing;
+  color: var(--brass);
+  background: rgba(232, 196, 118, 0.1);
+}
+
+.floating-window-actions {
+  display: flex;
+  gap: 5px;
 }
 
 .course-control,
@@ -1319,72 +1331,30 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .sail-control {
-  position: fixed;
+  position: absolute;
   z-index: 7;
   top: 338px;
-  right: 0;
-  width: min(240px, calc(100vw - 56px));
+  right: 24px;
+  width: 240px;
   min-height: 0;
   padding: 0;
-  overflow: visible;
-  transform: translateX(calc(100% + 2px));
+  overflow: hidden;
   border: 1px solid var(--line) !important;
-  border-right: 0 !important;
-  border-radius: 16px 0 0 16px;
+  border-radius: 16px;
   background: rgba(4, 25, 33, 0.9);
   box-shadow: 0 22px 55px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(14px);
-  transition: transform 240ms ease;
 }
 
-.sail-control.is-open {
-  transform: translateX(0);
-}
-
-.sail-drawer-content {
+.sail-window-content {
   max-height: calc(100dvh - 356px);
   min-height: 198px;
   padding: 16px 18px;
   overflow-y: auto;
 }
 
-.sail-drawer-tab {
-  position: fixed;
-  z-index: 8;
-  top: 338px;
-  right: 0;
-  width: 44px;
-  height: 74px;
-  display: grid;
-  place-items: center;
-  padding: 8px 4px;
-  border: 1px solid rgba(255, 255, 255, 0.21);
-  border-right: 0;
-  border-radius: 12px 0 0 12px;
-  color: var(--paper);
-  background: rgba(4, 25, 33, 0.94);
-  box-shadow: -8px 8px 22px rgba(0, 0, 0, 0.22);
-  cursor: pointer;
-  backdrop-filter: blur(14px);
-  transition: right 240ms ease;
-}
-
-.sail-drawer-tab.is-open {
-  right: min(240px, calc(100vw - 56px));
-}
-
-.sail-drawer-tab strong {
-  font-size: 9px;
-  letter-spacing: 0.08em;
-}
-
-.sail-drawer-tab span {
-  color: var(--brass);
-  font-size: 22px;
-  line-height: 1;
-}
-
 .sail-control .control-heading { margin-bottom: 7px; }
+.sail-control .window-drag-handle { margin-left: auto; }
 .sail-row { display: grid; grid-template-columns: 52px 1fr; gap: 1px 9px; margin-top: 4px; }
 .sail-row label,
 .motor-row label { color: rgba(244, 240, 229, 0.68); font-size: 10px; }
@@ -1637,18 +1607,14 @@ input[type="range"]::-moz-range-thumb {
   .course-control { border-right: 0; }
   .sail-control {
     top: 268px;
-    right: 0;
-    width: min(240px, calc(100vw - 56px));
+    right: 10px;
+    width: min(240px, calc(100vw - 20px));
     padding: 0;
   }
-  .sail-drawer-content {
+  .sail-window-content {
     max-height: calc(100dvh - 286px);
     min-height: 198px;
   }
-  .sail-drawer-tab {
-    top: 240px;
-  }
-
   .settings-overlay {
     align-items: end;
     padding: 0;
