@@ -154,8 +154,8 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);
-  assert.match(page, /north-indicator/);
-  assert.match(page, /NORTE/);
+  assert.doesNotMatch(page, /north-indicator/);
+  assert.doesNotMatch(page, /Indicador de norte/);
   assert.doesNotMatch(page, /setIsometricView/);
   assert.equal(JSON.parse(packageJson).version, version.trim());
   assert.equal(JSON.parse(publicVersion).version, version.trim());
