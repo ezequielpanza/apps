@@ -84,6 +84,7 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /data-floating-panel="helm"/);
   assert.match(page, /data-floating-panel="autopilot"/);
   assert.match(page, /data-floating-panel="anchor"/);
+  assert.match(page, /data-floating-panel="rigging"/);
   assert.match(page, /data-floating-panel="compass"/);
   assert.match(page, /data-floating-panel="gps"/);
   assert.match(page, /data-floating-panel="wind"/);
@@ -109,6 +110,7 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /Minimizar ventana del timón/);
   assert.match(page, /Minimizar ventana del piloto automático/);
   assert.match(page, /Minimizar ventana de ancla/);
+  assert.match(page, /Minimizar ventana de superficies y líneas/);
   assert.match(page, /Minimizar ventana del compás/);
   assert.match(page, /Minimizar ventana GPS/);
   assert.match(page, /Minimizar ventana de viento/);
@@ -128,6 +130,11 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /anchorIsHolding/);
   assert.match(page, /beginAnchorWinch/);
   assert.match(page, /LIBERAR ANCLA/);
+  assert.match(page, /SUPERFICIES Y LÍNEAS/);
+  assert.match(page, /DRIZA MAYOR/);
+  assert.match(page, /ENROLLADOR GENOA/);
+  assert.match(page, /ESCOTA MAYOR/);
+  assert.match(page, /ESCOTA GENOA/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);

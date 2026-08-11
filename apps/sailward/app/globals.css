@@ -705,6 +705,71 @@ input:focus-visible {
   width: 240px;
 }
 
+.rigging-window {
+  left: 444px;
+  width: 270px;
+}
+
+.rigging-window.is-minimized {
+  width: 420px;
+}
+
+.rigging-window-content {
+  display: grid;
+  gap: 12px;
+  padding: 13px 15px 15px;
+}
+
+.rigging-window-content > section {
+  display: grid;
+  gap: 6px;
+}
+
+.rigging-window-content > section + section {
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.rigging-window-content > section > span {
+  color: rgba(244, 240, 229, 0.45);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+}
+
+.rigging-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rigging-values > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.rigging-values small {
+  overflow: hidden;
+  color: rgba(244, 240, 229, 0.48);
+  font-size: 8px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rigging-values strong {
+  color: var(--paper-bright);
+  font-family: Georgia, serif;
+  font-size: 21px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
 .instrument-window-content {
   min-width: 0;
   padding: 13px 15px 15px;
@@ -1860,6 +1925,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .sail-control .control-heading { margin-bottom: 7px; }
+.sail-control .control-heading strong,
+.sail-row b { display: none; }
 .sail-row { display: grid; grid-template-columns: 52px 1fr; gap: 1px 9px; margin-top: 4px; }
 .sail-row label,
 .motor-row label { color: rgba(244, 240, 229, 0.68); font-size: 10px; }
@@ -2012,6 +2079,17 @@ input[type="range"]::-moz-range-thumb {
     top: 220px;
     right: 10px;
     width: min(240px, calc(62vw - 10px));
+  }
+
+  .rigging-window {
+    top: 510px;
+    right: 10px;
+    left: auto;
+    width: min(270px, calc(100vw - 20px));
+  }
+
+  .rigging-window.is-minimized {
+    width: min(420px, calc(100vw - 20px));
   }
 
   .gps-window {
