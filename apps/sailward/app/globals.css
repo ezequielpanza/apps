@@ -665,6 +665,33 @@ input:focus-visible {
   font-size: 9px;
 }
 
+.meteorology-window.is-minimized {
+  width: 350px;
+  padding: 7px 8px 5px 14px;
+}
+
+.meteorology-window.is-minimized .conditions-title {
+  margin-bottom: 0;
+}
+
+.meteorology-window.is-minimized .conditions-title > div:first-child {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.meteorology-window.is-minimized .minimized-summary {
+  display: inline;
+  color: var(--paper-bright);
+  font-family: Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.meteorology-window.is-minimized .floating-window-actions button:nth-child(2) {
+  display: none;
+}
+
 .instrument-window {
   position: absolute;
   z-index: 7;
@@ -2056,12 +2083,26 @@ input[type="range"]::-moz-range-thumb {
   .conditions-card {
     top: 78px;
     right: 10px;
-    width: 150px;
+    width: 180px;
     padding: 11px;
+  }
+
+  .meteorology-window.is-minimized {
+    width: min(350px, calc(100vw - 20px));
   }
 
   .conditions-card dl > div {
     padding: 5px 0;
+  }
+
+  .conditions-title > div:first-child {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+  }
+
+  .conditions-title button {
+    width: 24px;
+    height: 24px;
   }
 
   .conditions-card .floating-window-content > small,

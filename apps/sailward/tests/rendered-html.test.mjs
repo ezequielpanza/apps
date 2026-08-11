@@ -105,7 +105,7 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /togglePanelMinimized/);
   assert.match(page, /window-minimize-button/);
   assert.match(page, /Minimizar ventana de travesía/);
-  assert.match(page, /Minimizar ventana de condiciones/);
+  assert.match(page, /Minimizar ventana de meteorología/);
   assert.match(page, /Minimizar ventana de velas/);
   assert.match(page, /Minimizar ventana del timón/);
   assert.match(page, /Minimizar ventana del piloto automático/);
@@ -135,6 +135,10 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /ENROLLADOR GENOA/);
   assert.match(page, /ESCOTA MAYOR/);
   assert.match(page, /ESCOTA GENOA/);
+  assert.match(page, /METEOROLOGÍA/);
+  assert.match(page, /Viento real/);
+  assert.match(page, /Información local en vivo/);
+  assert.match(page, /<dt>Profundidad<\/dt>/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);
