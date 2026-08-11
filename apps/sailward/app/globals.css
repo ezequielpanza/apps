@@ -349,6 +349,46 @@ input:focus-visible {
   cursor: pointer;
 }
 
+.settings-danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(226, 91, 80, 0.28);
+}
+
+.settings-danger-zone > div {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-danger-zone span {
+  color: #f1a49c;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.settings-danger-zone small {
+  color: rgba(244, 240, 229, 0.5);
+  font-size: 10px;
+}
+
+.settings-danger-zone button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(226, 91, 80, 0.58);
+  border-radius: 8px;
+  color: #ffd2cb;
+  background: rgba(226, 91, 80, 0.1);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
 @keyframes settingsPulse {
   to { box-shadow: 0 0 0 4px rgba(78, 211, 202, 0.08); }
 }
@@ -1704,8 +1744,12 @@ input[type="range"]::-moz-range-thumb {
 
 .dock-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 6px;
+}
+
+.dock-actions button:last-child {
+  display: none;
 }
 
 .dock-actions button {
@@ -2563,6 +2607,11 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .settings-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .settings-danger-zone {
     align-items: flex-start;
     flex-direction: column;
   }

@@ -151,6 +151,8 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /sailward\.panelSizes\.v1/);
   assert.match(page, /panelResizeRef/);
   assert.match(page, /floating-window-bar/);
+  assert.match(page, /settings-danger-zone/);
+  assert.match(page, /FINALIZAR SIMULACIÓN/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);
