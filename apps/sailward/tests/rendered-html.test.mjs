@@ -85,6 +85,13 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /beginPanelDrag/);
   assert.match(page, /setPointerCapture/);
   assert.match(page, /Mover ventana del timón/);
+  assert.match(page, /sailward\.minimizedPanels\.v1/);
+  assert.match(page, /togglePanelMinimized/);
+  assert.match(page, /window-minimize-button/);
+  assert.match(page, /Minimizar ventana de travesía/);
+  assert.match(page, /Minimizar ventana de condiciones/);
+  assert.match(page, /Minimizar ventana de velas/);
+  assert.match(page, /Minimizar ventana del timón/);
   assert.match(page, /sailward\.keybindings\.v1/);
   assert.match(page, /DEFAULT_KEY_BINDINGS[\s\S]*KeyA[\s\S]*KeyD/);
   assert.match(page, /event\.code === keyBindings\.rudderLeft/);
