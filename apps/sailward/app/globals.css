@@ -1735,27 +1735,7 @@ input:focus-visible {
 }
 
 .window-drag-handle {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 7px;
-  color: rgba(244, 240, 229, 0.58);
-  background: rgba(255, 255, 255, 0.04);
-  font-size: 17px;
-  line-height: 1;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-
-.window-drag-handle:active {
-  cursor: grabbing;
-  color: var(--brass);
-  background: rgba(232, 196, 118, 0.1);
+  display: none;
 }
 
 .window-minimize-button {
