@@ -29,7 +29,8 @@ type Conditions = {
 };
 
 const PORTS: Port[] = [
-  { id: "las-palmas", name: "Las Palmas", country: "Islas Canarias", lat: 28.137, lon: -15.416, heading: 55 },
+  // Just outside the marina entrance: enough clear water for the first manoeuvre.
+  { id: "las-palmas", name: "Las Palmas", country: "Islas Canarias", lat: 28.1278, lon: -15.4145, heading: 55 },
   { id: "miami", name: "Miami", country: "Estados Unidos", lat: 25.769, lon: -80.15, heading: 105 },
   { id: "barcelona", name: "Barcelona", country: "España", lat: 41.341, lon: 2.183, heading: 135 },
   { id: "cape-town", name: "Ciudad del Cabo", country: "Sudáfrica", lat: -33.899, lon: 18.433, heading: 320 },
