@@ -18,14 +18,19 @@ const PANEL_POSITIONS_STORAGE_KEY = "sailward.panelPositions.v1";
 const MINIMIZED_PANELS_STORAGE_KEY = "sailward.minimizedPanels.v1";
 const BASE_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const BOAT_SPRITE_SIZE_PX = 72;
+const MAX_ANCHOR_RODE_M = 160;
+const ANCHOR_RELEASE_MPS = 1.2;
+const ANCHOR_RETRIEVE_M_PER_TURN = 1.1;
 
 type Port = { id: string; name: string; country: string; lat: number; lon: number; heading: number };
 type TrailPoint = { lat: number; lon: number };
+type AnchorId = 1 | 2;
 type Voyage = {
   portId: string; lat: number; lon: number; heading: number; rudder: number;
   mainSail: number; genoaSail: number; mainSheet: number; genoaSheet: number;
   motor: number; autopilot: boolean; targetHeading: number | null;
   speedKn: number; sailSpeedKn: number; distanceNm: number; grounded: boolean;
+  selectedAnchor: AnchorId; anchorRelease: AnchorId | 0; anchor1RodeM: number; anchor2RodeM: number;
   trail: TrailPoint[]; startedAt: number; updatedAt: number;
 };
 type Conditions = {
@@ -34,12 +39,13 @@ type Conditions = {
 };
 type KeyBindingName = "rudderLeft" | "rudderRight";
 type KeyBindings = Record<KeyBindingName, string>;
-const FLOATING_PANELS = ["voyage", "conditions", "sails", "helm", "autopilot", "compass", "gps", "wind"] as const;
+const FLOATING_PANELS = ["voyage", "conditions", "sails", "helm", "autopilot", "anchor", "compass", "gps", "wind"] as const;
 type FloatingPanelName = (typeof FLOATING_PANELS)[number];
 type PanelPosition = { x: number; y: number };
 type PanelPositions = Partial<Record<FloatingPanelName, PanelPosition>>;
 type MinimizedPanels = Partial<Record<FloatingPanelName, boolean>>;
 type PanelDrag = { panel: FloatingPanelName; offsetX: number; offsetY: number; width: number; height: number };
+type AnchorWinchDrag = { pointerId: number; lastAngle: number };
 
 const DEFAULT_KEY_BINDINGS: KeyBindings = { rudderLeft: "KeyA", rudderRight: "KeyD" };
 
@@ -119,12 +125,36 @@ function appendTrail(trail: TrailPoint[], next: TrailPoint) {
   }
   return [...trail, next].slice(-700);
 }
+function anchorRode(voyage: Voyage, anchor: AnchorId) { return anchor === 1 ? voyage.anchor1RodeM : voyage.anchor2RodeM; }
+function anchorSetLengthM(conditions: Conditions) { return clamp(conditions.depthM * 1.8, 4, MAX_ANCHOR_RODE_M); }
+function anchorIsHolding(voyage: Voyage, conditions: Conditions) {
+  const setLength = anchorSetLengthM(conditions);
+  return voyage.anchor1RodeM >= setLength || voyage.anchor2RodeM >= setLength;
+}
+function anchorStatus(voyage: Voyage, conditions: Conditions, anchor: AnchorId) {
+  const rode = anchorRode(voyage, anchor);
+  if (voyage.anchorRelease === anchor) return "LIBERANDO";
+  if (rode >= anchorSetLengthM(conditions)) return "FONDEADA";
+  if (rode >= conditions.depthM) return "EN FONDO · FALTA CADENA";
+  if (rode > 0.05) return "SUSPENDIDA";
+  return "ESTIBADA";
+}
 function advanceVoyage(voyage: Voyage, conditions: Conditions, now: number) {
   let remaining = Math.min(Math.max(0, (now - voyage.updatedAt) / 1000), 3600);
   let next = { ...voyage, trail: [...voyage.trail] };
   while (remaining > 0.001) {
-    const stepSeconds = Math.min(remaining, 4); const speed = motion(next, conditions);
+    const stepSeconds = Math.min(remaining, 4);
+    if (next.anchorRelease !== 0) {
+      const rodeKey = next.anchorRelease === 1 ? "anchor1RodeM" : "anchor2RodeM";
+      next = { ...next, [rodeKey]: clamp(next[rodeKey] + ANCHOR_RELEASE_MPS * stepSeconds, 0, MAX_ANCHOR_RODE_M) };
+    }
+    const speed = motion(next, conditions);
     const heading = headingAfter({ ...next, ...speed }, conditions, stepSeconds);
+    if (anchorIsHolding(next, conditions)) {
+      next = { ...next, heading, speedKn: 0, sailSpeedKn: speed.sailSpeedKn, grounded: false };
+      remaining -= stepSeconds;
+      continue;
+    }
     const throughWater = speed.speedKn * stepSeconds / 3600;
     const waterPoint = destinationPoint(next.lat, next.lon, heading, throughWater);
     const candidate = destinationPoint(waterPoint.lat, waterPoint.lon, conditions.currentDirection, conditions.currentKn * stepSeconds / 3600);
@@ -136,7 +166,7 @@ function advanceVoyage(voyage: Voyage, conditions: Conditions, now: number) {
 }
 function normalizeVoyage(saved: Partial<Voyage> & { sail?: number }): Voyage {
   const timestamp = numeric(saved.updatedAt, Date.now()); const main = numeric(saved.mainSail, numeric(saved.sail, 72));
-  return { portId: typeof saved.portId === "string" ? saved.portId : PORTS[0].id, lat: numeric(saved.lat, PORTS[0].lat), lon: numeric(saved.lon, PORTS[0].lon), heading: normalizeHeading(numeric(saved.heading, PORTS[0].heading)), rudder: clamp(numeric(saved.rudder, 0), -35, 35), mainSail: clamp(main, 0, 100), genoaSail: clamp(numeric(saved.genoaSail, main), 0, 100), mainSheet: clamp(numeric(saved.mainSheet, 70), 0, 100), genoaSheet: clamp(numeric(saved.genoaSheet, 70), 0, 100), motor: clamp(numeric(saved.motor, 0), 0, 100), autopilot: Boolean(saved.autopilot), targetHeading: typeof saved.targetHeading === "number" ? normalizeHeading(saved.targetHeading) : null, speedKn: numeric(saved.speedKn, 0), sailSpeedKn: numeric(saved.sailSpeedKn, 0), distanceNm: numeric(saved.distanceNm, 0), grounded: Boolean(saved.grounded), trail: Array.isArray(saved.trail) ? saved.trail.filter((item): item is TrailPoint => Boolean(item) && typeof item.lat === "number" && typeof item.lon === "number").slice(-700) : [], startedAt: numeric(saved.startedAt, timestamp), updatedAt: timestamp };
+  return { portId: typeof saved.portId === "string" ? saved.portId : PORTS[0].id, lat: numeric(saved.lat, PORTS[0].lat), lon: numeric(saved.lon, PORTS[0].lon), heading: normalizeHeading(numeric(saved.heading, PORTS[0].heading)), rudder: clamp(numeric(saved.rudder, 0), -35, 35), mainSail: clamp(main, 0, 100), genoaSail: clamp(numeric(saved.genoaSail, main), 0, 100), mainSheet: clamp(numeric(saved.mainSheet, 70), 0, 100), genoaSheet: clamp(numeric(saved.genoaSheet, 70), 0, 100), motor: clamp(numeric(saved.motor, 0), 0, 100), autopilot: Boolean(saved.autopilot), targetHeading: typeof saved.targetHeading === "number" ? normalizeHeading(saved.targetHeading) : null, speedKn: numeric(saved.speedKn, 0), sailSpeedKn: numeric(saved.sailSpeedKn, 0), distanceNm: numeric(saved.distanceNm, 0), grounded: Boolean(saved.grounded), selectedAnchor: saved.selectedAnchor === 2 ? 2 : 1, anchorRelease: saved.anchorRelease === 1 || saved.anchorRelease === 2 ? saved.anchorRelease : 0, anchor1RodeM: clamp(numeric(saved.anchor1RodeM, 0), 0, MAX_ANCHOR_RODE_M), anchor2RodeM: clamp(numeric(saved.anchor2RodeM, 0), 0, MAX_ANCHOR_RODE_M), trail: Array.isArray(saved.trail) ? saved.trail.filter((item): item is TrailPoint => Boolean(item) && typeof item.lat === "number" && typeof item.lon === "number").slice(-700) : [], startedAt: numeric(saved.startedAt, timestamp), updatedAt: timestamp };
 }
 function compassPoint(heading: number) { const points = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"]; return points[Math.round(normalizeHeading(heading) / 45) % 8]; }
 function formatCoordinate(value: number, positive: string, negative: string) { return `${Math.abs(value).toFixed(4)}° ${value >= 0 ? positive : negative}`; }
@@ -144,7 +174,7 @@ function velocityVector(speedKn: number, direction: number) {
   return { east: speedKn * Math.sin(toRadians(direction)), north: speedKn * Math.cos(toRadians(direction)) };
 }
 function gpsNavigation(voyage: Voyage, conditions: Conditions) {
-  if (voyage.grounded) return { course: voyage.heading, speedKn: 0 };
+  if (voyage.grounded || anchorIsHolding(voyage, conditions)) return { course: voyage.heading, speedKn: 0 };
   const boat = velocityVector(voyage.speedKn, voyage.heading); const current = velocityVector(conditions.currentKn, conditions.currentDirection);
   const east = boat.east + current.east; const north = boat.north + current.north; const speedKn = Math.hypot(east, north);
   return { course: speedKn > 0.01 ? normalizeHeading(toDegrees(Math.atan2(east, north))) : voyage.heading, speedKn };
@@ -174,12 +204,13 @@ function parseMinimizedPanels(raw: string): MinimizedPanels {
 export default function Home() {
   const mapContainerRef = useRef<HTMLDivElement>(null); const mapRef = useRef<MapInstance | null>(null); const boatMarkerRef = useRef<MarkerInstance | null>(null);
   const voyageRef = useRef<Voyage | null>(null); const conditionsRef = useRef(DEFAULT_CONDITIONS); const followRef = useRef(true); const lastMapCenterRef = useRef<string | null>(null);
-  const panelPositionsRef = useRef<PanelPositions>({}); const panelDragRef = useRef<PanelDrag | null>(null);
+  const panelPositionsRef = useRef<PanelPositions>({}); const panelDragRef = useRef<PanelDrag | null>(null); const anchorWinchDragRef = useRef<AnchorWinchDrag | null>(null);
   const [hydrated, setHydrated] = useState(false); const [selectedPortId, setSelectedPortId] = useState(PORTS[0].id); const [developerLatitude, setDeveloperLatitude] = useState(""); const [developerLongitude, setDeveloperLongitude] = useState(""); const [voyage, setVoyage] = useState<Voyage | null>(null);
   const [conditions, setConditions] = useState(DEFAULT_CONDITIONS); const [followBoat, setFollowBoat] = useState(true); const [satelliteLayer, setSatelliteLayer] = useState(true); const [nauticalLayer, setNauticalLayer] = useState(true); const isometricView = true;
   const [mapReady, setMapReady] = useState(false); const [mapError, setMapError] = useState(false); const [conditionsBusy, setConditionsBusy] = useState(false); const [now, setNow] = useState(0);
   const [panelPositions, setPanelPositions] = useState<PanelPositions>({}); const [activePanel, setActivePanel] = useState<FloatingPanelName>("helm");
   const [minimizedPanels, setMinimizedPanels] = useState<MinimizedPanels>({});
+  const [anchorWinchRotation, setAnchorWinchRotation] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false); const [capturingKey, setCapturingKey] = useState<KeyBindingName | null>(null); const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
   const selectedPort = useMemo(() => PORTS.find((port) => port.id === selectedPortId) ?? PORTS[0], [selectedPortId]);
   const developerStart = useMemo(() => {
@@ -281,7 +312,7 @@ export default function Home() {
     if (developerStart === undefined) return;
     const timestamp = Date.now();
     const launchPoint = developerStart ?? selectedPort;
-    const base: Voyage = { portId: selectedPort.id, lat: launchPoint.lat, lon: launchPoint.lon, heading: selectedPort.heading, rudder: 0, mainSail: 0, genoaSail: 0, mainSheet: 0, genoaSheet: 0, motor: 0, autopilot: false, targetHeading: null, speedKn: 0, sailSpeedKn: 0, distanceNm: 0, grounded: false, trail: [{ lat: launchPoint.lat, lon: launchPoint.lon }], startedAt: timestamp, updatedAt: timestamp };
+    const base: Voyage = { portId: selectedPort.id, lat: launchPoint.lat, lon: launchPoint.lon, heading: selectedPort.heading, rudder: 0, mainSail: 0, genoaSail: 0, mainSheet: 0, genoaSheet: 0, motor: 0, autopilot: false, targetHeading: null, speedKn: 0, sailSpeedKn: 0, distanceNm: 0, grounded: false, selectedAnchor: 1, anchorRelease: 0, anchor1RodeM: 0, anchor2RodeM: 0, trail: [{ lat: launchPoint.lat, lon: launchPoint.lon }], startedAt: timestamp, updatedAt: timestamp };
     const next = advanceVoyage(base, conditions, timestamp);
     setVoyage(next); setFollowBoat(true); window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     mapRef.current?.flyTo({ center: [next.lon, next.lat], zoom: 10.5, duration: 1500 });
@@ -313,6 +344,20 @@ export default function Home() {
     const next = { ...panelPositionsRef.current, [drag.panel]: position }; panelPositionsRef.current = next; setPanelPositions(next);
   };
   const endPanelDrag = (event: ReactPointerEvent<HTMLElement>) => { if (!panelDragRef.current) return; panelDragRef.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); window.localStorage.setItem(PANEL_POSITIONS_STORAGE_KEY, JSON.stringify(panelPositionsRef.current)); };
+  const beginAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect(); const angle = toDegrees(Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2)));
+    anchorWinchDragRef.current = { pointerId: event.pointerId, lastAngle: angle }; event.currentTarget.setPointerCapture(event.pointerId); updateVoyage((current) => ({ ...current, anchorRelease: 0 })); event.preventDefault();
+  };
+  const moveAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = anchorWinchDragRef.current; if (!drag || drag.pointerId !== event.pointerId || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const rect = event.currentTarget.getBoundingClientRect(); const angle = toDegrees(Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2))); const delta = signedAngle(drag.lastAngle, angle); drag.lastAngle = angle;
+    if (Math.abs(delta) < 0.05) return;
+    setAnchorWinchRotation((current) => current + delta);
+    const meters = Math.abs(delta) / 360 * ANCHOR_RETRIEVE_M_PER_TURN;
+    updateVoyage((current) => { const rodeKey = current.selectedAnchor === 1 ? "anchor1RodeM" : "anchor2RodeM"; return { ...current, anchorRelease: 0, [rodeKey]: Math.max(0, current[rodeKey] - meters) }; });
+  };
+  const endAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => { if (!anchorWinchDragRef.current) return; anchorWinchDragRef.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); };
   const resetPanelPosition = (panel: FloatingPanelName) => { const next = { ...panelPositionsRef.current }; delete next[panel]; panelPositionsRef.current = next; setPanelPositions(next); window.localStorage.setItem(PANEL_POSITIONS_STORAGE_KEY, JSON.stringify(next)); };
   const togglePanelMinimized = (panel: FloatingPanelName) => { setMinimizedPanels((current) => { const next = { ...current, [panel]: !current[panel] }; window.localStorage.setItem(MINIMIZED_PANELS_STORAGE_KEY, JSON.stringify(next)); return next; }); setActivePanel(panel); };
   const floatingPanelStyle = (panel: FloatingPanelName): CSSProperties => { const position = panelPositions[panel]; return { ...(position ? { left: position.x, top: position.y, right: "auto", bottom: "auto", transform: "none" } : {}), zIndex: activePanel === panel ? 12 : 7 }; };
@@ -320,6 +365,7 @@ export default function Home() {
   const utcTime = now ? new Date(now).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC" }) : "--:--:--";
   const gps = voyage ? gpsNavigation(voyage, conditions) : { course: 0, speedKn: 0 };
   const apparent = apparentWind(conditions.windKn, conditions.windDirection, gps.speedKn, gps.course);
+  const selectedAnchor = voyage?.selectedAnchor ?? 1; const selectedAnchorRode = voyage ? anchorRode(voyage, selectedAnchor) : 0; const selectedAnchorStatus = voyage ? anchorStatus(voyage, conditions, selectedAnchor) : "ESTIBADA";
   return <main className={`game-shell ${voyage ? "is-sailing" : "is-docked"}`}><div ref={mapContainerRef} className="world-map" aria-label="Mapa mundial interactivo de Sailward" /><div className="ocean-vignette" aria-hidden="true" />
     <header className="brand-bar"><button type="button" className="brand-lockup brand-button" aria-label="Abrir ajustes de Sailward" title="Ajustes" onClick={() => setSettingsOpen(true)}><span className="brand-mark" aria-hidden="true">S</span><div><strong>SAILWARD <em>v{APP_VERSION}</em></strong><span>REAL-TIME SAILING</span></div></button><div className="world-clock"><span className="live-dot" /><span>{utcTime} UTC</span><small>TIEMPO REAL · 1×</small></div></header>
     {settingsOpen && <div className="settings-overlay" onPointerDown={(event) => { if (event.target === event.currentTarget) { setCapturingKey(null); setSettingsOpen(false); } }}><section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title"><header className="settings-header"><div><span>SAILWARD</span><h2 id="settings-title">Ajustes</h2></div><button type="button" aria-label="Cerrar ajustes" onClick={() => { setCapturingKey(null); setSettingsOpen(false); }}>×</button></header><div className="settings-layout"><nav aria-label="Secciones de ajustes"><button type="button" className="is-active"><span aria-hidden="true">⌨</span> TECLAS</button></nav><div className="settings-content"><span className="settings-eyebrow">CONTROLES</span><h3>Teclas</h3><p>Elegí una acción y luego presioná la tecla que quieras asignar.</p><div className="key-binding-list">{([ ["rudderLeft", "Timón a babor"], ["rudderRight", "Timón a estribor"] ] as const).map(([binding, label]) => <div className="key-binding-row" key={binding}><div><strong>{label}</strong><small>{binding === "rudderLeft" ? "Girar hacia la izquierda" : "Girar hacia la derecha"}</small></div><button type="button" className={capturingKey === binding ? "is-capturing" : ""} aria-label={`Cambiar tecla para ${label}`} onClick={() => setCapturingKey(binding)} onKeyDown={(event) => { if (capturingKey !== binding) return; event.preventDefault(); event.stopPropagation(); assignKey(binding, event.code); }}>{capturingKey === binding ? "PRESIONÁ…" : keyLabel(keyBindings[binding])}</button></div>)}</div><div className="settings-footer"><small>Los próximos comandos aparecerán en esta sección.</small><button type="button" onClick={resetKeyBindings}>RESTAURAR A / D</button></div></div></div></section></div>}
@@ -359,6 +405,10 @@ export default function Home() {
       </aside>
       <aside className={`conditions-card floating-window ${minimizedPanels.conditions ? "is-minimized" : ""}`} data-floating-panel="conditions" style={floatingPanelStyle("conditions")} onPointerDownCapture={() => setActivePanel("conditions")}><div className="conditions-title"><div><span className="live-dot" /> CONDICIONES</div><div className="floating-window-actions"><button type="button" className="window-drag-handle" aria-label="Mover ventana de condiciones" title="Arrastrar para mover · doble clic para restaurar" onPointerDown={(event) => beginPanelDrag("conditions", event)} onPointerMove={movePanel} onPointerUp={endPanelDrag} onPointerCancel={endPanelDrag} onDoubleClick={() => resetPanelPosition("conditions")}>⠿</button><button title="Actualizar condiciones" onClick={() => void refreshConditions(voyage.lat, voyage.lon)}>↻</button><button type="button" className="window-minimize-button" aria-label={minimizedPanels.conditions ? "Restaurar ventana de condiciones" : "Minimizar ventana de condiciones"} aria-expanded={!minimizedPanels.conditions} onClick={() => togglePanelMinimized("conditions")}>{minimizedPanels.conditions ? "□" : "—"}</button></div></div><div className="floating-window-content"><dl><div><dt>Olas</dt><dd>{conditions.waveHeight.toFixed(1)} m</dd></div><div><dt>Corriente</dt><dd>{conditions.currentKn.toFixed(1)} kn · {compassPoint(conditions.currentDirection)}</dd></div><div><dt>Prof. est.</dt><dd>~{conditions.depthM} m</dd></div></dl><small>{conditionsBusy ? "Actualizando…" : conditions.source === "live" ? "Datos oceanográficos en vivo" : "Datos estimados · profundidad de juego"}</small></div></aside>
       <div className={`sail-control floating-window ${minimizedPanels.sails ? "is-minimized" : ""}`} data-floating-panel="sails" style={floatingPanelStyle("sails")} onPointerDownCapture={() => setActivePanel("sails")}><div className="floating-window-bar"><span>VELAS Y MOTOR</span><div className="floating-window-actions"><button type="button" className="window-drag-handle" aria-label="Mover ventana de velas" title="Arrastrar para mover · doble clic para restaurar" onPointerDown={(event) => beginPanelDrag("sails", event)} onPointerMove={movePanel} onPointerUp={endPanelDrag} onPointerCancel={endPanelDrag} onDoubleClick={() => resetPanelPosition("sails")}>⠿</button><button type="button" className="window-minimize-button" aria-label={minimizedPanels.sails ? "Restaurar ventana de velas" : "Minimizar ventana de velas"} aria-expanded={!minimizedPanels.sails} onClick={() => togglePanelMinimized("sails")}>{minimizedPanels.sails ? "□" : "—"}</button></div></div><div className="sail-window-content floating-window-content"><div className="control-heading"><span>APAREJO Y MOTOR</span><strong>{Math.round(voyage.mainSail + voyage.genoaSail) / 2}%</strong><small>VELAS</small></div>{([ ["Mayor", "mainSail", "mainSheet"], ["Genoa", "genoaSail", "genoaSheet"] ] as const).map(([name, sailKey, sheetKey]) => <div className="sail-row" key={name}><label>{name} <b>{Math.round(voyage[sailKey])}%</b></label><input aria-label={`${name} desplegada`} type="range" min="0" max="100" value={voyage[sailKey]} onChange={(event) => updateVoyage((current) => ({ ...current, [sailKey]: Number(event.target.value) }))} /><label className="sheet-label">Escota <b>{Math.round(voyage[sheetKey])}%</b></label><input aria-label={`Escota de ${name}`} type="range" min="0" max="100" value={voyage[sheetKey]} onChange={(event) => updateVoyage((current) => ({ ...current, [sheetKey]: Number(event.target.value) }))} /></div>)}<div className="motor-row"><label htmlFor="motor">Motor <b>{Math.round(voyage.motor)}%</b></label><input id="motor" type="range" min="0" max="100" value={voyage.motor} onChange={(event) => updateVoyage((current) => ({ ...current, motor: Number(event.target.value) }))} /></div></div></div>
+      <section className={`instrument-window anchor-window floating-window ${minimizedPanels.anchor ? "is-minimized" : ""}`} data-floating-panel="anchor" style={floatingPanelStyle("anchor")} onPointerDownCapture={() => setActivePanel("anchor")}>
+        <div className="floating-window-bar"><span>ANCLA <strong className="minimized-summary">A{selectedAnchor} · {selectedAnchorRode.toFixed(1)} m · {selectedAnchorStatus}</strong></span><div className="floating-window-actions"><button type="button" className="window-drag-handle" aria-label="Mover ventana de ancla" title="Arrastrar para mover · doble clic para restaurar" onPointerDown={(event) => beginPanelDrag("anchor", event)} onPointerMove={movePanel} onPointerUp={endPanelDrag} onPointerCancel={endPanelDrag} onDoubleClick={() => resetPanelPosition("anchor")}>⠿</button><button type="button" className="window-minimize-button" aria-label={minimizedPanels.anchor ? "Restaurar ventana de ancla" : "Minimizar ventana de ancla"} aria-expanded={!minimizedPanels.anchor} onClick={() => togglePanelMinimized("anchor")}>{minimizedPanels.anchor ? "□" : "—"}</button></div></div>
+        <div className="anchor-window-content floating-window-content"><div className="anchor-selector" aria-label="Seleccionar ancla">{([1, 2] as const).map((anchor) => <button type="button" className={selectedAnchor === anchor ? "is-active" : ""} aria-pressed={selectedAnchor === anchor} key={anchor} onClick={() => updateVoyage((current) => ({ ...current, selectedAnchor: anchor, anchorRelease: 0 }))}><span>ANCLA {anchor}</span><small>{anchorRode(voyage, anchor).toFixed(1)} m</small></button>)}</div><div className="anchor-control"><button type="button" className="anchor-winch" aria-label={`Girar molinete para recoger el ancla ${selectedAnchor}`} onPointerDown={beginAnchorWinch} onPointerMove={moveAnchorWinch} onPointerUp={endAnchorWinch} onPointerCancel={endAnchorWinch}><span className="anchor-winch-handle" style={{ transform: `rotate(${anchorWinchRotation}deg)` }}><b /></span></button><div className="anchor-readout"><span>CADENA</span><strong>{selectedAnchorRode.toFixed(1)} m</strong><small>{selectedAnchorStatus}</small><small>Fondeo: ~{anchorSetLengthM(conditions).toFixed(0)} m</small></div></div><button type="button" className={`anchor-release-button ${voyage.anchorRelease === selectedAnchor ? "is-active" : ""}`} aria-pressed={voyage.anchorRelease === selectedAnchor} disabled={selectedAnchorRode >= MAX_ANCHOR_RODE_M && voyage.anchorRelease !== selectedAnchor} onClick={() => updateVoyage((current) => ({ ...current, anchorRelease: current.anchorRelease === current.selectedAnchor ? 0 : current.selectedAnchor }))}>{voyage.anchorRelease === selectedAnchor ? "DETENER LIBERACIÓN" : "LIBERAR ANCLA"}</button><small className="anchor-instruction">Girá el molinete con el mouse para cobrar cadena.</small></div>
+      </section>
       <section className={`control-dock floating-window ${minimizedPanels.helm ? "is-minimized" : ""}`} data-floating-panel="helm" style={floatingPanelStyle("helm")} onPointerDownCapture={() => setActivePanel("helm")}>
         <div className="floating-window-bar floating-window-bar--helm"><span>TIMÓN</span><div className="floating-window-actions"><button type="button" className="window-drag-handle" aria-label="Mover ventana del timón" title="Arrastrar para mover · doble clic para restaurar" onPointerDown={(event) => beginPanelDrag("helm", event)} onPointerMove={movePanel} onPointerUp={endPanelDrag} onPointerCancel={endPanelDrag} onDoubleClick={() => resetPanelPosition("helm")}>⠿</button><button type="button" className="window-minimize-button" aria-label={minimizedPanels.helm ? "Restaurar ventana del timón" : "Minimizar ventana del timón"} aria-expanded={!minimizedPanels.helm} onClick={() => togglePanelMinimized("helm")}>{minimizedPanels.helm ? "□" : "—"}</button></div></div>
         <div className="helm-window-content floating-window-content"><div className="course-control"><div className="control-heading"><span>ÁNGULO DE TIMÓN</span><strong>{voyage.rudder > 0 ? "+" : ""}{Math.round(voyage.rudder)}°</strong><small>{voyage.autopilot ? "PILOTO" : "MANUAL"}</small></div><div className="helm-layout"><div className="helm-step-column"><button onClick={() => updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder - 1, -35, 35) }))}>−1°</button><button onClick={() => updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder - 10, -35, 35) }))}>−10°</button></div><div className="helm-center"><button className="helm" aria-label="Mover timón" aria-valuemin={-35} aria-valuemax={35} aria-valuenow={Math.round(voyage.rudder)} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); const rect = event.currentTarget.getBoundingClientRect(); updateVoyage((current) => ({ ...current, rudder: clamp(((event.clientX - rect.left) / rect.width - .5) * 70, -35, 35) })); }} onPointerMove={(event) => { if (!event.currentTarget.hasPointerCapture(event.pointerId)) return; const rect = event.currentTarget.getBoundingClientRect(); updateVoyage((current) => ({ ...current, rudder: clamp(((event.clientX - rect.left) / rect.width - .5) * 70, -35, 35) })); }}><span style={{ transform: `rotate(${voyage.rudder * 3}deg)` }} /></button><button className="center-helm-button" onClick={() => updateVoyage((current) => ({ ...current, rudder: 0 }))}>CENTRAR</button></div><div className="helm-step-column"><button onClick={() => updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder + 1, -35, 35) }))}>+1°</button><button onClick={() => updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder + 10, -35, 35) }))}>+10°</button></div></div><small className="map-hint">{keyLabel(keyBindings.rudderLeft)} / {keyLabel(keyBindings.rudderRight)} ajustan el timón.</small></div>
