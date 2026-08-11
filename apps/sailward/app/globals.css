@@ -770,6 +770,8 @@ input[type="range"]::-moz-range-thumb {
   overflow: visible;
   border-radius: 0;
   background: transparent;
+  transform-style: preserve-3d;
+  will-change: transform;
   transition: transform 360ms linear;
 }
 

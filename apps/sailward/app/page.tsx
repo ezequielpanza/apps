@@ -159,7 +159,30 @@ export default function Home() {
       map.on("load", () => { try { map.addSource("open-seamap", { type: "raster", tiles: ["https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenSeaMap contributors" }); map.addLayer({ id: "open-seamap", type: "raster", source: "open-seamap", paint: { "raster-opacity": 0.88 } }); } catch {} setMapReady(true); }); map.on("error", () => setMapError(true)); mapRef.current = map; boatMarkerRef.current = marker;
     }); return () => { disposed = true; boatMarkerRef.current?.remove(); mapRef.current?.remove(); boatMarkerRef.current = null; mapRef.current = null; };
   }, [selectedPort.lat, selectedPort.lon]);
-  useEffect(() => { const map = mapRef.current; const marker = boatMarkerRef.current; const position = voyage ?? selectedPort; if (!map || !marker) return; marker.setLngLat([position.lon, position.lat]); const vessel = marker.getElement().querySelector<HTMLElement>(".boat-marker__vessel"); if (vessel) { const ahead = destinationPoint(position.lat, position.lon, voyage?.heading ?? position.heading, 0.06); const originPx = map.project([position.lon, position.lat]); const aheadPx = map.project([ahead.lon, ahead.lat]); const screenAngle = toDegrees(Math.atan2(aheadPx.x - originPx.x, -(aheadPx.y - originPx.y))); vessel.style.transform = `rotate(${screenAngle}deg)`; vessel.style.setProperty("--main-sheet", `${voyage?.mainSheet ?? 70}%`); vessel.style.setProperty("--genoa-sheet", `${voyage?.genoaSheet ?? 70}%`); vessel.style.setProperty("--main-sail", `${voyage?.mainSail ?? 0}%`); vessel.style.setProperty("--genoa-sail", `${voyage?.genoaSail ?? 0}%`); } if (voyage && followRef.current) map.easeTo({ center: [voyage.lon, voyage.lat], duration: 750 }); else if (!voyage) map.flyTo({ center: [selectedPort.lon, selectedPort.lat], zoom: 8.2 }); }, [selectedPort, voyage]);
+  useEffect(() => {
+    const map = mapRef.current;
+    const marker = boatMarkerRef.current;
+    const position = voyage ?? selectedPort;
+    if (!map || !marker) return;
+    marker.setLngLat([position.lon, position.lat]);
+    const vessel = marker.getElement().querySelector<HTMLElement>(".boat-marker__vessel");
+    if (vessel) {
+      const ahead = destinationPoint(position.lat, position.lon, voyage?.heading ?? position.heading, 0.06);
+      const originPx = map.project([position.lon, position.lat]);
+      const aheadPx = map.project([ahead.lon, ahead.lat]);
+      const screenAngle = toDegrees(Math.atan2(aheadPx.x - originPx.x, -(aheadPx.y - originPx.y)));
+      // The marker is a flat deck: it must use the same foreshortening as the map plane.
+      vessel.style.transform = isometricView
+        ? `perspective(360px) rotateX(42deg) rotate(${screenAngle}deg)`
+        : `rotate(${screenAngle}deg)`;
+      vessel.style.setProperty("--main-sheet", `${voyage?.mainSheet ?? 70}%`);
+      vessel.style.setProperty("--genoa-sheet", `${voyage?.genoaSheet ?? 70}%`);
+      vessel.style.setProperty("--main-sail", `${voyage?.mainSail ?? 0}%`);
+      vessel.style.setProperty("--genoa-sail", `${voyage?.genoaSail ?? 0}%`);
+    }
+    if (voyage && followRef.current) map.easeTo({ center: [voyage.lon, voyage.lat], duration: 750 });
+    else if (!voyage) map.flyTo({ center: [selectedPort.lon, selectedPort.lat], zoom: 8.2 });
+  }, [isometricView, selectedPort, voyage]);
   useEffect(() => { const map = mapRef.current; if (!mapReady || !map) return; if (map.getLayer("open-seamap")) map.setLayoutProperty("open-seamap", "visibility", nauticalLayer ? "visible" : "none"); map.easeTo({ pitch: isometricView ? 56 : 0, bearing: isometricView ? -34 : 0, duration: 850 }); }, [mapReady, nauticalLayer, isometricView]);
   useEffect(() => { const map = mapRef.current; if (!mapReady || !map) return; const coordinates = voyage?.trail.map((entry) => [entry.lon, entry.lat]) ?? []; const source = map.getSource("voyage-trail") as { setData?: (data: object) => void } | undefined; const data = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates } }; if (source?.setData) source.setData(data); else { map.addSource("voyage-trail", { type: "geojson", data }); map.addLayer({ id: "voyage-trail", type: "line", source: "voyage-trail", paint: { "line-color": "#e8c476", "line-width": 2.4, "line-opacity": 0.82 } }); } }, [mapReady, voyage?.trail]);
   const startVoyage = () => { const timestamp = Date.now(); const base: Voyage = { portId: selectedPort.id, lat: selectedPort.lat, lon: selectedPort.lon, heading: selectedPort.heading, rudder: 0, mainSail: 72, genoaSail: 72, mainSheet: 70, genoaSheet: 70, motor: 0, autopilot: false, targetHeading: null, speedKn: 0, sailSpeedKn: 0, distanceNm: 0, grounded: false, trail: [{ lat: selectedPort.lat, lon: selectedPort.lon }], startedAt: timestamp, updatedAt: timestamp }; const next = advanceVoyage(base, conditions, timestamp); setVoyage(next); setFollowBoat(true); window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); mapRef.current?.flyTo({ center: [next.lon, next.lat], zoom: 10.5, duration: 1500 }); };
