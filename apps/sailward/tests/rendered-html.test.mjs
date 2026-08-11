@@ -52,6 +52,8 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /sailward\.voyage/);
   assert.match(page, /open-meteo\.com/);
   assert.match(page, /tiles\.openseamap\.org/);
+  assert.match(page, /World_Imagery\/MapServer/);
+  assert.match(page, /satelliteLayer/);
   assert.match(page, /pitch: 56/);
   assert.match(page, /autopilot/);
   assert.match(page, /polarEfficiency/);

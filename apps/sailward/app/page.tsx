@@ -130,7 +130,7 @@ export default function Home() {
   const mapContainerRef = useRef<HTMLDivElement>(null); const mapRef = useRef<MapInstance | null>(null); const boatMarkerRef = useRef<MarkerInstance | null>(null);
   const voyageRef = useRef<Voyage | null>(null); const conditionsRef = useRef(DEFAULT_CONDITIONS); const followRef = useRef(true); const lastMapCenterRef = useRef<string | null>(null);
   const [hydrated, setHydrated] = useState(false); const [selectedPortId, setSelectedPortId] = useState(PORTS[0].id); const [developerLatitude, setDeveloperLatitude] = useState(""); const [developerLongitude, setDeveloperLongitude] = useState(""); const [voyage, setVoyage] = useState<Voyage | null>(null);
-  const [conditions, setConditions] = useState(DEFAULT_CONDITIONS); const [followBoat, setFollowBoat] = useState(true); const [nauticalLayer, setNauticalLayer] = useState(true); const [isometricView, setIsometricView] = useState(true);
+  const [conditions, setConditions] = useState(DEFAULT_CONDITIONS); const [followBoat, setFollowBoat] = useState(true); const [satelliteLayer, setSatelliteLayer] = useState(true); const [nauticalLayer, setNauticalLayer] = useState(true); const [isometricView, setIsometricView] = useState(true);
   const [mapReady, setMapReady] = useState(false); const [mapError, setMapError] = useState(false); const [conditionsBusy, setConditionsBusy] = useState(false); const [now, setNow] = useState(0);
   const selectedPort = useMemo(() => PORTS.find((port) => port.id === selectedPortId) ?? PORTS[0], [selectedPortId]);
   const developerStart = useMemo(() => {
@@ -164,8 +164,28 @@ export default function Home() {
       const markerRoot = document.createElement("div"); markerRoot.className = "boat-marker"; markerRoot.setAttribute("aria-label", "Posición de tu barco");
       const vessel = document.createElement("div"); vessel.className = "boat-marker__vessel"; vessel.innerHTML = '<img src="/sailboat-hull.png" alt="" /><span class="boat-sail boat-sail--main"></span><span class="boat-sail boat-sail--genoa"></span>'; markerRoot.appendChild(vessel);
       const marker = new maplibregl.Marker({ element: markerRoot, anchor: "center" }).setLngLat([selectedPort.lon, selectedPort.lat]).addTo(map);
-      // eslint-disable-next-line no-empty
-      map.on("load", () => { try { map.addSource("open-seamap", { type: "raster", tiles: ["https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenSeaMap contributors" }); map.addLayer({ id: "open-seamap", type: "raster", source: "open-seamap", paint: { "raster-opacity": 0.88 } }); } catch {} setMapReady(true); }); map.on("error", () => setMapError(true)); mapRef.current = map; boatMarkerRef.current = marker;
+      map.on("load", () => {
+        try {
+          map.addSource("esri-world-imagery", {
+            type: "raster",
+            tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+            tileSize: 256,
+            attribution: "Tiles © Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+          });
+          map.addLayer({ id: "satellite-imagery", type: "raster", source: "esri-world-imagery" });
+          map.addSource("open-seamap", {
+            type: "raster",
+            tiles: ["https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            attribution: "© OpenSeaMap contributors",
+          });
+          map.addLayer({ id: "open-seamap", type: "raster", source: "open-seamap", paint: { "raster-opacity": 0.88 } });
+        } catch {
+          // The base map remains playable if an optional imagery layer fails.
+        }
+        setMapReady(true);
+      });
+      map.on("error", () => setMapError(true)); mapRef.current = map; boatMarkerRef.current = marker;
     }); return () => { disposed = true; boatMarkerRef.current?.remove(); mapRef.current?.remove(); boatMarkerRef.current = null; mapRef.current = null; };
   }, [selectedPort.lat, selectedPort.lon]);
   useEffect(() => {
@@ -198,7 +218,13 @@ export default function Home() {
       map.flyTo({ center: [selectedPort.lon, selectedPort.lat], zoom: 8.2 });
     }
   }, [isometricView, selectedPort, voyage]);
-  useEffect(() => { const map = mapRef.current; if (!mapReady || !map) return; if (map.getLayer("open-seamap")) map.setLayoutProperty("open-seamap", "visibility", nauticalLayer ? "visible" : "none"); map.easeTo({ pitch: isometricView ? 56 : 0, bearing: isometricView ? -34 : 0, duration: 850 }); }, [mapReady, nauticalLayer, isometricView]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    if (map.getLayer("satellite-imagery")) map.setLayoutProperty("satellite-imagery", "visibility", satelliteLayer ? "visible" : "none");
+    if (map.getLayer("open-seamap")) map.setLayoutProperty("open-seamap", "visibility", nauticalLayer ? "visible" : "none");
+    map.easeTo({ pitch: isometricView ? 56 : 0, bearing: isometricView ? -34 : 0, duration: 850 });
+  }, [mapReady, satelliteLayer, nauticalLayer, isometricView]);
   useEffect(() => { const map = mapRef.current; if (!mapReady || !map) return; const coordinates = voyage?.trail.map((entry) => [entry.lon, entry.lat]) ?? []; const source = map.getSource("voyage-trail") as { setData?: (data: object) => void } | undefined; const data = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates } }; if (source?.setData) source.setData(data); else { map.addSource("voyage-trail", { type: "geojson", data }); map.addLayer({ id: "voyage-trail", type: "line", source: "voyage-trail", paint: { "line-color": "#e8c476", "line-width": 2.4, "line-opacity": 0.82 } }); } }, [mapReady, voyage?.trail]);
   const startVoyage = () => {
     if (developerStart === undefined) return;
@@ -238,6 +264,11 @@ export default function Home() {
       <section className="control-dock"><div className="course-control"><div className="control-heading"><span>TIMÓN</span><strong>{voyage.rudder > 0 ? "+" : ""}{Math.round(voyage.rudder)}°</strong><small>{voyage.autopilot ? "PILOTO" : "MANUAL"}</small></div><div className="helm-row"><button className="helm" aria-label="Mover timón" aria-valuemin={-35} aria-valuemax={35} aria-valuenow={Math.round(voyage.rudder)} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); const rect = event.currentTarget.getBoundingClientRect(); updateVoyage((current) => ({ ...current, rudder: clamp(((event.clientX - rect.left) / rect.width - .5) * 70, -35, 35) })); }} onPointerMove={(event) => { if (!event.currentTarget.hasPointerCapture(event.pointerId)) return; const rect = event.currentTarget.getBoundingClientRect(); updateVoyage((current) => ({ ...current, rudder: clamp(((event.clientX - rect.left) / rect.width - .5) * 70, -35, 35) })); }}><span style={{ transform: `rotate(${voyage.rudder * 3}deg)` }} /></button><div className="step-buttons"><button onClick={() => updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder - 1, -35, 35) }))}>−1°</button><button onClick={() => updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder - 10, -35, 35) }))}>−10°</button><button onClick={() => updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder + 10, -35, 35) }))}>+10°</button><button onClick={() => updateVoyage((current) => ({ ...current, rudder: clamp(current.rudder + 1, -35, 35) }))}>+1°</button></div></div><button className="autopilot-button" onClick={() => updateVoyage((current) => ({ ...current, autopilot: !current.autopilot, targetHeading: !current.autopilot ? current.heading : null, rudder: !current.autopilot ? 0 : current.rudder }))}>{voyage.autopilot ? `DESACTIVAR PILOTO (${Math.round(voyage.targetHeading ?? voyage.heading)}°)` : "FIJAR RUMBO · PILOTO AUTOMÁTICO"}</button><small className="map-hint">A / D ajustan el timón. El rumbo sólo se fija con piloto.</small></div>
         <div className="sail-control"><div className="control-heading"><span>APAREJO Y MOTOR</span><strong>{Math.round(voyage.mainSail + voyage.genoaSail) / 2}%</strong><small>VELAS</small></div>{([ ["Mayor", "mainSail", "mainSheet"], ["Genoa", "genoaSail", "genoaSheet"] ] as const).map(([name, sailKey, sheetKey]) => <div className="sail-row" key={name}><label>{name} <b>{Math.round(voyage[sailKey])}%</b></label><input aria-label={`${name} desplegada`} type="range" min="0" max="100" value={voyage[sailKey]} onChange={(event) => updateVoyage((current) => ({ ...current, [sailKey]: Number(event.target.value) }))} /><label className="sheet-label">Escota <b>{Math.round(voyage[sheetKey])}%</b></label><input aria-label={`Escota de ${name}`} type="range" min="0" max="100" value={voyage[sheetKey]} onChange={(event) => updateVoyage((current) => ({ ...current, [sheetKey]: Number(event.target.value) }))} /></div>)}<div className="motor-row"><label htmlFor="motor">Motor <b>{Math.round(voyage.motor)}%</b></label><input id="motor" type="range" min="0" max="100" value={voyage.motor} onChange={(event) => updateVoyage((current) => ({ ...current, motor: Number(event.target.value) }))} /></div></div>
         <div className="telemetry"><div className="speed-readout"><span>VEL. SOBRE FONDO</span><strong>{voyage.speedKn.toFixed(1)}</strong><small>NUDOS</small></div><div className="position-readout"><span>{formatCoordinate(voyage.lat, "N", "S")}</span><span>{formatCoordinate(voyage.lon, "E", "O")}</span><span>Rumbo {Math.round(voyage.heading)}° · Vela {voyage.sailSpeedKn.toFixed(1)} kn</span>{voyage.grounded && <span className="grounded">TIERRA: SIN AVANCE</span>}</div><div className="dock-actions"><button onClick={centerBoat}>CENTRAR BARCO</button><button onClick={resetVoyage}>FINALIZAR</button></div></div></section></>}
-    <div className="map-tools"><button className={isometricView ? "is-active" : ""} onClick={() => setIsometricView((value) => !value)}>Vista isométrica</button><button className={nauticalLayer ? "is-active" : ""} onClick={() => setNauticalLayer((value) => !value)}>Carta náutica</button>{voyage && <button onClick={centerBoat}>Seguir barco</button>}</div>{mapError && <div className="map-notice">No se pudo cargar una capa del mapa. El simulador sigue disponible.</div>}<div className="version-tag">SAILWARD · v{APP_VERSION} · ALPHA</div>
+    <div className="map-tools">
+      <button className={satelliteLayer ? "is-active" : ""} onClick={() => setSatelliteLayer((value) => !value)}>Satélite</button>
+      <button className={isometricView ? "is-active" : ""} onClick={() => setIsometricView((value) => !value)}>Vista isométrica</button>
+      <button className={nauticalLayer ? "is-active" : ""} onClick={() => setNauticalLayer((value) => !value)}>Carta náutica</button>
+      {voyage && <button onClick={centerBoat}>Seguir barco</button>}
+    </div>{mapError && <div className="map-notice">No se pudo cargar una capa del mapa. El simulador sigue disponible.</div>}<div className="version-tag">SAILWARD · v{APP_VERSION} · ALPHA</div>
   </main>;
 }
