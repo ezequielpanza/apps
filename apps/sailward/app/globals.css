@@ -920,6 +920,32 @@ input[type="range"]::-moz-range-thumb {
 .helm::after { transform: translate(-50%, -50%) rotate(-60deg); }
 .helm span { transform: translate(-50%, -50%); }
 
+/* All three spokes belong to the rotating inner hub, rather than to the fixed rim. */
+.helm::before,
+.helm::after {
+  display: none;
+}
+
+.helm span {
+  margin: -31px 0 0 -2px;
+}
+
+.helm span::before,
+.helm span::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 62px;
+  border-radius: 4px;
+  background: var(--brass);
+  transform-origin: 50% 50%;
+}
+
+.helm span::before { transform: rotate(60deg); }
+.helm span::after { transform: rotate(-60deg); }
+
 .step-buttons {
   flex-wrap: wrap;
   margin: 0;
