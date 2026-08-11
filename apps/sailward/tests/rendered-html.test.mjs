@@ -138,7 +138,12 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /METEOROLOGÍA/);
   assert.match(page, /Viento real/);
   assert.match(page, /Información local en vivo/);
-  assert.match(page, /<dt>Profundidad<\/dt>/);
+  assert.match(page, /data-floating-panel="depth"/);
+  assert.match(page, /DEPTH SOUNDER/);
+  assert.match(page, /Minimizar ventana de sonda de profundidad/);
+  assert.match(page, /sailward\.depthAlarm\.v1/);
+  assert.match(page, /Profundidad de alarma/);
+  assert.match(page, /BAJA PROFUNDIDAD/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);

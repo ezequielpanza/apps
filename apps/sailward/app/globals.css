@@ -741,6 +741,137 @@ input:focus-visible {
   width: 420px;
 }
 
+.depth-window {
+  top: 380px;
+  right: 288px;
+  width: 240px;
+}
+
+.depth-window.is-minimized {
+  width: 315px;
+}
+
+.depth-window.is-shallow {
+  border-color: rgba(245, 141, 91, 0.92);
+  box-shadow: 0 0 0 1px rgba(245, 141, 91, 0.22), 0 22px 55px rgba(0, 0, 0, 0.3);
+}
+
+.depth-window.is-shallow > .floating-window-bar {
+  background: rgba(151, 52, 25, 0.24);
+}
+
+.depth-window-content {
+  display: grid;
+  gap: 10px;
+}
+
+.depth-reading {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 2px 7px;
+  padding: 10px 12px;
+  border: 1px solid rgba(232, 196, 118, 0.23);
+  border-radius: 10px;
+  background: rgba(232, 196, 118, 0.045);
+}
+
+.depth-reading span,
+.depth-threshold > span {
+  color: rgba(244, 240, 229, 0.48);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.depth-reading strong {
+  grid-row: 2;
+  color: var(--paper-bright);
+  font-family: Georgia, serif;
+  font-size: 35px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.94;
+}
+
+.depth-reading small {
+  grid-column: 2;
+  grid-row: 2;
+  padding-bottom: 2px;
+  color: var(--brass);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.depth-alarm-status {
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  color: rgba(244, 240, 229, 0.66);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.depth-alarm-status.is-alert {
+  border-color: rgba(245, 141, 91, 0.75);
+  background: rgba(191, 61, 23, 0.22);
+  color: #ffd4ba;
+}
+
+.depth-threshold {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.depth-threshold > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.depth-threshold input[type="number"] {
+  width: 56px;
+  padding: 5px 6px;
+  border: 1px solid rgba(232, 196, 118, 0.35);
+  border-radius: 6px;
+  color: var(--paper-bright);
+  background: rgba(255, 255, 255, 0.06);
+  font: 700 13px Consolas, monospace;
+}
+
+.depth-threshold small,
+.depth-note {
+  color: rgba(244, 240, 229, 0.48);
+  font-size: 9px;
+}
+
+.depth-alarm-toggle {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  color: rgba(244, 240, 229, 0.68);
+  background: rgba(255, 255, 255, 0.045);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.depth-alarm-toggle.is-active {
+  border-color: rgba(232, 196, 118, 0.58);
+  color: var(--brass);
+}
+
+.depth-note {
+  text-align: center;
+}
+
 .rigging-window-content {
   display: grid;
   gap: 12px;
@@ -2131,6 +2262,16 @@ input[type="range"]::-moz-range-thumb {
 
   .rigging-window.is-minimized {
     width: min(420px, calc(100vw - 20px));
+  }
+
+  .depth-window {
+    top: 370px;
+    right: 10px;
+    width: min(240px, calc(50vw - 10px));
+  }
+
+  .depth-window.is-minimized {
+    width: min(315px, calc(100vw - 20px));
   }
 
   .gps-window {
