@@ -166,6 +166,13 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /min="-100" max="100"/);
   assert.match(page, /REVERSA/);
   assert.match(page, /Math\.abs\(throughWater\)/);
+  assert.match(page, /BOAT_PROFILE_STORAGE_KEY/);
+  assert.match(page, /PERFIL DE BARCO/);
+  assert.match(page, /Velocidad máxima del motor/);
+  assert.match(page, /Ángulo máximo de timón/);
+  assert.match(page, /Velocidad de giro/);
+  assert.match(page, /boatProfile\.motorMaxKn/);
+  assert.match(page, /boatProfile\.rudderMaxDeg/);
   assert.match(page, /const isometricView = true/);
   assert.match(page, /minPitch: 56, maxPitch: 56/);
   assert.match(page, /touchPitch: false/);
