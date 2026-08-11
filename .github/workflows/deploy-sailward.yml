@@ -39,23 +39,38 @@ jobs:
         working-directory: apps/sailward
         run: npm test
 
-      - name: Ensure Cloudflare Pages project
+      - name: Publish to Cloudflare Workers
         working-directory: apps/sailward
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler pages project create sailward --production-branch=main || true
+        run: npx wrangler deploy --config dist/server/wrangler.json
 
-      - name: Publish to Cloudflare Pages
-        working-directory: apps/sailward
+      - name: Resolve public URL
+        id: public
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler pages deploy dist --project-name=sailward --branch=main
+        run: |
+          response="$(curl --silent --show-error \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain")"
+          subdomain="$(printf '%s' "${response}" | node -e '
+            let value="";
+            process.stdin.on("data", chunk => value += chunk);
+            process.stdin.on("end", () => {
+              const payload = JSON.parse(value);
+              if (!payload.success || !payload.result?.subdomain) process.exit(1);
+              process.stdout.write(payload.result.subdomain);
+            });
+          ')"
+          url="https://sailward.${subdomain}.workers.dev"
+          echo "url=${url}" >> "${GITHUB_OUTPUT}"
+          echo "Sailward URL: ${url}"
 
       - name: Verify production
         env:
-          SAILWARD_URL: https://sailward.pages.dev
+          SAILWARD_URL: ${{ steps.public.outputs.url }}
         run: |
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
             nonce="${GITHUB_RUN_ID}-${attempt}-$(date +%s)"
@@ -75,7 +90,7 @@ jobs:
         if: always()
         env:
           RESULT: ${{ job.status }}
-          SAILWARD_URL: https://sailward.pages.dev
+          SAILWARD_URL: ${{ steps.public.outputs.url }}
         run: |
           mkdir -p deploy-status
           verified=false

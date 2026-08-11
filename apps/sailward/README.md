@@ -8,7 +8,6 @@ Sailward es un simulador de navegación 2D sobre el mundo real. El jugador parte
 
 - Ocho puertos de salida distribuidos por el mundo.
 - Mapa vectorial interactivo con MapLibre y datos de OpenStreetMap.
-- Cámara isométrica 2.5D, con cambio instantáneo a vista cenital.
 - Capa náutica opcional de OpenSeaMap.
 - Viento, olas y corrientes consultados en Open-Meteo.
 - Velocidad calculada según viento, rumbo y porcentaje de velas.
