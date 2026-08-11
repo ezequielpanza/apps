@@ -739,6 +739,68 @@ input[type="range"]::-moz-range-thumb {
   background: var(--brass);
 }
 
+.developer-gps {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(181, 137, 45, 0.62);
+  border-radius: 9px;
+  background: rgba(232, 196, 118, 0.1);
+}
+
+.developer-gps summary {
+  color: var(--brass-deep);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.developer-gps p {
+  margin: 8px 0 9px;
+  color: #52646a;
+  font-size: 11px;
+}
+
+.developer-gps__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.developer-gps__fields label {
+  display: grid;
+  gap: 4px;
+  color: #52646a;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.developer-gps__fields input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(7, 28, 36, 0.2);
+  border-radius: 6px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.72);
+  font: 600 12px Consolas, monospace;
+}
+
+.developer-gps__error {
+  display: block;
+  margin-top: 8px;
+  color: #a54336;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
 /* The hull is an independent sprite; the two sails remain live game elements. */
 .brand-lockup strong em {
   margin-left: 5px;
