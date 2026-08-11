@@ -16,6 +16,7 @@ const LEGACY_STORAGE_KEY = "sailward.voyage.0.1.0";
 const KEY_BINDINGS_STORAGE_KEY = "sailward.keybindings.v1";
 const PANEL_POSITIONS_STORAGE_KEY = "sailward.panelPositions.v1";
 const BASE_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+const BOAT_SPRITE_SIZE_PX = 72;
 
 type Port = { id: string; name: string; country: string; lat: number; lon: number; heading: number };
 type TrailPoint = { lat: number; lon: number };
@@ -186,9 +187,9 @@ export default function Home() {
     if (!mapContainerRef.current || mapRef.current) return; let disposed = false;
     void import("maplibre-gl").then(({ default: maplibregl }) => { if (disposed || !mapContainerRef.current) return; const map = new maplibregl.Map({ container: mapContainerRef.current, style: BASE_STYLE, center: [selectedPort.lon, selectedPort.lat], zoom: 8.2, pitch: 56, minPitch: 56, maxPitch: 56, bearing: -34, touchPitch: false, attributionControl: false });
       map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right"); map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
-      const markerRoot = document.createElement("div"); markerRoot.className = "boat-marker"; markerRoot.setAttribute("aria-label", "Posición de tu barco");
+      const markerRoot = document.createElement("div"); markerRoot.className = "boat-marker"; markerRoot.setAttribute("aria-label", "Posición de tu barco"); markerRoot.style.setProperty("--boat-sprite-size", `${BOAT_SPRITE_SIZE_PX}px`);
       const vessel = document.createElement("div"); vessel.className = "boat-marker__vessel"; vessel.innerHTML = '<img src="/sailboat-hull.png" alt="" /><span class="boat-sail boat-sail--main"></span><span class="boat-sail boat-sail--genoa"></span>'; markerRoot.appendChild(vessel);
-      const marker = new maplibregl.Marker({ element: markerRoot, anchor: "center" }).setLngLat([selectedPort.lon, selectedPort.lat]).addTo(map);
+      const marker = new maplibregl.Marker({ element: markerRoot, anchor: "center", pitchAlignment: "viewport", rotationAlignment: "viewport", scale: 1 }).setLngLat([selectedPort.lon, selectedPort.lat]).addTo(map);
       map.on("load", () => {
         try {
           map.addSource("esri-world-imagery", {

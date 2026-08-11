@@ -1170,8 +1170,12 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .boat-marker {
-  width: 94px;
-  height: 94px;
+  width: var(--boat-sprite-size, 72px);
+  min-width: var(--boat-sprite-size, 72px);
+  max-width: var(--boat-sprite-size, 72px);
+  height: var(--boat-sprite-size, 72px);
+  min-height: var(--boat-sprite-size, 72px);
+  max-height: var(--boat-sprite-size, 72px);
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -1184,8 +1188,12 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .boat-marker__vessel {
-  width: 94px;
-  height: 94px;
+  width: var(--boat-sprite-size, 72px);
+  min-width: var(--boat-sprite-size, 72px);
+  max-width: var(--boat-sprite-size, 72px);
+  height: var(--boat-sprite-size, 72px);
+  min-height: var(--boat-sprite-size, 72px);
+  max-height: var(--boat-sprite-size, 72px);
   overflow: visible;
   border-radius: 0;
   background: transparent;
@@ -1217,10 +1225,10 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .boat-sail--main {
-  left: 45px;
-  top: 12px;
-  width: 24px;
-  height: 50px;
+  left: 35px;
+  top: 9px;
+  width: 18px;
+  height: 38px;
   clip-path: polygon(5% 100%, 60% 2%, 100% 100%);
   background: linear-gradient(100deg, #e5e0d1 0%, #fffdf3 65%, #b8c4bf 100%);
   opacity: calc(var(--main-sail) / 100);
@@ -1228,10 +1236,10 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .boat-sail--genoa {
-  left: 23px;
-  top: 17px;
-  width: 26px;
-  height: 39px;
+  left: 18px;
+  top: 13px;
+  width: 20px;
+  height: 30px;
   clip-path: polygon(95% 100%, 12% 7%, 0% 100%);
   background: linear-gradient(70deg, #d8e4e2, #fffdf3 65%, #b9c8c4);
   opacity: calc(var(--genoa-sail) / 100);

@@ -59,6 +59,9 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /polarEfficiency/);
   assert.match(page, /isOnLand/);
   assert.match(page, /sailboat-hull\.png/);
+  assert.match(page, /BOAT_SPRITE_SIZE_PX = 72/);
+  assert.match(page, /pitchAlignment: "viewport"/);
+  assert.match(page, /rotationAlignment: "viewport"/);
   assert.match(page, /rotateX\(42deg\)/);
   assert.match(page, /GPS de arranque temporal/);
   assert.match(page, /developerLatitude/);
