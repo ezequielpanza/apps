@@ -134,7 +134,8 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /DRIZA MAYOR/);
   assert.match(page, /ENROLLADOR GENOA/);
   assert.match(page, /ESCOTA MAYOR/);
-  assert.match(page, /ESCOTA GENOA/);
+  assert.match(page, /ESCOTA GENOA BABOR/);
+  assert.match(page, /ESCOTA GENOA ESTRIBOR/);
   assert.match(page, /METEOROLOGÍA/);
   assert.match(page, /Viento real/);
   assert.match(page, /Información local en vivo/);
