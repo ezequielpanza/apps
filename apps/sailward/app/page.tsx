@@ -3,7 +3,7 @@
 
 import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
 import { point } from "@turf/helpers";
-import type { Feature, MultiPolygon, Polygon } from "geojson";
+import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import type { Map as MapInstance, Marker as MarkerInstance } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { feature } from "topojson-client";
@@ -40,7 +40,7 @@ const PORTS: Port[] = [
   { id: "singapore", name: "Singapur", country: "Singapur", lat: 1.247, lon: 103.86, heading: 110 },
 ];
 const DEFAULT_CONDITIONS: Conditions = { windKn: 13, windDirection: 65, waveHeight: 0.9, currentKn: 0.4, currentDirection: 110, depthM: 42, source: "estimated", updatedAt: Date.now() };
-const landFeature = feature(landTopology as never, (landTopology as { objects: { land: never } }).objects.land) as Feature<Polygon | MultiPolygon>;
+const landFeatures = (feature(landTopology as never, (landTopology as { objects: { land: never } }).objects.land) as FeatureCollection<Polygon | MultiPolygon>).features;
 const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
 const toDegrees = (radians: number) => (radians * 180) / Math.PI;
 const normalizeHeading = (heading: number) => ((heading % 360) + 360) % 360;
@@ -56,7 +56,10 @@ function destinationPoint(lat: number, lon: number, heading: number, distanceNm:
   const lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1), Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2));
   return { lat: toDegrees(lat2), lon: ((toDegrees(lon2) + 540) % 360) - 180 };
 }
-function isOnLand(lat: number, lon: number) { return booleanPointInPolygon(point([lon, lat]), landFeature); }
+function isOnLand(lat: number, lon: number) {
+  const location = point([lon, lat]);
+  return landFeatures.some((land) => booleanPointInPolygon(location, land));
+}
 function estimateDepthM(lat: number, lon: number) {
   for (let distance = 0.25; distance <= 12; distance += 0.25) for (let bearing = 0; bearing < 360; bearing += 30) {
     const sample = destinationPoint(lat, lon, bearing, distance);

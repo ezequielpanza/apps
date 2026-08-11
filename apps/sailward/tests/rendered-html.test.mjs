@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point } from "@turf/helpers";
+import { feature } from "topojson-client";
+import landTopology from "world-atlas/land-110m.json" with { type: "json" };
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -61,4 +65,11 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /Vista isométrica/);
   assert.equal(JSON.parse(packageJson).version, version.trim());
   assert.equal(JSON.parse(publicVersion).version, version.trim());
+});
+
+test("uses each land polygon when evaluating navigation collisions", () => {
+  const collection = feature(landTopology, landTopology.objects.land);
+  assert.equal(collection.type, "FeatureCollection");
+  assert.ok(collection.features.length > 0);
+  assert.doesNotThrow(() => collection.features.some((land) => booleanPointInPolygon(point([-15.4145, 28.1278]), land)));
 });
