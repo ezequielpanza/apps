@@ -82,6 +82,16 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /data-floating-panel="conditions"/);
   assert.match(page, /data-floating-panel="sails"/);
   assert.match(page, /data-floating-panel="helm"/);
+  assert.match(page, /data-floating-panel="compass"/);
+  assert.match(page, /data-floating-panel="gps"/);
+  assert.match(page, /data-floating-panel="wind"/);
+  assert.match(page, /gpsNavigation/);
+  assert.match(page, /apparentWind/);
+  assert.match(page, /RUMBO GPS · COG/);
+  assert.match(page, /VELOCIDAD GPS · SOG/);
+  assert.match(page, /VIENTO REAL/);
+  assert.match(page, /VIENTO APARENTE/);
+  assert.match(page, /HEADING/);
   assert.match(page, /beginPanelDrag/);
   assert.match(page, /setPointerCapture/);
   assert.match(page, /Mover ventana del timón/);
@@ -92,6 +102,9 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /Minimizar ventana de condiciones/);
   assert.match(page, /Minimizar ventana de velas/);
   assert.match(page, /Minimizar ventana del timón/);
+  assert.match(page, /Minimizar ventana del compás/);
+  assert.match(page, /Minimizar ventana GPS/);
+  assert.match(page, /Minimizar ventana de viento/);
   assert.match(page, /sailward\.keybindings\.v1/);
   assert.match(page, /DEFAULT_KEY_BINDINGS[\s\S]*KeyA[\s\S]*KeyD/);
   assert.match(page, /event\.code === keyBindings\.rudderLeft/);
