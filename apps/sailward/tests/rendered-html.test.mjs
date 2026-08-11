@@ -123,6 +123,8 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /RESTAURAR A \/ D/);
   assert.match(page, /helm-layout/);
   assert.match(page, /helm-step-column/);
+  assert.match(page, /−FULL/);
+  assert.match(page, /\+FULL/);
   assert.match(page, /FIJAR HEADING ACTUAL/);
   assert.match(page, /MAX_ANCHOR_RODE_M = 160/);
   assert.match(page, /anchor1RodeM/);

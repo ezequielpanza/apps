@@ -2257,6 +2257,13 @@ input[type="range"]::-moz-range-thumb {
   background: rgba(78, 211, 202, 0.13);
 }
 
+.helm-step-column .helm-full-button {
+  border-color: rgba(232, 196, 118, 0.42);
+  color: var(--brass);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+
 .center-helm-button {
   border-color: rgba(232, 196, 118, 0.5);
   color: var(--brass);
