@@ -436,6 +436,16 @@ export default function Home() {
     };
     document.addEventListener("dblclick", onDoubleClick); return () => document.removeEventListener("dblclick", onDoubleClick);
   }, []);
+  useEffect(() => {
+    const enhanceWindows = () => document.querySelectorAll<HTMLElement>("[data-floating-panel]").forEach((windowElement) => {
+      const actions = windowElement.querySelector<HTMLElement>(".floating-window-actions"); if (!actions || actions.querySelector(".window-power-button")) return;
+      const power = document.createElement("button"); power.type = "button"; power.className = "window-power-button is-active"; power.setAttribute("aria-label", "Desactivar herramienta"); power.title = "Activar o desactivar herramienta"; power.textContent = "⏻";
+      power.onclick = () => { const enabled = power.classList.toggle("is-active"); windowElement.classList.toggle("is-tool-disabled", !enabled); power.setAttribute("aria-label", enabled ? "Desactivar herramienta" : "Activar herramienta"); };
+      const close = document.createElement("button"); close.type = "button"; close.className = "window-close-button"; close.setAttribute("aria-label", "Cerrar ventana"); close.title = "Cerrar ventana"; close.textContent = "×"; close.onclick = () => { windowElement.classList.add("is-tool-closed"); };
+      actions.prepend(close); actions.prepend(power);
+    });
+    enhanceWindows(); const observer = new MutationObserver(enhanceWindows); observer.observe(document.body, { childList: true, subtree: true }); return () => observer.disconnect();
+  }, []);
   const beginAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     const rect = event.currentTarget.getBoundingClientRect(); const angle = toDegrees(Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2)));
