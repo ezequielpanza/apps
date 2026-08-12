@@ -105,6 +105,9 @@ input:focus-visible {
   backdrop-filter: blur(14px);
 }
 
+.tools-inventory section > div { display: none !important; }
+.tools-inventory section.is-open > div { display: grid !important; }
+
 .brand-button {
   appearance: none;
   color: var(--paper);
