@@ -228,7 +228,7 @@ function parseMinimizedPanels(raw: string): MinimizedPanels {
 
 export default function Home() {
   const mapContainerRef = useRef<HTMLDivElement>(null); const mapRef = useRef<MapInstance | null>(null); const boatMarkerRef = useRef<MarkerInstance | null>(null);
-  const voyageRef = useRef<Voyage | null>(null); const conditionsRef = useRef(DEFAULT_CONDITIONS); const followRef = useRef(true); const lastMapCenterRef = useRef<string | null>(null);
+  const voyageRef = useRef<Voyage | null>(null); const conditionsRef = useRef(DEFAULT_CONDITIONS); const followRef = useRef(true); const lastMapCenterRef = useRef<string | null>(null); const toolsClosedOnStartRef = useRef(false);
   const panelPositionsRef = useRef<PanelPositions>({}); const panelSizesRef = useRef<PanelSizes>({}); const panelDragRef = useRef<PanelDrag | null>(null); const panelResizeRef = useRef<PanelResize | null>(null); const anchorWinchDragRef = useRef<AnchorWinchDrag | null>(null); const deckWinchDragRef = useRef<Partial<Record<WinchId, AnchorWinchDrag>>>({});
   const [hydrated, setHydrated] = useState(false); const [selectedPortId, setSelectedPortId] = useState(PORTS[0].id); const [developerLatitude, setDeveloperLatitude] = useState(""); const [developerLongitude, setDeveloperLongitude] = useState(""); const [voyage, setVoyage] = useState<Voyage | null>(null);
   const [conditions, setConditions] = useState(DEFAULT_CONDITIONS); const [followBoat, setFollowBoat] = useState(true); const [satelliteLayer, setSatelliteLayer] = useState(true); const [nauticalLayer, setNauticalLayer] = useState(true); const isometricView = true;
@@ -246,6 +246,7 @@ export default function Home() {
     return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180 ? { lat, lon } : undefined;
   }, [developerLatitude, developerLongitude]);
   useEffect(() => { followRef.current = followBoat; }, [followBoat]); useEffect(() => { voyageRef.current = voyage; }, [voyage]); useEffect(() => { conditionsRef.current = conditions; }, [conditions]);
+  useEffect(() => { if (!voyage) { toolsClosedOnStartRef.current = false; return; } if (toolsClosedOnStartRef.current) return; const timer = window.setTimeout(() => { document.querySelectorAll("[data-floating-panel]").forEach((item) => item.classList.add("is-tool-closed")); toolsClosedOnStartRef.current = true; }, 0); return () => window.clearTimeout(timer); }, [voyage]);
   const refreshConditions = useCallback(async (lat: number, lon: number) => {
     setConditionsBusy(true); const depthM = estimateDepthM(lat, lon);
     try {
