@@ -829,7 +829,7 @@ input:focus-visible {
 }
 
 .meteorology-window.is-minimized {
-  width: 350px;
+  width: 500px;
   padding: 7px 8px 5px 14px;
 }
 
@@ -839,8 +839,12 @@ input:focus-visible {
 
 .meteorology-window.is-minimized .conditions-title > div:first-child {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.meteorology-window.is-minimized .floating-window-actions { flex: 0 0 auto; }
 
 .meteorology-window.is-minimized .minimized-summary {
   display: inline;
