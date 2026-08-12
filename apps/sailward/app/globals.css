@@ -1149,6 +1149,8 @@ input:focus-visible {
   margin: 0;
   justify-self: center;
   align-self: center;
+  appearance: slider-vertical;
+  -webkit-appearance: slider-vertical;
   writing-mode: vertical-lr;
   direction: rtl;
   cursor: ns-resize;
