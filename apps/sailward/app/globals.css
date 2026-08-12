@@ -1054,6 +1054,7 @@ input:focus-visible {
 .deck-winch i { position: absolute; inset: 50% auto auto 50%; width: 5px; height: 48px; margin: -24px 0 0 -2px; border-radius: 4px; background: linear-gradient(#eef0eb 0 55%,#78878a 55%); transform-origin: 50% 50%; }
 .winch-control > div { display: grid; gap: 4px; }
 .winch-control strong { color: var(--brass); font-size: 9px; letter-spacing: .08em; }
+.winch-control .winch-line-percent { color: var(--paper-bright); font: 800 10px Consolas, monospace; letter-spacing: 0; }
 .winch-control small { color: rgba(244,240,229,.47); font-size: 9px; line-height: 1.25; }
 .winch-control > div > button { width: fit-content; padding: 6px 9px; margin-top: 2px; }
 .winch-control > div > button.is-filing { border-color: rgba(241,164,156,.65); color: #f1a49c; }
