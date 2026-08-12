@@ -10,7 +10,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { feature } from "topojson-client";
 import landTopology from "world-atlas/land-110m.json";
 
-const APP_VERSION = "0.3.8";
+const APP_VERSION = "0.3.9";
 const STORAGE_KEY = "sailward.voyage";
 const LEGACY_STORAGE_KEY = "sailward.voyage.0.1.0";
 const KEY_BINDINGS_STORAGE_KEY = "sailward.keybindings.v1";
@@ -277,10 +277,10 @@ export default function Home() {
   useEffect(() => { const timer = window.setTimeout(() => { try { const raw = window.localStorage.getItem(BOAT_PROFILE_STORAGE_KEY); if (raw) setBoatProfile(normalizeBoatProfile(JSON.parse(raw) as Partial<BoatProfile>)); } catch { window.localStorage.removeItem(BOAT_PROFILE_STORAGE_KEY); } }, 0); return () => window.clearTimeout(timer); }, []);
   useEffect(() => { const onResize = () => { const next: PanelPositions = {}; for (const panel of FLOATING_PANELS) { const position = panelPositionsRef.current[panel]; if (position) next[panel] = { x: clamp(position.x, 8, Math.max(8, window.innerWidth - 80)), y: clamp(position.y, 8, Math.max(8, window.innerHeight - 50)) }; } panelPositionsRef.current = next; setPanelPositions(next); }; window.addEventListener("resize", onResize); return () => window.removeEventListener("resize", onResize); }, []);
   useEffect(() => { if (!hydrated) return; const refresh = () => { const target = voyageRef.current ?? selectedPort; void refreshConditions(target.lat, target.lon); }; refresh(); const interval = window.setInterval(refresh, 15 * 60 * 1000); return () => window.clearInterval(interval); }, [hydrated, refreshConditions, selectedPort]);
-  useEffect(() => { const interval = window.setInterval(() => { const timestamp = Date.now(); setNow(timestamp); setVoyage((current) => current ? advanceVoyage(current, conditionsRef.current, timestamp) : current); }, 1000); return () => window.clearInterval(interval); }, []);
+  useEffect(() => { const interval = window.setInterval(() => { const timestamp = Date.now(); setNow(timestamp); setVoyage((current) => current ? advanceVoyage(current, conditionsRef.current, timestamp) : current); }, 50); return () => window.clearInterval(interval); }, []);
   useEffect(() => { if (!hydrated) return; const save = () => { if (voyageRef.current) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(voyageRef.current)); }; const interval = window.setInterval(save, 5000); window.addEventListener("beforeunload", save); return () => { save(); window.clearInterval(interval); window.removeEventListener("beforeunload", save); }; }, [hydrated]);
   // Helm, sails and motor are commands. They must never run the geographic
-  // simulation for every pixel crossed by a range input; the 1 Hz loop does that.
+  // simulation for every pixel crossed by a range input; the 20 Hz loop does that.
   const updateVoyage = useCallback((change: (current: Voyage) => Voyage) => setVoyage((current) => current ? change(current) : current), []);
   const updateDepthAlarm = (change: (current: DepthAlarm) => DepthAlarm) => setDepthAlarm((current) => { const next = change(current); window.localStorage.setItem(DEPTH_ALARM_STORAGE_KEY, JSON.stringify(next)); return next; });
   const updateBoatProfile = (change: (current: BoatProfile) => BoatProfile) => setBoatProfile((current) => { const next = normalizeBoatProfile(change(current)); window.localStorage.setItem(BOAT_PROFILE_STORAGE_KEY, JSON.stringify(next)); setVoyage((active) => active ? { ...active, boatProfile: next, rudder: clamp(active.rudder, -next.rudderMaxDeg, next.rudderMaxDeg) } : active); return next; });
