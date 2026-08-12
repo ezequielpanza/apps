@@ -10,7 +10,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { feature } from "topojson-client";
 import landTopology from "world-atlas/land-110m.json";
 
-const APP_VERSION = "0.3.7";
+const APP_VERSION = "0.3.8";
 const STORAGE_KEY = "sailward.voyage";
 const LEGACY_STORAGE_KEY = "sailward.voyage.0.1.0";
 const KEY_BINDINGS_STORAGE_KEY = "sailward.keybindings.v1";
@@ -467,6 +467,8 @@ export default function Home() {
     enhanceWindows(); const observer = new MutationObserver(enhanceWindows); observer.observe(document.body, { childList: true, subtree: true }); return () => observer.disconnect();
   }, []);
   useEffect(() => { const shell = document.querySelector<HTMLElement>(".game-shell"); if (!shell) return; const tab = document.createElement("button"); tab.type = "button"; tab.className = `inventory-dock-tab ${toolsOpen ? "is-open" : ""}`; tab.textContent = "INVENTARIO"; tab.setAttribute("aria-label", toolsOpen ? "Ocultar inventario" : "Abrir inventario"); tab.setAttribute("aria-expanded", String(toolsOpen)); tab.onclick = () => setToolsOpen((open) => !open); shell.append(tab); return () => tab.remove(); }, [toolsOpen]);
+  useEffect(() => { if (!settingsOpen) return; const content = document.querySelector<HTMLElement>(".settings-content"); if (!content) return; const section = document.createElement("section"); section.className = "map-layer-settings"; section.innerHTML = `<span>MAPA</span><strong>Capas cartográficas</strong><small>Elegí las capas que querés ver durante la travesía.</small>`; const satellite = document.createElement("button"); satellite.type = "button"; satellite.className = satelliteLayer ? "is-active" : ""; satellite.textContent = `SATELITAL · ${satelliteLayer ? "ACTIVA" : "OCULTA"}`; satellite.onclick = () => setSatelliteLayer((active) => !active); const nautical = document.createElement("button"); nautical.type = "button"; nautical.className = nauticalLayer ? "is-active" : ""; nautical.textContent = `CARTA NÁUTICA · ${nauticalLayer ? "ACTIVA" : "OCULTA"}`; nautical.onclick = () => setNauticalLayer((active) => !active); section.append(satellite, nautical); content.prepend(section); return () => section.remove(); }, [settingsOpen, satelliteLayer, nauticalLayer]);
+  useEffect(() => { if (!voyage) return; const brand = document.querySelector<HTMLElement>(".brand-bar"); const lockup = brand?.querySelector<HTMLElement>(".brand-lockup"); if (!brand || !lockup) return; const center = document.createElement("button"); center.type = "button"; center.className = `brand-follow-button ${followBoat ? "is-active" : ""}`; center.textContent = "⌖"; center.setAttribute("aria-label", followBoat ? "Desactivar seguimiento del barco" : "Centrar y seguir barco"); center.title = followBoat ? "Desactivar seguimiento" : "Centrar barco"; center.onclick = toggleFollowBoat; lockup.after(center); return () => center.remove(); }, [voyage, followBoat]);
   const beginAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     const rect = event.currentTarget.getBoundingClientRect(); const angle = toDegrees(Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2)));
