@@ -48,7 +48,7 @@ test("keeps product version and offline voyage contract aligned", async () => {
     readFile(new URL("../public/version.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /const APP_VERSION = "0\.2\.0"/);
+  assert.match(page, /const APP_VERSION = "0\.3\.0"/);
   assert.match(page, /sailward\.voyage/);
   assert.match(page, /open-meteo\.com/);
   assert.match(page, /tiles\.openseamap\.org/);
