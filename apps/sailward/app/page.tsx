@@ -46,7 +46,8 @@ type Conditions = {
 type KeyBindingName = "rudderLeft" | "rudderRight";
 type KeyBindings = Record<KeyBindingName, string>;
 type DepthAlarm = { thresholdM: number; armed: boolean };
-const FLOATING_PANELS = ["voyage", "conditions", "sails", "engine", "helm", "autopilot", "anchor", "rigging", "resources", "depth", "compass", "gps", "wind"] as const;
+type WinchId = "winchMainPort" | "winchMainStarboard" | "winchPort" | "winchStarboard";
+const FLOATING_PANELS = ["voyage", "conditions", "sails", "engine", "helm", "autopilot", "anchor", "rigging", "resources", "depth", "compass", "gps", "wind", "winchMainPort", "winchMainStarboard", "winchPort", "winchStarboard"] as const;
 type FloatingPanelName = (typeof FLOATING_PANELS)[number];
 type PanelPosition = { x: number; y: number };
 type PanelPositions = Partial<Record<FloatingPanelName, PanelPosition>>;
@@ -60,6 +61,12 @@ type AnchorWinchDrag = { pointerId: number; lastAngle: number };
 const DEFAULT_KEY_BINDINGS: KeyBindings = { rudderLeft: "KeyA", rudderRight: "KeyD" };
 const DEFAULT_DEPTH_ALARM: DepthAlarm = { thresholdM: 8, armed: true };
 const DEFAULT_BOAT_PROFILE: BoatProfile = { id: "sailward-01", name: "Sailward 01", motorMaxKn: 6.5, rudderMaxDeg: 35, rudderTurnRate: 10 };
+const WINCHES = [
+  { id: "winchMainPort", title: "WINCH 1 · HARKEN 40", side: "COCKPIT · BABOR", lines: ["DRIZA MAYOR", "RIZO 1"] },
+  { id: "winchMainStarboard", title: "WINCH 2 · HARKEN 40", side: "COCKPIT · ESTRIBOR", lines: ["RIZO 2", "DRIZA SPINNAKER"] },
+  { id: "winchPort", title: "WINCH 3 · HARKEN 46", side: "BANDA · BABOR", lines: ["ESCOTA GENOA BABOR", "ENROLLADOR GENOA"] },
+  { id: "winchStarboard", title: "WINCH 4 · HARKEN 46", side: "BANDA · ESTRIBOR", lines: ["ESCOTA GENOA ESTRIBOR"] }
+] as const;
 
 const PORTS: Port[] = [
   // Just outside the marina entrance: enough clear water for the first manoeuvre.
@@ -228,7 +235,7 @@ export default function Home() {
   const [mapReady, setMapReady] = useState(false); const [mapError, setMapError] = useState(false); const [conditionsBusy, setConditionsBusy] = useState(false); const [now, setNow] = useState(0);
   const [panelPositions, setPanelPositions] = useState<PanelPositions>({}); const [panelSizes, setPanelSizes] = useState<PanelSizes>({}); const [activePanel, setActivePanel] = useState<FloatingPanelName>("helm");
   const [minimizedPanels, setMinimizedPanels] = useState<MinimizedPanels>({});
-  const [anchorWinchRotation, setAnchorWinchRotation] = useState(0);
+  const [anchorWinchRotation, setAnchorWinchRotation] = useState(0); const [winchRotation, setWinchRotation] = useState<Record<WinchId, number>>({ winchMainPort: 0, winchMainStarboard: 0, winchPort: 0, winchStarboard: 0 }); const [winchLine, setWinchLine] = useState<Record<WinchId, string>>({ winchMainPort: "DRIZA MAYOR", winchMainStarboard: "RIZO 2", winchPort: "ESCOTA GENOA BABOR", winchStarboard: "ESCOTA GENOA ESTRIBOR" }); const [winchFiling, setWinchFiling] = useState<Record<WinchId, boolean>>({ winchMainPort: false, winchMainStarboard: false, winchPort: false, winchStarboard: false });
   const [settingsOpen, setSettingsOpen] = useState(false); const [capturingKey, setCapturingKey] = useState<KeyBindingName | null>(null); const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
   const [depthAlarm, setDepthAlarm] = useState<DepthAlarm>(DEFAULT_DEPTH_ALARM);
   const [boatProfile, setBoatProfile] = useState<BoatProfile>(DEFAULT_BOAT_PROFILE);
@@ -460,6 +467,7 @@ export default function Home() {
   const selectedAnchor = voyage?.selectedAnchor ?? 1; const selectedAnchorRode = voyage ? anchorRode(voyage, selectedAnchor) : 0; const selectedAnchorStatus = voyage ? anchorStatus(voyage, conditions, selectedAnchor) : "ESTIBADA";
   return <main className={`game-shell ${voyage ? "is-sailing" : "is-docked"}`}><div ref={mapContainerRef} className="world-map" aria-label="Mapa mundial interactivo de Sailward" /><div className="ocean-vignette" aria-hidden="true" />
     <header className="brand-bar"><button type="button" className="brand-lockup brand-button" aria-label="Abrir ajustes de Sailward" title="Ajustes" onClick={() => setSettingsOpen(true)}><span className="brand-mark" aria-hidden="true">S</span><div><strong>SAILWARD <em>v{APP_VERSION}</em></strong><span>REAL-TIME SAILING</span></div></button><div className="world-clock"><span className="live-dot" /><span>{utcTime} UTC</span><small>TIEMPO REAL · 1×</small></div></header>
+    {voyage && WINCHES.map((winch) => <section key={winch.id} className={`instrument-window winch-window floating-window ${minimizedPanels[winch.id] ? "is-minimized" : ""}`} data-floating-panel={winch.id} style={floatingPanelStyle(winch.id)} onPointerDownCapture={() => setActivePanel(winch.id)}><div className="floating-window-bar"><span>{winch.title} <strong className="minimized-summary">{winchLine[winch.id]}</strong></span><div className="floating-window-actions"><button type="button" className="window-minimize-button" aria-label={minimizedPanels[winch.id] ? `Restaurar ${winch.title}` : `Minimizar ${winch.title}`} onClick={() => togglePanelMinimized(winch.id)}>{minimizedPanels[winch.id] ? "□" : "—"}</button></div></div><div className="winch-window-content floating-window-content"><span>{winch.side}</span><div className="winch-line-selector">{winch.lines.map((line) => <button type="button" key={line} className={winchLine[winch.id] === line ? "is-active" : ""} onClick={() => setWinchLine((current) => ({ ...current, [winch.id]: line }))}>{line}</button>)}</div><div className="winch-control"><button type="button" className="deck-winch" aria-label={`Girar ${winch.title}`} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); }} onPointerMove={(event) => { if (!event.currentTarget.hasPointerCapture(event.pointerId)) return; setWinchRotation((current) => ({ ...current, [winch.id]: current[winch.id] + event.movementX * 2 })); }} onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)} onPointerCancel={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}><i style={{ transform: `rotate(${winchRotation[winch.id]}deg)` }} /></button><div><strong>{winchFiling[winch.id] ? "FILANDO" : "EN FRENO"}</strong><small>{winchFiling[winch.id] ? "Girá para soltar cabo" : "Girá para cobrar cabo"}</small><button type="button" className={winchFiling[winch.id] ? "is-filing" : ""} aria-pressed={winchFiling[winch.id]} onClick={() => setWinchFiling((current) => ({ ...current, [winch.id]: !current[winch.id] }))}>{winchFiling[winch.id] ? "TOMAR FRENO" : "FILAR"}</button></div></div></div></section>)}
     {settingsOpen && <div className="settings-overlay" onPointerDown={(event) => { if (event.target === event.currentTarget) { setCapturingKey(null); setSettingsOpen(false); } }}>
       <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <header className="settings-header"><div><span>SAILWARD</span><h2 id="settings-title">Ajustes</h2></div><button type="button" aria-label="Cerrar ajustes" onClick={() => { setCapturingKey(null); setSettingsOpen(false); }}>×</button></header>

@@ -1002,6 +1002,27 @@ input:focus-visible {
   width: 305px;
 }
 
+.winch-window { width: 245px; }
+.winch-window[data-floating-panel="winchMainPort"] { top: 108px; right: 24px; }
+.winch-window[data-floating-panel="winchMainStarboard"] { top: 300px; right: 24px; }
+.winch-window[data-floating-panel="winchPort"] { top: 492px; left: 300px; }
+.winch-window[data-floating-panel="winchStarboard"] { top: 492px; left: 560px; }
+.winch-window-content { display: grid; gap: 9px; padding: 13px 15px 15px; }
+.winch-window-content > span { color: rgba(244,240,229,.45); font-size: 8px; font-weight: 900; letter-spacing: .12em; }
+.winch-line-selector { display: flex; gap: 5px; flex-wrap: wrap; }
+.winch-line-selector button, .winch-control button { border: 1px solid rgba(244,240,229,.16); border-radius: 6px; color: rgba(244,240,229,.7); background: rgba(255,255,255,.04); font-size: 8px; font-weight: 800; cursor: pointer; }
+.winch-line-selector button { padding: 6px 7px; }
+.winch-line-selector button.is-active { border-color: rgba(232,196,118,.62); color: var(--paper-bright); background: rgba(232,196,118,.1); }
+.winch-control { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 12px; }
+.deck-winch { position: relative; width: 70px; height: 70px; padding: 0; border: 8px solid #889699 !important; border-radius: 50% !important; background: radial-gradient(circle,#cbd1cf 0 16%,#5b6d72 17% 32%,#19333a 33% 55%,#0d1d22 56%) !important; cursor: grab !important; touch-action: none; }
+.deck-winch:active { cursor: grabbing !important; }
+.deck-winch i { position: absolute; inset: 50% auto auto 50%; width: 5px; height: 48px; margin: -24px 0 0 -2px; border-radius: 4px; background: linear-gradient(#eef0eb 0 55%,#78878a 55%); transform-origin: 50% 50%; }
+.winch-control > div { display: grid; gap: 4px; }
+.winch-control strong { color: var(--brass); font-size: 9px; letter-spacing: .08em; }
+.winch-control small { color: rgba(244,240,229,.47); font-size: 9px; line-height: 1.25; }
+.winch-control > div > button { width: fit-content; padding: 6px 9px; margin-top: 2px; }
+.winch-control > div > button.is-filing { border-color: rgba(241,164,156,.65); color: #f1a49c; }
+
 .engine-window-content {
   display: grid;
   gap: 12px;
