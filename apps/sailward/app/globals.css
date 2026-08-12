@@ -2078,6 +2078,9 @@ input[type="range"]::-moz-range-thumb {
   gap: 4px;
 }
 
+.tools-inventory { position: absolute; z-index: 20; top: 92px; right: 76px; width: 260px; max-height: calc(100dvh - 120px); overflow: auto; padding: 15px; border: 1px solid var(--line); border-radius: 14px; color: var(--paper); background: rgba(4,25,33,.96); box-shadow: 0 22px 55px rgba(0,0,0,.35); }
+.tools-inventory header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }.tools-inventory header button { border:0; color:var(--paper); background:transparent; font-size:22px; cursor:pointer; }.tools-inventory > small { display:block; margin:12px 0 6px; color:var(--brass); font-size:8px; font-weight:900; letter-spacing:.13em; }.tools-inventory section { margin-bottom:9px; }.tools-inventory section b { font-size:10px; }.tools-inventory section div { display:grid; gap:3px; margin-top:4px; }.tools-inventory section button,.tools-group { border:0; padding:5px 0; color:rgba(244,240,229,.7); background:transparent; text-align:left; font-size:10px; cursor:pointer; }.tools-group { color:var(--teal); font-weight:800; }
+
 .map-tools button {
   width: 44px;
   height: 44px;
