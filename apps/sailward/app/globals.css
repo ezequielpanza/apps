@@ -2109,7 +2109,9 @@ input[type="range"]::-moz-range-thumb {
   gap: 4px;
 }
 
-.tools-inventory { position: absolute; z-index: 20; top: 92px; left: 18px; right: auto; width: 280px; min-width: 220px; max-width: min(520px, calc(100vw - 36px)); max-height: calc(100dvh - 120px); overflow: auto; resize: horizontal; padding: 15px; border: 1px solid var(--line); border-radius: 14px; color: var(--paper); background: rgba(4,25,33,.96); box-shadow: 0 22px 55px rgba(0,0,0,.35); }
+.tools-inventory { position: absolute; z-index: 20; top: 72px; bottom: 0; left: 0; right: auto; width: 280px; min-width: 220px; max-width: min(520px, calc(100vw - 36px)); max-height: none; overflow: auto; resize: horizontal; padding: 15px; border: 1px solid var(--line); border-left: 0; border-radius: 0 14px 14px 0; color: var(--paper); background: rgba(4,25,33,.98); box-shadow: 16px 0 38px rgba(0,0,0,.3); }
+.inventory-dock-tab { position:absolute; z-index:21; top:108px; left:0; padding:10px 9px; border:1px solid var(--line); border-left:0; border-radius:0 8px 8px 0; color:var(--brass); background:rgba(4,25,33,.96); font-size:9px; font-weight:900; letter-spacing:.12em; cursor:pointer; writing-mode:vertical-rl; transform:rotate(180deg); box-shadow:8px 0 20px rgba(0,0,0,.22); }.inventory-dock-tab.is-open { left:280px; color:var(--paper-bright); background:#061c24; }
+.map-tools button:first-child { display:none; }
 .tools-inventory { scrollbar-width: thin; scrollbar-color: rgba(232,196,118,.72) rgba(255,255,255,.05); }
 .tools-inventory::-webkit-scrollbar { width: 10px; }.tools-inventory::-webkit-scrollbar-track { margin:10px 0; border-radius:999px; background:rgba(255,255,255,.05); }.tools-inventory::-webkit-scrollbar-thumb { border:2px solid rgba(4,25,33,.96); border-radius:999px; background:linear-gradient(180deg,var(--brass),#a88448); }
 .tools-inventory section b { display:block; padding:5px 0; cursor:pointer; }.tools-inventory section b::before { content:"▸ "; color:var(--brass); }.tools-inventory section.is-open b::before { content:"▾ "; }.tools-inventory section div { display:none; }.tools-inventory section.is-open div { display:grid; }

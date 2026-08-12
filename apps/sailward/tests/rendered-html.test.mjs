@@ -48,7 +48,8 @@ test("keeps product version and offline voyage contract aligned", async () => {
     readFile(new URL("../public/version.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /const APP_VERSION = "0\.3\.6"/);
+  assert.match(page, /const APP_VERSION = "0\.3\.7"/);
+  assert.match(page, /inventory-dock-tab/);
   assert.match(page, /winchLinePercentage/);
   assert.match(page, /winch-line-percent/);
   assert.match(page, /inventory-folder-toggle/);
