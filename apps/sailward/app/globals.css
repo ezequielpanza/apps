@@ -2518,19 +2518,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .sail-control {
-  position: absolute;
-  z-index: 7;
-  top: 338px;
-  right: 24px;
-  width: 240px;
-  min-height: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--line) !important;
-  border-radius: 16px;
-  background: rgba(4, 25, 33, 0.9);
-  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(14px);
+  display: none !important;
 }
 
 .sail-window-content {

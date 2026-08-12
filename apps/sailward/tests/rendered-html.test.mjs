@@ -48,7 +48,7 @@ test("keeps product version and offline voyage contract aligned", async () => {
     readFile(new URL("../public/version.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /const APP_VERSION = "0\.3\.5"/);
+  assert.match(page, /const APP_VERSION = "0\.3\.6"/);
   assert.match(page, /winchLinePercentage/);
   assert.match(page, /winch-line-percent/);
   assert.match(page, /inventory-folder-toggle/);
@@ -84,7 +84,6 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /sailward\.panelPositions\.v1/);
   assert.match(page, /data-floating-panel="voyage"/);
   assert.match(page, /data-floating-panel="conditions"/);
-  assert.match(page, /data-floating-panel="sails"/);
   assert.match(page, /data-floating-panel="helm"/);
   assert.match(page, /data-floating-panel="autopilot"/);
   assert.match(page, /data-floating-panel="anchor"/);
