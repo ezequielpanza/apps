@@ -108,7 +108,7 @@ input:focus-visible {
 .tools-inventory section > div { display: none !important; }
 .tools-inventory section.is-open > div { display: grid !important; }
 .inventory-add-folder,.inventory-folder { border:1px solid rgba(244,240,229,.12); border-radius:6px; padding:6px 8px; color:rgba(244,240,229,.75); background:rgba(255,255,255,.04); text-align:left; font-size:9px; cursor:pointer; }.inventory-add-folder { margin-top:7px; color:var(--teal); }
-.tools-inventory section > b::after { content: " 📁"; }.tools-inventory section > div { margin-left: 9px; padding-left: 12px; border-left: 1px solid rgba(232,196,118,.25); }.tools-inventory section > div > button { position: relative; }.tools-inventory section > div > button::before { content: ""; position: absolute; left: -13px; top: 50%; width: 9px; border-top: 1px solid rgba(232,196,118,.25); }
+.tools-inventory section > b::after { content: ""; }.tools-inventory section > b::before { content: "▸ 📁 "; }.tools-inventory section.is-open > b::before { content: "▾ 📂 "; }.tools-inventory section > div { margin-left: 9px; padding-left: 12px; border-left: 1px solid rgba(232,196,118,.25); }.tools-inventory section > div > button { position: relative; }.tools-inventory section > div > button::before { content: ""; position: absolute; left: -13px; top: 50%; width: 9px; border-top: 1px solid rgba(232,196,118,.25); }
 
 .brand-button {
   appearance: none;
