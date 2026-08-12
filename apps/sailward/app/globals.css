@@ -1156,9 +1156,13 @@ input:focus-visible {
 }
 
 .engine-throttle strong {
-  display: none;
+  display: block;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: end;
   color: var(--brass);
-  font: 800 19px Consolas, monospace;
+  font: 800 11px Consolas, monospace;
+  white-space: nowrap;
 }
 
 .engine-throttle.is-reverse strong,
