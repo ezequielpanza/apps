@@ -422,6 +422,7 @@ export default function Home() {
     document.addEventListener("pointerdown", onPointerDown); document.addEventListener("pointermove", onPointerMove); document.addEventListener("pointerup", onPointerUp); document.addEventListener("pointercancel", onPointerUp);
     return () => { setResizeCursor(null); document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("pointermove", onPointerMove); document.removeEventListener("pointerup", onPointerUp); document.removeEventListener("pointercancel", onPointerUp); };
   }, []);
+  useEffect(() => { const toggleFolder = (event: MouseEvent) => { const heading = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(".tools-inventory section > b") : null; if (heading) heading.parentElement?.classList.toggle("is-open"); }; document.addEventListener("click", toggleFolder); return () => document.removeEventListener("click", toggleFolder); }, []);
   useEffect(() => {
     const onDoubleClick = (event: MouseEvent) => {
       if (!(event.target instanceof HTMLElement) || event.target.closest("button, input, select, label, a")) return;
