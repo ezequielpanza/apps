@@ -415,6 +415,20 @@ export default function Home() {
     document.addEventListener("pointerdown", onPointerDown); document.addEventListener("pointermove", onPointerMove); document.addEventListener("pointerup", onPointerUp); document.addEventListener("pointercancel", onPointerUp);
     return () => { setResizeCursor(null); document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("pointermove", onPointerMove); document.removeEventListener("pointerup", onPointerUp); document.removeEventListener("pointercancel", onPointerUp); };
   }, []);
+  useEffect(() => {
+    const onDoubleClick = (event: MouseEvent) => {
+      if (!(event.target instanceof HTMLElement) || event.target.closest("button, input, select, label, a")) return;
+      const bar = event.target.closest<HTMLElement>(".floating-window-bar, .conditions-title"); const element = event.target.closest<HTMLElement>("[data-floating-panel]"); const panel = element?.dataset.floatingPanel as FloatingPanelName | undefined;
+      if (!bar || !element || !panel || !FLOATING_PANELS.includes(panel)) return;
+      event.preventDefault(); setActivePanel(panel);
+      if (panelPositionsRef.current[panel] || panelSizesRef.current[panel]) {
+        const positions = { ...panelPositionsRef.current }; const sizes = { ...panelSizesRef.current }; delete positions[panel]; delete sizes[panel]; panelPositionsRef.current = positions; panelSizesRef.current = sizes; setPanelPositions(positions); setPanelSizes(sizes); window.localStorage.setItem(PANEL_POSITIONS_STORAGE_KEY, JSON.stringify(positions)); window.localStorage.setItem(PANEL_SIZES_STORAGE_KEY, JSON.stringify(sizes));
+      } else {
+        setMinimizedPanels((current) => { const next = { ...current, [panel]: !current[panel] }; window.localStorage.setItem(MINIMIZED_PANELS_STORAGE_KEY, JSON.stringify(next)); return next; });
+      }
+    };
+    document.addEventListener("dblclick", onDoubleClick); return () => document.removeEventListener("dblclick", onDoubleClick);
+  }, []);
   const beginAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     const rect = event.currentTarget.getBoundingClientRect(); const angle = toDegrees(Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2)));

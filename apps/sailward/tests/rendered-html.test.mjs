@@ -153,6 +153,8 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /waterReserveL/);
   assert.match(page, /sailward\.panelSizes\.v1/);
   assert.match(page, /panelResizeRef/);
+  assert.match(page, /onDoubleClick/);
+  assert.match(page, /document\.addEventListener\("dblclick", onDoubleClick\)/);
   assert.match(page, /floating-window-bar/);
   assert.match(page, /settings-danger-zone/);
   assert.match(page, /FINALIZAR SIMULACIÓN/);
