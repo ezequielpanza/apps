@@ -107,6 +107,7 @@ input:focus-visible {
 
 .tools-inventory section > div { display: none !important; }
 .tools-inventory section.is-open > div { display: grid !important; }
+.inventory-add-folder,.inventory-folder { border:1px solid rgba(244,240,229,.12); border-radius:6px; padding:6px 8px; color:rgba(244,240,229,.75); background:rgba(255,255,255,.04); text-align:left; font-size:9px; cursor:pointer; }.inventory-add-folder { margin-top:7px; color:var(--teal); }
 
 .brand-button {
   appearance: none;
