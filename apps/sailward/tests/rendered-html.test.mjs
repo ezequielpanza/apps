@@ -48,7 +48,7 @@ test("keeps product version and offline voyage contract aligned", async () => {
     readFile(new URL("../public/version.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /const APP_VERSION = "0\.3\.2"/);
+  assert.match(page, /const APP_VERSION = "0\.3\.3"/);
   assert.match(page, /inventory-folder-toggle/);
   assert.match(page, /Eliminar carpeta/);
   assert.match(page, /sailward\.voyage/);

@@ -10,7 +10,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { feature } from "topojson-client";
 import landTopology from "world-atlas/land-110m.json";
 
-const APP_VERSION = "0.3.2";
+const APP_VERSION = "0.3.3";
 const STORAGE_KEY = "sailward.voyage";
 const LEGACY_STORAGE_KEY = "sailward.voyage.0.1.0";
 const KEY_BINDINGS_STORAGE_KEY = "sailward.keybindings.v1";

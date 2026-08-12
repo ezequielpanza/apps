@@ -781,6 +781,13 @@ input:focus-visible {
   width: 240px;
 }
 
+/* Meteorology is a floating instrument too: keep it fully legible over satellite imagery. */
+.meteorology-window {
+  background: #061c24 !important;
+  border-color: rgba(174, 205, 204, 0.4);
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.42);
+}
+
 .conditions-title {
   display: flex;
   align-items: center;
