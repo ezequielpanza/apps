@@ -270,7 +270,14 @@ input:focus-visible {
   padding: 26px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 196, 118, 0.72) rgba(255, 255, 255, 0.05);
 }
+
+.settings-content::-webkit-scrollbar { width: 10px; }
+.settings-content::-webkit-scrollbar-track { margin: 10px 0; border-radius: 999px; background: rgba(255, 255, 255, 0.05); }
+.settings-content::-webkit-scrollbar-thumb { border: 2px solid rgba(4, 25, 33, 0.98); border-radius: 999px; background: linear-gradient(180deg, var(--brass), #a88448); }
+.settings-content::-webkit-scrollbar-thumb:hover { background: var(--paper-bright); }
 
 .settings-content h3 {
   margin-top: 4px;
