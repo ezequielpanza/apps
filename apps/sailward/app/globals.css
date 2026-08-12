@@ -1816,6 +1816,7 @@ input:focus-visible {
 
 .window-power-button,
 .window-close-button { width: 28px; height: 28px; padding: 0; border: 1px solid rgba(244,240,229,.15); border-radius: 7px; color: rgba(244,240,229,.58); background: rgba(255,255,255,.04); font-size: 16px; line-height: 1; cursor: pointer; }
+.window-power-button { display: none !important; }
 .window-power-button.is-active { color: var(--teal); border-color: rgba(78,211,202,.46); background: rgba(78,211,202,.1); }
 .window-close-button:hover { color: #f1a49c; border-color: rgba(226,91,80,.6); background: rgba(226,91,80,.1); }
 .floating-window.is-tool-disabled .floating-window-content { opacity: .34; filter: grayscale(.8); pointer-events: none; }
