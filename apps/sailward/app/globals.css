@@ -1710,7 +1710,7 @@ input:focus-visible {
   z-index: 7;
   left: 50%;
   bottom: 36px;
-  width: min(520px, calc(100vw - 48px));
+  width: min(360px, calc(100vw - 48px));
   min-height: 0;
   display: block;
   transform: translateX(-50%);
@@ -1725,7 +1725,7 @@ input:focus-visible {
 .helm-window-content {
   min-height: 180px;
   display: grid;
-  grid-template-columns: 1fr 190px;
+  grid-template-columns: 1fr;
 }
 
 .floating-window-bar {

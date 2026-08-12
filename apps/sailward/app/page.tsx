@@ -424,7 +424,7 @@ export default function Home() {
     return () => { setResizeCursor(null); document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("pointermove", onPointerMove); document.removeEventListener("pointerup", onPointerUp); document.removeEventListener("pointercancel", onPointerUp); };
   }, []);
   useEffect(() => { const toggleFolder = (event: MouseEvent) => { const heading = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(".tools-inventory section > b") : null; if (heading) heading.parentElement?.classList.toggle("is-open"); }; document.addEventListener("click", toggleFolder); return () => document.removeEventListener("click", toggleFolder); }, []);
-  useEffect(() => { try { const saved = JSON.parse(window.localStorage.getItem("sailward.inventoryFolders.v1") ?? "[]"); if (Array.isArray(saved)) setInventoryFolders(saved.filter((item): item is string => typeof item === "string")); } catch { window.localStorage.removeItem("sailward.inventoryFolders.v1"); } }, []);
+  useEffect(() => { const timer = window.setTimeout(() => { try { const saved = JSON.parse(window.localStorage.getItem("sailward.inventoryFolders.v1") ?? "[]"); if (Array.isArray(saved)) setInventoryFolders(saved.filter((item): item is string => typeof item === "string")); } catch { window.localStorage.removeItem("sailward.inventoryFolders.v1"); } }, 0); return () => window.clearTimeout(timer); }, []);
   useEffect(() => {
     const onDoubleClick = (event: MouseEvent) => {
       if (!(event.target instanceof HTMLElement) || event.target.closest("button, input, select, label, a")) return;
