@@ -10,7 +10,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { feature } from "topojson-client";
 import landTopology from "world-atlas/land-110m.json";
 
-const APP_VERSION = "0.3.9";
+const APP_VERSION = "0.4.0";
 const STORAGE_KEY = "sailward.voyage";
 const LEGACY_STORAGE_KEY = "sailward.voyage.0.1.0";
 const KEY_BINDINGS_STORAGE_KEY = "sailward.keybindings.v1";
@@ -253,6 +253,7 @@ export default function Home() {
   const [minimizedPanels, setMinimizedPanels] = useState<MinimizedPanels>({});
   const [anchorWinchRotation, setAnchorWinchRotation] = useState(0); const [winchRotation, setWinchRotation] = useState<Record<WinchId, number>>({ winchMainPort: 0, winchMainStarboard: 0, winchPort: 0, winchStarboard: 0 }); const [winchLine, setWinchLine] = useState<Record<WinchId, string>>({ winchMainPort: "DRIZA MAYOR", winchMainStarboard: "RIZO 2", winchPort: "ESCOTA GENOA BABOR", winchStarboard: "ESCOTA GENOA ESTRIBOR" }); const [winchFiling, setWinchFiling] = useState<Record<WinchId, boolean>>({ winchMainPort: false, winchMainStarboard: false, winchPort: false, winchStarboard: false });
   const [settingsOpen, setSettingsOpen] = useState(false); const [toolsOpen, setToolsOpen] = useState(false); const [inventoryFolders, setInventoryFolders] = useState<string[]>([]); const [openInventoryFolders, setOpenInventoryFolders] = useState<string[]>([]); const [inventoryFolderTools, setInventoryFolderTools] = useState<Record<string, string[]>>({}); const [newInventoryFolder, setNewInventoryFolder] = useState(""); const [capturingKey, setCapturingKey] = useState<KeyBindingName | null>(null); const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
+  const [showBearingRing, setShowBearingRing] = useState(false);
   const [depthAlarm, setDepthAlarm] = useState<DepthAlarm>(DEFAULT_DEPTH_ALARM);
   const [boatProfile, setBoatProfile] = useState<BoatProfile>(DEFAULT_BOAT_PROFILE);
   const selectedPort = useMemo(() => PORTS.find((port) => port.id === selectedPortId) ?? PORTS[0], [selectedPortId]);
@@ -261,6 +262,8 @@ export default function Home() {
     const lat = Number(developerLatitude); const lon = Number(developerLongitude);
     return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180 ? { lat, lon } : undefined;
   }, [developerLatitude, developerLongitude]);
+  useEffect(() => { if (!settingsOpen) return; const section = document.querySelector<HTMLElement>(".map-layer-settings"); if (!section) return; const bearing = document.createElement("button"); bearing.type = "button"; bearing.className = showBearingRing ? "is-active" : ""; bearing.textContent = `ROSA DE GRADOS · ${showBearingRing ? "ACTIVA" : "OCULTA"}`; bearing.onclick = () => setShowBearingRing((visible) => !visible); section.append(bearing); return () => bearing.remove(); }, [settingsOpen, showBearingRing]);
+  useEffect(() => { const map = mapRef.current; const marker = boatMarkerRef.current; if (!map || !marker) return; const root = marker.getElement(); let ring = root.querySelector<HTMLElement>(".boat-bearing-ring"); if (!ring) { ring = document.createElement("div"); ring.className = "boat-bearing-ring"; ring.innerHTML = '<b class="bearing-north">0°</b><b class="bearing-east">90°</b><b class="bearing-south">180°</b><b class="bearing-west">270°</b>'; root.insertBefore(ring, root.firstChild); } ring.style.display = showBearingRing ? "block" : "none"; if (!showBearingRing || !voyage) return; const north = destinationPoint(voyage.lat, voyage.lon, 0, 0.06); const originPx = map.project([voyage.lon, voyage.lat]); const northPx = map.project([north.lon, north.lat]); const northScreenAngle = toDegrees(Math.atan2(northPx.x - originPx.x, -(northPx.y - originPx.y))); ring.style.transform = isometricView ? `perspective(360px) rotateX(42deg) rotate(${northScreenAngle}deg)` : `rotate(${northScreenAngle}deg)`; }, [mapReady, voyage?.lat, voyage?.lon, showBearingRing, isometricView]);
   useEffect(() => { followRef.current = followBoat; }, [followBoat]); useEffect(() => { voyageRef.current = voyage; }, [voyage]); useEffect(() => { conditionsRef.current = conditions; }, [conditions]);
   useEffect(() => { if (!voyage) { toolsClosedOnStartRef.current = false; return; } if (toolsClosedOnStartRef.current) return; const timer = window.setTimeout(() => { document.querySelectorAll("[data-floating-panel]").forEach((item) => item.classList.add("is-tool-closed")); toolsClosedOnStartRef.current = true; }, 0); return () => window.clearTimeout(timer); }, [voyage]);
   const refreshConditions = useCallback(async (lat: number, lon: number) => {

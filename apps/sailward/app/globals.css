@@ -2356,6 +2356,10 @@ input[type="range"]::-moz-range-thumb {
   transition: transform 360ms linear;
 }
 
+.boat-bearing-ring { position:absolute; z-index:0; left:50%; top:50%; width:184px; height:184px; margin:-92px; border-radius:50%; pointer-events:none; transform-origin:50% 50%; background:repeating-conic-gradient(from 0deg, rgba(244,240,229,.66) 0 .35deg, transparent .35deg 2deg), repeating-conic-gradient(from 0deg, rgba(232,196,118,.9) 0 1deg, transparent 1deg 10deg); -webkit-mask:radial-gradient(circle, transparent 0 68%, #000 69% 72%, transparent 73%); mask:radial-gradient(circle, transparent 0 68%, #000 69% 72%, transparent 73%); filter:drop-shadow(0 1px 2px rgba(0,0,0,.72)); }.boat-bearing-ring b { position:absolute; color:var(--paper-bright); font:800 9px Consolas,monospace; text-shadow:0 1px 3px #000; }.boat-bearing-ring .bearing-north { top:11px; left:50%; transform:translateX(-50%); color:var(--brass); }.boat-bearing-ring .bearing-east { right:10px; top:50%; transform:translateY(-50%) rotate(90deg); }.boat-bearing-ring .bearing-south { bottom:11px; left:50%; transform:translateX(-50%) rotate(180deg); }.boat-bearing-ring .bearing-west { left:10px; top:50%; transform:translateY(-50%) rotate(-90deg); }.boat-marker__vessel { z-index:1; }
+
+.boat-bearing-ring { background:none; -webkit-mask:none; mask:none; }.boat-bearing-ring::before { content:""; position:absolute; inset:0; border-radius:50%; background:repeating-conic-gradient(from 0deg, rgba(244,240,229,.66) 0 .35deg, transparent .35deg 2deg), repeating-conic-gradient(from 0deg, rgba(232,196,118,.9) 0 1deg, transparent 1deg 10deg); -webkit-mask:radial-gradient(circle, transparent 0 68%, #000 69% 72%, transparent 73%); mask:radial-gradient(circle, transparent 0 68%, #000 69% 72%, transparent 73%); }
+
 .boat-marker__vessel::before,
 .boat-marker__vessel::after {
   display: none;
