@@ -171,6 +171,8 @@ input:focus-visible {
 .settings-dialog {
   width: min(690px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 18px;
@@ -224,8 +226,11 @@ input:focus-visible {
 
 .settings-layout {
   min-height: 330px;
+  min-height: 0;
+  flex: 1;
   display: grid;
   grid-template-columns: 155px 1fr;
+  overflow: hidden;
 }
 
 .settings-layout nav {
@@ -261,8 +266,10 @@ input:focus-visible {
 }
 
 .settings-content {
+  min-height: 0;
   padding: 26px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .settings-content h3 {
