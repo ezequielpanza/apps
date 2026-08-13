@@ -48,12 +48,12 @@ test("keeps product version and offline voyage contract aligned", async () => {
     readFile(new URL("../public/version.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /const APP_VERSION = "0\.4\.2"/);
+  assert.match(page, /const APP_VERSION = "0\.4\.3"/);
   assert.match(page, /boat-bearing-ring/);
   assert.match(page, /ROSA DE GRADOS/);
   assert.match(page, /\}, 50\); return \(\) => window\.clearInterval\(interval\);/);
   assert.match(page, /map-layer-settings/);
-  assert.match(page, /brand-follow-button/);
+  assert.doesNotMatch(page, /brand-follow-button/);
   assert.match(page, /inventory-dock-tab/);
   assert.match(page, /winchLinePercentage/);
   assert.match(page, /winch-line-percent/);
