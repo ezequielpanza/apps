@@ -1213,6 +1213,16 @@ input:focus-visible {
   text-align: left;
 }
 
+/* Compact engine: controls only; operating instruments live in their own tool. */
+.engine-window { width: 168px; }
+.engine-window.is-minimized { width: 230px; }
+.engine-window-content { display: grid; grid-template-columns: 1fr; gap: 11px; min-height: 276px; padding: 13px 12px 15px; }
+.engine-state { grid-column: 1; justify-content: center; flex-wrap: wrap; }
+.engine-state button { margin-left: 0; }
+.engine-throttle { grid-column: 1; grid-row: 2; min-height: 212px; }
+.engine-throttle input { width: 184px; }
+
+
 .depth-window.is-minimized {
   width: 315px;
 }
