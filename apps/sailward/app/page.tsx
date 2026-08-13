@@ -10,7 +10,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { feature } from "topojson-client";
 import landTopology from "world-atlas/land-110m.json";
 
-const APP_VERSION = "0.4.5";
+const APP_VERSION = "0.4.6";
 const STORAGE_KEY = "sailward.voyage";
 const LEGACY_STORAGE_KEY = "sailward.voyage.0.1.0";
 const KEY_BINDINGS_STORAGE_KEY = "sailward.keybindings.v1";
@@ -291,7 +291,7 @@ export default function Home() {
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return; let disposed = false;
     void import("maplibre-gl").then(({ default: maplibregl }) => { if (disposed || !mapContainerRef.current) return; const map = new maplibregl.Map({ container: mapContainerRef.current, style: BASE_STYLE, center: [selectedPort.lon, selectedPort.lat], zoom: 8.2, pitch: 56, minPitch: 56, maxPitch: 56, bearing: -34, touchPitch: false, attributionControl: false });
-      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right"); map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
       const markerRoot = document.createElement("div"); markerRoot.className = "boat-marker"; markerRoot.setAttribute("aria-label", "Posición de tu barco"); markerRoot.style.setProperty("--boat-sprite-size", `${BOAT_SPRITE_SIZE_PX}px`);
       const vessel = document.createElement("div"); vessel.className = "boat-marker__vessel"; vessel.innerHTML = '<img src="/sailboat-hull.png" alt="" /><span class="boat-sail boat-sail--main"></span><span class="boat-sail boat-sail--genoa"></span>'; markerRoot.appendChild(vessel);
       const marker = new maplibregl.Marker({ element: markerRoot, anchor: "center", pitchAlignment: "viewport", rotationAlignment: "viewport", scale: 1 }).setLngLat([selectedPort.lon, selectedPort.lat]).addTo(map);

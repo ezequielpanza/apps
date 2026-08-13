@@ -2561,24 +2561,6 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
-.maplibregl-ctrl-top-right {
-  top: 92px;
-  right: 14px;
-}
-
-.maplibregl-ctrl-group {
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 10px !important;
-  background: rgba(4, 25, 33, 0.86) !important;
-  box-shadow: none !important;
-  backdrop-filter: blur(12px);
-}
-
-.maplibregl-ctrl-group button {
-  filter: invert(1) brightness(1.8);
-}
-
 .maplibregl-ctrl-attrib {
   color: #233d46 !important;
   font-size: 9px !important;
@@ -2867,11 +2849,6 @@ input[type="range"]::-moz-range-thumb {
 
   .is-docked .map-tools {
     bottom: 14px;
-  }
-
-  .maplibregl-ctrl-top-right {
-    top: 72px;
-    right: 0;
   }
 
   .version-tag {
