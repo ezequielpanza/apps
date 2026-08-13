@@ -10,7 +10,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { feature } from "topojson-client";
 import landTopology from "world-atlas/land-110m.json";
 
-const APP_VERSION = "0.4.4";
+const APP_VERSION = "0.4.5";
 const STORAGE_KEY = "sailward.voyage";
 const LEGACY_STORAGE_KEY = "sailward.voyage.0.1.0";
 const KEY_BINDINGS_STORAGE_KEY = "sailward.keybindings.v1";
@@ -469,7 +469,7 @@ export default function Home() {
     });
     enhanceWindows(); const observer = new MutationObserver(enhanceWindows); observer.observe(document.body, { childList: true, subtree: true }); return () => observer.disconnect();
   }, []);
-  useEffect(() => { const shell = document.querySelector<HTMLElement>(".game-shell"); if (!shell) return; const tab = document.createElement("button"); tab.type = "button"; tab.className = `inventory-dock-tab ${toolsOpen ? "is-open" : ""}`; tab.textContent = "INVENTARIO"; tab.setAttribute("aria-label", toolsOpen ? "Ocultar inventario" : "Abrir inventario"); tab.setAttribute("aria-expanded", String(toolsOpen)); tab.onclick = () => setToolsOpen((open) => !open); shell.append(tab); return () => tab.remove(); }, [toolsOpen]);
+  useEffect(() => { const shell = document.querySelector<HTMLElement>(".game-shell"); if (!shell) return; const tab = document.createElement("button"); tab.type = "button"; tab.className = `inventory-dock-tab ${toolsOpen ? "is-open" : ""}`; tab.innerHTML = "INVENTARIO".split("").map((letter) => `<span aria-hidden=\"true\">${letter}</span>`).join(""); tab.setAttribute("aria-label", toolsOpen ? "Ocultar inventario" : "Abrir inventario"); tab.setAttribute("aria-expanded", String(toolsOpen)); tab.onclick = () => setToolsOpen((open) => !open); shell.append(tab); return () => tab.remove(); }, [toolsOpen]);
   useEffect(() => { if (!settingsOpen) return; const content = document.querySelector<HTMLElement>(".settings-content"); if (!content) return; const section = document.createElement("section"); section.className = "map-layer-settings"; section.innerHTML = `<span>MAPA</span><strong>Capas cartográficas</strong><small>Elegí las capas que querés ver durante la travesía.</small>`; const satellite = document.createElement("button"); satellite.type = "button"; satellite.className = satelliteLayer ? "is-active" : ""; satellite.textContent = `SATELITAL · ${satelliteLayer ? "ACTIVA" : "OCULTA"}`; satellite.onclick = () => setSatelliteLayer((active) => !active); const nautical = document.createElement("button"); nautical.type = "button"; nautical.className = nauticalLayer ? "is-active" : ""; nautical.textContent = `CARTA NÁUTICA · ${nauticalLayer ? "ACTIVA" : "OCULTA"}`; nautical.onclick = () => setNauticalLayer((active) => !active); section.append(satellite, nautical); content.prepend(section); return () => section.remove(); }, [settingsOpen, satelliteLayer, nauticalLayer]);
   const beginAnchorWinch = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
