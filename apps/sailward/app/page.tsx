@@ -10,7 +10,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { feature } from "topojson-client";
 import landTopology from "world-atlas/land-110m.json";
 
-const APP_VERSION = "0.4.6";
+const APP_VERSION = "0.4.7";
 const STORAGE_KEY = "sailward.voyage";
 const LEGACY_STORAGE_KEY = "sailward.voyage.0.1.0";
 const KEY_BINDINGS_STORAGE_KEY = "sailward.keybindings.v1";
@@ -62,7 +62,7 @@ const DEFAULT_KEY_BINDINGS: KeyBindings = { rudderLeft: "KeyA", rudderRight: "Ke
 const DEFAULT_DEPTH_ALARM: DepthAlarm = { thresholdM: 8, armed: true };
 const DEFAULT_BOAT_PROFILE: BoatProfile = { id: "sailward-01", name: "Sailward 01", motorMaxKn: 6.5, rudderMaxDeg: 35, rudderTurnRate: 10 };
 const WINCHES = [
-  { id: "winchMainPort", title: "WINCH 1 · HARKEN 40", side: "COCKPIT · BABOR", lines: ["DRIZA MAYOR", "RIZO 1"] },
+  { id: "winchMainPort", title: "WINCH 1 · HARKEN 40", side: "COCKPIT · BABOR", lines: ["DRIZA MAYOR", "RIZO 1", "ESCOTA MAYOR"] },
   { id: "winchMainStarboard", title: "WINCH 2 · HARKEN 40", side: "COCKPIT · ESTRIBOR", lines: ["RIZO 2", "DRIZA SPINNAKER"] },
   { id: "winchPort", title: "WINCH 3 · HARKEN 46", side: "BANDA · BABOR", lines: ["ESCOTA GENOA BABOR", "ENROLLADOR GENOA"] },
   { id: "winchStarboard", title: "WINCH 4 · HARKEN 46", side: "BANDA · ESTRIBOR", lines: ["ESCOTA GENOA ESTRIBOR"] }
