@@ -63,7 +63,7 @@ jobs:
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
             if curl --fail --silent --show-error --location \
               "https://sailward.pages.dev/version.json?probe=${GITHUB_RUN_ID}-${attempt}" \
-              | grep -Fq '"version": "0.4.3"'; then
+              | grep -Fq '"version": "0.4.4"'; then
               exit 0
             fi
             sleep 6
