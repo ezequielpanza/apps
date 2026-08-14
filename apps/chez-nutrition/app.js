@@ -1,57 +1,30 @@
-const DEFAULTS={spreadsheetId:'1D1bh6oqja9iuET3O-zvkcuHSW54cBcq9Q7ihZ3KHmRw',goals:{Eze:{kcal:1800,p:115,h:200,g:60,weight:65},Chilu:{kcal:1425,p:70,h:162,g:55,weight:42}}};
-const SHEETS={evolution:101,intakes:102};
+const CONFIG={spreadsheetId:'1D1bh6oqja9iuET3O-zvkcuHSW54cBcq9Q7ihZ3KHmRw'};
+const SHEETS={general:0,evolution:101,intakes:102};
+const FALLBACK_GOALS={Eze:{kcal:1800,p:115,h:200,g:60,weight:65},Chilu:{kcal:1425,p:70,h:162,g:55,weight:42}};
 let weightChart=null,calorieChart=null;
 
 const $=id=>document.getElementById(id);
 const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
-const num=v=>{if(v==null||v==='')return 0;const n=Number(String(v).replace(/\./g,'').replace(',','.'));return Number.isFinite(n)?n:0};
+const num=v=>{if(v==null||v==='')return 0;let s=String(v).trim().replace(/\s/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=Number(s);return Number.isFinite(n)?n:0};
 const localToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santo_Domingo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const fmtDate=iso=>{const [y,m,d]=String(iso).split('-').map(Number);return y?new Intl.DateTimeFormat('es-AR',{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(Date.UTC(y,m-1,d))):iso};
 const fmt=v=>Math.round(v).toLocaleString('es-AR');
 
-function loadSettings(){try{return {...DEFAULTS,...JSON.parse(localStorage.getItem('chezNutritionSettings')||'{}'),goals:{...DEFAULTS.goals,...(JSON.parse(localStorage.getItem('chezNutritionSettings')||'{}').goals||{})}}}catch{return structuredClone(DEFAULTS)}}
-function saveSettings(s){localStorage.setItem('chezNutritionSettings',JSON.stringify(s))}
-
 function parseCSV(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(q){if(c==='"'&&n==='"'){cell+='"';i++}else if(c==='"')q=false;else cell+=c}else{if(c==='"')q=true;else if(c===','){row.push(cell);cell=''}else if(c==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=c}}if(cell.length||row.length){row.push(cell.replace(/\r$/,''));rows.push(row)}return rows.filter(r=>r.some(x=>x!==''))}
 
-async function fetchSheetCSV(gid){const s=loadSettings();const urls=[
-  `https://docs.google.com/spreadsheets/d/${s.spreadsheetId}/export?format=csv&gid=${gid}`,
-  `https://docs.google.com/spreadsheets/d/${s.spreadsheetId}/gviz/tq?tqx=out:csv&gid=${gid}`
+async function fetchSheetCSV(gid){const urls=[
+  `https://docs.google.com/spreadsheets/d/${CONFIG.spreadsheetId}/export?format=csv&gid=${gid}`,
+  `https://docs.google.com/spreadsheets/d/${CONFIG.spreadsheetId}/gviz/tq?tqx=out:csv&gid=${gid}`
 ];let lastErr;for(const url of urls){try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error(`HTTP ${r.status}`);const t=await r.text();if(!t||t.trim().startsWith('<!DOCTYPE')||t.includes('<html'))throw new Error('Google devolvió HTML en vez de CSV');return parseCSV(t)}catch(e){lastErr=e}}throw lastErr||new Error('No se pudo leer la planilla')}
-
 function rowsToObjects(rows){if(!rows.length)return[];const headers=rows[0].map(x=>x.trim());return rows.slice(1).map(r=>Object.fromEntries(headers.map((h,i)=>[h,(r[i]??'').trim()]))) }
+function goalsFromGeneral(rows){const goals=structuredClone(FALLBACK_GOALS);for(const r of rows.slice(2)){const key=(r[0]||'').trim();const e=num(r[1]),c=num(r[2]);if(key==='Objetivo diario (kcal)'){if(e)goals.Eze.kcal=e;if(c)goals.Chilu.kcal=c}if(key==='Peso objetivo (kg)'){if(e)goals.Eze.weight=e;if(c)goals.Chilu.weight=c}if(key==='Objetivo proteína (g)'){if(e)goals.Eze.p=e;if(c)goals.Chilu.p=c}if(key==='Objetivo hidratos (g)'){if(e)goals.Eze.h=e;if(c)goals.Chilu.h=c}if(key==='Objetivo grasas (g)'){if(e)goals.Eze.g=e;if(c)goals.Chilu.g=c}}return goals}
 
 function todayData(evolution,intakes){const today=localToday();const people=['Eze','Chilu'];const out={today,people:{}};for(const person of people){const evo=[...evolution].reverse().find(r=>r.Fecha===today&&r.Persona===person)||{};const its=intakes.filter(r=>r.Fecha===today&&r.Persona===person);const totals=its.reduce((a,r)=>({kcal:a.kcal+num(r.kcal),p:a.p+num(r['P (g)']),h:a.h+num(r['H (g)']),g:a.g+num(r['G (g)'])}),{kcal:0,p:0,h:0,g:0});if(!its.length&&evo.Persona){totals.kcal=num(evo['Calorías']);totals.p=num(evo['Proteína (g)']);totals.h=num(evo['Hidratos (g)']);totals.g=num(evo['Grasas (g)'])}out.people[person]={evo,its,totals}}return out}
-
 function progress(value,target){return target?clamp(value/target*100,0,100):0}
-function personCard(name,data,goal){const t=data.totals,remaining={kcal:Math.max(0,goal.kcal-t.kcal),p:Math.max(0,goal.p-t.p),h:Math.max(0,goal.h-t.h),g:Math.max(0,goal.g-t.g)};const latestWeight=num(data.evo['Peso (kg)']);return `<article class="panel person-card">
-  <div class="person-head"><div><div class="eyebrow">Hoy</div><div class="person-title">${name}</div></div><div class="muted">${latestWeight?`${latestWeight.toLocaleString('es-AR')} kg`:'Sin peso hoy'}</div></div>
-  <div class="kcal-block">
-    <div class="metric-box"><div class="metric-label">Consumidas</div><div class="metric-value">${fmt(t.kcal)} kcal</div><div class="metric-sub">de ${fmt(goal.kcal)} kcal</div><div class="progress"><span style="width:${progress(t.kcal,goal.kcal)}%"></span></div></div>
-    <div class="metric-box"><div class="metric-label">Te quedan</div><div class="metric-value">${fmt(remaining.kcal)}</div><div class="metric-sub">kcal disponibles hoy</div></div>
-  </div>
-  <div class="macro-grid">
-    ${macro('P','Proteína',t.p,goal.p,remaining.p)}
-    ${macro('H','Hidratos',t.h,goal.h,remaining.h)}
-    ${macro('G','Grasas',t.g,goal.g,remaining.g)}
-  </div>
-  <div class="target-note">Objetivo peso: ${goal.weight} kg · PHG objetivo: ${goal.p}/${goal.h}/${goal.g} g</div>
-</article>`}
-function macro(letter,label,val,target,rest){return `<div class="macro"><div class="macro-name">${letter} · ${label}</div><div class="macro-main">${Math.round(val)} / ${target} g</div><div class="macro-rest">Restan ${Math.round(rest)} g</div><div class="progress"><span style="width:${progress(val,target)}%"></span></div></div>`}
-
+function personCard(name,data,goal){const t=data.totals,remaining={kcal:Math.max(0,goal.kcal-t.kcal),p:Math.max(0,goal.p-t.p),h:Math.max(0,goal.h-t.h),g:Math.max(0,goal.g-t.g)};const latestWeight=num(data.evo['Peso (kg)']);return `<article class="panel person-card"><div class="person-head"><div><div class="eyebrow">Hoy</div><div class="person-title">${name}</div></div><div class="muted">${latestWeight?`${latestWeight.toLocaleString('es-AR')} kg`:'Sin peso hoy'}</div></div><div class="kcal-block"><div class="metric-box"><div class="metric-label">Consumidas</div><div class="metric-value">${fmt(t.kcal)} kcal</div><div class="metric-sub">de ${fmt(goal.kcal)} kcal · ${Math.round(progress(t.kcal,goal.kcal))}%</div><div class="progress"><span style="width:${progress(t.kcal,goal.kcal)}%"></span></div></div><div class="metric-box"><div class="metric-label">Te quedan</div><div class="metric-value">${fmt(remaining.kcal)}</div><div class="metric-sub">kcal disponibles hoy</div></div></div><div class="macro-grid">${macro('P','Proteína',t.p,goal.p,remaining.p)}${macro('H','Hidratos',t.h,goal.h,remaining.h)}${macro('G','Grasas',t.g,goal.g,remaining.g)}</div><div class="target-note">Objetivo peso: ${goal.weight} kg · PHG objetivo: ${goal.p}/${goal.h}/${goal.g} g</div></article>`}
+function macro(letter,label,val,target,rest){return `<div class="macro"><div class="macro-name">${letter} · ${label}</div><div class="macro-main">${Math.round(val)} / ${target} g</div><div class="macro-rest">Restan ${Math.round(rest)} g · ${Math.round(progress(val,target))}%</div><div class="progress"><span style="width:${progress(val,target)}%"></span></div></div>`}
 function renderIntakes(intakes,today){const rows=intakes.filter(r=>r.Fecha===today);$('intakes').innerHTML=rows.length?rows.map(r=>`<div class="intake-row"><div class="intake-moment">${r.Momento||''}</div><div><div class="intake-food"><span class="intake-person">${r.Persona}</span>${r['Alimento / bebida']||''}</div><div class="intake-macros">P ${fmt(num(r['P (g)']))} · H ${fmt(num(r['H (g)']))} · G ${fmt(num(r['G (g)']))} g</div></div><div class="intake-kcal">${fmt(num(r.kcal))} kcal</div></div>`).join(''):'<div class="empty">Todavía no hay ingestas cargadas para hoy.</div>'}
-
-function renderCharts(evolution){const names=['Eze','Chilu'];const byPerson=Object.fromEntries(names.map(n=>[n,evolution.filter(r=>r.Persona===n)]));const labels=[...new Set(evolution.map(r=>r.Fecha).filter(Boolean))].sort();const settings=loadSettings();
-  if(weightChart)weightChart.destroy();weightChart=new Chart($('weightChart'),{type:'line',data:{labels:labels.map(fmtDate),datasets:names.map(n=>({label:n,data:labels.map(d=>{const r=byPerson[n].find(x=>x.Fecha===d);return r?num(r['Peso (kg)']):null}),spanGaps:true,tension:.25}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:false}}}});
-  if(calorieChart)calorieChart.destroy();calorieChart=new Chart($('calorieChart'),{type:'bar',data:{labels:labels.map(fmtDate),datasets:names.map(n=>({label:n,data:labels.map(d=>{const r=byPerson[n].find(x=>x.Fecha===d);return r?num(r['Calorías']):null})}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}})
-}
-
-function showStatus(msg,error=false){const el=$('statusBar');el.textContent=msg;el.classList.remove('hidden');el.classList.toggle('error',error)}
-function hideStatus(){$('statusBar').classList.add('hidden')}
-
-async function loadAll(){showStatus('Actualizando datos desde Google Sheets…');try{const [evoRows,intakeRows]=await Promise.all([fetchSheetCSV(SHEETS.evolution),fetchSheetCSV(SHEETS.intakes)]);const evolution=rowsToObjects(evoRows),intakes=rowsToObjects(intakeRows);const td=todayData(evolution,intakes),settings=loadSettings();$('peopleGrid').innerHTML=['Eze','Chilu'].map(n=>personCard(n,td.people[n],settings.goals[n])).join('');renderIntakes(intakes,td.today);renderCharts(evolution);hideStatus()}catch(e){console.error(e);showStatus(`No pude leer la planilla: ${e.message}. Revisá que el enlace permita lectura.`,true)}}
-
-function openSettings(){const s=loadSettings();$('spreadsheetInput').value=s.spreadsheetId;$('ezeKcal').value=s.goals.Eze.kcal;$('ezeP').value=s.goals.Eze.p;$('ezeH').value=s.goals.Eze.h;$('ezeG').value=s.goals.Eze.g;$('chiluKcal').value=s.goals.Chilu.kcal;$('chiluP').value=s.goals.Chilu.p;$('chiluH').value=s.goals.Chilu.h;$('chiluG').value=s.goals.Chilu.g;$('clientIdInput').closest('label').style.display='none';$('settingsDialog').showModal()}
-function saveFromDialog(e){e.preventDefault();const s=loadSettings();s.spreadsheetId=$('spreadsheetInput').value.trim();s.goals={Eze:{...s.goals.Eze,kcal:num($('ezeKcal').value),p:num($('ezeP').value),h:num($('ezeH').value),g:num($('ezeG').value)},Chilu:{...s.goals.Chilu,kcal:num($('chiluKcal').value),p:num($('chiluP').value),h:num($('chiluH').value),g:num($('chiluG').value)}};saveSettings(s);$('settingsDialog').close();loadAll()}
-
-window.addEventListener('DOMContentLoaded',()=>{$('todayLabel').textContent=new Intl.DateTimeFormat('es-AR',{dateStyle:'full',timeZone:'America/Santo_Domingo'}).format(new Date());$('refreshBtn').addEventListener('click',loadAll);$('settingsBtn').addEventListener('click',openSettings);$('settingsForm').addEventListener('submit',saveFromDialog);$('connectBtn')?.addEventListener('click',loadAll);loadAll()});
+function renderCharts(evolution){const names=['Eze','Chilu'];const byPerson=Object.fromEntries(names.map(n=>[n,evolution.filter(r=>r.Persona===n)]));const labels=[...new Set(evolution.map(r=>r.Fecha).filter(Boolean))].sort();if(weightChart)weightChart.destroy();weightChart=new Chart($('weightChart'),{type:'line',data:{labels:labels.map(fmtDate),datasets:names.map(n=>({label:n,data:labels.map(d=>{const r=byPerson[n].find(x=>x.Fecha===d);return r?num(r['Peso (kg)']):null}),spanGaps:true,tension:.25}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:false}}}});if(calorieChart)calorieChart.destroy();calorieChart=new Chart($('calorieChart'),{type:'bar',data:{labels:labels.map(fmtDate),datasets:names.map(n=>({label:n,data:labels.map(d=>{const r=byPerson[n].find(x=>x.Fecha===d);return r?num(r['Calorías']):null})}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}})}
+function showStatus(msg,error=false){const el=$('statusBar');el.textContent=msg;el.classList.remove('hidden');el.classList.toggle('error',error)}function hideStatus(){$('statusBar').classList.add('hidden')}
+async function loadAll(){showStatus('Actualizando datos desde Google Sheets…');try{const [generalRows,evoRows,intakeRows]=await Promise.all([fetchSheetCSV(SHEETS.general),fetchSheetCSV(SHEETS.evolution),fetchSheetCSV(SHEETS.intakes)]);const goals=goalsFromGeneral(generalRows),evolution=rowsToObjects(evoRows),intakes=rowsToObjects(intakeRows),td=todayData(evolution,intakes);$('peopleGrid').innerHTML=['Eze','Chilu'].map(n=>personCard(n,td.people[n],goals[n])).join('');renderIntakes(intakes,td.today);renderCharts(evolution);hideStatus()}catch(e){console.error(e);showStatus(`No pude leer la planilla: ${e.message}. Revisá que el enlace permita lectura.`,true)}}
+window.addEventListener('DOMContentLoaded',()=>{$('todayLabel').textContent=new Intl.DateTimeFormat('es-AR',{dateStyle:'full',timeZone:'America/Santo_Domingo'}).format(new Date());$('refreshBtn').addEventListener('click',loadAll);loadAll()});
