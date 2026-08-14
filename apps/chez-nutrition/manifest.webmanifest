@@ -1,0 +1,19 @@
+{
+  "name": "Chez Nutrition",
+  "short_name": "Chez Nutrition",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "description": "Seguimiento diario de calorías, PHG, ingestas y peso de Eze y Chilu.",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
