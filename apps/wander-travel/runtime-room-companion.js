@@ -18,6 +18,10 @@
   let stableSince = 0;
   let activeIntervention = null;
 
+  function wanderModeActive() {
+    return window.WanderMode?.isActive?.() === true || context.value?.('companion.wanderModeActive') === true;
+  }
+
   function readState() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; }
     catch { return {}; }
@@ -131,7 +135,7 @@
     ui.hideWander();
     setTimeout(() => {
       const shown = window.WanderProactiveCompanion?.requestNowPlan?.() || window.WanderProactiveCompanion?.requestAlternative?.();
-      if (!shown) ui.showWander('Sigo buscando', 'Todavía no encontré una propuesta suficientemente buena. Voy a avisarte cuando aparezca una opción útil.', { timeoutMs: 7000 });
+      if (!shown && wanderModeActive()) ui.showWander('Sigo buscando', 'Todavía no encontré una propuesta suficientemente buena. Voy a avisarte cuando aparezca una opción útil.', { timeoutMs: 7000 });
     }, 0);
   }
 
@@ -142,6 +146,7 @@
   }
 
   function showPrompt(snapshot, intervention = interventionFor(snapshot), reason = 'room:stable') {
+    if (!wanderModeActive()) return false;
     if (window.WanderCompanion?.getActive?.()) {
       schedule(30000);
       return false;
@@ -176,7 +181,7 @@
   }
 
   async function notifyPrompt(snapshot) {
-    if (!platform?.canNotifyInBackground?.()) return false;
+    if (!wanderModeActive() || !platform?.canNotifyInBackground?.()) return false;
     const intervention = interventionFor(snapshot);
     const delivery = await platform.deliverNotification({
       id: intervention.id,
@@ -210,6 +215,7 @@
   }
 
   function openNotification(id) {
+    if (!wanderModeActive()) return false;
     if (activeIntervention?.id === id) {
       window.WanderScreen?.open?.('map');
       return true;
@@ -236,6 +242,7 @@
 
   function evaluate() {
     timer = null;
+    if (!wanderModeActive()) return false;
     const snapshot = currentSnapshot();
     if (!snapshot.room || !snapshot.placeId || snapshot.motion === 'pending' || snapshot.motion === 'moving' || snapshot.speedKmh > 1.5) {
       stableRoomId = null;
@@ -278,7 +285,10 @@
 
   function schedule(delay = 1200) {
     if (timer) clearTimeout(timer);
+    timer = null;
+    if (!wanderModeActive()) return false;
     timer = setTimeout(evaluate, Math.max(100, delay));
+    return true;
   }
 
   context.subscribe((key) => {
@@ -288,6 +298,20 @@
     if (document.visibilityState !== 'hidden') schedule(300);
   });
   window.addEventListener('wander:app-ready', () => schedule(1000), { once: true });
+  window.addEventListener('wander:wander-mode-change', (event) => {
+    if (event.detail?.active === true) {
+      stableRoomId = null;
+      stableSince = 0;
+      schedule(1000);
+      return;
+    }
+    if (timer) clearTimeout(timer);
+    timer = null;
+    stableRoomId = null;
+    stableSince = 0;
+    activeIntervention = null;
+    ui.hideWander?.();
+  });
 
   window.WanderRoomCompanion = Object.freeze({
     evaluate,
@@ -299,5 +323,5 @@
     constants: { ROOM_STABILITY_MS, PROMPT_COOLDOWN_MS, REST_QUIET_MS, DONT_INTERRUPT_MS, PENDING_NOTIFICATION_TTL_MS },
   });
 
-  schedule(1500);
+  if (wanderModeActive()) schedule(1500);
 })();
