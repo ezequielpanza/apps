@@ -14,6 +14,10 @@
   let stableSince = 0;
   let lastSnapshot = null;
 
+  function wanderModeActive() {
+    return window.WanderMode?.isActive?.() === true || context.value?.('companion.wanderModeActive') === true;
+  }
+
   function readState() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; }
     catch { return {}; }
@@ -120,6 +124,7 @@
   }
 
   function emitPlaceContext(snapshot, now) {
+    if (!wanderModeActive()) return false;
     const state = readState();
     const previousAt = finite(state.placeIntroductions?.[snapshot.placeId]);
     if (previousAt !== null && now - previousAt < PLACE_REINTRO_MS) return false;
@@ -159,6 +164,7 @@
   }
 
   function emitNearbySuggestion(snapshot, now, options = {}) {
+    if (!wanderModeActive()) return false;
     const state = readState();
     const lastAt = finite(state.lastSuggestionAt);
     if (!options.ignoreCooldown && lastAt !== null && now - lastAt < SUGGESTION_COOLDOWN_MS) return false;
@@ -213,6 +219,7 @@
   }
 
   function requestAlternative(excludeId) {
+    if (!wanderModeActive()) return false;
     const snapshot = currentSnapshot();
     lastSnapshot = snapshot;
     const shown = emitNearbySuggestion(snapshot, Date.now(), {
@@ -227,6 +234,7 @@
   }
 
   function requestNowPlan() {
+    if (!wanderModeActive()) return false;
     const snapshot = currentSnapshot();
     lastSnapshot = snapshot;
     return emitNearbySuggestion(snapshot, Date.now(), {
@@ -238,12 +246,13 @@
 
   function evaluate() {
     timer = null;
+    if (!wanderModeActive()) return false;
     const snapshot = currentSnapshot();
     lastSnapshot = snapshot;
-    if (!snapshot.placeId || !snapshot.placeName || snapshot.motion === 'pending') return;
+    if (!snapshot.placeId || !snapshot.placeName || snapshot.motion === 'pending') return false;
     if (window.WanderRoomCompanion?.isCurrentRoom?.()) {
       schedule(PLACE_STABILITY_MS);
-      return;
+      return false;
     }
 
     const now = Date.now();
@@ -251,23 +260,31 @@
       stablePlaceId = snapshot.placeId;
       stableSince = now;
       schedule(PLACE_STABILITY_MS);
-      return;
+      return false;
     }
     if (now - stableSince < PLACE_STABILITY_MS) {
       schedule(PLACE_STABILITY_MS - (now - stableSince));
-      return;
+      return false;
     }
 
     if (emitPlaceContext(snapshot, now)) {
       schedule(SUGGESTION_COOLDOWN_MS);
-      return;
+      return true;
     }
-    if (emitNearbySuggestion(snapshot, now)) schedule(SUGGESTION_COOLDOWN_MS);
+    if (emitNearbySuggestion(snapshot, now)) {
+      schedule(SUGGESTION_COOLDOWN_MS);
+      return true;
+    }
+    schedule(PLACE_STABILITY_MS);
+    return false;
   }
 
   function schedule(delay = 1200) {
     if (timer) clearTimeout(timer);
+    timer = null;
+    if (!wanderModeActive()) return false;
     timer = setTimeout(evaluate, Math.max(100, delay));
+    return true;
   }
 
   context.subscribe((key) => {
@@ -280,6 +297,22 @@
   window.addEventListener('wander:screen-change', () => schedule(500));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden') schedule(500);
+  });
+  window.addEventListener('wander:wander-mode-change', (event) => {
+    if (event.detail?.active !== true) {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      stablePlaceId = null;
+      stableSince = 0;
+      return;
+    }
+    stablePlaceId = null;
+    stableSince = 0;
+    schedule(600);
+  });
+  window.addEventListener('wander:wander-mode-request', () => {
+    if (!wanderModeActive()) return;
+    if (!requestNowPlan()) schedule(900);
   });
 
   window.WanderProactiveCompanion = Object.freeze({
@@ -295,5 +328,5 @@
     constants: { INITIAL_DELAY_MS, PLACE_STABILITY_MS, SUGGESTION_COOLDOWN_MS, PLACE_REINTRO_MS },
   });
 
-  schedule(INITIAL_DELAY_MS);
+  if (wanderModeActive()) schedule(INITIAL_DELAY_MS);
 })();
