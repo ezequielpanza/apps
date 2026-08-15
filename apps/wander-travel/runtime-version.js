@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.24';
+  const VERSION = 'v0.109.25';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -87,6 +87,9 @@
   window.WanderContext?.set?.('tts.mapToggle', true, metadata);
   window.WanderContext?.set?.('map.zoomButtonsEnabled', true, metadata);
   window.WanderContext?.set?.('map.resumeRecoveryEnabled', true, metadata);
+  window.WanderContext?.set?.('companion.wanderModeControl', true, metadata);
+  window.WanderContext?.set?.('companion.wanderModeDefaultActive', false, metadata);
+  window.WanderContext?.set?.('companion.startupInteractionEnabled', false, metadata);
   window.WanderContext?.set?.('companion.startupSilenceMs', 120000, metadata);
   window.WanderContext?.set?.('companion.morningBriefingStartupSilenceMs', 120000, metadata);
   window.WanderContext?.set?.('companion.morningBriefingRequiresUsefulContext', true, metadata);
