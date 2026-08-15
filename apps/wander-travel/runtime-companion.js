@@ -11,6 +11,10 @@
   let retryTimer = null;
   let activeIntervention = null;
 
+  function wanderModeActive() {
+    return window.WanderMode?.isActive?.() === true || context.value?.('companion.wanderModeActive') === true;
+  }
+
   function interventionHistory() {
     return (engine.getState?.()?.memory?.interactions || [])
       .filter((entry) => entry?.type === 'companion_intervention');
@@ -35,7 +39,7 @@
 
   function scheduleRetry(retryAt) {
     clearRetry();
-    if (!Number.isFinite(retryAt)) return;
+    if (!Number.isFinite(retryAt) || !wanderModeActive()) return;
     retryTimer = setTimeout(() => {
       retryTimer = null;
       attempt('policy:retry');
@@ -195,6 +199,7 @@
   }
 
   function present(intervention, reason) {
+    if (!wanderModeActive()) return false;
     const choices = interactionChoices(intervention);
     const shown = ui.showWander(intervention.title, intervention.message, {
       timeoutMs: choices.length ? 0 : 14000,
@@ -210,6 +215,7 @@
   }
 
   function notify(intervention, reason) {
+    if (!wanderModeActive()) return false;
     if (!window.WanderPlatform?.notifyCompanion?.(intervention)) return false;
     activeIntervention = null;
     interactionCore?.present?.(intervention, { reason, channel: 'notification' });
@@ -269,6 +275,11 @@
   }
 
   function attempt(reason = 'manual') {
+    if (!wanderModeActive()) {
+      pendingEvaluation = null;
+      clearRetry();
+      return { disposition: 'ignore', reason: 'wander_mode_inactive' };
+    }
     if (!pendingEvaluation) return { disposition: 'ignore', reason: 'nothing_pending' };
     const contentId = contentIdFor(pendingEvaluation);
     const result = policy.decide({
@@ -299,7 +310,13 @@
   }
 
   function handleEvaluation(evaluation, reason = 'engine') {
-    if (['introduce_place', 'discover_poi', 'contextual_suggestion'].includes(evaluation?.type)) pendingEvaluation = evaluation;
+    const relevant = ['introduce_place', 'discover_poi', 'contextual_suggestion'].includes(evaluation?.type);
+    if (relevant && !wanderModeActive()) {
+      pendingEvaluation = null;
+      clearRetry();
+      return { disposition: 'ignore', reason: 'wander_mode_inactive' };
+    }
+    if (relevant) pendingEvaluation = evaluation;
     return attempt(reason);
   }
 
@@ -340,6 +357,16 @@
   engine.subscribeEvaluation(handleEvaluation);
   document.addEventListener('visibilitychange', () => attempt('document:visibility'));
   window.addEventListener('wander:screen-change', () => attempt('screen:change'));
+  window.addEventListener('wander:wander-mode-change', (event) => {
+    if (event.detail?.active === true) {
+      attempt('wander-mode:enabled');
+      return;
+    }
+    pendingEvaluation = null;
+    clearRetry();
+    activeIntervention = null;
+    ui.hideWander?.();
+  });
 
   const initial = engine.getLastEvaluation?.();
   if (initial) handleEvaluation(initial, 'companion:init');
@@ -350,5 +377,6 @@
     receive,
     getPending: () => pendingEvaluation,
     getActive: () => activeIntervention,
+    isWanderModeActive: wanderModeActive,
   };
 })();
