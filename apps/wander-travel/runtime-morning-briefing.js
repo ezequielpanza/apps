@@ -9,6 +9,10 @@
   let timer = null;
   let presenting = false;
 
+  function wanderModeActive() {
+    return window.WanderMode?.isActive?.() === true || window.WanderContext?.value?.('companion.wanderModeActive') === true;
+  }
+
   function dayKey() {
     return window.WanderTravelLog?.dayKey?.() || new Date().toISOString().slice(0, 10);
   }
@@ -116,7 +120,7 @@
   }
 
   function present() {
-    if (presenting || !morningWindow() || document.visibilityState === 'hidden') return false;
+    if (!wanderModeActive() || presenting || !morningWindow() || document.visibilityState === 'hidden') return false;
     if (startupRemaining() > 0) return false;
     const today = dayKey();
     if (read(LAST_DAY_KEY) === today) return false;
@@ -173,15 +177,18 @@
 
   function schedule(delay = RETRY_WITHOUT_CONTEXT_MS) {
     if (timer) clearTimeout(timer);
+    timer = null;
+    if (!wanderModeActive()) return false;
     const wait = Math.max(1000, Number(delay) || RETRY_WITHOUT_CONTEXT_MS, startupRemaining());
     timer = setTimeout(() => {
       timer = null;
       if (!present() && read(LAST_DAY_KEY) !== dayKey() && morningWindow()) schedule(RETRY_WITHOUT_CONTEXT_MS);
     }, wait);
+    return true;
   }
 
   function initialize() {
-    schedule(Math.max(STARTUP_SILENCE_MS, startupRemaining()));
+    if (wanderModeActive()) schedule(Math.max(STARTUP_SILENCE_MS, startupRemaining()));
   }
 
   window.addEventListener('wander:app-ready', initialize, { once: true });
@@ -189,6 +196,15 @@
     if (document.visibilityState === 'visible') schedule(RETRY_WITHOUT_CONTEXT_MS);
   });
   window.addEventListener('focus', () => schedule(RETRY_WITHOUT_CONTEXT_MS));
+  window.addEventListener('wander:wander-mode-change', (event) => {
+    if (event.detail?.active === true) {
+      schedule(Math.max(1000, startupRemaining()));
+      return;
+    }
+    if (timer) clearTimeout(timer);
+    timer = null;
+    presenting = false;
+  });
 
   window.WanderMorningBriefing = Object.freeze({
     present,
