@@ -70,10 +70,6 @@
     window.WanderProviders?.currentContainerBridge?.apply?.();
     window.WanderSituationEngine?.evaluate?.();
 
-    window.dispatchEvent(new CustomEvent('wander:wander-mode-request', {
-      detail: { at: Date.now(), intent: 'what_can_i_do_here' },
-    }));
-
     const ask = () => window.WanderProactiveCompanion?.requestNowPlan?.() === true;
     if (ask()) return true;
     setTimeout(() => {
