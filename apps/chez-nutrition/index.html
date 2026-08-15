@@ -23,6 +23,11 @@
         <p id="todayLabel" class="muted"></p>
       </div>
       <div class="actions">
+        <div class="date-nav" aria-label="Navegación por fecha">
+          <button id="previousDayBtn" class="btn secondary" type="button" aria-label="Día anterior">‹</button>
+          <button id="todayBtn" class="btn secondary" type="button">Hoy</button>
+          <button id="nextDayBtn" class="btn secondary" type="button" aria-label="Día siguiente">›</button>
+        </div>
         <button id="refreshBtn" class="btn secondary">Actualizar</button>
       </div>
     </header>
@@ -47,7 +52,7 @@
 
     <section class="panel">
       <div class="section-head">
-        <div><div class="eyebrow">Hoy</div><h2>Ingestas</h2></div>
+        <div><div id="intakesEyebrow" class="eyebrow">Hoy</div><h2>Ingestas</h2></div>
       </div>
       <div id="intakes" class="intakes"></div>
     </section>
