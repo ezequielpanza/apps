@@ -8,6 +8,7 @@ const num=v=>{if(v==null||v==='')return 0;let s=String(v).trim().replace(/\s/g,'
 const localToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santo_Domingo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let selectedDate=localToday();
 const PEOPLE=['Eze','Chilu'];
+const PERSON_COLORS={Eze:{fill:'rgba(56,160,235,.70)',line:'#38a0eb'},Chilu:{fill:'rgba(244,114,182,.70)',line:'#f472b6'}};
 const PERSON_STORAGE_KEY='chez-nutrition:selected-person';
 let selectedPerson=(()=>{try{const saved=localStorage.getItem(PERSON_STORAGE_KEY);return PEOPLE.includes(saved)?saved:'Eze'}catch{return'Eze'}})();
 function rememberSelectedPerson(){const grid=$('peopleGrid');if(!grid)return;const index=Math.round(grid.scrollLeft/Math.max(grid.clientWidth,1));selectedPerson=PEOPLE[clamp(index,0,PEOPLE.length-1)];try{localStorage.setItem(PERSON_STORAGE_KEY,selectedPerson)}catch{}}
@@ -34,7 +35,7 @@ function renderCharts(evolution,intakes,goals){
   const latestDate=[localToday(),...evolution.map(r=>r.Fecha).filter(Boolean),...intakes.map(r=>r.Fecha).filter(Boolean)].sort().at(-1);
   const labels=Array.from({length:7},(_,i)=>shiftDate(latestDate,i-6));
   const weightDatasets=[
-    ...names.map(n=>({label:n,data:labels.map(d=>{const r=byPerson[n].find(x=>x.Fecha===d);return r?num(r['Peso (kg)']):null}),spanGaps:true,tension:.25})),
+    ...names.map(n=>({label:n,data:labels.map(d=>{const r=byPerson[n].find(x=>x.Fecha===d);return r?num(r['Peso (kg)']):null}),borderColor:PERSON_COLORS[n].line,backgroundColor:PERSON_COLORS[n].fill,pointBackgroundColor:PERSON_COLORS[n].fill,spanGaps:true,tension:.25})),
     ...names.map(n=>({label:`Objetivo ${n} · ${goals[n].weight} kg`,data:labels.map(()=>goals[n].weight),borderDash:[7,6],borderWidth:2,pointRadius:0,tension:0}))
   ];
   if(weightChart)weightChart.destroy();
@@ -46,7 +47,7 @@ function renderCharts(evolution,intakes,goals){
     return row?num(row['Calorías']):null;
   };
   const calorieDatasets=[
-    ...names.map(n=>({label:n,data:labels.map(d=>{const kcal=dailyCalories(n,d);return kcal==null?null:kcal/goals[n].kcal*100}),borderRadius:6})),
+    ...names.map(n=>({label:n,data:labels.map(d=>{const kcal=dailyCalories(n,d);return kcal==null?null:kcal/goals[n].kcal*100}),backgroundColor:PERSON_COLORS[n].fill,borderColor:PERSON_COLORS[n].line,borderWidth:1,borderRadius:6})),
     {type:'line',label:'Objetivo diario',data:labels.map(()=>100),borderColor:'#f59e0b',backgroundColor:'#f59e0b',borderDash:[6,5],borderWidth:2,pointRadius:0,tension:0}
   ];
   if(calorieChart)calorieChart.destroy();
