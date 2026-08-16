@@ -165,7 +165,8 @@
         setEnabled(!enabled, !enabled);
       });
     }
-    if (button.parentElement !== wrap || wrap.lastElementChild !== button) wrap.append(button);
+    if (button.parentElement !== wrap) wrap.prepend(button);
+    if (wrap.lastElementChild !== button) wrap.append(button);
     syncButton();
     return true;
   }
