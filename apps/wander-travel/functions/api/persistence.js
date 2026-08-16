@@ -1,38 +1,15 @@
 const SPREADSHEET_ID = '11hQDPp2nKDyaI8SHvRwPujIgGSN15Mt1_AlbQ6WxRCU';
 const TRACKS_FOLDER_ID = '1LlNCtOA5vLlxyP-ltiL8GRwerTtNES1W';
-const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive';
+const META_SHEET = '_Meta';
+const APPS_SCRIPT_URL_KEY = 'appsScriptUrl';
+const APPS_SCRIPT_URL_FALLBACK = '';
 const MAX_ROWS = 500;
-const MAX_GPX_BYTES = 10 * 1024 * 1024;
+const DISCOVERY_TTL_MS = 5 * 60 * 1000;
+const FAILURE_TTL_MS = 15 * 1000;
+const TABLES = Object.freeze(['Waypoints', 'Bitacora', 'Sesiones', 'TrackPoints', 'Ajustes', 'HUD']);
 
-const TABLES = Object.freeze({
-  Waypoints: Object.freeze({
-    columns: ['id', 'name', 'lat', 'lng', 'type', 'radiusM', 'notes', 'overnight', 'vehicle', 'vehicleState', 'createdAt', 'updatedAt', 'deletedAt', 'deviceId'],
-    key: (row) => String(row?.id || ''),
-  }),
-  Bitacora: Object.freeze({
-    columns: ['id', 'at', 'type', 'title', 'summary', 'sessionId', 'waypointId', 'lat', 'lng', 'source', 'confidence', 'rawRef', 'createdAt', 'updatedAt', 'deletedAt', 'deviceId'],
-    key: (row) => String(row?.id || ''),
-  }),
-  Sesiones: Object.freeze({
-    columns: ['id', 'name', 'status', 'startedAt', 'endedAt', 'distanceM', 'activity', 'method', 'pointCount', 'createdAt', 'updatedAt', 'deletedAt', 'deviceId', 'metadataJson'],
-    key: (row) => String(row?.id || ''),
-  }),
-  TrackPoints: Object.freeze({
-    columns: ['id', 'sessionId', 'segmentId', 'seq', 'at', 'lat', 'lng', 'accuracy', 'speedKmh', 'heading', 'altitude', 'source', 'raw', 'relevant', 'inconsistencyReason', 'updatedAt', 'deviceId'],
-    key: (row) => String(row?.id || `${row?.sessionId || ''}:${row?.segmentId || ''}:${row?.seq ?? ''}`),
-  }),
-  Ajustes: Object.freeze({
-    columns: ['key', 'valueJson', 'updatedAt', 'deviceId'],
-    key: (row) => String(row?.key || ''),
-  }),
-  HUD: Object.freeze({
-    columns: ['fieldId', 'enabled', 'orientation', 'x', 'y', 'width', 'height', 'order', 'configJson', 'updatedAt', 'deviceId'],
-    key: (row) => `${row?.fieldId || ''}|${row?.orientation || ''}`,
-  }),
-});
-
-let tokenCache = null;
+let cachedScriptUrl = '';
+let cachedUntil = 0;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -44,297 +21,127 @@ function json(data, status = 200) {
   });
 }
 
-function base64Url(bytes) {
-  let binary = '';
-  const chunk = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(bytes.length, offset + chunk)));
+function validateTargets(body) {
+  if (String(body?.spreadsheetId || '') !== SPREADSHEET_ID) return 'Unexpected spreadsheetId.';
+  if (body?.folderId != null && String(body.folderId) !== TRACKS_FOLDER_ID) return 'Unexpected folderId.';
+  if (body?.action === 'upsert' && !TABLES.includes(String(body?.table || ''))) return 'Unsupported persistence table.';
+  if (body?.action === 'upsert' && (!Array.isArray(body.rows) || body.rows.length > MAX_ROWS)) return `Maximum ${MAX_ROWS} rows per request.`;
+  if (!['upsert', 'upload-gpx'].includes(String(body?.action || ''))) return 'Unsupported persistence action.';
+  return null;
+}
+
+function looksLikeAppsScriptUrl(value) {
+  return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec(?:[?#].*)?$/.test(String(value || '').trim());
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (quoted) {
+      if (char === '"' && next === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        cell += char;
+      }
+    } else if (char === '"') {
+      quoted = true;
+    } else if (char === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (char === '\n') {
+      row.push(cell.replace(/\r$/, ''));
+      rows.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += char;
+    }
   }
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '');
-}
-
-function encodeJson(value) {
-  return base64Url(new TextEncoder().encode(JSON.stringify(value)));
-}
-
-function pemBytes(pem) {
-  const normalized = String(pem || '').replaceAll('\\n', '\n').trim();
-  const base64 = normalized
-    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
-    .replace(/-----END PRIVATE KEY-----/g, '')
-    .replace(/\s+/g, '');
-  if (!base64) throw new Error('Google service account private key is empty.');
-  const binary = atob(base64);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-async function serviceAccountToken(env) {
-  const email = String(env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '').trim();
-  const privateKey = String(env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '').trim();
-  if (!email || !privateKey) {
-    const error = new Error('Google persistence credentials are not configured.');
-    error.code = 'google_auth_not_configured';
-    error.status = 503;
-    throw error;
+  if (cell.length || row.length) {
+    row.push(cell.replace(/\r$/, ''));
+    rows.push(row);
   }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (tokenCache?.accessToken && Number(tokenCache.expiresAt || 0) > now + 90) return tokenCache.accessToken;
-
-  const header = encodeJson({ alg: 'RS256', typ: 'JWT' });
-  const claims = encodeJson({
-    iss: email,
-    scope: GOOGLE_SCOPE,
-    aud: TOKEN_URL,
-    iat: now,
-    exp: now + 3600,
-  });
-  const unsigned = `${header}.${claims}`;
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    pemBytes(privateKey),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const signature = new Uint8Array(await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    key,
-    new TextEncoder().encode(unsigned),
-  ));
-  const assertion = `${unsigned}.${base64Url(signature)}`;
-
-  const response = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion,
-    }).toString(),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload.access_token) {
-    const error = new Error(payload.error_description || payload.error || 'Google OAuth token request failed.');
-    error.code = 'google_auth_failed';
-    error.status = response.status || 502;
-    throw error;
-  }
-
-  tokenCache = {
-    accessToken: payload.access_token,
-    expiresAt: now + Math.max(120, Number(payload.expires_in) || 3600),
-  };
-  return tokenCache.accessToken;
+  return rows;
 }
 
-async function googleFetch(env, url, options = {}) {
-  const accessToken = await serviceAccountToken(env);
+async function discoverScriptUrl(env = {}) {
+  const envUrl = String(env.WANDER_APPS_SCRIPT_URL || '').trim();
+  if (looksLikeAppsScriptUrl(envUrl)) return envUrl;
+  if (looksLikeAppsScriptUrl(APPS_SCRIPT_URL_FALLBACK)) return APPS_SCRIPT_URL_FALLBACK;
+  if (env.WANDER_DISABLE_SCRIPT_DISCOVERY === '1') return '';
+
+  const now = Date.now();
+  if (cachedUntil > now) return cachedScriptUrl;
+
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(SPREADSHEET_ID)}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(META_SHEET)}&cacheBust=${now}`;
+    const response = await fetch(url, { headers: { 'cache-control': 'no-cache' } });
+    if (!response.ok) throw new Error(`Meta sheet HTTP ${response.status}`);
+    const rows = parseCsv(await response.text());
+    const match = rows.find((cells) => String(cells?.[0] || '').trim() === APPS_SCRIPT_URL_KEY);
+    const value = String(match?.[1] || '').trim();
+    cachedScriptUrl = looksLikeAppsScriptUrl(value) ? value : '';
+    cachedUntil = now + (cachedScriptUrl ? DISCOVERY_TTL_MS : FAILURE_TTL_MS);
+    return cachedScriptUrl;
+  } catch {
+    cachedScriptUrl = '';
+    cachedUntil = now + FAILURE_TTL_MS;
+    return '';
+  }
+}
+
+async function callAppsScript(url, body) {
   const response = await fetch(url, {
-    ...options,
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      ...(options.headers || {}),
-    },
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'content-type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body),
   });
   const text = await response.text();
   let payload = null;
   try { payload = text ? JSON.parse(text) : {}; }
-  catch { payload = { raw: text }; }
-  if (!response.ok) {
-    const error = new Error(payload?.error?.message || payload?.error_description || `Google API HTTP ${response.status}`);
-    error.code = 'google_api_failed';
-    error.status = response.status;
-    error.details = payload;
-    throw error;
+  catch { payload = null; }
+
+  if (!response.ok || !payload || typeof payload !== 'object') {
+    return {
+      ok: false,
+      error: 'apps_script_invalid_response',
+      message: `Apps Script returned HTTP ${response.status}.`,
+      retryable: true,
+      status: response.status || 502,
+    };
   }
-  return payload;
-}
-
-function quoteSheet(name) {
-  return `'${String(name).replaceAll("'", "''")}'`;
-}
-
-function columnLetter(index) {
-  let value = Math.max(1, Number(index) || 1);
-  let output = '';
-  while (value > 0) {
-    const remainder = (value - 1) % 26;
-    output = String.fromCharCode(65 + remainder) + output;
-    value = Math.floor((value - 1) / 26);
+  if (payload.ok !== true) {
+    return {
+      ...payload,
+      ok: false,
+      error: payload.error || 'apps_script_failed',
+      retryable: payload.retryable !== false,
+      status: payload.retryable === false ? 400 : 502,
+    };
   }
-  return output;
-}
-
-function cellValue(value) {
-  if (value === undefined || value === null) return '';
-  if (typeof value === 'object') return JSON.stringify(value);
-  return value;
-}
-
-function rowValues(schema, row) {
-  return schema.columns.map((column) => cellValue(row?.[column]));
-}
-
-async function upsertRows(env, table, rows) {
-  const schema = TABLES[table];
-  if (!schema) {
-    const error = new Error(`Unsupported persistence table: ${table}`);
-    error.status = 400;
-    error.code = 'invalid_table';
-    throw error;
-  }
-
-  const normalizedRows = (Array.isArray(rows) ? rows : []).slice(0, MAX_ROWS);
-  if (!normalizedRows.length) return { table, updated: 0, appended: 0 };
-  const invalid = normalizedRows.find((row) => !schema.key(row));
-  if (invalid) {
-    const error = new Error(`A ${table} row is missing its primary key.`);
-    error.status = 400;
-    error.code = 'missing_row_key';
-    throw error;
-  }
-
-  const lastColumn = columnLetter(schema.columns.length);
-  const sheetRange = `${quoteSheet(table)}!A1:${lastColumn}`;
-  const valuesUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}/values/${encodeURIComponent(sheetRange)}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;
-  const existingPayload = await googleFetch(env, valuesUrl);
-  const existing = Array.isArray(existingPayload.values) ? existingPayload.values : [];
-  const header = existing[0] || [];
-  const headerMatches = schema.columns.every((column, index) => String(header[index] || '') === column);
-  if (!headerMatches) {
-    const error = new Error(`Unexpected header schema in ${table}.`);
-    error.status = 409;
-    error.code = 'sheet_schema_mismatch';
-    throw error;
-  }
-
-  const keyIndex = new Map();
-  for (let index = 1; index < existing.length; index += 1) {
-    const rowObject = Object.fromEntries(schema.columns.map((column, columnIndex) => [column, existing[index]?.[columnIndex] ?? '']));
-    const key = schema.key(rowObject);
-    if (key) keyIndex.set(key, index + 1);
-  }
-
-  const updates = [];
-  const appends = [];
-  normalizedRows.forEach((row) => {
-    const key = schema.key(row);
-    const rowNumber = keyIndex.get(key);
-    if (rowNumber) {
-      updates.push({
-        range: `${quoteSheet(table)}!A${rowNumber}:${lastColumn}${rowNumber}`,
-        majorDimension: 'ROWS',
-        values: [rowValues(schema, row)],
-      });
-    } else {
-      appends.push(rowValues(schema, row));
-    }
-  });
-
-  if (updates.length) {
-    await googleFetch(env, `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}/values:batchUpdate`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ valueInputOption: 'RAW', data: updates }),
-    });
-  }
-
-  if (appends.length) {
-    const appendRange = `${quoteSheet(table)}!A:${lastColumn}`;
-    await googleFetch(env, `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}/values/${encodeURIComponent(appendRange)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ majorDimension: 'ROWS', values: appends }),
-    });
-  }
-
-  return { table, updated: updates.length, appended: appends.length };
-}
-
-function driveEscape(value) {
-  return String(value || '').replaceAll('\\', '\\\\').replaceAll("'", "\\'");
-}
-
-async function findSessionGpx(env, folderId, sessionId) {
-  const q = `'${driveEscape(folderId)}' in parents and trashed = false and appProperties has { key='wanderSessionId' and value='${driveEscape(sessionId)}' }`;
-  const params = new URLSearchParams({
-    q,
-    spaces: 'drive',
-    pageSize: '10',
-    fields: 'files(id,name,webViewLink,modifiedTime,appProperties)',
-  });
-  const payload = await googleFetch(env, `https://www.googleapis.com/drive/v3/files?${params}`);
-  return Array.isArray(payload.files) ? payload.files[0] || null : null;
-}
-
-function multipartBody(metadata, content, boundary) {
-  return [
-    `--${boundary}\r\n`,
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n',
-    JSON.stringify(metadata),
-    '\r\n',
-    `--${boundary}\r\n`,
-    'Content-Type: application/gpx+xml; charset=UTF-8\r\n\r\n',
-    content,
-    '\r\n',
-    `--${boundary}--`,
-  ].join('');
-}
-
-async function uploadGpx(env, { folderId, sessionId, filename, content, deviceId }) {
-  if (!sessionId || !filename || !content) {
-    const error = new Error('sessionId, filename and content are required for GPX upload.');
-    error.status = 400;
-    error.code = 'invalid_gpx_payload';
-    throw error;
-  }
-  const bytes = new TextEncoder().encode(String(content));
-  if (bytes.byteLength > MAX_GPX_BYTES) {
-    const error = new Error('GPX payload is larger than the current 10 MB limit.');
-    error.status = 413;
-    error.code = 'gpx_too_large';
-    throw error;
-  }
-
-  const existing = await findSessionGpx(env, folderId, sessionId);
-  const metadata = {
-    name: String(filename).slice(0, 180),
-    mimeType: 'application/gpx+xml',
-    appProperties: {
-      wanderSessionId: String(sessionId),
-      wanderDeviceId: String(deviceId || '').slice(0, 120),
-      source: 'Wander',
-    },
-  };
-  if (!existing?.id) metadata.parents = [folderId];
-
-  const boundary = `wander_${crypto.randomUUID().replaceAll('-', '')}`;
-  const fields = encodeURIComponent('id,name,webViewLink,modifiedTime,appProperties');
-  const url = existing?.id
-    ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(existing.id)}?uploadType=multipart&fields=${fields}`
-    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=${fields}`;
-  const file = await googleFetch(env, url, {
-    method: existing?.id ? 'PATCH' : 'POST',
-    headers: { 'content-type': `multipart/related; boundary=${boundary}` },
-    body: multipartBody(metadata, String(content), boundary),
-  });
-  return { file, replaced: Boolean(existing?.id) };
-}
-
-function validateTargets(body) {
-  if (String(body?.spreadsheetId || '') !== SPREADSHEET_ID) return 'Unexpected spreadsheetId.';
-  if (body?.folderId != null && String(body.folderId) !== TRACKS_FOLDER_ID) return 'Unexpected folderId.';
-  return null;
+  return { ...payload, status: 200 };
 }
 
 export async function onRequestGet(context) {
+  const scriptUrl = await discoverScriptUrl(context.env || {});
   return json({
     ok: true,
-    provider: 'google-sheets-drive',
+    provider: 'google-apps-script',
     spreadsheetId: SPREADSHEET_ID,
     tracksFolderId: TRACKS_FOLDER_ID,
-    authConfigured: Boolean(context.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && context.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY),
-    tables: Object.keys(TABLES),
+    appsScriptConfigured: Boolean(scriptUrl),
+    authConfigured: Boolean(scriptUrl),
+    configurationSource: context.env?.WANDER_APPS_SCRIPT_URL ? 'environment' : scriptUrl ? 'sheet-meta' : 'pending-deployment',
+    tables: TABLES,
   });
 }
 
@@ -346,35 +153,26 @@ export async function onRequestPost(context) {
   const targetError = validateTargets(body);
   if (targetError) return json({ ok: false, error: targetError, retryable: false }, 400);
 
-  try {
-    if (body.action === 'upsert') {
-      const rows = Array.isArray(body.rows) ? body.rows : [];
-      if (rows.length > MAX_ROWS) return json({ ok: false, error: `Maximum ${MAX_ROWS} rows per request.`, retryable: false }, 400);
-      const result = await upsertRows(context.env, String(body.table || ''), rows);
-      return json({ ok: true, action: 'upsert', ...result });
-    }
-
-    if (body.action === 'upload-gpx') {
-      const result = await uploadGpx(context.env, {
-        folderId: TRACKS_FOLDER_ID,
-        sessionId: body.sessionId,
-        filename: body.filename,
-        content: body.content,
-        deviceId: body.deviceId,
-      });
-      return json({ ok: true, action: 'upload-gpx', ...result });
-    }
-
-    return json({ ok: false, error: 'Unsupported persistence action.', retryable: false }, 400);
-  } catch (error) {
-    const status = Number(error?.status) || 502;
+  const scriptUrl = await discoverScriptUrl(context.env || {});
+  if (!scriptUrl) {
     return json({
       ok: false,
-      error: error?.code || error?.message || 'persistence_failed',
-      message: error?.message || 'Persistence request failed.',
-      retryable: status >= 500 || status === 429,
-      upstreamStatus: status,
-      details: error?.details || null,
-    }, status);
+      error: 'apps_script_not_configured',
+      message: 'Deploy the Wander Apps Script web app once; it will register its URL in the _Meta sheet automatically.',
+      retryable: true,
+    }, 503);
+  }
+
+  try {
+    const result = await callAppsScript(scriptUrl, body);
+    const { status = 200, ...payload } = result;
+    return json(payload, status);
+  } catch (error) {
+    return json({
+      ok: false,
+      error: 'apps_script_unreachable',
+      message: error?.message || 'Apps Script persistence is unreachable.',
+      retryable: true,
+    }, 502);
   }
 }
