@@ -9,9 +9,10 @@
     map: core.map,
     route: core.route,
     currentTrack: core.currentTrack,
-    hasPosition: () => Boolean(position.getPosition()),
+    hasPosition: () => Boolean(position.getPosition() || position.getRememberedPosition?.()),
     getPosition: position.getPosition,
     getRealPosition: position.getRealPosition,
+    getRememberedPosition: position.getRememberedPosition,
     getMarker: position.getMarker,
     syncEffectiveMarker: position.syncEffectiveMarker,
     syncMarkerDraggable: position.syncMarkerDraggable,
@@ -132,9 +133,41 @@
     bootWaypoints = null;
   }
 
+  function loadCoreCrosshair() {
+    if (window.WanderMapCrosshair) return Promise.resolve(true);
+    if (!document.querySelector('link[data-wander-map-crosshair]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = './wander-map-crosshair.css?v=20260816-02';
+      link.dataset.wanderMapCrosshair = 'true';
+      document.head.appendChild(link);
+    }
+    const existing = document.querySelector('script[data-wander-map-crosshair]');
+    if (existing) {
+      if (existing.dataset.loaded === 'true') return Promise.resolve(Boolean(window.WanderMapCrosshair));
+      return new Promise((resolve) => {
+        existing.addEventListener('load', () => resolve(Boolean(window.WanderMapCrosshair)), { once: true });
+        existing.addEventListener('error', () => resolve(false), { once: true });
+      });
+    }
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = './runtime-map-crosshair.js?v=20260816-02';
+      script.async = false;
+      script.dataset.wanderMapCrosshair = 'true';
+      script.addEventListener('load', () => {
+        script.dataset.loaded = 'true';
+        resolve(Boolean(window.WanderMapCrosshair));
+      }, { once: true });
+      script.addEventListener('error', () => resolve(false), { once: true });
+      document.head.appendChild(script);
+    });
+  }
+
   const trackPoints = renderCurrentTrackImmediately();
   const waypointCount = renderWaypointsImmediately();
   const hasRawCursor = renderRawCursorImmediately();
+  const crosshairReady = loadCoreCrosshair();
 
   window.WanderContext?.subscribe?.((key) => {
     if (typeof key !== 'string') return;
@@ -148,18 +181,24 @@
     window.WanderCoreReady = true;
     document.documentElement.dataset.wanderCoreReady = 'true';
     window.dispatchEvent(new CustomEvent('wander:core-ready', {
-      detail: { at: Date.now(), hasRawCursor, trackPoints, waypointCount },
+      detail: {
+        at: Date.now(),
+        hasRawCursor,
+        trackPoints,
+        waypointCount,
+        crosshairReady: Boolean(window.WanderMapCrosshair),
+      },
     }));
   }
 
-  if (typeof requestAnimationFrame === 'function') {
-    requestAnimationFrame(() => {
-      try { core.map.invalidateSize({ pan: false, animate: false }); } catch {}
-      announceCoreReady();
-    });
-  } else {
-    announceCoreReady();
-  }
+  const paintCore = () => {
+    try { core.map.invalidateSize({ pan: false, animate: false }); } catch {}
+    Promise.resolve(crosshairReady).finally(announceCoreReady);
+  };
+
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(paintCore);
+  else paintCore();
+  // Never let an auxiliary overlay prevent the offline core from becoming usable.
   setTimeout(announceCoreReady, 250);
   setTimeout(() => core.map.invalidateSize(), 100);
 })();
