@@ -28,7 +28,7 @@ function localReferences(source) {
 
 function addDynamicReferences(target, source) {
   const patterns = [
-    /(?:script\.src|link\.href)\s*=\s*["'](?:\.\/)?([^"']+)["']/g,
+    /\b[A-Za-z_$][\w$]*\.(?:src|href)\s*=\s*["'](?:\.\/)?([^"']+)["']/g,
     /loadScript\(\s*["'](?:\.\/)?([^"']+)["']/g,
     /ensureStyles\(\s*["'](?:\.\/)?([^"']+)["']/g,
   ];
