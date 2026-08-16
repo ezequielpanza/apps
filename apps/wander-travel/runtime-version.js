@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.28';
+  const VERSION = 'v0.109.29';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -104,10 +104,12 @@
   window.WanderContext?.set?.('context.modularHud', true, metadata);
   window.WanderContext?.set?.('context.hudEditable', true, metadata);
   window.WanderContext?.set?.('context.hudSeparateOrientations', true, metadata);
-  window.WanderContext?.set?.('persistence.provider', 'google-sheets-drive', metadata);
+  window.WanderContext?.set?.('persistence.provider', 'google-apps-script', metadata);
   window.WanderContext?.set?.('persistence.offlineFirst', true, metadata);
   window.WanderContext?.set?.('persistence.googleSheetsIndex', true, metadata);
   window.WanderContext?.set?.('persistence.rawGpxDrive', true, metadata);
+  window.WanderContext?.set?.('persistence.appsScriptBridge', true, metadata);
+  window.WanderContext?.set?.('persistence.appsScriptAutoDiscovery', true, metadata);
   window.WanderContext?.set?.('currentPOI.switchHysteresis', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeControl', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeDefaultActive', false, metadata);
