@@ -152,20 +152,20 @@
   }
 
   function installButton() {
-    const wrap = document.querySelector('.wander-standard-map-actions');
+    const wrap = document.querySelector('.wander-personal-map-actions');
     if (!wrap) return false;
-    button = wrap.querySelector('.wander-tts-map-action');
+    button = document.querySelector('.wander-tts-map-action');
     if (!button) {
       button = document.createElement('button');
       button.type = 'button';
-      button.className = 'wander-map-action wander-tts-map-action';
+      button.className = 'wander-map-action wander-personal-map-action wander-tts-map-action';
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
         setEnabled(!enabled, !enabled);
       });
-      wrap.prepend(button);
     }
+    if (button.parentElement !== wrap || wrap.lastElementChild !== button) wrap.append(button);
     syncButton();
     return true;
   }
