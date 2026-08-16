@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.25';
+  const VERSION = 'v0.109.26';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -79,6 +79,9 @@
   window.WanderContext?.set?.('travelLog.activityLayerEnabled', false, metadata);
   window.WanderContext?.set?.('travelLog.episodesCollapsedByDefault', true, metadata);
   window.WanderContext?.set?.('travelLog.activeTrackSingleRepresentation', true, metadata);
+  window.WanderContext?.set?.('travelLog.gpsJitterReconciliation', true, metadata);
+  window.WanderContext?.set?.('travelLog.hideTechnicalTrackItems', true, metadata);
+  window.WanderContext?.set?.('travelLog.poiOscillationCleanup', true, metadata);
   window.WanderContext?.set?.('tracks.cloudHistorySync', true, metadata);
   window.WanderContext?.set?.('tracks.cloudHistoryBidirectional', true, metadata);
   window.WanderContext?.set?.('tracks.historyDatabase', 'wander-track-history', metadata);
@@ -87,6 +90,9 @@
   window.WanderContext?.set?.('tts.mapToggle', true, metadata);
   window.WanderContext?.set?.('map.zoomButtonsEnabled', true, metadata);
   window.WanderContext?.set?.('map.resumeRecoveryEnabled', true, metadata);
+  window.WanderContext?.set?.('map.centerModes', 'middle-off', metadata);
+  window.WanderContext?.set?.('map.controlsRegrouped', true, metadata);
+  window.WanderContext?.set?.('currentPOI.switchHysteresis', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeControl', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeDefaultActive', false, metadata);
   window.WanderContext?.set?.('companion.startupInteractionEnabled', false, metadata);
