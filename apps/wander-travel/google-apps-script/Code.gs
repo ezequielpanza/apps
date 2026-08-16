@@ -178,10 +178,21 @@ function recordDeployment_() {
   if (!url) return;
   const sheet = SpreadsheetApp.openById(WANDER_SPREADSHEET_ID).getSheetByName('_Meta');
   if (!sheet) return;
-  upsertMeta_(sheet, 'persistenceProvider', 'google-apps-script');
-  upsertMeta_(sheet, 'appsScriptUrl', url);
-  upsertMeta_(sheet, 'appsScriptUpdatedAt', new Date().toISOString());
-  upsertMeta_(sheet, 'tracksFolderId', WANDER_TRACKS_FOLDER_ID);
+  const lastRow = Math.max(1, sheet.getLastRow());
+  const values = sheet.getRange(1, 1, lastRow, 2).getValues();
+  const meta = new Map();
+  for (let index = 1; index < values.length; index += 1) {
+    const key = String(values[index][0] || '');
+    if (key) meta.set(key, String(values[index][1] || ''));
+  }
+
+  if (meta.get('persistenceProvider') !== 'google-apps-script') upsertMeta_(sheet, 'persistenceProvider', 'google-apps-script');
+  if (meta.get('tracksFolderId') !== WANDER_TRACKS_FOLDER_ID) upsertMeta_(sheet, 'tracksFolderId', WANDER_TRACKS_FOLDER_ID);
+  if (meta.get('appsScriptUrl') !== url) {
+    upsertMeta_(sheet, 'appsScriptUrl', url);
+    upsertMeta_(sheet, 'appsScriptUpdatedAt', new Date().toISOString());
+    upsertMeta_(sheet, 'appsScriptStatus', 'active');
+  }
 }
 
 function upsertMeta_(sheet, key, value) {
