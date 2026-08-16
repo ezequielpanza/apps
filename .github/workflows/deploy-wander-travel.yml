@@ -41,10 +41,13 @@ jobs:
           node apps/wander-travel/tests/map-cache.mjs
           node apps/wander-travel/tests/cloud-backup-api.mjs
           node apps/wander-travel/tests/cloud-backup-runtime.mjs
+          node apps/wander-travel/tests/persistence-api.mjs
           node apps/wander-travel/tests/app-shell.mjs
 
       - name: Check JavaScript syntax
-        run: find apps/wander-travel -maxdepth 1 -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+        run: |
+          find apps/wander-travel -maxdepth 1 -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          find apps/wander-travel/functions -type f -name '*.js' -print0 | xargs -0 -n1 node --check
 
       - name: Read expected version
         id: version
@@ -115,6 +118,31 @@ jobs:
           if (payload.ok !== true) throw new Error(`Cloud backup probe failed: ${JSON.stringify(payload)}`);
           if (typeof payload.exists !== 'boolean') throw new Error('Cloud backup probe did not return an exists flag.');
           console.log(`Cloud backup API is live; test snapshot exists: ${payload.exists}`);
+          NODE
+
+      - name: Verify live persistence API
+        run: |
+          result_file="${RUNNER_TEMP}/persistence-test.json"
+          endpoint='https://wander-travel.pages.dev/api/persistence'
+          for attempt in 1 2 3 4 5 6; do
+            status=$(curl --silent --show-error --location \
+              --header 'Cache-Control: no-cache' \
+              --output "${result_file}" \
+              --write-out '%{http_code}' \
+              "$endpoint" || true)
+            if [ "$status" = "200" ]; then
+              break
+            fi
+            echo "Persistence API attempt ${attempt} returned HTTP ${status}"
+            sleep 10
+          done
+          RESULT_FILE="${result_file}" node <<'NODE'
+          const fs = require('fs');
+          const payload = JSON.parse(fs.readFileSync(process.env.RESULT_FILE, 'utf8'));
+          if (payload.ok !== true) throw new Error(`Persistence API probe failed: ${JSON.stringify(payload)}`);
+          if (payload.spreadsheetId !== '11hQDPp2nKDyaI8SHvRwPujIgGSN15Mt1_AlbQ6WxRCU') throw new Error('Unexpected Wander spreadsheet target.');
+          if (payload.tracksFolderId !== '1LlNCtOA5vLlxyP-ltiL8GRwerTtNES1W') throw new Error('Unexpected Wander GPX folder target.');
+          console.log(`Persistence API is live; Google auth configured: ${payload.authConfigured}`);
           NODE
 
       - name: Test Google Places API through Wander
