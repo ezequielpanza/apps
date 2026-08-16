@@ -1,7 +1,8 @@
 (() => {
   const INSTALL_INTERVAL_MS = 250;
   const INSTALL_TIMEOUT_MS = 15000;
-  const TARGET_RESET_MS = 180;
+  const TARGET_RESET_MS = 360;
+  const ZOOM_DURATION_SEC = 0.22;
   const startedAt = Date.now();
   let targetZoom = null;
   let targetResetTimer = 0;
@@ -13,26 +14,35 @@
   function followingAnchor() {
     const position = window.WanderMapPosition;
     if (!position?.isFollowingPosition?.()) return null;
-    return position.getPosition?.() || null;
+    return position.getPosition?.() || position.getRememberedPosition?.() || null;
   }
 
   function centerForAnchor(map, anchor, zoom) {
     if (!anchor) return map.getCenter();
-    if (window.WanderMapControls?.getCenterMode?.() !== 'lower') return L.latLng(anchor);
-    const size = map.getSize();
-    const lowerPivot = L.point(size.x / 2, size.y * 0.72);
-    const projectedAnchor = map.project(anchor, zoom);
-    return map.unproject(projectedAnchor.add(size.divideBy(2)).subtract(lowerPivot), zoom);
+    return L.latLng(anchor);
   }
 
   function applyZoom(map, zoom) {
     const anchor = followingAnchor();
     const center = centerForAnchor(map, anchor, zoom);
+
+    // Keep Leaflet's old tile level transformed on screen while the next level
+    // becomes available. This is the same visual path used by normal animated
+    // zooms and avoids the blank/flash produced by the previous atomic setView.
     map._stop?.();
-    // Button zoom is intentionally atomic. Overlapping Leaflet zoom animations were
-    // briefly moving the camera to an intermediate center before follow-mode restored it.
-    map.setView(center, zoom, { animate: false });
-    if (anchor) window.WanderMapControls?.followPosition?.(anchor);
+    map.setView(center, zoom, {
+      animate: true,
+      duration: ZOOM_DURATION_SEC,
+      easeLinearity: 0.25,
+    });
+
+    if (anchor) {
+      map.once('zoomend', () => {
+        if (window.WanderMapPosition?.isFollowingPosition?.()) {
+          window.WanderMapControls?.followPosition?.(anchor);
+        }
+      });
+    }
   }
 
   function queueTargetReset() {
