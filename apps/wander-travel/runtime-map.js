@@ -173,11 +173,29 @@
     document.head.appendChild(script);
   }
 
+  function bootstrapPersistence() {
+    if (window.WanderPersistence || document.querySelector('script[data-wander-persistence-bootstrap]')) return;
+    const configScript = document.createElement('script');
+    configScript.src = './runtime-persistence-config.js?v=20260816-01';
+    configScript.async = false;
+    configScript.dataset.wanderPersistenceBootstrap = 'true';
+    configScript.addEventListener('load', () => {
+      if (window.WanderPersistence || document.querySelector('script[data-wander-persistence-runtime]')) return;
+      const runtime = document.createElement('script');
+      runtime.src = './runtime-persistence.js?v=20260816-01';
+      runtime.async = true;
+      runtime.dataset.wanderPersistenceRuntime = 'true';
+      document.head.appendChild(runtime);
+    }, { once: true });
+    document.head.appendChild(configScript);
+  }
+
   const trackPoints = renderCurrentTrackImmediately();
   const waypointCount = renderWaypointsImmediately();
   const hasRawCursor = renderRawCursorImmediately();
   const crosshairReady = loadCoreCrosshair();
   bootstrapContextHud();
+  bootstrapPersistence();
 
   window.WanderContext?.subscribe?.((key) => {
     if (typeof key !== 'string') return;
