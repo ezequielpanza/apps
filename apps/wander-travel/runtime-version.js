@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.26';
+  const VERSION = 'v0.109.27';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -49,6 +49,9 @@
   const metadata = { source: 'runtime-version', ttlMs: Infinity, confidence: 1 };
   window.WanderContext?.set?.('app.version', VERSION, metadata);
   window.WanderContext?.set?.('app.webVersion', VERSION, metadata);
+  window.WanderContext?.set?.('app.stagedStartup', true, metadata);
+  window.WanderContext?.set?.('app.coreBeforeInterpretation', true, metadata);
+  window.WanderContext?.set?.('app.coreOfflineContract', 'cursor-track-waypoints-ui', metadata);
   window.WanderContext?.set?.('sessions.rawTrackSchema', 2, metadata);
   window.WanderContext?.set?.('sessions.rawTrackPointFormat', 'latE7-array-v1', metadata);
   window.WanderContext?.set?.('sessions.recordingProfileDefault', 'balanced', metadata);
@@ -62,6 +65,7 @@
   window.WanderContext?.set?.('sessions.activeTrackVisibleInTravelLog', true, metadata);
   window.WanderContext?.set?.('sessions.gpsStabilizationRequired', false, metadata);
   window.WanderContext?.set?.('sessions.immediateGpsCapture', true, metadata);
+  window.WanderContext?.set?.('sessions.pendingReplayDeferredUntilCoreReady', true, metadata);
   window.WanderContext?.set?.('direction.simulatorThresholdFix', true, metadata);
   window.WanderContext?.set?.('direction.defaultThresholdKmh', 5, metadata);
   window.WanderContext?.set?.('direction.unifiedMotionSource', true, metadata);
@@ -92,6 +96,7 @@
   window.WanderContext?.set?.('map.resumeRecoveryEnabled', true, metadata);
   window.WanderContext?.set?.('map.centerModes', 'middle-off', metadata);
   window.WanderContext?.set?.('map.controlsRegrouped', true, metadata);
+  window.WanderContext?.set?.('map.landscapeControlsCompact', true, metadata);
   window.WanderContext?.set?.('currentPOI.switchHysteresis', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeControl', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeDefaultActive', false, metadata);
