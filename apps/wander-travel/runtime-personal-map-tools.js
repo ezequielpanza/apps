@@ -9,17 +9,6 @@
   let wanderModeActive = false;
   let wanderModeButton = null;
 
-  function makeButton(iconName, label) {
-    const button = L.DomUtil.create('button', 'wander-map-action wander-personal-map-action');
-    button.type = 'button';
-    button.setAttribute('aria-label', label);
-    button.title = label;
-    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="wander-icons.svg#${iconName}"></use></svg>`;
-    L.DomEvent.disableClickPropagation(button);
-    L.DomEvent.disableScrollPropagation(button);
-    return button;
-  }
-
   function radarMarkup() {
     return '<svg class="ui-icon wander-radar-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
       '<circle cx="12" cy="12" r="8.5"></circle>' +
@@ -121,13 +110,6 @@
     onAdd() {
       ensureWanderModeStyle();
       const wrap = L.DomUtil.create('div', 'wander-map-actions wander-personal-map-actions');
-      const waypointButton = makeButton('pin', 'Seleccionar punto en el centro del mapa');
-      waypointButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        if (window.WanderMapSelectedPoint?.openAtCenter) window.WanderMapSelectedPoint.openAtCenter();
-        else window.dispatchEvent(new CustomEvent('wander:open-waypoint-center'));
-      });
-
       wanderModeButton = L.DomUtil.create('button', 'wander-map-action wander-personal-map-action wander-mode-action');
       wanderModeButton.type = 'button';
       wanderModeButton.innerHTML = radarMarkup();
@@ -138,8 +120,7 @@
         toggleWanderMode();
       });
       syncWanderModeButton();
-
-      wrap.append(waypointButton, wanderModeButton);
+      wrap.append(wanderModeButton);
       return wrap;
     },
   });
