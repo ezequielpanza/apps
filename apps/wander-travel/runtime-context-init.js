@@ -144,23 +144,40 @@
     });
   }
 
+  function afterCoreReady(callback, delayMs = 0) {
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      setTimeout(callback, Math.max(0, Number(delayMs) || 0));
+    };
+    if (window.WanderCoreReady) schedule();
+    else window.addEventListener('wander:core-ready', schedule, { once: true });
+  }
+
+  // Zoom/pan resilience belongs to the core UX and may install immediately.
   loadScript('runtime-map-zoom-buttons.js?v=20260807-01', 'data-wander-map-zoom-buttons').catch(() => {});
   loadScript('runtime-resilience-fixes.js?v=20260807-01', 'data-wander-runtime-resilience').catch(() => {});
-  // Track history is a separate offline repository. Its cloud transport only
-  // activates when connectivity and the native stable identity are available.
-  loadScript('runtime-track-cloud-sync.js?v=20260807-01', 'data-wander-track-cloud-sync').catch(() => {});
 
-  loadScript('runtime-raw-location-recorder.js?v=20260805-02', 'data-wander-raw-recorder')
-    .then(() => loadScript('runtime-track-intelligence.js?v=20260805-01', 'data-wander-track-intelligence'))
-    .then(() => loadScript('runtime-track-intelligence-poller.js?v=20260805-01', 'data-wander-track-intelligence-poller'))
-    .then(() => loadScript('runtime-track-review-ui.js?v=20260805-01', 'data-wander-track-review-ui'))
-    .then(() => loadScript('runtime-track-tree-ui.js?v=20260806-01', 'data-wander-track-tree-ui'))
-    .then(() => loadScript('runtime-bitacora-tree-mode.js?v=20260807-01', 'data-wander-bitacora-tree-mode'))
-    .then(() => loadScript('runtime-unified-travel-log.js?v=20260807-02', 'data-wander-unified-travel-log'))
-    .then(() => loadScript('runtime-active-track-log-bridge.js?v=20260807-01', 'data-wander-active-track-log-bridge'))
-    .catch(() => {
-      context.set('sessions.trackIntelligenceStatus', 'error', {
-        source: 'context-init', kind: 'observed', ttlMs: 60000, confidence: 1,
+  // Everything below is interpretation/history/cloud work. It must never delay
+  // cursor + current track + waypoints + controls becoming usable.
+  afterCoreReady(() => {
+    loadScript('runtime-track-cloud-sync.js?v=20260807-01', 'data-wander-track-cloud-sync').catch(() => {});
+  }, 1200);
+
+  afterCoreReady(() => {
+    loadScript('runtime-raw-location-recorder.js?v=20260805-02', 'data-wander-raw-recorder')
+      .then(() => loadScript('runtime-track-intelligence.js?v=20260805-01', 'data-wander-track-intelligence'))
+      .then(() => loadScript('runtime-track-intelligence-poller.js?v=20260805-01', 'data-wander-track-intelligence-poller'))
+      .then(() => loadScript('runtime-track-review-ui.js?v=20260805-01', 'data-wander-track-review-ui'))
+      .then(() => loadScript('runtime-track-tree-ui.js?v=20260806-01', 'data-wander-track-tree-ui'))
+      .then(() => loadScript('runtime-bitacora-tree-mode.js?v=20260807-01', 'data-wander-bitacora-tree-mode'))
+      .then(() => loadScript('runtime-unified-travel-log.js?v=20260807-02', 'data-wander-unified-travel-log'))
+      .then(() => loadScript('runtime-active-track-log-bridge.js?v=20260807-01', 'data-wander-active-track-log-bridge'))
+      .catch(() => {
+        context.set('sessions.trackIntelligenceStatus', 'error', {
+          source: 'context-init', kind: 'observed', ttlMs: 60000, confidence: 1,
+        });
       });
-    });
+  }, 700);
 })();
