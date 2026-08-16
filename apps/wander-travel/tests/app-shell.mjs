@@ -10,6 +10,8 @@ const read = (name) => fs.readFileSync(path.join(ROOT, name), 'utf8');
 const html = read('index.html');
 const app = read('app.js');
 const contextInit = read('runtime-context-init.js');
+const mapRuntime = read('runtime-map.js');
+const contextHud = read('runtime-context-hud.js');
 const serviceWorker = read('sw.js');
 const platform = read('runtime-platform.js');
 const versionRuntime = read('runtime-version.js');
@@ -39,9 +41,17 @@ const loaded = new Set(localReferences(html));
 addDynamicReferences(loaded, platform);
 addDynamicReferences(loaded, app);
 addDynamicReferences(loaded, contextInit);
+addDynamicReferences(loaded, mapRuntime);
+addDynamicReferences(loaded, contextHud);
 loaded.add('index.html');
 const cached = new Set([...serviceWorker.matchAll(/["']\.\/([^"']+)["']/g)].map((match) => match[1]));
-const onlineEnhancements = new Set(['runtime-cloud-backup.js', 'wander-cloud-backup.css', 'runtime-track-cloud-sync.js']);
+const onlineEnhancements = new Set([
+  'runtime-cloud-backup.js',
+  'wander-cloud-backup.css',
+  'runtime-track-cloud-sync.js',
+  'runtime-persistence-config.js',
+  'runtime-persistence.js',
+]);
 
 for (const reference of loaded) {
   assert.equal(fs.existsSync(path.join(ROOT, reference)), true, `Missing shell asset: ${reference}`);
@@ -123,6 +133,14 @@ assert.match(ttsPlugin, /TextToSpeech/);
 assert.match(ttsPlugin, /public void speak\(PluginCall call\)/);
 assert.match(ttsPlugin, /public void stop\(PluginCall call\)/);
 
+assert.match(mapRuntime, /runtime-map-crosshair\.js/);
+assert.match(mapRuntime, /runtime-context-hud\.js/);
+assert.match(mapRuntime, /runtime-persistence-config\.js/);
+assert.match(mapRuntime, /runtime-persistence\.js/);
+assert.match(contextHud, /portrait/);
+assert.match(contextHud, /landscape/);
+assert.match(contextHud, /wander:hud-layout-change/);
+
 assert.match(mobileBuild, /entry\.isFile\(\)/);
 assert.match(mobileBuild, /assetExtensions/);
 assert.match(mobileBuild, /entry\.name === 'sw\.js'/);
@@ -134,4 +152,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${webVersion} / APK ${androidVersion.versionName}: balanced recording, two-level Bitácora, cloud track history, 5-second messages and TTS`);
+console.log(`PASS Wander Web ${webVersion} / APK ${androidVersion.versionName}: balanced recording, core overlays, modular HUD, cloud track history, 5-second messages and TTS`);
