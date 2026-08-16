@@ -62,8 +62,12 @@
     return fields().find((field) => field.id === id) || null;
   }
 
-  function viewport() {
-    return { width: Math.max(1, window.innerWidth), height: Math.max(1, window.innerHeight) };
+  function viewportFor(orientation = currentOrientation) {
+    const width = Math.max(1, window.innerWidth);
+    const height = Math.max(1, window.innerHeight);
+    const current = width > height ? 'landscape' : 'portrait';
+    if (orientation === current) return { width, height };
+    return { width: height, height: width };
   }
 
   function defaultRect(fieldId, orientation = currentOrientation) {
@@ -71,7 +75,7 @@
     const visibleIndex = Math.max(0, allVisible.indexOf(fieldId));
     const allIndex = Math.max(0, fields().findIndex((field) => field.id === fieldId));
     const index = allVisible.includes(fieldId) ? visibleIndex : allIndex;
-    const size = viewport();
+    const size = viewportFor(orientation);
     const startX = 64;
     const startY = orientation === 'landscape' ? 8 : 10;
     const gap = orientation === 'landscape' ? 5 : 6;
@@ -89,8 +93,8 @@
     };
   }
 
-  function clampRect(rect) {
-    const size = viewport();
+  function clampRect(rect, orientation = currentOrientation) {
+    const size = viewportFor(orientation);
     const width = Math.max(72, Math.min(Math.min(340, size.width - 8), Number(rect.width) || 116));
     const height = Math.max(38, Math.min(Math.min(180, size.height - 8), Number(rect.height) || 48));
     const x = Math.max(4, Math.min(size.width - width - 4, Number(rect.x) || 4));
@@ -101,13 +105,13 @@
   function rectFor(fieldId, orientation = currentOrientation) {
     const layout = layouts[orientation] || (layouts[orientation] = {});
     if (!layout[fieldId]) layout[fieldId] = defaultRect(fieldId, orientation);
-    layout[fieldId] = clampRect(layout[fieldId]);
+    layout[fieldId] = clampRect(layout[fieldId], orientation);
     return layout[fieldId];
   }
 
   function setRect(fieldId, rect, { persist = false, reason = 'field-layout' } = {}) {
     const layout = layouts[currentOrientation] || (layouts[currentOrientation] = {});
-    layout[fieldId] = clampRect({ ...rectFor(fieldId), ...rect });
+    layout[fieldId] = clampRect({ ...rectFor(fieldId), ...rect }, currentOrientation);
     applyCardRect(fieldId);
     if (persist) saveLayouts(reason);
     return clone(layout[fieldId]);
@@ -150,7 +154,6 @@
   }
 
   function ensureCards() {
-    api()?.render?.();
     const root = dashboard();
     if (!root) return;
     root.querySelectorAll('[data-dashboard-field]').forEach(decorateCard);
@@ -413,11 +416,7 @@
     window.addEventListener('pointermove', pointerMove, { passive: false });
     window.addEventListener('pointerup', endPointer);
     window.addEventListener('pointercancel', endPointer);
-    window.addEventListener('resize', () => {
-      const next = orientationKey();
-      if (next !== currentOrientation) currentOrientation = next;
-      applyLayout();
-    });
+    window.addEventListener('resize', applyLayout);
     window.addEventListener('orientationchange', () => setTimeout(applyLayout, 60));
     window.addEventListener('wander:dashboard-layout-change', () => requestAnimationFrame(applyLayout));
     window.addEventListener('wander:dashboard-values-change', ensureCards);
