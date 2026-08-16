@@ -3,9 +3,17 @@
   const store = window.WanderPOIStore;
   if (!context) return;
 
+  const SWITCH_CONFIRM_STATIONARY_MS = 45000;
+  const SWITCH_CONFIRM_MOVING_MS = 15000;
+  const SWITCH_CONFIRM_EXIT_MS = 8000;
+  const SWITCH_CONFIRM_HITS = 3;
   let lastId = null;
   let lastSignature = null;
   let evaluationQueued = false;
+  let switchCandidateId = null;
+  let switchCandidateSince = 0;
+  let switchCandidateHits = 0;
+  let switchCandidateSampleKey = null;
 
   function finite(value) {
     const number = Number(value);
@@ -125,6 +133,33 @@
     });
   }
 
+  function resetSwitchCandidate() {
+    switchCandidateId = null;
+    switchCandidateSince = 0;
+    switchCandidateHits = 0;
+    switchCandidateSampleKey = null;
+  }
+
+  function switchConfirmed(id, sampleKey, moving, forcedExit = false) {
+    const now = Date.now();
+    const key = String(id || '');
+    if (!key) return false;
+    if (switchCandidateId !== key) {
+      switchCandidateId = key;
+      switchCandidateSince = now;
+      switchCandidateHits = 1;
+      switchCandidateSampleKey = sampleKey;
+      return false;
+    }
+    if (sampleKey !== switchCandidateSampleKey) {
+      switchCandidateSampleKey = sampleKey;
+      switchCandidateHits += 1;
+    }
+    const requiredMs = forcedExit ? SWITCH_CONFIRM_EXIT_MS : moving ? SWITCH_CONFIRM_MOVING_MS : SWITCH_CONFIRM_STATIONARY_MS;
+    const requiredHits = forcedExit ? 2 : SWITCH_CONFIRM_HITS;
+    return switchCandidateHits >= requiredHits && now - switchCandidateSince >= requiredMs;
+  }
+
   function clear() {
     const hadCurrent = lastId !== null || Boolean(context.value('currentPOI.current'));
     if (!hadCurrent) return;
@@ -135,6 +170,7 @@
     context.remove('currentPOI.status');
     lastId = null;
     lastSignature = null;
+    resetSwitchCandidate();
     scheduleSituationEvaluation();
   }
 
@@ -176,6 +212,7 @@
     }
 
     const point = { lat, lng };
+    const sampleKey = String(location.updatedAt || `${lat.toFixed(7)},${lng.toFixed(7)}`);
     const containerMatch = containingArea(point, activeItems);
     const containerSources = sourceIds(containerMatch?.poi);
     const container = containerMatch ? {
@@ -203,16 +240,45 @@
       .sort((a, b) => a.distanceM - b.distanceM || Number(b.item.confidence || 0) - Number(a.item.confidence || 0));
 
     const nearest = candidates[0] || null;
+    const currentCandidate = lastId ? candidates.find((candidate) => String(candidate.item.id) === String(lastId)) || null : null;
     let specific = null;
-    if (nearest) {
-      const sameAsCurrent = lastId && String(nearest.item.id) === String(lastId);
-      const threshold = sameAsCurrent ? exitRadius : enterRadius;
+
+    if (lastId && currentCandidate) {
+      const currentInsideExit = currentCandidate.distanceM <= exitRadius;
+      const nearestIsCurrent = !nearest || String(nearest.item.id) === String(lastId);
+      if (nearestIsCurrent) {
+        if (currentInsideExit && !(moving && speedKmh > 45 && currentCandidate.distanceM > 35)) {
+          specific = { nearest: currentCandidate, threshold: exitRadius };
+          resetSwitchCandidate();
+        }
+      } else {
+        const switchAdvantageM = Math.max(18, Math.min(55, accuracy * 0.75));
+        const nearestEligible = nearest.distanceM <= enterRadius && !(moving && speedKmh > 45 && nearest.distanceM > 35);
+        const currentClearlyGone = !currentInsideExit;
+        const clearlyBetter = currentCandidate.distanceM - nearest.distanceM >= switchAdvantageM;
+        const canChallenge = nearestEligible && (currentClearlyGone || clearlyBetter);
+        if (canChallenge && switchConfirmed(nearest.item.id, sampleKey, moving, currentClearlyGone)) {
+          specific = { nearest, threshold: enterRadius };
+          resetSwitchCandidate();
+        } else if (currentInsideExit && !(moving && speedKmh > 45 && currentCandidate.distanceM > 35)) {
+          specific = { nearest: currentCandidate, threshold: exitRadius };
+        }
+      }
+    } else if (nearest) {
+      const threshold = lastId && String(nearest.item.id) === String(lastId) ? exitRadius : enterRadius;
       if (nearest.distanceM <= threshold && !(moving && speedKmh > 45 && nearest.distanceM > 35)) {
         specific = { nearest, threshold };
+        if (!lastId || String(nearest.item.id) === String(lastId)) resetSwitchCandidate();
       }
     }
 
     if (!specific && !container) {
+      if (lastId && switchCandidateId) {
+        context.set('currentPOI.status', 'switch_pending', {
+          source: 'current-poi-provider', kind: 'derived', ttlMs: 60000, confidence: 0.6,
+        });
+        return context.value('currentPOI.current') || null;
+      }
       clear();
       return null;
     }
@@ -232,7 +298,7 @@
       address: specific.nearest.item.address || null,
       distanceM: Math.round(specific.nearest.distanceM),
       accuracyM: Math.round(accuracy),
-      detectionMode: 'near_point',
+      detectionMode: String(specific.nearest.item.id) === String(lastId) ? 'held_by_hysteresis' : 'near_point',
       sources: specificSources,
       source: specificSources[0] || 'nearby',
       container,
@@ -260,7 +326,9 @@
     context.set('currentPOI.distanceM', value.distanceM, options);
     context.set('currentPOI.status', container && !specific ? 'inside_container' : 'detected', options);
 
+    const previousId = lastId;
     lastId = value.id;
+    if (String(previousId || '') !== String(lastId || '')) resetSwitchCandidate();
     const signature = `${value.id}|${value.name}|${value.distanceM}|${container?.id || ''}|${context.value('motion.status') || ''}`;
     if (signature !== lastSignature) {
       lastSignature = signature;
@@ -288,6 +356,12 @@
     containingArea,
     getCurrent: () => context.value('currentPOI.current') || null,
     getContainer: () => context.value('currentPOI.container') || null,
+    switchPolicy: Object.freeze({
+      stationaryMs: SWITCH_CONFIRM_STATIONARY_MS,
+      movingMs: SWITCH_CONFIRM_MOVING_MS,
+      forcedExitMs: SWITCH_CONFIRM_EXIT_MS,
+      hits: SWITCH_CONFIRM_HITS,
+    }),
   });
   detect();
 })();
