@@ -47,13 +47,14 @@ function renderCharts(evolution,intakes,goals){
     return row?num(row['Calorías']):null;
   };
   const percentage=(name,date)=>{const kcal=dailyCalories(name,date);return kcal==null?null:kcal/goals[name].kcal*100};
+  const overageColors={Eze:{fill:'rgba(220,38,38,.86)',line:'#dc2626'},Chilu:{fill:'rgba(190,24,93,.86)',line:'#be185d'}};
   const calorieDatasets=names.flatMap(name=>[
     {label:name,stack:name,data:labels.map(d=>{const pct=percentage(name,d);return pct==null?null:Math.min(pct,100)}),backgroundColor:PERSON_COLORS[name].fill,borderColor:PERSON_COLORS[name].line,borderWidth:1,borderRadius:6},
-    {label:`Exceso ${name}`,stack:name,data:labels.map(d=>{const pct=percentage(name,d);return pct==null?null:Math.max(pct-100,0)}),backgroundColor:'#dc2626',borderColor:'#dc2626',borderWidth:1,borderRadius:6}
+    {label:`Exceso ${name}`,stack:name,data:labels.map(d=>{const pct=percentage(name,d);return pct==null?null:Math.max(pct-100,0)}),backgroundColor:overageColors[name].fill,borderColor:overageColors[name].line,borderWidth:1,borderRadius:6}
   ]);
   calorieDatasets.push({type:'line',label:'Objetivo diario',data:labels.map(()=>100),borderColor:'#f59e0b',backgroundColor:'#f59e0b',borderDash:[6,5],borderWidth:2,pointRadius:0,tension:0});
   if(calorieChart)calorieChart.destroy();
-  calorieChart=new Chart($('calorieChart'),{type:'bar',data:{labels:labels.map(fmtDate),datasets:calorieDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{filter:item=>item.text!=='Exceso Chilu'}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${Math.round(ctx.raw)}%`}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'% del objetivo'},ticks:{callback:value=>`${value}%`}}}}});
+  calorieChart=new Chart($('calorieChart'),{type:'bar',data:{labels:labels.map(fmtDate),datasets:calorieDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${Math.round(ctx.raw)}%`}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'% del objetivo'},ticks:{callback:value=>`${value}%`}}}}});
 }
 function showStatus(msg,error=false){const el=$('statusBar');el.textContent=msg;el.classList.remove('hidden');el.classList.toggle('error',error)}
 function hideStatus(){$('statusBar').classList.add('hidden')}
