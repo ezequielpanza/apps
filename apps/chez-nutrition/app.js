@@ -46,12 +46,14 @@ function renderCharts(evolution,intakes,goals){
     const row=byPerson[name].find(x=>x.Fecha===date);
     return row?num(row['Calorías']):null;
   };
-  const calorieDatasets=[
-    ...names.map(n=>({label:n,data:labels.map(d=>{const kcal=dailyCalories(n,d);return kcal==null?null:kcal/goals[n].kcal*100}),backgroundColor:PERSON_COLORS[n].fill,borderColor:PERSON_COLORS[n].line,borderWidth:1,borderRadius:6})),
-    {type:'line',label:'Objetivo diario',data:labels.map(()=>100),borderColor:'#f59e0b',backgroundColor:'#f59e0b',borderDash:[6,5],borderWidth:2,pointRadius:0,tension:0}
-  ];
+  const percentage=(name,date)=>{const kcal=dailyCalories(name,date);return kcal==null?null:kcal/goals[name].kcal*100};
+  const calorieDatasets=names.flatMap(name=>[
+    {label:name,stack:name,data:labels.map(d=>{const pct=percentage(name,d);return pct==null?null:Math.min(pct,100)}),backgroundColor:PERSON_COLORS[name].fill,borderColor:PERSON_COLORS[name].line,borderWidth:1,borderRadius:6},
+    {label:`Exceso ${name}`,stack:name,data:labels.map(d=>{const pct=percentage(name,d);return pct==null?null:Math.max(pct-100,0)}),backgroundColor:'#dc2626',borderColor:'#dc2626',borderWidth:1,borderRadius:6}
+  ]);
+  calorieDatasets.push({type:'line',label:'Objetivo diario',data:labels.map(()=>100),borderColor:'#f59e0b',backgroundColor:'#f59e0b',borderDash:[6,5],borderWidth:2,pointRadius:0,tension:0});
   if(calorieChart)calorieChart.destroy();
-  calorieChart=new Chart($('calorieChart'),{type:'bar',data:{labels:labels.map(fmtDate),datasets:calorieDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${Math.round(ctx.raw)}%`}}},scales:{y:{beginAtZero:true,title:{display:true,text:'% del objetivo'},ticks:{callback:value=>`${value}%`}}}}});
+  calorieChart=new Chart($('calorieChart'),{type:'bar',data:{labels:labels.map(fmtDate),datasets:calorieDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{filter:item=>item.text!=='Exceso Chilu'}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${Math.round(ctx.raw)}%`}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'% del objetivo'},ticks:{callback:value=>`${value}%`}}}}});
 }
 function showStatus(msg,error=false){const el=$('statusBar');el.textContent=msg;el.classList.remove('hidden');el.classList.toggle('error',error)}
 function hideStatus(){$('statusBar').classList.add('hidden')}
