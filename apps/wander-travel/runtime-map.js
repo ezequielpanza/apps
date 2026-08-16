@@ -137,7 +137,8 @@
   const hasRawCursor = renderRawCursorImmediately();
 
   window.WanderContext?.subscribe?.((key) => {
-    if (key === 'location.real' || key.startsWith?.('location.real.')) clearBootCursorWhenLive();
+    if (typeof key !== 'string') return;
+    if (key === 'location.real' || key.startsWith('location.real.')) clearBootCursorWhenLive();
   });
   window.addEventListener('wander:personal-poi-ready', handOffBootWaypoints, { once: true });
   window.addEventListener('wander:sessions-changed', () => window.WanderTracks?.syncCurrentTrack?.(), { once: true });
@@ -151,10 +152,14 @@
     }));
   }
 
-  requestAnimationFrame(() => {
-    try { core.map.invalidateSize({ pan: false, animate: false }); } catch {}
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      try { core.map.invalidateSize({ pan: false, animate: false }); } catch {}
+      announceCoreReady();
+    });
+  } else {
     announceCoreReady();
-  });
+  }
   setTimeout(announceCoreReady, 250);
   setTimeout(() => core.map.invalidateSize(), 100);
 })();
