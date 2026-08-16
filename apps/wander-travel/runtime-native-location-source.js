@@ -116,6 +116,7 @@
   }
 
   function yieldToUi() {
+    if (typeof setTimeout !== 'function') return Promise.resolve();
     return new Promise((resolve) => setTimeout(resolve, 16));
   }
 
@@ -191,24 +192,34 @@
     });
   }
 
+  function runPendingSyncNow() {
+    if (pendingSyncScheduled || !watching) return;
+    pendingSyncScheduled = true;
+    refreshBackgroundStatus()
+      .then(() => syncPending())
+      .finally(() => { pendingSyncScheduled = false; });
+  }
+
   function schedulePendingSync(delayMs = 1200) {
     if (pendingSyncScheduled || !watching) return;
+
+    // Unit-test/non-visual environments have no animation frame. Keep their
+    // historical immediate replay behavior while Android waits for the map core.
+    if (typeof requestAnimationFrame !== 'function') {
+      runPendingSyncNow();
+      return;
+    }
+
     const run = () => {
       if (pendingSyncScheduled || !watching) return;
       pendingSyncScheduled = true;
       setTimeout(() => {
         pendingSyncScheduled = false;
         if (!watching) return;
-        refreshBackgroundStatus().then(() => syncPending());
+        runPendingSyncNow();
       }, Math.max(0, Number(delayMs) || 0));
     };
 
-    // Unit-test/non-visual environments have no animation frame. Keep their
-    // historical immediate replay behavior while Android waits for the map core.
-    if (typeof requestAnimationFrame !== 'function') {
-      run();
-      return;
-    }
     if (window.WanderCoreReady) run();
     else window.addEventListener('wander:core-ready', run, { once: true });
   }
