@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.27';
+  const VERSION = 'v0.109.28';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -51,7 +51,7 @@
   window.WanderContext?.set?.('app.webVersion', VERSION, metadata);
   window.WanderContext?.set?.('app.stagedStartup', true, metadata);
   window.WanderContext?.set?.('app.coreBeforeInterpretation', true, metadata);
-  window.WanderContext?.set?.('app.coreOfflineContract', 'cursor-track-waypoints-ui', metadata);
+  window.WanderContext?.set?.('app.coreOfflineContract', 'cursor-track-waypoints-crosshair-ui', metadata);
   window.WanderContext?.set?.('sessions.rawTrackSchema', 2, metadata);
   window.WanderContext?.set?.('sessions.rawTrackPointFormat', 'latE7-array-v1', metadata);
   window.WanderContext?.set?.('sessions.recordingProfileDefault', 'balanced', metadata);
@@ -90,13 +90,24 @@
   window.WanderContext?.set?.('tracks.cloudHistoryBidirectional', true, metadata);
   window.WanderContext?.set?.('tracks.historyDatabase', 'wander-track-history', metadata);
   window.WanderContext?.set?.('tracks.defaultNameFromStartedAt', true, metadata);
+  window.WanderContext?.set?.('tracks.rawGpxDriveArchive', true, metadata);
   window.WanderContext?.set?.('messages.defaultTimeoutMs', 5000, metadata);
   window.WanderContext?.set?.('tts.mapToggle', true, metadata);
   window.WanderContext?.set?.('map.zoomButtonsEnabled', true, metadata);
+  window.WanderContext?.set?.('map.smoothButtonZoom', true, metadata);
+  window.WanderContext?.set?.('map.crosshairCoreStartup', true, metadata);
+  window.WanderContext?.set?.('map.crosshairRememberedPositionFallback', true, metadata);
   window.WanderContext?.set?.('map.resumeRecoveryEnabled', true, metadata);
   window.WanderContext?.set?.('map.centerModes', 'middle-off', metadata);
   window.WanderContext?.set?.('map.controlsRegrouped', true, metadata);
   window.WanderContext?.set?.('map.landscapeControlsCompact', true, metadata);
+  window.WanderContext?.set?.('context.modularHud', true, metadata);
+  window.WanderContext?.set?.('context.hudEditable', true, metadata);
+  window.WanderContext?.set?.('context.hudSeparateOrientations', true, metadata);
+  window.WanderContext?.set?.('persistence.provider', 'google-sheets-drive', metadata);
+  window.WanderContext?.set?.('persistence.offlineFirst', true, metadata);
+  window.WanderContext?.set?.('persistence.googleSheetsIndex', true, metadata);
+  window.WanderContext?.set?.('persistence.rawGpxDrive', true, metadata);
   window.WanderContext?.set?.('currentPOI.switchHysteresis', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeControl', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeDefaultActive', false, metadata);
