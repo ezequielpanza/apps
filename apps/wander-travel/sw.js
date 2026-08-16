@@ -1,6 +1,6 @@
 importScripts('./runtime-version.js');
 
-const SHELL_REVISION = '20260807-01';
+const SHELL_REVISION = '20260816-01';
 const CACHE_NAME = 'wander-travel-' + self.WanderVersion + '-' + SHELL_REVISION;
 const TILE_CACHE_NAME = 'wander-map-tiles-v1';
 const TILE_META_DB = 'wander-map-cache-meta-v1';
@@ -19,6 +19,7 @@ const APP_SHELL = [
   './wander-ui.css',
   './wander-simulator-interactions.css',
   './wander-context-dashboard.css',
+  './wander-context-hud.css',
   './wander-dashboard-order.css',
   './wander-rule-checker.css',
   './wander-message-top.css',
@@ -85,6 +86,7 @@ const APP_SHELL = [
   './runtime-ui.js',
   './runtime-interaction-core.js',
   './runtime-context-dashboard.js',
+  './runtime-context-hud.js',
   './runtime-place-hierarchy-dashboard.js',
   './runtime-dashboard-order.js',
   './runtime-panel.js',
@@ -199,8 +201,8 @@ async function deleteTileMeta(url) {
 }
 
 async function listTileMeta() {
-  try { return await tileDbRequest(TILE_META_STORE, 'readonly', (store) => store.getAll()) || []; }
-  catch { return []; }
+  try { return await tileDbRequest(TILE_META_STORE, 'readonly', (store) => store.getAll()) || [];
+  } catch { return []; }
 }
 
 async function clearTileMeta() {
@@ -218,90 +220,99 @@ function isMapTileRequest(url) {
 
 async function mapCacheStatus() {
   const cache = await caches.open(TILE_CACHE_NAME);
-  const keys = await cache.keys();
+  const requests = await cache.keys();
+  const metadata = await listTileMeta();
+  const retentionDays = await getTileRetentionDays();
+  const totals = { osm: 0, esri: 0 };
+  const bytes = { osm: 0, esri: 0 };
+  metadata.forEach((item) => {
+    if (item.source === 'osm' || item.source === 'esri') {
+      totals[item.source] += 1;
+      bytes[item.source] += Number(item.bytes) || 0;
+    }
+  });
   return {
-    ok: true,
-    retentionDays: await getTileRetentionDays(),
-    count: keys.length,
-    maxEntries: MAX_TILE_ENTRIES,
+    entries: requests.length,
+    bySource: totals,
+    bytesBySource: bytes,
+    approximateBytes: Object.values(bytes).reduce((total, value) => total + value, 0),
+    retentionDays,
+    maximumEntries: MAX_TILE_ENTRIES,
   };
 }
 
 async function clearMapTileCache() {
   await caches.delete(TILE_CACHE_NAME);
   await clearTileMeta();
-  tileWritesSinceCleanup = 0;
   return mapCacheStatus();
 }
 
-async function cleanupMapTileCache(retentionDays = null, force = false) {
-  const days = retentionDays === null ? await getTileRetentionDays() : normalizeRetentionDays(retentionDays);
+async function cleanupMapTileCache(retentionDays = DEFAULT_TILE_RETENTION_DAYS, force = false) {
+  const days = normalizeRetentionDays(retentionDays);
   if (days === 0) return clearMapTileCache();
-  if (!force && tileWritesSinceCleanup < 25) return mapCacheStatus();
+  if (!force && tileWritesSinceCleanup < 50) return null;
   tileWritesSinceCleanup = 0;
-
-  const cache = await caches.open(TILE_CACHE_NAME);
-  const records = await listTileMeta();
   const now = Date.now();
-  const ttlMs = days * 24 * 60 * 60 * 1000;
-  const expired = records.filter((record) => now - Number(record.cachedAt || 0) > ttlMs);
-  for (const record of expired) {
-    await cache.delete(record.url);
-    await deleteTileMeta(record.url);
+  const cutoff = now - days * 24 * 60 * 60 * 1000;
+  const cache = await caches.open(TILE_CACHE_NAME);
+  const metadata = (await listTileMeta()).sort((left, right) => Number(left.lastAccessAt || 0) - Number(right.lastAccessAt || 0));
+  const expired = metadata.filter((item) => Number(item.lastAccessAt || item.cachedAt || 0) < cutoff);
+  for (const item of expired) {
+    await cache.delete(item.url);
+    await deleteTileMeta(item.url);
   }
-
-  const remaining = records
-    .filter((record) => !expired.some((expiredRecord) => expiredRecord.url === record.url))
-    .sort((a, b) => Number(a.lastAccessAt || a.cachedAt || 0) - Number(b.lastAccessAt || b.cachedAt || 0));
-  const excess = Math.max(0, remaining.length - MAX_TILE_ENTRIES);
-  for (const record of remaining.slice(0, excess)) {
-    await cache.delete(record.url);
-    await deleteTileMeta(record.url);
+  const remaining = (await listTileMeta()).sort((left, right) => Number(left.lastAccessAt || 0) - Number(right.lastAccessAt || 0));
+  if (remaining.length > MAX_TILE_ENTRIES) {
+    const overflow = remaining.slice(0, remaining.length - MAX_TILE_ENTRIES);
+    for (const item of overflow) {
+      await cache.delete(item.url);
+      await deleteTileMeta(item.url);
+    }
   }
   return mapCacheStatus();
 }
 
-async function cacheMapTile(request, response) {
-  if (!(response?.ok || response?.type === 'opaque')) return response;
+async function cacheMapTile(request) {
   const cache = await caches.open(TILE_CACHE_NAME);
-  await cache.put(request, response.clone());
-  const now = Date.now();
-  await putTileMeta({ url: request.url, cachedAt: now, lastAccessAt: now });
-  tileWritesSinceCleanup += 1;
-  cleanupMapTileCache().catch(() => {});
-  return response;
-}
-
-async function handleMapTileRequest(request) {
-  const retentionDays = await getTileRetentionDays();
-  if (retentionDays === 0) return fetch(request);
-
-  const cache = await caches.open(TILE_CACHE_NAME);
-  const cached = await cache.match(request);
-  const meta = cached ? await getTileMeta(request.url) : null;
-  const now = Date.now();
-  const ttlMs = retentionDays * 24 * 60 * 60 * 1000;
-  const fresh = cached && meta && now - Number(meta.cachedAt || 0) <= ttlMs;
-
-  if (fresh) {
-    if (now - Number(meta.lastAccessAt || 0) >= TOUCH_INTERVAL_MS) {
-      putTileMeta({ ...meta, lastAccessAt: now }).catch(() => {});
-    }
-    return cached;
-  }
-
   try {
     const response = await fetch(request);
-    return cacheMapTile(request, response);
+    if (!response.ok) throw new Error('Tile network response failed');
+    const clone = response.clone();
+    await cache.put(request, clone);
+    const buffer = await response.clone().arrayBuffer().catch(() => null);
+    const url = new URL(request.url);
+    const source = url.hostname === 'tile.openstreetmap.org' ? 'osm' : 'esri';
+    const now = Date.now();
+    await putTileMeta({
+      url: request.url,
+      source,
+      bytes: buffer?.byteLength || 0,
+      cachedAt: now,
+      lastAccessAt: now,
+    });
+    tileWritesSinceCleanup += 1;
+    cleanupMapTileCache(undefined, false).catch(() => {});
+    return response;
   } catch (error) {
+    const cached = await cache.match(request);
     if (cached) return cached;
     throw error;
   }
 }
 
-function respondToMessage(event, payload) {
-  const port = event.ports?.[0];
-  if (port) port.postMessage(payload);
+async function cachedMapTile(request) {
+  const cache = await caches.open(TILE_CACHE_NAME);
+  const cached = await cache.match(request);
+  if (!cached) return null;
+  const meta = await getTileMeta(request.url);
+  const now = Date.now();
+  if (!meta || now - Number(meta.lastAccessAt || 0) >= TOUCH_INTERVAL_MS) {
+    await putTileMeta({
+      ...(meta || { url: request.url, source: new URL(request.url).hostname === 'tile.openstreetmap.org' ? 'osm' : 'esri', bytes: 0, cachedAt: now }),
+      lastAccessAt: now,
+    });
+  }
+  return cached;
 }
 
 self.addEventListener('install', (event) => {
@@ -311,61 +322,51 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(Promise.all([
-    caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME && key !== TILE_CACHE_NAME).map((key) => caches.delete(key))
-    )),
-    cleanupMapTileCache(null, true).catch(() => null),
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith('wander-travel-') && key !== CACHE_NAME).map((key) => caches.delete(key)))),
+    cleanupMapTileCache(undefined, true),
   ]));
   self.clients.claim();
 });
 
 self.addEventListener('message', (event) => {
   const type = event.data?.type;
-  if (type === 'SKIP_WAITING') {
-    self.skipWaiting();
-    return;
+  if (type === 'wander-map-cache-status') {
+    event.waitUntil(mapCacheStatus().then((status) => event.source?.postMessage?.({ type: 'wander-map-cache-status', status })));
   }
-  if (type === 'WANDER_MAP_CACHE_STATUS') {
-    event.waitUntil(mapCacheStatus().then((status) => respondToMessage(event, status)).catch((error) => respondToMessage(event, { ok: false, error: error.message })));
-    return;
+  if (type === 'wander-map-cache-clear') {
+    event.waitUntil(clearMapTileCache().then((status) => event.source?.postMessage?.({ type: 'wander-map-cache-cleared', status })));
   }
-  if (type === 'WANDER_MAP_CACHE_CONFIG') {
-    event.waitUntil(setTileRetentionDays(event.data?.retentionDays)
-      .then(() => mapCacheStatus())
-      .then((status) => respondToMessage(event, status))
-      .catch((error) => respondToMessage(event, { ok: false, error: error.message })));
-    return;
-  }
-  if (type === 'WANDER_MAP_CACHE_CLEAR') {
-    event.waitUntil(clearMapTileCache().then((status) => respondToMessage(event, status)).catch((error) => respondToMessage(event, { ok: false, error: error.message })));
+  if (type === 'wander-map-cache-retention') {
+    event.waitUntil(setTileRetentionDays(event.data?.retentionDays).then((retentionDays) => event.source?.postMessage?.({ type: 'wander-map-cache-retention', retentionDays })));
   }
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  const url = new URL(event.request.url);
+  const request = event.request;
+  const url = new URL(request.url);
 
+  if (request.method !== 'GET') return;
   if (isMapTileRequest(url)) {
-    event.respondWith(handleMapTileRequest(event.request));
+    event.respondWith((async () => {
+      const cached = await cachedMapTile(request);
+      if (cached) {
+        event.waitUntil(cacheMapTile(request).catch(() => {}));
+        return cached;
+      }
+      return cacheMapTile(request);
+    })());
     return;
   }
 
-  if (url.origin !== self.location.origin) return;
-
-  const preferNetwork = event.request.mode === 'navigate' || /\.(?:js|css)$/.test(url.pathname);
-  if (preferNetwork) {
+  if (url.origin === location.origin) {
     event.respondWith(
-      fetch(new Request(event.request, { cache: 'no-store' }))
+      fetch(request)
         .then((response) => {
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
           return response;
         })
-        .catch(() => caches.match(event.request, { ignoreSearch: true }))
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('./index.html')))
     );
-    return;
   }
-
-  event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then((cached) => cached || fetch(event.request))
-  );
 });
