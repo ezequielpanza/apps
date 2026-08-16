@@ -164,10 +164,20 @@
     });
   }
 
+  function bootstrapContextHud() {
+    if (window.WanderContextHUD || document.querySelector('script[data-wander-context-hud-bootstrap]')) return;
+    const script = document.createElement('script');
+    script.src = './runtime-context-hud.js?v=20260816-01';
+    script.async = true;
+    script.dataset.wanderContextHudBootstrap = 'true';
+    document.head.appendChild(script);
+  }
+
   const trackPoints = renderCurrentTrackImmediately();
   const waypointCount = renderWaypointsImmediately();
   const hasRawCursor = renderRawCursorImmediately();
   const crosshairReady = loadCoreCrosshair();
+  bootstrapContextHud();
 
   window.WanderContext?.subscribe?.((key) => {
     if (typeof key !== 'string') return;
