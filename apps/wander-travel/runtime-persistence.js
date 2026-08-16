@@ -37,6 +37,7 @@
   let lastActiveSessionSyncAt = 0;
   let waypointCache = new Map();
   let lastSessionSnapshot = null;
+  let started = false;
   const deviceId = loadDeviceId();
 
   function clone(value) {
@@ -490,6 +491,9 @@
   }
 
   function start() {
+    if (started) return false;
+    started = true;
+    window.WanderPersistenceStarted = true;
     installListeners();
     publishStatus({ status: navigator.onLine === false ? 'offline' : queue.length ? 'waiting' : 'idle' });
     setTimeout(initialSync, 800);
@@ -497,6 +501,7 @@
       syncSettings();
       scheduleFlush(1000);
     }, 5 * 60 * 1000);
+    return true;
   }
 
   window.WanderPersistence = Object.freeze({
@@ -523,10 +528,5 @@
   else window.addEventListener('wander:logic-ready', start, { once: true });
   // The deferred loader dispatches logic-ready, but keep a non-blocking fallback
   // so persistence never depends on a secondary UI module completing correctly.
-  setTimeout(() => {
-    if (!window.WanderPersistenceStarted) {
-      window.WanderPersistenceStarted = true;
-      start();
-    }
-  }, 5000);
+  setTimeout(start, 5000);
 })();
