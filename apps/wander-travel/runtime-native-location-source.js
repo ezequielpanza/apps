@@ -3,8 +3,9 @@
   if (!capacitor?.isNativePlatform?.()) return;
 
   const RECORDING_KEY = 'wander.recording.profile.v1';
-  const SYNC_BATCH_SIZE = 500;
-  const MAX_SYNC_BATCHES = 20;
+  const SYNC_BATCH_SIZE = 100;
+  const MAX_SYNC_BATCHES = 100;
+  const REPLAY_YIELD_EVERY = 20;
   const PRESETS = Object.freeze({
     precise: Object.freeze({ intervalSec: 1, distanceM: 0 }),
     balanced: Object.freeze({ intervalSec: 5, distanceM: 5 }),
@@ -19,6 +20,7 @@
   let activeOnError = null;
   let syncPromise = null;
   let deliveryChain = Promise.resolve();
+  let pendingSyncScheduled = false;
   const deliveredJournalIds = new Set();
 
   function plugin() {
@@ -113,6 +115,10 @@
     return deliveryChain;
   }
 
+  function yieldToUi() {
+    return new Promise((resolve) => setTimeout(resolve, 16));
+  }
+
   async function syncPending() {
     const nativePlugin = plugin();
     if (!watching || !activeOnPosition || typeof nativePlugin?.getPendingLocations !== 'function') return null;
@@ -129,13 +135,16 @@
         if (!locations.length) break;
 
         const ids = [];
-        for (const location of locations) {
+        for (let index = 0; index < locations.length; index += 1) {
+          const location = locations[index];
           const journalId = Number(location?.journalId) || null;
           await enqueueLocation({ ...location, replayed: true }, false);
           if (journalId) ids.push(journalId);
           syncedCount += 1;
+          if ((index + 1) % REPLAY_YIELD_EVERY === 0) await yieldToUi();
         }
         await acknowledge(ids);
+        await yieldToUi();
         if (locations.length < SYNC_BATCH_SIZE) break;
       }
 
@@ -182,6 +191,28 @@
     });
   }
 
+  function schedulePendingSync(delayMs = 1200) {
+    if (pendingSyncScheduled || !watching) return;
+    const run = () => {
+      if (pendingSyncScheduled || !watching) return;
+      pendingSyncScheduled = true;
+      setTimeout(() => {
+        pendingSyncScheduled = false;
+        if (!watching) return;
+        refreshBackgroundStatus().then(() => syncPending());
+      }, Math.max(0, Number(delayMs) || 0));
+    };
+
+    // Unit-test/non-visual environments have no animation frame. Keep their
+    // historical immediate replay behavior while Android waits for the map core.
+    if (typeof requestAnimationFrame !== 'function') {
+      run();
+      return;
+    }
+    if (window.WanderCoreReady) run();
+    else window.addEventListener('wander:core-ready', run, { once: true });
+  }
+
   window.WanderNativeLocationSource = {
     id: 'android-background-location',
     capabilities: {
@@ -212,9 +243,11 @@
         onError(event?.status || 'unavailable');
       })).then((handle) => { errorListenerHandle = handle; });
 
+      // Start live RAW capture immediately. Historical journal replay is a
+      // background task and must never be part of the visual startup path.
       applyTrackingConfig()
         .then(() => refreshBackgroundStatus())
-        .then(() => syncPending())
+        .then(() => schedulePendingSync())
         .catch(() => { watching = false; });
       return true;
     },
@@ -235,6 +268,7 @@
     isWatching: () => watching,
     syncPending,
     refreshBackgroundStatus,
+    schedulePendingSync,
   };
 
   window.addEventListener('wander:recording-profile-changed', (event) => {
@@ -244,7 +278,7 @@
 
   const syncWhenVisible = () => {
     if (!watching || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return;
-    refreshBackgroundStatus().then(() => syncPending());
+    schedulePendingSync(350);
   };
   document.addEventListener('visibilitychange', syncWhenVisible);
   document.addEventListener('resume', syncWhenVisible);
