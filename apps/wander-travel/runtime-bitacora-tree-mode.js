@@ -4,7 +4,8 @@
   const SORT_KEY = 'wander.travelLog.sortOrder.v1';
   const DEFAULT_SORT = 'desc';
   const MIN_JITTER_RADIUS_M = 40;
-  const MAX_JITTER_RADIUS_M = 70;
+  const MAX_JITTER_RADIUS_M = 100;
+  const SHORT_NOISE_MS = 2 * 60 * 1000;
   let applying = false;
 
   function loadSortOrder() {
@@ -53,16 +54,33 @@
 
   function segmentLooksLikeGpsJitter(segment) {
     if (!segment || segment.type !== 'movement') return false;
-    const points = (Array.isArray(segment.points) ? segment.points : []).filter((point) => finite(point?.lat) !== null && finite(point?.lng) !== null);
-    if (points.length < 2) return false;
-    const accuracy = median(points.map((point) => finite(point.accuracy)).filter((value) => value !== null && value > 0 && value <= 150));
-    const allowedRadius = Math.max(MIN_JITTER_RADIUS_M, Math.min(MAX_JITTER_RADIUS_M, accuracy * 2));
+    const startedAt = Number(segment.startedAt || 0);
+    const endedAt = Number(segment.endedAt || Date.now());
+    const durationMs = Math.max(0, endedAt - startedAt);
+    const recordedDistance = Math.max(0, Number(segment.distanceM || 0));
+    const points = (Array.isArray(segment.points) ? segment.points : [])
+      .filter((point) => finite(point?.lat) !== null && finite(point?.lng) !== null);
+
+    if (points.length <= 1) return durationMs <= SHORT_NOISE_MS && recordedDistance <= 80;
+
+    const accuracies = points
+      .map((point) => finite(point.accuracy))
+      .filter((value) => value !== null && value > 0 && value <= 180);
+    const accuracy = median(accuracies);
+    const allowedRadius = Math.max(MIN_JITTER_RADIUS_M, Math.min(MAX_JITTER_RADIUS_M, accuracy * 2.25));
     const center = points.reduce((sum, point) => ({ lat: sum.lat + Number(point.lat), lng: sum.lng + Number(point.lng) }), { lat: 0, lng: 0 });
     center.lat /= points.length;
     center.lng /= points.length;
     const maxRadius = points.reduce((max, point) => Math.max(max, distanceMeters(center, point)), 0);
     const netDisplacement = distanceMeters(points[0], points[points.length - 1]);
-    return maxRadius <= allowedRadius && netDisplacement <= allowedRadius;
+    const firstAccuracy = Math.max(0, finite(points[0]?.accuracy) || accuracy);
+    const lastAccuracy = Math.max(0, finite(points[points.length - 1]?.accuracy) || accuracy);
+    const effectiveNet = Math.max(0, netDisplacement - 0.7 * (firstAccuracy + lastAccuracy));
+    const strongSpeedSamples = points.filter((point) => (finite(point.speedKmh) || 0) >= 5).length;
+
+    if (strongSpeedSamples >= 2 && (recordedDistance >= 50 || effectiveNet >= 35)) return false;
+    if (durationMs <= SHORT_NOISE_MS && effectiveNet <= 20 && maxRadius <= allowedRadius) return true;
+    return strongSpeedSamples === 0 && netDisplacement <= allowedRadius && maxRadius <= allowedRadius && recordedDistance <= allowedRadius * 1.5;
   }
 
   function jitterSegmentIds() {
@@ -87,11 +105,35 @@
     return key.startsWith(marker) ? key.slice(marker.length) : null;
   }
 
+  function parseDistanceM(text) {
+    const value = String(text || '').replace(',', '.');
+    const km = value.match(/(\d+(?:\.\d+)?)\s*km\b/i);
+    if (km) return Number(km[1]) * 1000;
+    const m = value.match(/(\d+(?:\.\d+)?)\s*m\b/i);
+    return m ? Number(m[1]) : null;
+  }
+
+  function markupLooksLikeNoise(episode) {
+    const meta = String(episode?.querySelector('.utl-episode-heading > span')?.textContent || '');
+    const short = /<\s*1\s*min|\b1\s*min\b/i.test(meta);
+    const tracks = [...(episode?.querySelectorAll('.utl-track') || [])];
+    if (!tracks.length) return false;
+    const distances = tracks.map((track) => parseDistanceM(track.querySelector('small')?.textContent)).filter(Number.isFinite);
+    const pointCounts = tracks.map((track) => {
+      const match = String(track.querySelector('small')?.textContent || '').match(/(\d+)\s+puntos?/i);
+      return match ? Number(match[1]) : null;
+    }).filter(Number.isFinite);
+    const tinyDistance = distances.length && Math.max(...distances) <= 40;
+    const tinyPoints = pointCounts.length && Math.max(...pointCounts) <= 2;
+    return short && (tinyDistance || tinyPoints);
+  }
+
   function hideJitterEpisodes(content) {
     const jitter = jitterSegmentIds();
     content.querySelectorAll('details.utl-episode').forEach((episode) => {
       const movementId = keyId(episode, 'movement');
-      const hidden = Boolean(movementId && jitter.has(movementId));
+      const hidden = Boolean(movementId && jitter.has(movementId)) ||
+        (episode.dataset.episodeKind === 'movement' && markupLooksLikeNoise(episode));
       episode.hidden = hidden;
       episode.dataset.gpsJitter = hidden ? 'true' : 'false';
     });
@@ -117,9 +159,11 @@
     const toHost = to.querySelector('.utl-elements');
     if (!fromHost || !toHost) return;
     [...fromHost.children].forEach((node) => toHost.appendChild(node));
-    const count = toHost.querySelectorAll('.utl-item').length;
-    const badge = to.querySelector(':scope > summary > small');
-    if (badge) badge.textContent = `${count} elemento${count === 1 ? '' : 's'}`;
+  }
+
+  function clock24(at) {
+    const date = new Date(Number(at || Date.now()));
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   }
 
   function mergeDuplicateStays(content) {
@@ -136,11 +180,9 @@
           if (meta && previousStay && currentStay) {
             const start = Math.min(Number(previousStay.startedAt || Date.now()), Number(currentStay.startedAt || Date.now()));
             const end = Math.max(Number(previousStay.endedAt || Date.now()), Number(currentStay.endedAt || Date.now()));
-            const startLabel = new Date(start).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-            const endLabel = new Date(end).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
             const minutes = Math.max(0, Math.round((end - start) / 60000));
-            const duration = minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
-            meta.textContent = `${startLabel}–${endLabel} · ${duration}`;
+            const duration = minutes < 1 ? '< 1 min' : minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+            meta.textContent = `${clock24(start)}–${currentStay.endedAt ? clock24(end) : 'Ahora'} · ${duration}`;
           }
           episode.hidden = true;
           episode.dataset.mergedStay = 'true';
@@ -148,6 +190,93 @@
         }
         previousVisible = episode;
       });
+    });
+  }
+
+  function humanize(text) {
+    return String(text || '')
+      .replace(/\bstationary\b/gi, 'detenido')
+      .replace(/\bwalking\b/gi, 'caminando')
+      .replace(/\bdriving\b/gi, 'en vehículo')
+      .replace(/\bsailing\b/gi, 'navegando')
+      .replace(/\bunknown\b/gi, 'sin determinar');
+  }
+
+  function hideTechnicalItems(content) {
+    content.querySelectorAll('.utl-track').forEach((item) => {
+      item.hidden = true;
+      item.dataset.technicalTrack = 'true';
+    });
+
+    const internalTitles = new Set(['en movimiento', 'permanencia', 'forma de desplazamiento']);
+    content.querySelectorAll('.utl-event').forEach((item) => {
+      const title = String(item.querySelector('.utl-item-copy strong')?.textContent || '').trim().toLocaleLowerCase('es');
+      if (internalTitles.has(title)) {
+        item.hidden = true;
+        item.dataset.internalContext = 'true';
+        return;
+      }
+      const summary = item.querySelector('.utl-item-copy p');
+      if (summary) summary.textContent = humanize(summary.textContent);
+    });
+  }
+
+  function cleanPoiOscillation(content) {
+    content.querySelectorAll('details.utl-episode').forEach((episode) => {
+      if (!keyId(episode, 'stay') || episode.hidden) return;
+      const heading = String(episode.querySelector('.utl-episode-heading strong')?.textContent || '').replace(/^En\s+/i, '').trim();
+      const arrivals = [...episode.querySelectorAll('.utl-event')].filter((item) => {
+        const title = String(item.querySelector('.utl-item-copy strong')?.textContent || '').trim().toLocaleLowerCase('es');
+        return title === 'llegada' && !item.hidden;
+      });
+      if (arrivals.length > 1) {
+        const matching = arrivals.filter((item) => {
+          const text = `${item.querySelector('.utl-item-copy p')?.textContent || ''} ${item.querySelector('.utl-item-copy small')?.textContent || ''}`;
+          return heading && text.toLocaleLowerCase('es').includes(heading.toLocaleLowerCase('es'));
+        });
+        const keep = matching[matching.length - 1] || arrivals[arrivals.length - 1];
+        arrivals.forEach((item) => {
+          if (item !== keep) {
+            item.hidden = true;
+            item.dataset.poiOscillation = 'true';
+          }
+        });
+      }
+      episode.querySelectorAll('.utl-event').forEach((item) => {
+        const title = String(item.querySelector('.utl-item-copy strong')?.textContent || '').trim().toLocaleLowerCase('es');
+        if (title === 'salida' && !item.hidden) {
+          item.hidden = true;
+          item.dataset.poiOscillation = 'true';
+        }
+      });
+    });
+  }
+
+  function normalizeClockText(text) {
+    return String(text || '').replace(/(\d{1,2}):(\d{2})\s*(a\.?\s*m\.?|p\.?\s*m\.?)/gi, (_all, hourRaw, minute, periodRaw) => {
+      let hour = Number(hourRaw) % 12;
+      const period = periodRaw.toLocaleLowerCase('es').replace(/[.\s]/g, '');
+      if (period === 'pm') hour += 12;
+      return `${String(hour).padStart(2, '0')}:${minute}`;
+    });
+  }
+
+  function normalizeClockLabels(content) {
+    content.querySelectorAll('.utl-time, .utl-episode-heading > span').forEach((node) => {
+      node.textContent = normalizeClockText(node.textContent);
+      node.style.whiteSpace = 'nowrap';
+    });
+  }
+
+  function refreshEpisodeBadges(content) {
+    content.querySelectorAll('details.utl-episode').forEach((episode) => {
+      const count = [...episode.querySelectorAll(':scope > .utl-elements > .utl-item')].filter((item) => !item.hidden).length;
+      const badge = episode.querySelector(':scope > summary > small');
+      if (!badge) return;
+      badge.hidden = count === 0;
+      if (count > 0) badge.textContent = `${count} elemento${count === 1 ? '' : 's'}`;
+      const host = episode.querySelector(':scope > .utl-elements');
+      if (host) host.hidden = count === 0;
     });
   }
 
@@ -204,8 +333,12 @@
     if (!screen || !content || !content.querySelector('.utl-tree')) return false;
     applying = true;
     try {
+      normalizeClockLabels(content);
       hideJitterEpisodes(content);
       mergeDuplicateStays(content);
+      hideTechnicalItems(content);
+      cleanPoiOscillation(content);
+      refreshEpisodeBadges(content);
       const order = loadSortOrder();
       sortTree(content, order);
       updateDayCounts(content);
@@ -217,8 +350,6 @@
     }
   }
 
-  // UnifiedTravelLog remains the single Bitácora renderer. This layer only
-  // reconciles GPS jitter for presentation and applies the user's sort order.
   function mount() {
     const screen = document.querySelector('[data-app-screen="travel-log"]');
     const content = screen?.querySelector('#travel-log-content');
@@ -244,6 +375,11 @@
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
-  window.WanderBitacoraTreeMode = Object.freeze({ mount, applyView, segmentLooksLikeGpsJitter, getSortOrder: loadSortOrder });
+  window.WanderBitacoraTreeMode = Object.freeze({
+    mount,
+    applyView,
+    segmentLooksLikeGpsJitter,
+    getSortOrder: loadSortOrder,
+  });
   setTimeout(mount, 500);
 })();
