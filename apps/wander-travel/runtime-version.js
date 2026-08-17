@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = 'v0.109.29';
+  const VERSION = 'v0.109.30';
   const globalScope = typeof window !== 'undefined' ? window : self;
   globalScope.WanderVersion = VERSION;
   globalScope.WanderWebVersion = VERSION;
@@ -104,12 +104,17 @@
   window.WanderContext?.set?.('context.modularHud', true, metadata);
   window.WanderContext?.set?.('context.hudEditable', true, metadata);
   window.WanderContext?.set?.('context.hudSeparateOrientations', true, metadata);
-  window.WanderContext?.set?.('persistence.provider', 'google-apps-script', metadata);
+  window.WanderContext?.set?.('persistence.provider', 'google-drive-oauth', metadata);
   window.WanderContext?.set?.('persistence.offlineFirst', true, metadata);
   window.WanderContext?.set?.('persistence.googleSheetsIndex', true, metadata);
   window.WanderContext?.set?.('persistence.rawGpxDrive', true, metadata);
-  window.WanderContext?.set?.('persistence.appsScriptBridge', true, metadata);
-  window.WanderContext?.set?.('persistence.appsScriptAutoDiscovery', true, metadata);
+  window.WanderContext?.set?.('persistence.googleDriveOAuth', true, metadata);
+  window.WanderContext?.set?.('persistence.googleDriveScope', 'drive.file', metadata);
+  window.WanderContext?.set?.('persistence.userSelectedStorage', true, metadata);
+  window.WanderContext?.set?.('persistence.reuseExistingStorage', true, metadata);
+  window.WanderContext?.set?.('persistence.schemaSafeRepair', true, metadata);
+  window.WanderContext?.set?.('persistence.appsScriptBridge', false, metadata);
+  window.WanderContext?.set?.('persistence.appsScriptAutoDiscovery', false, metadata);
   window.WanderContext?.set?.('currentPOI.switchHysteresis', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeControl', true, metadata);
   window.WanderContext?.set?.('companion.wanderModeDefaultActive', false, metadata);

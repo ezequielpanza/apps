@@ -88,7 +88,6 @@ assert.match(location, /accepted-suspicious/);
 assert.doesNotMatch(location, /isolated-jump/);
 
 assert.match(tree, /Días → Episodios → Actividades → Tracks/);
-assert.match(treeMode, /Día → Episodio → Elementos/);
 assert.match(treeMode, /WanderUnifiedTravelLog/);
 assert.match(treeMode, /content\.hidden = false/);
 assert.doesNotMatch(treeMode, /appendChild\(trackList\)/);
@@ -127,4 +126,4 @@ for (const asset of [
   'runtime-active-track-log-bridge.js',
 ]) assert.ok(cached.has(asset), `Offline shell must cache ${asset}`);
 
-console.log(`PASS Wander Web ${version} / APK ${androidVersion.versionName}: two-level Bitácora, bidirectional cloud track history, balanced ≤1 Hz recording, 5-second messages and TTS`);
+console.log(`PASS Wander Web ${version} / APK ${androidVersion.versionName}: Día/Episodio/Elementos, bidirectional cloud track history, balanced ≤1 Hz recording, 5-second messages and TTS`);

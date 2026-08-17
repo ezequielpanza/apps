@@ -99,20 +99,20 @@ result = inference.inferSituation(context);
 assert.equal(result.motion.status, 'stationary', 'accelerometer activity alone must not open a movement track');
 
 currentResult = baseResult('moving', {
-  adjustedDisplacementM: 20,
-  displacementM: 30,
-  derivedSpeedKmh: 4,
-  segmentMedianSpeedKmh: 3.5,
+  adjustedDisplacementM: 40,
+  displacementM: 55,
+  derivedSpeedKmh: 9,
+  segmentMedianSpeedKmh: 9,
   segmentCount: 3,
-  providerSpeedKmh: 4,
-  rawSpeedMedianKmh: 3,
-  stationaryWindowSpreadM: 25,
+  providerSpeedKmh: 8,
+  rawSpeedMedianKmh: 6,
+  stationaryWindowSpreadM: 35,
 });
 result = inference.inferSituation(context);
 assert.equal(result.motion.status, 'stationary', 'movement requires sustained confirmation');
-NOW += 6100;
+NOW += 10100;
 values.set('motion.sensor.summary', sensorSummary(true));
 result = inference.inferSituation(context);
-assert.equal(result.motion.status, 'moving', 'corroborated movement becomes active after hysteresis');
+assert.equal(result.motion.status, 'moving', 'strong corroborated movement becomes active after the 10-second hysteresis');
 
 console.log('PASS startup and accelerometer noise cannot create movement without sustained positional corroboration');

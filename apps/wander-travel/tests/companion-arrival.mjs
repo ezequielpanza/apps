@@ -115,7 +115,12 @@ const at = clockNow;
       };
     },
   };
-  const context = { set() {} };
+  const context = {
+    set() {},
+    value(key, fallback = null) {
+      return key === 'companion.wanderModeActive' ? true : fallback;
+    },
+  };
   const ui = { showWander(title, message, options) { shown.push({ title, message, options }); return true; } };
   const sandbox = {
     window: {
