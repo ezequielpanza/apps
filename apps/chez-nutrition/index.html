@@ -33,7 +33,11 @@
     </header>
 
     <section id="statusBar" class="status hidden"></section>
-    <section id="peopleGrid" class="people-grid"></section>
+    <section class="people-carousel" aria-label="Resumen por persona">
+      <button id="previousPersonBtn" class="person-nav" type="button" aria-label="Ver persona anterior">‹</button>
+      <section id="peopleGrid" class="people-grid"></section>
+      <button id="nextPersonBtn" class="person-nav" type="button" aria-label="Ver persona siguiente">›</button>
+    </section>
 
     <section class="charts-grid">
       <article class="panel chart-card">
