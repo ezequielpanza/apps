@@ -176,16 +176,32 @@
   function bootstrapPersistence() {
     if (window.WanderPersistence || document.querySelector('script[data-wander-persistence-bootstrap]')) return;
     const configScript = document.createElement('script');
-    configScript.src = './runtime-persistence-config.js?v=20260816-01';
+    configScript.src = './runtime-persistence-config.js?v=20260816-02';
     configScript.async = false;
     configScript.dataset.wanderPersistenceBootstrap = 'true';
     configScript.addEventListener('load', () => {
-      if (window.WanderPersistence || document.querySelector('script[data-wander-persistence-runtime]')) return;
-      const runtime = document.createElement('script');
-      runtime.src = './runtime-persistence.js?v=20260816-01';
-      runtime.async = true;
-      runtime.dataset.wanderPersistenceRuntime = 'true';
-      document.head.appendChild(runtime);
+      const storageScript = document.createElement('script');
+      storageScript.src = './runtime-google-drive-storage.js?v=20260816-01';
+      storageScript.async = false;
+      storageScript.dataset.wanderGoogleDriveStorage = 'true';
+      storageScript.addEventListener('load', () => {
+        if (!window.WanderPersistence && !document.querySelector('script[data-wander-persistence-runtime]')) {
+          const runtime = document.createElement('script');
+          runtime.src = './runtime-persistence.js?v=20260816-02';
+          runtime.async = true;
+          runtime.dataset.wanderPersistenceRuntime = 'true';
+          runtime.addEventListener('load', () => {
+            if (document.querySelector('script[data-wander-google-drive-settings]')) return;
+            const settings = document.createElement('script');
+            settings.src = './runtime-google-drive-settings.js?v=20260816-01';
+            settings.async = true;
+            settings.dataset.wanderGoogleDriveSettings = 'true';
+            document.head.appendChild(settings);
+          }, { once: true });
+          document.head.appendChild(runtime);
+        }
+      }, { once: true });
+      document.head.appendChild(storageScript);
     }, { once: true });
     document.head.appendChild(configScript);
   }
