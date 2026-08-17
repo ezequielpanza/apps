@@ -51,6 +51,8 @@ const onlineEnhancements = new Set([
   'runtime-track-cloud-sync.js',
   'runtime-persistence-config.js',
   'runtime-persistence.js',
+  'runtime-google-drive-storage.js',
+  'runtime-google-drive-settings.js',
 ]);
 
 for (const reference of loaded) {
@@ -85,6 +87,8 @@ const directionSettings = read('runtime-direction-indicator-settings.js');
 const ui = read('runtime-ui.js');
 const mainActivity = read('android/app/src/main/java/app/wandertravel/mobile/MainActivity.java');
 const ttsPlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderTTSPlugin.java');
+const googleDrivePlugin = read('android/app/src/main/java/app/wandertravel/mobile/WanderGoogleDrivePlugin.java');
+const googleDriveStorage = read('runtime-google-drive-storage.js');
 const mobileBuild = read('mobile/build-web.mjs');
 
 assert.match(contextInit, /wanderRecordingGateInstalled/);
@@ -128,14 +132,23 @@ assert.match(directionSettings, /wander-tts-map-action/);
 assert.match(directionSettings, /wrap\.prepend\(button\)/);
 assert.match(directionSettings, /wander:interaction-change/);
 assert.match(mainActivity, /registerPlugin\(WanderTTSPlugin\.class\)/);
+assert.match(mainActivity, /registerPlugin\(WanderGoogleDrivePlugin\.class\)/);
 assert.match(ttsPlugin, /@CapacitorPlugin\(name = "WanderTTS"\)/);
 assert.match(ttsPlugin, /TextToSpeech/);
 assert.match(ttsPlugin, /public void speak\(PluginCall call\)/);
 assert.match(ttsPlugin, /public void stop\(PluginCall call\)/);
+assert.match(googleDrivePlugin, /Scopes\.DRIVE_FILE/);
+assert.doesNotMatch(googleDrivePlugin, /Scopes\.DRIVE\b/);
+assert.match(googleDriveStorage, /provider: 'google-drive-oauth'/);
+assert.match(googleDriveStorage, /APP_ROOT_NAME = 'Wander'/);
+assert.match(googleDriveStorage, /DATA_FOLDER_NAME = 'Data'/);
+assert.match(googleDriveStorage, /TRACKS_FOLDER_NAME = 'Tracks'/);
 
 assert.match(mapRuntime, /runtime-map-crosshair\.js/);
 assert.match(mapRuntime, /runtime-context-hud\.js/);
 assert.match(mapRuntime, /runtime-persistence-config\.js/);
+assert.match(mapRuntime, /runtime-google-drive-storage\.js/);
+assert.match(mapRuntime, /runtime-google-drive-settings\.js/);
 assert.match(mapRuntime, /runtime-persistence\.js/);
 assert.match(contextHud, /portrait/);
 assert.match(contextHud, /landscape/);
@@ -152,4 +165,4 @@ for (const retiredPath of ['imports/wander', 'imports/wander-clean', 'imports/wa
   assert.equal(hasFiles, false, `Retired Wander staging path is not empty: ${retiredPath}`);
 }
 
-console.log(`PASS Wander Web ${webVersion} / APK ${androidVersion.versionName}: balanced recording, core overlays, modular HUD, cloud track history, 5-second messages and TTS`);
+console.log(`PASS Wander Web ${webVersion} / APK ${androidVersion.versionName}: balanced recording, core overlays, modular HUD, scoped Google Drive storage, cloud track history, 5-second messages and TTS`);
