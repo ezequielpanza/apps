@@ -22,8 +22,10 @@ assert.doesNotMatch(app, /await loadCloudBackup\(\)/);
 assert.match(app, /loadDirectionIndicator\(\),\s*loadMapCrosshair\(\),\s*loadTravelMemory\(\)/s);
 
 assert.match(crosshair, /return position\.isFollowingPosition\?\.\(\) !== true/);
-assert.match(crosshair, /const bearingDeg = bearingTo\(here, target\)/);
-assert.match(crosshair, /const distanceM = map\.distance\(here, target\)/);
+assert.match(crosshair, /getRememberedPosition\?\.\(\)/);
+assert.match(crosshair, /const bearingDeg = here \? bearingTo\(here, target\) : null/);
+assert.match(crosshair, /const distanceM = here \? map\.distance\(here, target\) : null/);
+assert.match(crosshair, /bearingElement\.textContent = Number\.isFinite\(bearingDeg\)/);
 assert.match(crosshair, /map-point-marker/);
 
 assert.match(travelLog, /movementItemsForDay/);
@@ -36,4 +38,4 @@ assert.doesNotMatch(travelLog, /open\?\.\('routes'\)/);
 assert.match(mapCore, /result\.fallback === true/);
 assert.match(mapCore, /context\.drawImage\(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 256, 256\)/);
 
-console.log('PASS local-first modules parse and expose integrated travel timeline, crosshair metrics, and offline zoom fallback');
+console.log('PASS local-first modules parse and expose integrated travel timeline, startup-safe crosshair metrics, and offline zoom fallback');
