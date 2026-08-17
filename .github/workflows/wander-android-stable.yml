@@ -66,6 +66,15 @@ jobs:
               -validity 10000
           fi
 
+      - name: Show stable OAuth signing fingerprint
+        shell: bash
+        run: |
+          keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android | grep -E 'SHA1:|SHA-1:'
+
       - name: Save stable Wander signing key
         if: steps.signing-key.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
