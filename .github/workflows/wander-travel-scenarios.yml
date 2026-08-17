@@ -67,6 +67,9 @@ jobs:
       - name: Run local-first UI integration tests
         run: node apps/wander-travel/tests/local-first-ui.mjs
 
+      - name: Run scoped Google Drive storage tests
+        run: node apps/wander-travel/tests/google-drive-storage.mjs
+
       - name: Run cloud backup API tests
         run: node apps/wander-travel/tests/cloud-backup-api.mjs
 
