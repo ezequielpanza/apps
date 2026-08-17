@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WanderNotificationPlugin.class);
         registerPlugin(WanderOfflineTilePlugin.class);
         registerPlugin(WanderCloudIdentityPlugin.class);
+        registerPlugin(WanderGoogleDrivePlugin.class);
         registerPlugin(WanderTTSPlugin.class);
         super.onCreate(savedInstanceState);
         WanderNotificationPlugin.captureOpenIntent(getIntent());
@@ -54,5 +55,11 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         WanderNotificationPlugin.captureOpenIntent(intent);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (WanderGoogleDrivePlugin.handleActivityResult(requestCode, resultCode, data)) return;
+        super.onActivityResult(requestCode, resultCode, data);
     }
 }
