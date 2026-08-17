@@ -26,9 +26,12 @@ import java.util.List;
 public class WanderGoogleDrivePlugin extends Plugin {
     private static final int PICK_STORAGE_REQUEST_CODE = 41936;
     private static final List<Scope> DRIVE_FILE_SCOPES = Collections.singletonList(new Scope(Scopes.DRIVE_FILE));
+    private static final String FOLDER_MIME = "application/vnd.google-apps.folder";
+    private static final String SHEET_MIME = "application/vnd.google-apps.spreadsheet";
 
     private static WanderGoogleDrivePlugin activeInstance;
     private PluginCall pendingPickerCall;
+    private boolean pendingPickerRequiresSelection;
 
     @Override
     public void load() {
@@ -39,30 +42,36 @@ public class WanderGoogleDrivePlugin extends Plugin {
         return Identity.getAuthorizationClient(getActivity());
     }
 
-    private AuthorizationRequest driveFileRequest(boolean picker) {
+    private AuthorizationRequest tokenRequest() {
+        return AuthorizationRequest.builder()
+            .setRequestedScopes(DRIVE_FILE_SCOPES)
+            .setOptOutIncludingGrantedScopes(true)
+            .build();
+    }
+
+    private AuthorizationRequest pickerRequest(boolean multiple, String mimeTypes, String fileIds) {
         AuthorizationRequest.Builder builder = AuthorizationRequest.builder()
             .setRequestedScopes(DRIVE_FILE_SCOPES)
-            .setOptOutIncludingGrantedScopes(true);
-
-        if (picker) {
-            builder
-                .setPrompt(AuthorizationRequest.Prompt.CONSENT | AuthorizationRequest.Prompt.SELECT_ACCOUNT)
-                .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_OAUTH_TRIGGER, "true")
-                .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_ALLOW_FOLDER_SELECTION, "true")
-                .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_ALLOW_MULTIPLE, "false")
-                .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_MIMETYPES, "application/vnd.google-apps.folder");
+            .setOptOutIncludingGrantedScopes(true)
+            .setPrompt(AuthorizationRequest.Prompt.CONSENT | AuthorizationRequest.Prompt.SELECT_ACCOUNT)
+            .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_OAUTH_TRIGGER, "true")
+            .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_ALLOW_FOLDER_SELECTION, "true")
+            .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_ALLOW_MULTIPLE, multiple ? "true" : "false");
+        if (mimeTypes != null && !mimeTypes.trim().isEmpty()) {
+            builder.addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_MIMETYPES, mimeTypes.trim());
+        }
+        if (fileIds != null && !fileIds.trim().isEmpty()) {
+            builder.addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_FILE_IDS, fileIds.trim());
         }
         return builder.build();
     }
 
-    @PluginMethod
-    public void pickStorageFolder(PluginCall call) {
+    private void launchPicker(PluginCall call, AuthorizationRequest request, boolean requireSelection) {
         if (pendingPickerCall != null) {
-            call.reject("A Google Drive folder selection is already in progress.", "PICKER_BUSY");
+            call.reject("A Google Drive selection is already in progress.", "PICKER_BUSY");
             return;
         }
-
-        authorizationClient().authorize(driveFileRequest(true))
+        authorizationClient().authorize(request)
             .addOnSuccessListener(result -> {
                 if (result.hasResolution()) {
                     PendingIntent pendingIntent = result.getPendingIntent();
@@ -71,6 +80,7 @@ public class WanderGoogleDrivePlugin extends Plugin {
                         return;
                     }
                     pendingPickerCall = call;
+                    pendingPickerRequiresSelection = requireSelection;
                     try {
                         getActivity().startIntentSenderForResult(
                             pendingIntent.getIntentSender(),
@@ -82,11 +92,12 @@ public class WanderGoogleDrivePlugin extends Plugin {
                         );
                     } catch (Exception error) {
                         pendingPickerCall = null;
-                        call.reject("Could not open the Google Drive folder picker.", "PICKER_OPEN_FAILED", error);
+                        pendingPickerRequiresSelection = false;
+                        call.reject("Could not open the Google Drive picker.", "PICKER_OPEN_FAILED", error);
                     }
                     return;
                 }
-                resolveAuthorization(call, result, true);
+                resolveAuthorization(call, result, requireSelection);
             })
             .addOnFailureListener(error -> call.reject(
                 "Google Drive authorization failed.",
@@ -96,8 +107,19 @@ public class WanderGoogleDrivePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void pickStorageFolder(PluginCall call) {
+        launchPicker(call, pickerRequest(false, FOLDER_MIME, null), true);
+    }
+
+    @PluginMethod
+    public void pickExistingStorageItems(PluginCall call) {
+        String fileIds = call.getString("fileIds", "");
+        launchPicker(call, pickerRequest(true, FOLDER_MIME + "," + SHEET_MIME, fileIds), true);
+    }
+
+    @PluginMethod
     public void getAccessToken(PluginCall call) {
-        authorizationClient().authorize(driveFileRequest(false))
+        authorizationClient().authorize(tokenRequest())
             .addOnSuccessListener(result -> {
                 if (result.hasResolution()) {
                     call.reject("Google Drive authorization requires user interaction.", "AUTH_REQUIRED");
@@ -130,7 +152,7 @@ public class WanderGoogleDrivePlugin extends Plugin {
             ));
     }
 
-    private void resolveAuthorization(PluginCall call, AuthorizationResult result, boolean requireFolder) {
+    private void resolveAuthorization(PluginCall call, AuthorizationResult result, boolean requireSelection) {
         String accessToken = result.getAccessToken();
         if (accessToken == null || accessToken.trim().isEmpty()) {
             call.reject("Google authorization returned no access token.", "TOKEN_UNAVAILABLE");
@@ -152,11 +174,10 @@ public class WanderGoogleDrivePlugin extends Plugin {
         Bundle params = result.getTokenResponseParams();
         String pickedIds = params == null ? null : params.getString("picked_file_ids");
         if (pickedIds != null && !pickedIds.trim().isEmpty()) {
-            String firstId = pickedIds.split(",")[0].trim();
             payload.put("pickedFileIds", pickedIds);
-            payload.put("folderId", firstId);
-        } else if (requireFolder) {
-            call.reject("No Google Drive folder was selected.", "FOLDER_NOT_SELECTED");
+            payload.put("folderId", pickedIds.split(",")[0].trim());
+        } else if (requireSelection) {
+            call.reject("No Google Drive item was selected.", "ITEM_NOT_SELECTED");
             return;
         }
 
@@ -171,7 +192,9 @@ public class WanderGoogleDrivePlugin extends Plugin {
 
     private void onPickerActivityResult(int resultCode, Intent data) {
         PluginCall call = pendingPickerCall;
+        boolean requireSelection = pendingPickerRequiresSelection;
         pendingPickerCall = null;
+        pendingPickerRequiresSelection = false;
         if (call == null) return;
 
         if (resultCode != Activity.RESULT_OK || data == null) {
@@ -183,7 +206,7 @@ public class WanderGoogleDrivePlugin extends Plugin {
 
         try {
             AuthorizationResult authorizationResult = authorizationClient().getAuthorizationResultFromIntent(data);
-            resolveAuthorization(call, authorizationResult, true);
+            resolveAuthorization(call, authorizationResult, requireSelection);
         } catch (Exception error) {
             call.reject("Could not read the Google Drive picker result.", "PICKER_RESULT_FAILED", error);
         }
