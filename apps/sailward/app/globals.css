@@ -2133,6 +2133,11 @@ input[type="range"]::-moz-range-thumb {
 .tools-inventory section:not(.inventory-personal) > b { display:none; }
 .tools-inventory section:not(.inventory-personal) > div, .tools-inventory section:not(.inventory-personal).is-open > div { display:grid !important; margin:0; padding:0; border:0; gap:3px; }
 .tools-inventory section:not(.inventory-personal) > div > button::before { display:none; }
+.tools-inventory .inventory-tool-entry { display:flex !important; align-items:center; gap:7px; min-height:24px; color:rgba(244,240,229,.72); font-size:10px; }
+.tools-inventory .inventory-tool-check { display:grid; flex:0 0 17px; width:17px; height:17px; place-items:center; padding:0; border:1px solid rgba(244,240,229,.28); border-radius:4px; color:transparent; background:rgba(255,255,255,.03); cursor:pointer; transition:background .15s ease,border-color .15s ease,color .15s ease; }
+.tools-inventory .inventory-tool-check:hover { border-color:var(--teal); background:rgba(78,211,202,.12); }
+.tools-inventory .inventory-tool-entry.is-active .inventory-tool-check { border-color:var(--teal); color:#05232b; background:var(--teal); }
+.tools-inventory .inventory-tool-check span { font-size:12px; font-weight:900; line-height:1; }
 .map-tools { display:none; }
 .map-layer-settings { display:grid; gap:7px; margin:0 0 16px; padding:12px; border:1px solid rgba(244,240,229,.12); border-radius:10px; background:rgba(4,25,33,.36); }.map-layer-settings > span { color:var(--brass); font-size:8px; font-weight:900; letter-spacing:.13em; }.map-layer-settings > strong { color:var(--paper-bright); font-size:12px; }.map-layer-settings > small { color:rgba(244,240,229,.52); font-size:9px; }.map-layer-settings button { padding:8px 9px; border:1px solid rgba(244,240,229,.16); border-radius:7px; color:rgba(244,240,229,.64); background:rgba(255,255,255,.04); font-size:9px; font-weight:800; letter-spacing:.05em; cursor:pointer; text-align:left; }.map-layer-settings button.is-active { border-color:rgba(78,211,202,.56); color:var(--teal); background:rgba(78,211,202,.1); }
 .tools-inventory { scrollbar-width: thin; scrollbar-color: rgba(232,196,118,.72) rgba(255,255,255,.05); }
