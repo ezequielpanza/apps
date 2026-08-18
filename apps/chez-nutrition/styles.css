@@ -10,3 +10,5 @@
 .weekly-allowance{margin-top:7px;padding-top:7px;border-top:1px solid #d5ebe7;color:#0f766e;font-size:11px;font-weight:800;line-height:1.25}.weekly-allowance.is-over{border-color:#fecaca;color:#b91c1c}@media(max-width:460px){.people-grid .weekly-allowance{margin-top:5px;padding-top:5px;font-size:9px}}
 
 .weekly-average-value small{font-size:11px;font-weight:800;letter-spacing:0;white-space:nowrap}@media(max-width:460px){.people-grid .weekly-average-value small{font-size:9px}}
+
+.weekly-grid-single{grid-template-columns:1fr}
