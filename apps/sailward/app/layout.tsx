@@ -17,6 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
     description:
       "Navegá el mundo real en un velero persistente, impulsado por el viento y el reloj reales.",
     applicationName: "Sailward",
+    manifest: "/manifest.webmanifest",
+    themeColor: "#061c24",
     openGraph: {
       title: "Sailward · Real-time sailing",
       description:

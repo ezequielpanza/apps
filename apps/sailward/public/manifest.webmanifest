@@ -1,0 +1,11 @@
+{
+  "name": "Sailward · Real-time sailing",
+  "short_name": "Sailward",
+  "description": "Simulador de navegación a vela en tiempo real.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#061c24",
+  "theme_color": "#061c24",
+  "lang": "es",
+  "icons": [{ "src": "/sailboat-hull.png", "sizes": "300x300", "type": "image/png", "purpose": "any maskable" }]
+}
