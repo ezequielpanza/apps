@@ -1,4 +1,4 @@
-const CACHE = "sailward-shell-v0.4.9";
+const CACHE = "sailward-shell-v0.4.10";
 const SHELL = ["/", "/manifest.webmanifest", "/sailboat-hull.png"];
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));

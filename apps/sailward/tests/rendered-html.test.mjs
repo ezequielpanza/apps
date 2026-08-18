@@ -48,7 +48,7 @@ test("keeps product version and offline voyage contract aligned", async () => {
     readFile(new URL("../public/version.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /const APP_VERSION = "0\.4\.9"/);
+  assert.match(page, /const APP_VERSION = "0\.4\.10"/);
   assert.doesNotMatch(page, /PRESIÓN DE ACEITE/);
   assert.match(page, /WINCH 1 · HARKEN 40[\s\S]*ESCOTA MAYOR/);
   assert.doesNotMatch(page, /NavigationControl/);
@@ -171,7 +171,7 @@ test("keeps product version and offline voyage contract aligned", async () => {
   assert.match(page, /settings-danger-zone/);
   assert.match(page, /FINALIZAR SIMULACIÓN/);
   assert.match(page, /data-floating-panel="engine"/);
-  assert.match(page, /PRESIÓN DE ACEITE/);
+  assert.doesNotMatch(page, /PRESIÓN DE ACEITE/);
   assert.match(page, /Acelerador del motor/);
   assert.match(page, /engineRunning/);
   assert.match(page, /rudderSensitivity/);
