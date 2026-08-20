@@ -3,15 +3,15 @@
   if (!capacitor?.isNativePlatform?.()) return;
 
   const RECORDING_KEY = 'wander.recording.profile.v1';
-  const SYNC_BATCH_SIZE = 100;
+  const SYNC_BATCH_SIZE = 1000;
   const MAX_SYNC_BATCHES = 100;
-  const REPLAY_YIELD_EVERY = 20;
   const PRESETS = Object.freeze({
     precise: Object.freeze({ intervalSec: 1, distanceM: 0 }),
     balanced: Object.freeze({ intervalSec: 5, distanceM: 5 }),
     vehicle: Object.freeze({ intervalSec: 3, distanceM: 10 }),
     saver: Object.freeze({ intervalSec: 15, distanceM: 20 }),
   });
+
   let watching = false;
   let listenerHandle = null;
   let errorListenerHandle = null;
@@ -84,8 +84,7 @@
     if (!id) return;
     deliveredJournalIds.add(id);
     if (deliveredJournalIds.size <= 5000) return;
-    const oldest = deliveredJournalIds.values().next().value;
-    deliveredJournalIds.delete(oldest);
+    deliveredJournalIds.delete(deliveredJournalIds.values().next().value);
   }
 
   async function acknowledge(ids) {
@@ -115,9 +114,31 @@
     return deliveryChain;
   }
 
-  function yieldToUi() {
-    if (typeof setTimeout !== 'function') return Promise.resolve();
-    return new Promise((resolve) => setTimeout(resolve, 16));
+  function waitForSessionEngine(timeoutMs = 6000) {
+    if (window.WanderSessionEngine?.importHistoricalLocations) return Promise.resolve(window.WanderSessionEngine);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('wander:session-engine-ready', onReady);
+        resolve(window.WanderSessionEngine || null);
+      };
+      const onReady = () => finish();
+      window.addEventListener('wander:session-engine-ready', onReady, { once: true });
+      setTimeout(finish, timeoutMs);
+    });
+  }
+
+  async function importHistoricalBatch(locations) {
+    if (!Array.isArray(locations) || !locations.length) return { imported: 0 };
+    const engine = await waitForSessionEngine();
+    if (typeof engine?.importHistoricalLocations === 'function') {
+      return engine.importHistoricalLocations(locations);
+    }
+    // Do not visually replay a historical track if the bulk importer is unavailable.
+    // Keep it pending so a later app version/run can import it safely.
+    return { imported: 0, deferred: true };
   }
 
   async function syncPending() {
@@ -128,6 +149,8 @@
     syncPromise = (async () => {
       let syncedCount = 0;
       let finalStatus = null;
+      let latestHistorical = null;
+
       for (let batch = 0; batch < MAX_SYNC_BATCHES; batch += 1) {
         const result = await nativePlugin.getPendingLocations({ limit: SYNC_BATCH_SIZE });
         finalStatus = result || finalStatus;
@@ -135,31 +158,39 @@
         publishBackgroundStatus(result || {});
         if (!locations.length) break;
 
-        const ids = [];
-        for (let index = 0; index < locations.length; index += 1) {
-          const location = locations[index];
+        const imported = await importHistoricalBatch(locations);
+        if (imported?.deferred) break;
+
+        const ids = locations
+          .map((location) => Number(location?.journalId) || null)
+          .filter((id) => id && Number.isFinite(id));
+        locations.forEach((location) => {
           const journalId = Number(location?.journalId) || null;
-          await enqueueLocation({ ...location, replayed: true }, false);
-          if (journalId) ids.push(journalId);
-          syncedCount += 1;
-          if ((index + 1) % REPLAY_YIELD_EVERY === 0) await yieldToUi();
-        }
+          rememberJournalId(journalId);
+          if (!latestHistorical || Number(location?.timestamp || 0) >= Number(latestHistorical?.timestamp || 0)) {
+            latestHistorical = location;
+          }
+        });
+
         await acknowledge(ids);
-        await yieldToUi();
+        syncedCount += Number(imported?.imported ?? locations.length) || 0;
         if (locations.length < SYNC_BATCH_SIZE) break;
       }
 
+      // Update the visible cursor exactly once, to the newest recovered position.
+      // The historical route itself was already imported silently in bulk.
+      if (latestHistorical && activeOnPosition) {
+        activeOnPosition(positionFromNative({ ...latestHistorical, replayed: true }));
+      }
+
       const syncedAt = Date.now();
-      publishBackgroundStatus({
-        ...(finalStatus || {}),
-        syncedCount,
-        syncedAt,
-      });
+      publishBackgroundStatus({ ...(finalStatus || {}), syncedCount, syncedAt });
       window.dispatchEvent(new CustomEvent('wander:background-location-synced', {
         detail: { syncedCount, syncedAt, pendingCount: Number(finalStatus?.pendingCount) || 0 },
       }));
       return { syncedCount, syncedAt, status: finalStatus };
     })().catch((error) => {
+      console.warn('Wander background import failed', error);
       activeOnError?.(error?.code === 'PERMISSION_DENIED' ? 'denied' : 'unavailable');
       return null;
     }).finally(() => {
@@ -180,7 +211,9 @@
 
   function applyTrackingConfig(config = storedRecordingConfig()) {
     const nativePlugin = plugin();
-    if (typeof nativePlugin?.start !== 'function') return Promise.reject(Object.assign(new Error('Native location plugin unavailable'), { code: 'PLUGIN_UNAVAILABLE' }));
+    if (typeof nativePlugin?.start !== 'function') {
+      return Promise.reject(Object.assign(new Error('Native location plugin unavailable'), { code: 'PLUGIN_UNAVAILABLE' }));
+    }
     const options = activeOptions || {};
     return nativePlugin.start({
       minimumIntervalMs: clampInteger(config?.intervalSec, 1, 60, 1) * 1000,
@@ -202,14 +235,6 @@
 
   function schedulePendingSync(delayMs = 1200) {
     if (pendingSyncScheduled || !watching) return;
-
-    // Unit-test/non-visual environments have no animation frame. Keep their
-    // historical immediate replay behavior while Android waits for the map core.
-    if (typeof requestAnimationFrame !== 'function') {
-      runPendingSyncNow();
-      return;
-    }
-
     const run = () => {
       if (pendingSyncScheduled || !watching) return;
       pendingSyncScheduled = true;
@@ -219,7 +244,6 @@
         runPendingSyncNow();
       }, Math.max(0, Number(delayMs) || 0));
     };
-
     if (window.WanderCoreReady) run();
     else window.addEventListener('wander:core-ready', run, { once: true });
   }
@@ -234,6 +258,7 @@
       reportsPermissionPrecision: true,
       nativeJournal: true,
       replaysMissedLocations: true,
+      bulkHistoricalImport: true,
     },
 
     isSupported: () => typeof plugin()?.start === 'function',
@@ -254,8 +279,8 @@
         onError(event?.status || 'unavailable');
       })).then((handle) => { errorListenerHandle = handle; });
 
-      // Start live RAW capture immediately. Historical journal replay is a
-      // background task and must never be part of the visual startup path.
+      // Live RAW capture starts immediately. Pending history is imported later,
+      // silently and in bulk, after the map has already become usable.
       applyTrackingConfig()
         .then(() => refreshBackgroundStatus())
         .then(() => schedulePendingSync())
