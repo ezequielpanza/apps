@@ -76,6 +76,20 @@
     return state;
   }
 
+  function errorDetail(error) {
+    const parts = [error?.message || 'No se pudo completar la operación con Google Drive.'];
+    if (error?.code) parts.push(`Código: ${error.code}`);
+    const data = error?.data;
+    if (data && typeof data === 'object') {
+      const compact = Object.entries(data)
+        .filter(([, value]) => value !== null && value !== undefined && value !== '')
+        .map(([key, value]) => `${key}=${String(value)}`)
+        .join(' · ');
+      if (compact) parts.push(compact);
+    }
+    return parts.join(' · ');
+  }
+
   async function run(action, label = 'Google Drive') {
     if (busy) return null;
     busy = true;
@@ -87,7 +101,8 @@
       return result;
     } catch (error) {
       render();
-      ui?.showWander?.(label, error?.message || 'No se pudo completar la operación con Google Drive.', { timeoutMs: 9000 });
+      console.warn('Wander Google Drive error', error);
+      ui?.showWander?.(label, errorDetail(error), { timeoutMs: 12000 });
       return null;
     } finally {
       busy = false;
