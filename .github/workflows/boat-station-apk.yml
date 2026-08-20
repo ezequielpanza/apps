@@ -40,26 +40,26 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Build Boat Station 0.0.8
+      - name: Build Boat Station 0.0.9
         run: gradle -p boat-station :app:assembleDebug --stacktrace
 
       - name: Stage APK
         run: |
           mkdir -p boat-station/releases
-          cp boat-station/app/build/outputs/apk/debug/app-debug.apk boat-station/releases/BoatStation-0.0.8.apk
+          cp boat-station/app/build/outputs/apk/debug/app-debug.apk boat-station/releases/BoatStation-0.0.9.apk
 
       - name: Publish APK in repository
         if: github.event_name == 'push'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add boat-station/releases/BoatStation-0.0.8.apk
-          git diff --cached --quiet || git commit -m 'Build Boat Station 0.0.8 APK'
+          git add boat-station/releases/BoatStation-0.0.9.apk
+          git diff --cached --quiet || git commit -m 'Build Boat Station 0.0.9 APK'
           git push
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BoatStation-0.0.8
-          path: boat-station/releases/BoatStation-0.0.8.apk
+          name: BoatStation-0.0.9
+          path: boat-station/releases/BoatStation-0.0.9.apk
           if-no-files-found: error
