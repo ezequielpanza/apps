@@ -75,12 +75,11 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
 
     private void installUiPatches() {
         String js = "(function(){" +
-                "if(window.__boatStationPagerFix)return;window.__boatStationPagerFix=true;" +
+                "if(!window.__boatStationPagerFix){window.__boatStationPagerFix=true;" +
                 "window.updateCardPager=function(card,idx){" +
                 "if(!card)return;card.querySelectorAll('.pager').forEach(function(p){" +
                 "var s=p.querySelectorAll('span');s.forEach(function(x,i){x.classList.toggle('on',i===idx);x.textContent=i===idx?'●':'○';});" +
                 "});};" +
-                "var oldCycle=window.cycleView;" +
                 "window.cycleView=function(id,dir){" +
                 "var card=document.querySelector('.card[data-id=\\\"'+id+'\\\"]');" +
                 "var all=card?Array.from(card.querySelectorAll('.view')):[];" +
@@ -97,9 +96,22 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
                 "setTimeout(function(){card.classList.remove(inn);card.dataset.flipping='0';},195);" +
                 "},155);" +
                 "};" +
-                "document.querySelectorAll('.card').forEach(function(card){" +
-                "var id=card.dataset.id;window.updateCardPager(card,views[id]||0);" +
+                "document.querySelectorAll('.card').forEach(function(card){var id=card.dataset.id;window.updateCardPager(card,views[id]||0);});" +
+                "}" +
+                "if(!window.__boatStationSheetDrag){window.__boatStationSheetDrag=true;" +
+                "var closeSheet=function(sheet,inner){inner.style.transition='transform .22s ease';inner.style.transform='translateY(105%)';setTimeout(function(){sheet.classList.remove('open');inner.style.transition='';inner.style.transform='';},220);};" +
+                "document.querySelectorAll('.sheet').forEach(function(sheet){" +
+                "var inner=sheet.querySelector('.sheet-inner'),handle=sheet.querySelector('.handle');if(!inner||!handle||handle.dataset.dragBound==='1')return;handle.dataset.dragBound='1';" +
+                "handle.style.cursor='grab';handle.style.touchAction='none';" +
+                "var startY=0,lastY=0,startT=0,dragging=false;" +
+                "handle.addEventListener('touchstart',function(e){if(e.touches.length!==1)return;startY=lastY=e.touches[0].clientY;startT=Date.now();dragging=true;inner.style.transition='none';},{passive:true});" +
+                "handle.addEventListener('touchmove',function(e){if(!dragging||e.touches.length!==1)return;var y=e.touches[0].clientY;lastY=y;var dy=Math.max(0,y-startY);inner.style.transform='translateY('+dy+'px)';if(dy>2)e.preventDefault();},{passive:false});" +
+                "var finish=function(){if(!dragging)return;dragging=false;var dy=Math.max(0,lastY-startY),dt=Math.max(1,Date.now()-startT),velocity=dy/dt;if(dy>110||velocity>.65){closeSheet(sheet,inner);}else{inner.style.transition='transform .2s ease';inner.style.transform='translateY(0)';setTimeout(function(){inner.style.transition='';inner.style.transform='';},210);}};" +
+                "handle.addEventListener('touchend',finish,{passive:true});handle.addEventListener('touchcancel',finish,{passive:true});" +
+                "handle.addEventListener('mousedown',function(e){e.preventDefault();startY=lastY=e.clientY;startT=Date.now();dragging=true;inner.style.transition='none';var mm=function(ev){if(!dragging)return;lastY=ev.clientY;inner.style.transform='translateY('+Math.max(0,lastY-startY)+'px)';};var mu=function(){document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);finish();};document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);});" +
                 "});" +
+                "}" +
+                "var versionRow=Array.from(document.querySelectorAll('#menuSheet .option')).find(function(x){return x.textContent.indexOf('Versión')>=0;});if(versionRow){var sm=versionRow.querySelector('small');if(sm)sm.textContent='0.0.3';}" +
                 "})();";
         eval(js);
     }
