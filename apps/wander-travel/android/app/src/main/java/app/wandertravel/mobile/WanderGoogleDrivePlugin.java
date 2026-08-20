@@ -21,6 +21,7 @@ import com.google.android.gms.common.api.Scope;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 @CapacitorPlugin(name = "WanderGoogleDrive")
 public class WanderGoogleDrivePlugin extends Plugin {
@@ -35,7 +36,7 @@ public class WanderGoogleDrivePlugin extends Plugin {
     private boolean pendingPickerMultiple;
     private String pendingPickerMimeTypes;
     private String pendingPickerFileIds;
-    private boolean pendingPickerCanRetry;
+    private int pendingPickerAttempt;
 
     @Override
     public void load() {
@@ -71,9 +72,7 @@ public class WanderGoogleDrivePlugin extends Plugin {
             .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_ALLOW_FOLDER_SELECTION, "true")
             .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_ALLOW_MULTIPLE, multiple ? "true" : "false");
 
-        if (account != null && account.getAccount() != null) {
-            builder.setAccount(account.getAccount());
-        }
+        if (account != null && account.getAccount() != null) builder.setAccount(account.getAccount());
         if (mimeTypes != null && !mimeTypes.trim().isEmpty()) {
             builder.addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_MIMETYPES, mimeTypes.trim());
         }
@@ -89,14 +88,14 @@ public class WanderGoogleDrivePlugin extends Plugin {
         boolean multiple,
         String mimeTypes,
         String fileIds,
-        boolean canRetry
+        int attempt
     ) {
         pendingPickerCall = call;
         pendingPickerRequiresSelection = requireSelection;
         pendingPickerMultiple = multiple;
         pendingPickerMimeTypes = mimeTypes;
         pendingPickerFileIds = fileIds;
-        pendingPickerCanRetry = canRetry;
+        pendingPickerAttempt = attempt;
     }
 
     private boolean launchResolution(
@@ -106,7 +105,7 @@ public class WanderGoogleDrivePlugin extends Plugin {
         boolean multiple,
         String mimeTypes,
         String fileIds,
-        boolean canRetry
+        int attempt
     ) {
         if (result == null || !result.hasResolution()) return false;
         PendingIntent pendingIntent = result.getPendingIntent();
@@ -115,7 +114,7 @@ public class WanderGoogleDrivePlugin extends Plugin {
             return true;
         }
 
-        savePendingPicker(call, requireSelection, multiple, mimeTypes, fileIds, canRetry);
+        savePendingPicker(call, requireSelection, multiple, mimeTypes, fileIds, attempt);
         try {
             getActivity().startIntentSenderForResult(
                 pendingIntent.getIntentSender(),
@@ -132,65 +131,68 @@ public class WanderGoogleDrivePlugin extends Plugin {
         return true;
     }
 
-    private void launchPicker(
+    private void authorizePicker(
         PluginCall call,
-        AuthorizationRequest request,
         boolean requireSelection,
         boolean multiple,
         String mimeTypes,
         String fileIds,
-        boolean canRetry
+        boolean selectAccount,
+        GoogleSignInAccount account,
+        int attempt
     ) {
-        if (pendingPickerCall != null) {
-            call.reject("A Google Drive selection is already in progress.", "PICKER_BUSY");
-            return;
-        }
-        authorizationClient().authorize(request)
+        authorizationClient().authorize(pickerRequest(multiple, mimeTypes, fileIds, selectAccount, account))
             .addOnSuccessListener(result -> {
-                if (launchResolution(call, result, requireSelection, multiple, mimeTypes, fileIds, canRetry)) return;
-                resolveAuthorizationOrRetry(
-                    call,
-                    result,
-                    requireSelection,
-                    multiple,
-                    mimeTypes,
-                    fileIds,
-                    canRetry
-                );
+                if (launchResolution(call, result, requireSelection, multiple, mimeTypes, fileIds, attempt)) return;
+                finishOrContinuePicker(call, result, requireSelection, multiple, mimeTypes, fileIds, attempt);
             })
             .addOnFailureListener(error -> call.reject(
-                "Google Drive authorization failed.",
+                "Google Drive authorization failed: " + safeMessage(error),
                 "AUTHORIZATION_FAILED",
                 error
             ));
     }
 
+    private void launchFreshPicker(
+        PluginCall call,
+        boolean requireSelection,
+        boolean multiple,
+        String mimeTypes,
+        String fileIds
+    ) {
+        if (pendingPickerCall != null) {
+            call.reject("A Google Drive selection is already in progress.", "PICKER_BUSY");
+            return;
+        }
+
+        // A stale drive.file grant can cause Google Play services to complete the
+        // account step without entering One Pick. Revoke only Wander's drive.file
+        // grant before a user-initiated selection so every connection starts from
+        // the documented consent + Picker path.
+        RevokeAccessRequest revoke = RevokeAccessRequest.builder().setScopes(DRIVE_FILE_SCOPES).build();
+        authorizationClient().revokeAccess(revoke)
+            .addOnCompleteListener(ignored -> authorizePicker(
+                call,
+                requireSelection,
+                multiple,
+                mimeTypes,
+                fileIds,
+                true,
+                null,
+                0
+            ));
+    }
+
     @PluginMethod
     public void pickStorageFolder(PluginCall call) {
-        launchPicker(
-            call,
-            pickerRequest(false, null, null, true, null),
-            true,
-            false,
-            null,
-            null,
-            true
-        );
+        launchFreshPicker(call, true, false, null, null);
     }
 
     @PluginMethod
     public void pickExistingStorageItems(PluginCall call) {
         String fileIds = call.getString("fileIds", "");
         String mimeTypes = FOLDER_MIME + "," + SHEET_MIME;
-        launchPicker(
-            call,
-            pickerRequest(true, mimeTypes, fileIds, true, null),
-            true,
-            true,
-            mimeTypes,
-            fileIds,
-            true
-        );
+        launchFreshPicker(call, true, true, mimeTypes, fileIds);
     }
 
     @PluginMethod
@@ -204,7 +206,7 @@ public class WanderGoogleDrivePlugin extends Plugin {
                 resolveAuthorization(call, result, false);
             })
             .addOnFailureListener(error -> call.reject(
-                "Could not refresh Google Drive authorization.",
+                "Could not refresh Google Drive authorization: " + safeMessage(error),
                 "AUTHORIZATION_FAILED",
                 error
             ));
@@ -212,9 +214,7 @@ public class WanderGoogleDrivePlugin extends Plugin {
 
     @PluginMethod
     public void disconnect(PluginCall call) {
-        RevokeAccessRequest request = RevokeAccessRequest.builder()
-            .setScopes(DRIVE_FILE_SCOPES)
-            .build();
+        RevokeAccessRequest request = RevokeAccessRequest.builder().setScopes(DRIVE_FILE_SCOPES).build();
         authorizationClient().revokeAccess(request)
             .addOnSuccessListener(ignored -> {
                 JSObject result = new JSObject();
@@ -234,34 +234,67 @@ public class WanderGoogleDrivePlugin extends Plugin {
         return pickedIds == null ? null : pickedIds.trim();
     }
 
-    private void resolveAuthorizationOrRetry(
+    private void finishOrContinuePicker(
         PluginCall call,
         AuthorizationResult result,
         boolean requireSelection,
         boolean multiple,
         String mimeTypes,
         String fileIds,
-        boolean canRetry
+        int attempt
     ) {
         String selectedIds = pickedIds(result);
-        if (requireSelection && (selectedIds == null || selectedIds.isEmpty()) && canRetry) {
+        if (!requireSelection || (selectedIds != null && !selectedIds.isEmpty())) {
+            resolveAuthorization(call, result, requireSelection);
+            return;
+        }
+
+        // On some devices the first resolution is only account selection. Continue
+        // with the account returned by Google and force consent/One Pick again.
+        if (attempt < 2) {
             GoogleSignInAccount account = result == null ? null : result.toGoogleSignInAccount();
-            getActivity().getWindow().getDecorView().postDelayed(() -> launchPicker(
+            int nextAttempt = attempt + 1;
+            getActivity().getWindow().getDecorView().postDelayed(() -> authorizePicker(
                 call,
-                pickerRequest(multiple, mimeTypes, fileIds, false, account),
                 true,
                 multiple,
                 mimeTypes,
                 fileIds,
-                false
-            ), 350);
+                false,
+                account,
+                nextAttempt
+            ), nextAttempt == 1 ? 250 : 700);
             return;
         }
-        resolveAuthorization(call, result, requireSelection);
+
+        JSObject details = diagnosticPayload(result, attempt);
+        call.reject(
+            "Google autorizó la cuenta pero no abrió el selector de Drive. Revisá Google Picker API y el cliente OAuth Android.",
+            "PICKER_NOT_RETURNED",
+            null,
+            details
+        );
+    }
+
+    private JSObject diagnosticPayload(AuthorizationResult result, int attempt) {
+        JSObject details = new JSObject();
+        details.put("attempt", attempt);
+        details.put("hasResolution", result != null && result.hasResolution());
+        details.put("hasAccessToken", result != null && result.getAccessToken() != null && !result.getAccessToken().trim().isEmpty());
+        GoogleSignInAccount account = result == null ? null : result.toGoogleSignInAccount();
+        if (account != null && account.getEmail() != null) details.put("accountEmail", account.getEmail());
+        Bundle params = result == null ? null : result.getTokenResponseParams();
+        if (params != null) {
+            Set<String> keys = params.keySet();
+            details.put("tokenResponseKeys", String.join(",", keys));
+            String ids = params.getString("picked_file_ids");
+            if (ids != null) details.put("pickedFileIds", ids);
+        }
+        return details;
     }
 
     private void resolveAuthorization(PluginCall call, AuthorizationResult result, boolean requireSelection) {
-        String accessToken = result.getAccessToken();
+        String accessToken = result == null ? null : result.getAccessToken();
         if (accessToken == null || accessToken.trim().isEmpty()) {
             call.reject("Google authorization returned no access token.", "TOKEN_UNAVAILABLE");
             return;
@@ -291,13 +324,18 @@ public class WanderGoogleDrivePlugin extends Plugin {
         call.resolve(payload);
     }
 
+    private String safeMessage(Exception error) {
+        if (error == null || error.getMessage() == null || error.getMessage().trim().isEmpty()) return "unknown error";
+        return error.getMessage();
+    }
+
     private void clearPendingPicker() {
         pendingPickerCall = null;
         pendingPickerRequiresSelection = false;
         pendingPickerMultiple = false;
         pendingPickerMimeTypes = null;
         pendingPickerFileIds = null;
-        pendingPickerCanRetry = false;
+        pendingPickerAttempt = 0;
     }
 
     public static boolean handleActivityResult(int requestCode, int resultCode, Intent data) {
@@ -312,31 +350,25 @@ public class WanderGoogleDrivePlugin extends Plugin {
         boolean multiple = pendingPickerMultiple;
         String mimeTypes = pendingPickerMimeTypes;
         String fileIds = pendingPickerFileIds;
-        boolean canRetry = pendingPickerCanRetry;
+        int attempt = pendingPickerAttempt;
         clearPendingPicker();
         if (call == null) return;
 
         if (resultCode != Activity.RESULT_OK || data == null) {
             JSObject result = new JSObject();
             result.put("cancelled", true);
+            result.put("resultCode", resultCode);
+            result.put("attempt", attempt);
             call.resolve(result);
             return;
         }
 
         try {
             AuthorizationResult authorizationResult = authorizationClient().getAuthorizationResultFromIntent(data);
-            if (launchResolution(call, authorizationResult, requireSelection, multiple, mimeTypes, fileIds, canRetry)) return;
-            resolveAuthorizationOrRetry(
-                call,
-                authorizationResult,
-                requireSelection,
-                multiple,
-                mimeTypes,
-                fileIds,
-                canRetry
-            );
+            if (launchResolution(call, authorizationResult, requireSelection, multiple, mimeTypes, fileIds, attempt)) return;
+            finishOrContinuePicker(call, authorizationResult, requireSelection, multiple, mimeTypes, fileIds, attempt);
         } catch (Exception error) {
-            call.reject("Could not read the Google Drive picker result.", "PICKER_RESULT_FAILED", error);
+            call.reject("Could not read the Google Drive picker result: " + safeMessage(error), "PICKER_RESULT_FAILED", error);
         }
     }
 }
