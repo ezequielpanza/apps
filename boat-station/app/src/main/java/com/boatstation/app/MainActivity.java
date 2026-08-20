@@ -15,7 +15,7 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationListener;
- android.location.LocationManager;
+import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -75,43 +75,33 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
 
     private void installUiPatches() {
         String js = "(function(){" +
-                "try{catalog.phone.name='Estado del teléfono';delete catalog.gateway;order=order.filter(function(id){return id!=='gateway';});delete collapsed.gateway;delete views.gateway;if(order.indexOf('phone')<0)order.push('phone');save();render();}catch(_e){}" +
+                "try{" +
+                "catalog.phone.name='Estado del teléfono';" +
+                "delete catalog.gateway;" +
+                "catalog.seastate={name:'Sea State',source:'Calculado · sensores del teléfono'};" +
+                "order=order.filter(function(id){return id!=='gateway';});" +
+                "delete collapsed.gateway;delete views.gateway;" +
+                "if(order.indexOf('phone')<0)order.push('phone');" +
+                "if(!window.__boatStationSeaState){" +
+                "window.__boatStationSeaState=true;" +
+                "window.__seaStateValue=0;window.__seaStatePeak=0;" +
+                "var oldBodyFor=window.bodyFor;" +
+                "window.bodyFor=function(id){" +
+                "if(id==='seastate'){var idx=views[id]||0;return '<div class=\"view\"><div class=\"big\" data-sea-label>Calmo</div><div class=\"sub\">Intensidad de movimiento del barco</div><div class=\"row\"><span class=\"pill\" data-sea-value>0.00 m/s²</span><span class=\"pill\" data-sea-peak>Pico 0.00</span></div>'+dots(1,idx)+'</div>'; }" +
+                "return oldBodyFor(id);};" +
+                "var oldSummary=window.summary;" +
+                "window.summary=function(id){if(id==='seastate')return window.__seaStateLabel+' · '+window.__seaStateValue.toFixed(2);return oldSummary(id);};" +
+                "window.__seaStateLabel='Calmo';" +
+                "var oldUpdateMotion=window.BoatStation&&BoatStation.updateMotion;" +
+                "if(oldUpdateMotion){BoatStation.updateMotion=function(m){oldUpdateMotion(m);var v=Math.max(0,Number(m)||0);window.__seaStateValue=window.__seaStateValue*0.86+v*0.14;window.__seaStatePeak=Math.max(window.__seaStatePeak*0.995,v);var x=window.__seaStateValue;window.__seaStateLabel=x<0.18?'Calmo':x<0.45?'Suave':x<0.85?'Moderado':x<1.5?'Movido':'Fuerte';var a=document.querySelector('[data-sea-label]');if(a)a.textContent=window.__seaStateLabel;var b=document.querySelector('[data-sea-value]');if(b)b.textContent=x.toFixed(2)+' m/s²';var c=document.querySelector('[data-sea-peak]');if(c)c.textContent='Pico '+window.__seaStatePeak.toFixed(2);document.querySelectorAll('.card[data-id=\"seastate\"] [data-summary]').forEach(function(s){s.textContent=window.__seaStateLabel+' · '+x.toFixed(2);});};}" +
+                "}" +
+                "save();render();" +
+                "}catch(_e){}" +
                 "if(!window.__boatStationPagerFix){window.__boatStationPagerFix=true;" +
-                "window.updateCardPager=function(card,idx){" +
-                "if(!card)return;card.querySelectorAll('.pager').forEach(function(p){" +
-                "var s=p.querySelectorAll('span');s.forEach(function(x,i){x.classList.toggle('on',i===idx);x.textContent=i===idx?'●':'○';});" +
-                "});};" +
-                "window.cycleView=function(id,dir){" +
-                "var card=document.querySelector('.card[data-id=\\\"'+id+'\\\"]');" +
-                "var all=card?Array.from(card.querySelectorAll('.view')):[];" +
-                "if(!card||all.length<2||card.dataset.flipping==='1')return;" +
-                "var current=all.findIndex(function(v){return v.classList.contains('active');});" +
-                "var next=(current+dir+all.length)%all.length;" +
-                "card.dataset.flipping='1';" +
-                "var out=dir>0?'flip-out-left':'flip-out-right',inn=dir>0?'flip-in-right':'flip-in-left';" +
-                "card.classList.add(out);" +
-                "setTimeout(function(){" +
-                "all.forEach(function(v,i){v.classList.toggle('active',i===next);});" +
-                "views[id]=next;save();window.updateCardPager(card,next);" +
-                "card.classList.remove(out);card.classList.add(inn);" +
-                "setTimeout(function(){card.classList.remove(inn);card.dataset.flipping='0';},195);" +
-                "},155);" +
-                "};" +
-                "document.querySelectorAll('.card').forEach(function(card){var id=card.dataset.id;window.updateCardPager(card,views[id]||0);});" +
-                "}" +
-                "if(!window.__boatStationSheetDrag){window.__boatStationSheetDrag=true;" +
-                "var closeSheet=function(sheet,inner){inner.style.transition='transform .22s ease';inner.style.transform='translateY(105%)';setTimeout(function(){sheet.classList.remove('open');inner.style.transition='';inner.style.transform='';},220);};" +
-                "document.querySelectorAll('.sheet').forEach(function(sheet){" +
-                "var inner=sheet.querySelector('.sheet-inner'),handle=sheet.querySelector('.handle');if(!inner||!handle||handle.dataset.dragBound==='1')return;handle.dataset.dragBound='1';" +
-                "handle.style.cursor='grab';handle.style.touchAction='none';" +
-                "var startY=0,lastY=0,startT=0,dragging=false;" +
-                "handle.addEventListener('touchstart',function(e){if(e.touches.length!==1)return;startY=lastY=e.touches[0].clientY;startT=Date.now();dragging=true;inner.style.transition='none';},{passive:true});" +
-                "handle.addEventListener('touchmove',function(e){if(!dragging||e.touches.length!==1)return;var y=e.touches[0].clientY;lastY=y;var dy=Math.max(0,y-startY);inner.style.transform='translateY('+dy+'px)';if(dy>2)e.preventDefault();},{passive:false});" +
-                "var finish=function(){if(!dragging)return;dragging=false;var dy=Math.max(0,lastY-startY),dt=Math.max(1,Date.now()-startT),velocity=dy/dt;if(dy>110||velocity>.65){closeSheet(sheet,inner);}else{inner.style.transition='transform .2s ease';inner.style.transform='translateY(0)';setTimeout(function(){inner.style.transition='';inner.style.transform='';},210);}};" +
-                "handle.addEventListener('touchend',finish,{passive:true});handle.addEventListener('touchcancel',finish,{passive:true});" +
-                "handle.addEventListener('mousedown',function(e){e.preventDefault();startY=lastY=e.clientY;startT=Date.now();dragging=true;inner.style.transition='none';var mm=function(ev){if(!dragging)return;lastY=ev.clientY;inner.style.transform='translateY('+Math.max(0,lastY-startY)+'px)';};var mu=function(){document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);finish();};document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);});" +
-                "});" +
-                "}" +
+                "window.updateCardPager=function(card,idx){if(!card)return;card.querySelectorAll('.pager').forEach(function(p){var s=p.querySelectorAll('span');s.forEach(function(x,i){x.classList.toggle('on',i===idx);x.textContent=i===idx?'●':'○';});});};" +
+                "window.cycleView=function(id,dir){var card=document.querySelector('.card[data-id=\\\"'+id+'\\\"]');var all=card?Array.from(card.querySelectorAll('.view')):[];if(!card||all.length<2||card.dataset.flipping==='1')return;var current=all.findIndex(function(v){return v.classList.contains('active');});var next=(current+dir+all.length)%all.length;card.dataset.flipping='1';var out=dir>0?'flip-out-left':'flip-out-right',inn=dir>0?'flip-in-right':'flip-in-left';card.classList.add(out);setTimeout(function(){all.forEach(function(v,i){v.classList.toggle('active',i===next);});views[id]=next;save();window.updateCardPager(card,next);card.classList.remove(out);card.classList.add(inn);setTimeout(function(){card.classList.remove(inn);card.dataset.flipping='0';},195);},155);};" +
+                "document.querySelectorAll('.card').forEach(function(card){var id=card.dataset.id;window.updateCardPager(card,views[id]||0);});}" +
+                "if(!window.__boatStationSheetDrag){window.__boatStationSheetDrag=true;var closeSheet=function(sheet,inner){inner.style.transition='transform .22s ease';inner.style.transform='translateY(105%)';setTimeout(function(){sheet.classList.remove('open');inner.style.transition='';inner.style.transform='';},220);};document.querySelectorAll('.sheet').forEach(function(sheet){var inner=sheet.querySelector('.sheet-inner'),handle=sheet.querySelector('.handle');if(!inner||!handle||handle.dataset.dragBound==='1')return;handle.dataset.dragBound='1';handle.style.cursor='grab';handle.style.touchAction='none';var startY=0,lastY=0,startT=0,dragging=false;handle.addEventListener('touchstart',function(e){if(e.touches.length!==1)return;startY=lastY=e.touches[0].clientY;startT=Date.now();dragging=true;inner.style.transition='none';},{passive:true});handle.addEventListener('touchmove',function(e){if(!dragging||e.touches.length!==1)return;var y=e.touches[0].clientY;lastY=y;var dy=Math.max(0,y-startY);inner.style.transform='translateY('+dy+'px)';if(dy>2)e.preventDefault();},{passive:false});var finish=function(){if(!dragging)return;dragging=false;var dy=Math.max(0,lastY-startY),dt=Math.max(1,Date.now()-startT),velocity=dy/dt;if(dy>110||velocity>.65){closeSheet(sheet,inner);}else{inner.style.transition='transform .2s ease';inner.style.transform='translateY(0)';setTimeout(function(){inner.style.transition='';inner.style.transform='';},210);}};handle.addEventListener('touchend',finish,{passive:true});handle.addEventListener('touchcancel',finish,{passive:true});});}" +
                 "var versionRow=Array.from(document.querySelectorAll('#menuSheet .option')).find(function(x){return x.textContent.indexOf('Versión')>=0;});if(versionRow){var sm=versionRow.querySelector('small');if(sm)sm.textContent='0.0.3';}" +
                 "})();";
         eval(js);
@@ -128,11 +118,8 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQ_LOCATION && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            startLocationUpdates();
-        } else if (requestCode == REQ_LOCATION) {
-            eval("window.BoatStation && BoatStation.locationDenied && BoatStation.locationDenied()");
-        }
+        if (requestCode == REQ_LOCATION && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) startLocationUpdates();
+        else if (requestCode == REQ_LOCATION) eval("window.BoatStation && BoatStation.locationDenied && BoatStation.locationDenied()");
     }
 
     private void startLocationUpdates() {
@@ -162,8 +149,7 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
     private void pushPhoneStatus() {
         try {
             Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-            int level = 0;
-            int tempTenths = 0;
+            int level = 0, tempTenths = 0;
             boolean charging = false;
             if (battery != null) {
                 int raw = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
@@ -173,7 +159,6 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
                 int status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
                 charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL;
             }
-
             JSONObject o = new JSONObject();
             o.put("battery", level);
             o.put("batteryTemp", tempTenths / 10.0);
