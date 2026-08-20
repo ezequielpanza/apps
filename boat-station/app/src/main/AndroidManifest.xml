@@ -12,6 +12,7 @@
     <application
         android:allowBackup="true"
         android:icon="@drawable/boat_station_icon"
+        android:roundIcon="@drawable/boat_station_icon"
         android:label="Boat Station"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
