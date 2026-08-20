@@ -14,6 +14,7 @@
   const MAX_ACCURACY_M = 120;
   const MOVEMENT_BACKFILL_MS = 12000;
   const POSITION_BUFFER_MS = 30000;
+  const HISTORICAL_SEGMENT_GAP_MS = 5 * 60 * 1000;
   const RECORDING_LIMITS = Object.freeze({
     minimumIntervalSec: 1,
     maximumIntervalSec: 60,
@@ -146,18 +147,8 @@
     const profileId = PROFILE_BY_ID[raw.profileId] ? raw.profileId : 'precise';
     return {
       profileId,
-      manualIntervalSec: clampInteger(
-        raw.manualIntervalSec,
-        RECORDING_LIMITS.minimumIntervalSec,
-        RECORDING_LIMITS.maximumIntervalSec,
-        1
-      ),
-      manualDistanceM: clampInteger(
-        raw.manualDistanceM,
-        RECORDING_LIMITS.minimumDistanceM,
-        RECORDING_LIMITS.maximumDistanceM,
-        0
-      ),
+      manualIntervalSec: clampInteger(raw.manualIntervalSec, RECORDING_LIMITS.minimumIntervalSec, RECORDING_LIMITS.maximumIntervalSec, 1),
+      manualDistanceM: clampInteger(raw.manualDistanceM, RECORDING_LIMITS.minimumDistanceM, RECORDING_LIMITS.maximumDistanceM, 0),
     };
   }
 
@@ -178,10 +169,7 @@
   }
 
   function recordingState() {
-    return {
-      ...recordingSettings,
-      config: recordingConfig(),
-    };
+    return { ...recordingSettings, config: recordingConfig() };
   }
 
   function publishRecordingContext() {
@@ -218,18 +206,8 @@
     recordingSettings = {
       ...recordingSettings,
       profileId: 'manual',
-      manualIntervalSec: clampInteger(
-        changes.intervalSec ?? recordingSettings.manualIntervalSec,
-        RECORDING_LIMITS.minimumIntervalSec,
-        RECORDING_LIMITS.maximumIntervalSec,
-        recordingSettings.manualIntervalSec
-      ),
-      manualDistanceM: clampInteger(
-        changes.distanceM ?? recordingSettings.manualDistanceM,
-        RECORDING_LIMITS.minimumDistanceM,
-        RECORDING_LIMITS.maximumDistanceM,
-        recordingSettings.manualDistanceM
-      ),
+      manualIntervalSec: clampInteger(changes.intervalSec ?? recordingSettings.manualIntervalSec, RECORDING_LIMITS.minimumIntervalSec, RECORDING_LIMITS.maximumIntervalSec, recordingSettings.manualIntervalSec),
+      manualDistanceM: clampInteger(changes.distanceM ?? recordingSettings.manualDistanceM, RECORDING_LIMITS.minimumDistanceM, RECORDING_LIMITS.maximumDistanceM, recordingSettings.manualDistanceM),
     };
     return persistRecordingSettings(true);
   }
@@ -333,8 +311,9 @@
       else localStorage.removeItem(ACTIVE_KEY);
     } catch {}
     publishContext();
-    listeners.forEach((listener) => { try { listener(snapshot()); } catch {} });
-    window.dispatchEvent(new CustomEvent('wander:sessions-changed', { detail: snapshot() }));
+    const nextSnapshot = snapshot();
+    listeners.forEach((listener) => { try { listener(nextSnapshot); } catch {} });
+    window.dispatchEvent(new CustomEvent('wander:sessions-changed', { detail: nextSnapshot }));
   }
 
   function snapshot() {
@@ -379,12 +358,8 @@
   }
 
   function calculateDurations(session, now = Date.now()) {
-    const movingDurationMs = movementSegments(session).reduce((sum, segment) => {
-      return sum + Math.max(0, Number(segment.endedAt || now) - Number(segment.startedAt || now));
-    }, 0);
-    const stationaryDurationMs = (session?.stays || []).reduce((sum, stay) => {
-      return sum + Math.max(0, Number(stay.endedAt || now) - Number(stay.startedAt || now));
-    }, 0);
+    const movingDurationMs = movementSegments(session).reduce((sum, segment) => sum + Math.max(0, Number(segment.endedAt || now) - Number(segment.startedAt || now)), 0);
+    const stationaryDurationMs = (session?.stays || []).reduce((sum, stay) => sum + Math.max(0, Number(stay.endedAt || now) - Number(stay.startedAt || now)), 0);
     return { movingDurationMs, stationaryDurationMs };
   }
 
@@ -432,7 +407,7 @@
     return active;
   }
 
-  function createMovement(position, at) {
+  function createMovement(position, at, extras = {}) {
     if (!active) return null;
     const segment = {
       id: makeId('movement'),
@@ -444,6 +419,7 @@
       raw: true,
       points: [],
       distanceM: 0,
+      ...extras,
     };
     active.segments.push(segment);
     addMovementPoint(segment, position, at, true);
@@ -472,12 +448,84 @@
       const distance = distanceMeters(last, point);
       const elapsedMs = Math.max(1, at - Number(last.at || at));
       const plausibleSpeedKmh = (distance / 1000) / (elapsedMs / 3600000);
-      if (elapsedMs >= 250 && plausibleSpeedKmh <= 250) {
-        segment.distanceM = Math.round(Number(segment.distanceM || 0) + distance);
-      }
+      if (elapsedMs >= 250 && plausibleSpeedKmh <= 250) segment.distanceM = Math.round(Number(segment.distanceM || 0) + distance);
     }
     segment.points.push(point);
     return true;
+  }
+
+  function historicalPosition(location) {
+    const lat = finite(location?.latitude ?? location?.lat);
+    const lng = finite(location?.longitude ?? location?.lng);
+    if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    const speedMps = finite(location?.speed);
+    return {
+      lat,
+      lng,
+      at: Number(location?.timestamp || location?.at) || Date.now(),
+      accuracy: finite(location?.accuracy),
+      speedKmh: speedMps === null ? finite(location?.speedKmh) : Math.max(0, speedMps * 3.6),
+      heading: finite(location?.heading),
+      altitude: finite(location?.altitude),
+      provider: location?.provider || location?.source || 'unknown',
+      permissionPrecision: location?.permissionPrecision || null,
+      raw: true,
+    };
+  }
+
+  function importHistoricalLocations(locations = []) {
+    if (!settings.autoEnabled || !Array.isArray(locations) || !locations.length) return { imported: 0 };
+    const points = locations.map(historicalPosition).filter(Boolean).sort((a, b) => a.at - b.at);
+    if (!points.length) return { imported: 0 };
+
+    const existing = new Set();
+    movementSegments(active).forEach((segment) => {
+      (segment.points || []).forEach((point) => existing.add(`${Number(point.at)}|${Number(point.lat).toFixed(7)}|${Number(point.lng).toFixed(7)}`));
+    });
+
+    if (!active) startSession(points[0], points[0].at);
+    if (!active) return { imported: 0 };
+    active.startedAt = Math.min(Number(active.startedAt || points[0].at), points[0].at);
+    active.startPosition = active.startPosition || { lat: points[0].lat, lng: points[0].lng };
+
+    let imported = 0;
+    let segment = null;
+    let previousAt = null;
+    for (const point of points) {
+      const key = `${Number(point.at)}|${Number(point.lat).toFixed(7)}|${Number(point.lng).toFixed(7)}`;
+      if (existing.has(key)) continue;
+      existing.add(key);
+
+      if (!segment || (previousAt !== null && point.at - previousAt > HISTORICAL_SEGMENT_GAP_MS)) {
+        if (segment && !segment.endedAt) segment.endedAt = previousAt;
+        segment = createMovement(point, point.at, {
+          method: 'recovered',
+          recoveredHistorical: true,
+          interpretationPending: true,
+        });
+        if (!segment) continue;
+        imported += 1;
+      } else if (addMovementPoint(segment, point, point.at, true)) {
+        imported += 1;
+      }
+      previousAt = point.at;
+    }
+
+    if (segment && !segment.endedAt && previousAt !== null) segment.endedAt = Math.max(segment.startedAt, previousAt);
+    if (imported > 0) {
+      active.events.push({
+        type: 'location.history.bulk-imported',
+        at: Date.now(),
+        pointCount: imported,
+        firstAt: points[0].at,
+        lastAt: points[points.length - 1].at,
+        interpretationPending: true,
+      });
+      active.updatedAt = Date.now();
+      active.distanceM = calculateDistance(active);
+      persist();
+    }
+    return { imported, firstAt: points[0].at, lastAt: points[points.length - 1].at };
   }
 
   function closeMovement(at) {
@@ -538,17 +586,10 @@
     if (!stay) return createStay(position, at);
     const accuracy = finite(position?.accuracy);
     if (accuracy !== null && accuracy > MAX_ACCURACY_M) return stay;
-
     const distance = distanceMeters(stay.center, position);
     if (distance <= stayAllowance(stay, position)) return stay;
-
     closeStay(at);
-    active.events.push({
-      type: 'stay.relocated',
-      at,
-      fromStayId: stay.id,
-      distanceM: Math.round(distance),
-    });
+    active.events.push({ type: 'stay.relocated', at, fromStayId: stay.id, distanceM: Math.round(distance) });
     return createStay(position, at);
   }
 
@@ -617,9 +658,7 @@
     if (!isVehicleMode(mode) && speedKmh < 10) return false;
     attachedVehicleId = poi.id;
     parkedCandidate = null;
-    window.WanderPersonalPOIs?.update?.(poi.id, {
-      vehicleState: 'with-user', lat: position.lat, lng: position.lng, vehicleUpdatedAt: at,
-    }, { silent: true });
+    window.WanderPersonalPOIs?.update?.(poi.id, { vehicleState: 'with-user', lat: position.lat, lng: position.lng, vehicleUpdatedAt: at }, { silent: true });
     if (active) active.attachedVehicleId = attachedVehicleId;
     return true;
   }
@@ -629,20 +668,15 @@
     const mode = mobilityMode();
     if (motion === 'stationary') {
       if (!parkedCandidate) parkedCandidate = { lat: position.lat, lng: position.lng, at };
-      window.WanderPersonalPOIs?.update?.(attachedVehicleId, {
-        vehicleState: 'parked-candidate', lat: parkedCandidate.lat, lng: parkedCandidate.lng, vehicleUpdatedAt: at,
-      }, { silent: true });
+      window.WanderPersonalPOIs?.update?.(attachedVehicleId, { vehicleState: 'parked-candidate', lat: parkedCandidate.lat, lng: parkedCandidate.lng, vehicleUpdatedAt: at }, { silent: true });
       if (active) active.parkedCandidate = parkedCandidate;
       return;
     }
-
     if (parkedCandidate) {
       const walkedAway = isWalkingMode(mode) && distanceMeters(parkedCandidate, position) >= 15;
       const slowUnknownAway = !isVehicleMode(mode) && distanceMeters(parkedCandidate, position) >= 30 && Number(position.speedKmh || 0) < 10;
       if (walkedAway || slowUnknownAway) {
-        window.WanderPersonalPOIs?.update?.(attachedVehicleId, {
-          vehicleState: 'parked', lat: parkedCandidate.lat, lng: parkedCandidate.lng, vehicleUpdatedAt: at,
-        }, { silent: true });
+        window.WanderPersonalPOIs?.update?.(attachedVehicleId, { vehicleState: 'parked', lat: parkedCandidate.lat, lng: parkedCandidate.lng, vehicleUpdatedAt: at }, { silent: true });
         attachedVehicleId = null;
         parkedCandidate = null;
         if (active) {
@@ -654,10 +688,7 @@
       if (isVehicleMode(mode) || Number(position.speedKmh || 0) >= 10) parkedCandidate = null;
       else return;
     }
-
-    window.WanderPersonalPOIs?.update?.(attachedVehicleId, {
-      vehicleState: 'with-user', lat: position.lat, lng: position.lng, vehicleUpdatedAt: at,
-    }, { silent: true });
+    window.WanderPersonalPOIs?.update?.(attachedVehicleId, { vehicleState: 'with-user', lat: position.lat, lng: position.lng, vehicleUpdatedAt: at }, { silent: true });
   }
 
   function observe(reason = 'context') {
@@ -666,7 +697,6 @@
       publishContext();
       return;
     }
-
     const motion = String(context.value?.('motion.status') || 'pending').toLowerCase();
     const position = currentPosition();
     const at = position?.at || Date.now();
@@ -716,11 +746,7 @@
         updateAttachedVehicle(position, motion, at);
         if (shouldCloseOvernight(stay, Date.now())) {
           phase = 'confirming-overnight';
-          finishSession('overnight', stay.startedAt, {
-            position: stay.center,
-            poiId: stay.poiId,
-            poiName: stay.poiName,
-          });
+          finishSession('overnight', stay.startedAt, { position: stay.center, poiId: stay.poiId, poiName: stay.poiName });
           lastMotion = motion;
           return;
         }
@@ -773,6 +799,7 @@
     snapshot,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     observe,
+    importHistoricalLocations,
     setAutoEnabled,
     isAutoEnabled: () => Boolean(settings.autoEnabled),
     finishSession: (reason = 'manual') => finishSession(reason, Date.now(), { position: currentPosition() }),
