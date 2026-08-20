@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:colorAccent">#12B8C8</item>
+        <item name="android:navigationBarColor">#061522</item>
+        <item name="android:statusBarColor">#0B2239</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowSplashScreenBackground">#061522</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/boat_station_icon</item>
+    </style>
+</resources>
