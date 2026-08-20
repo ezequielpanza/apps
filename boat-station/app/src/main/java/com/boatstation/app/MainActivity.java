@@ -15,7 +15,7 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationListener;
-import android.location.LocationManager;
+ android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -75,6 +75,7 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
 
     private void installUiPatches() {
         String js = "(function(){" +
+                "try{catalog.phone.name='Estado del teléfono';delete catalog.gateway;order=order.filter(function(id){return id!=='gateway';});delete collapsed.gateway;delete views.gateway;if(order.indexOf('phone')<0)order.push('phone');save();render();}catch(_e){}" +
                 "if(!window.__boatStationPagerFix){window.__boatStationPagerFix=true;" +
                 "window.updateCardPager=function(card,idx){" +
                 "if(!card)return;card.querySelectorAll('.pager').forEach(function(p){" +
