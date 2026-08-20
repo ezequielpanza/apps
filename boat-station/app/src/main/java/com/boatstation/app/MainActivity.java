@@ -20,7 +20,6 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.BatteryManager;
-import android.provider.Settings;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -59,7 +58,7 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
-        webView.setBackgroundColor(0xFFF5F7FA);
+        webView.setBackgroundColor(0xFF061522);
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -68,9 +67,41 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
 
         webView.loadUrl("file:///android_asset/index.html");
         webView.postDelayed(() -> {
+            installUiPatches();
             requestLocationIfNeeded();
             pushPhoneStatus();
-        }, 800);
+        }, 900);
+    }
+
+    private void installUiPatches() {
+        String js = "(function(){" +
+                "if(window.__boatStationPagerFix)return;window.__boatStationPagerFix=true;" +
+                "window.updateCardPager=function(card,idx){" +
+                "if(!card)return;card.querySelectorAll('.pager').forEach(function(p){" +
+                "var s=p.querySelectorAll('span');s.forEach(function(x,i){x.classList.toggle('on',i===idx);x.textContent=i===idx?'●':'○';});" +
+                "});};" +
+                "var oldCycle=window.cycleView;" +
+                "window.cycleView=function(id,dir){" +
+                "var card=document.querySelector('.card[data-id=\\\"'+id+'\\\"]');" +
+                "var all=card?Array.from(card.querySelectorAll('.view')):[];" +
+                "if(!card||all.length<2||card.dataset.flipping==='1')return;" +
+                "var current=all.findIndex(function(v){return v.classList.contains('active');});" +
+                "var next=(current+dir+all.length)%all.length;" +
+                "card.dataset.flipping='1';" +
+                "var out=dir>0?'flip-out-left':'flip-out-right',inn=dir>0?'flip-in-right':'flip-in-left';" +
+                "card.classList.add(out);" +
+                "setTimeout(function(){" +
+                "all.forEach(function(v,i){v.classList.toggle('active',i===next);});" +
+                "views[id]=next;save();window.updateCardPager(card,next);" +
+                "card.classList.remove(out);card.classList.add(inn);" +
+                "setTimeout(function(){card.classList.remove(inn);card.dataset.flipping='0';},195);" +
+                "},155);" +
+                "};" +
+                "document.querySelectorAll('.card').forEach(function(card){" +
+                "var id=card.dataset.id;window.updateCardPager(card,views[id]||0);" +
+                "});" +
+                "})();";
+        eval(js);
     }
 
     private void requestLocationIfNeeded() {
@@ -130,15 +161,14 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
                 charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL;
             }
 
-            String network = getNetworkLabel();
             JSONObject o = new JSONObject();
             o.put("battery", level);
             o.put("batteryTemp", tempTenths / 10.0);
             o.put("charging", charging);
-            o.put("network", network);
+            o.put("network", getNetworkLabel());
             o.put("model", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             o.put("android", android.os.Build.VERSION.RELEASE);
-            o.put("version", "0.0.1");
+            o.put("version", "0.0.3");
             eval("window.BoatStation && BoatStation.updatePhone(" + o.toString() + ")");
         } catch (Exception ignored) {}
     }
@@ -154,31 +184,27 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) return "Datos móviles";
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return "Ethernet";
             return "Online";
-        } catch (Exception e) {
-            return "Desconocida";
-        }
+        } catch (Exception e) { return "Desconocida"; }
     }
 
-    @Override
-    protected void onResume() {
+    @Override protected void onResume() {
         super.onResume();
         if (accelSensor != null) sensorManager.registerListener(this, accelSensor, SensorManager.SENSOR_DELAY_UI);
         if (magneticSensor != null) sensorManager.registerListener(this, magneticSensor, SensorManager.SENSOR_DELAY_UI);
         handler.removeCallbacks(statusTicker);
         handler.post(statusTicker);
+        webView.postDelayed(this::installUiPatches, 300);
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) startLocationUpdates();
     }
 
-    @Override
-    protected void onPause() {
+    @Override protected void onPause() {
         super.onPause();
         sensorManager.unregisterListener(this);
         handler.removeCallbacks(statusTicker);
         try { locationManager.removeUpdates(this); } catch (Exception ignored) {}
     }
 
-    @Override
-    public void onSensorChanged(SensorEvent event) {
+    @Override public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
             System.arraycopy(event.values, 0, gravity, 0, 3);
             hasGravity = true;
@@ -189,7 +215,6 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
             System.arraycopy(event.values, 0, geomagnetic, 0, 3);
             hasGeomagnetic = true;
         }
-
         if (hasGravity && hasGeomagnetic) {
             float[] R = new float[9];
             float[] I = new float[9];
@@ -213,8 +238,7 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
         webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
-    @Override
-    public void onBackPressed() {
+    @Override public void onBackPressed() {
         if (webView != null && webView.canGoBack()) webView.goBack();
         else super.onBackPressed();
     }
