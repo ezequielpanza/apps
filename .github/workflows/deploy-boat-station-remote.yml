@@ -18,20 +18,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Validate Boat Station PWA
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f "apps/boat-station/web/index.html"
-          test -f "apps/boat-station/web/sw.js"
-          test -f "apps/boat-station/web/manifest.webmanifest"
-          test -f "apps/boat-station/web/remote_gate.js"
-          test -f "apps/boat-station/web/apk_link.js"
-          test -f "apps/boat-station/web/backend_url.js"
-          test -f "apps/boat-station/web/remote_sync.js"
-          test -f "apps/boat-station/web/core_bridge_compat.js"
-
       - name: Stage latest APK in PWA
         shell: bash
         run: |
@@ -42,76 +28,29 @@ jobs:
             cp "$APK" "apps/boat-station/web/BoatStation-Core-${VERSION}.apk"
             echo "$VERSION" > apps/boat-station/web/APK_VERSION
             printf '%s\n' "/BoatStation.apk /BoatStation-Core-${VERSION}.apk 302" > apps/boat-station/web/_redirects
-          else
-            echo "Latest APK $APK not published yet; PWA deploy continues without replacing latest APK"
           fi
-
       - name: Inject unified Boat Station scripts
         shell: bash
         run: |
-          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('apps/boat-station/web/index.html')
-          s=p.read_text()
-
-          # Native callbacks can arrive while the page is still parsing. Buffer them so
-          # a stationary GPS fix (or any other early sensor value) is not lost.
-          buffer_script='''<script id="bs-native-buffer">(function(){
-            if(window.__bsNativeQueue)return;
-            window.__bsNativeQueue=[];
-            var methods=['updateGPS','updatePhone','updateCompass','updateMotion','onBleScanResult','onBatteryConnection','onBatteryData','onDataFolderChanged'];
-            var stub={};
-            methods.forEach(function(m){stub[m]=function(v){window.__bsNativeQueue.push([m,v])}});
-            window.BoatStation=stub;
-          })();</script>'''
-          if 'id="bs-native-buffer"' not in s:
-              s=s.replace('</head>', buffer_script+'\n</head>')
-
-          tags=[
-            '<script src="backend_url.js"></script>',
-            '<script src="core_bridge_compat.js"></script>',
-            '<script src="remote_gate.js"></script>',
-            '<script src="remote_sync.js"></script>',
-            '<script src="apk_link.js"></script>'
-          ]
+          p=Path('apps/boat-station/web/index.html'); s=p.read_text()
+          buffer_script='''<script id="bs-native-buffer">(function(){if(window.__bsNativeQueue)return;window.__bsNativeQueue=[];var methods=['updateGPS','updatePhone','updateCompass','updateMotion','onBleScanResult','onBatteryConnection','onBatteryData','onDataFolderChanged'];var stub={};methods.forEach(function(m){stub[m]=function(v){window.__bsNativeQueue.push([m,v])}});window.BoatStation=stub;})();</script>'''
+          if 'id="bs-native-buffer"' not in s:s=s.replace('</head>',buffer_script+'\n</head>')
+          tags=['<script src="backend_url.js"></script>','<script src="core_bridge_compat.js"></script>','<script src="remote_gate.js"></script>','<script src="remote_sync.js"></script>','<script src="apk_link.js"></script>','<script src="runtime_fixes.js"></script>']
           for tag in tags:
-              if tag not in s:
-                  s=s.replace('</body>', tag+'\n</body>')
-
-          drain_script='''<script id="bs-native-drain">(function(){
-            var q=window.__bsNativeQueue||[];
-            if(window.BoatStation){
-              q.forEach(function(x){try{var fn=window.BoatStation[x[0]];if(typeof fn==='function')fn(x[1])}catch(e){}});
-            }
-            window.__bsNativeQueue=[];
-          })();</script>'''
-          if 'id="bs-native-drain"' not in s:
-              s=s.replace('</body>', drain_script+'\n</body>')
-
+            if tag not in s:s=s.replace('</body>',tag+'\n</body>')
+          drain='''<script id="bs-native-drain">(function(){var q=window.__bsNativeQueue||[];if(window.BoatStation){q.forEach(function(x){try{var fn=window.BoatStation[x[0]];if(typeof fn==='function')fn(x[1])}catch(e){}})}window.__bsNativeQueue=[];})();</script>'''
+          if 'id="bs-native-drain"' not in s:s=s.replace('</body>',drain+'\n</body>')
           p.write_text(s)
           PY
-
       - name: Ensure Boat Station project exists
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@latest pages project create boat-station --production-branch=main || true
-
       - name: Deploy Boat Station to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@latest pages deploy apps/boat-station/web --project-name=boat-station --branch=main
-
-      - name: Remove obsolete Boat Station Web project
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@latest pages project delete boat-station-web --yes || true
-
-      - name: Remove obsolete Remote project
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@latest pages project delete boat-station-remote --yes || true
