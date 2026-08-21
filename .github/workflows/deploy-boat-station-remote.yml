@@ -37,7 +37,7 @@ jobs:
           p=Path('apps/boat-station/web/index.html'); s=p.read_text()
           buffer_script='''<script id="bs-native-buffer">(function(){if(window.__bsNativeQueue)return;window.__bsNativeQueue=[];var methods=['updateGPS','updatePhone','updateCompass','updateMotion','onBleScanResult','onBatteryConnection','onBatteryData','onDataFolderChanged'];var stub={};methods.forEach(function(m){stub[m]=function(v){window.__bsNativeQueue.push([m,v])}});window.BoatStation=stub;})();</script>'''
           if 'id="bs-native-buffer"' not in s:s=s.replace('</head>',buffer_script+'\n</head>')
-          tags=['<script src="backend_url.js"></script>','<script src="core_bridge_compat.js"></script>','<script src="remote_gate.js"></script>','<script src="remote_sync.js"></script>','<script src="apk_link.js"></script>','<script src="runtime_fixes.js"></script>']
+          tags=['<script src="backend_url.js"></script>','<script src="core_bridge_compat.js"></script>','<script src="local_runtime.js"></script>','<script src="remote_gate.js"></script>','<script src="remote_sync.js"></script>','<script src="apk_link.js"></script>','<script src="runtime_fixes.js"></script>']
           for tag in tags:
             if tag not in s:s=s.replace('</body>',tag+'\n</body>')
           drain='''<script id="bs-native-drain">(function(){var q=window.__bsNativeQueue||[];if(window.BoatStation){q.forEach(function(x){try{var fn=window.BoatStation[x[0]];if(typeof fn==='function')fn(x[1])}catch(e){}})}window.__bsNativeQueue=[];})();</script>'''
