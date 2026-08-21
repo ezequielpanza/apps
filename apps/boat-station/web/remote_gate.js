@@ -1,5 +1,25 @@
 (function(){
   const isInsideApk = !!(window.CoreBridge || window.BoatStationCore || /[?&]mode=station(?:&|$)/.test(location.search));
+
+  function adjustSupervisionMenu(){
+    const btn=document.querySelector('#showQrBtn');
+    if(!btn)return;
+    const row=btn.closest('.option')||btn.parentElement;
+    if(isInsideApk){
+      btn.textContent='Mostrar QR para supervisar remotamente';
+      btn.style.width='100%';
+      if(row){
+        Array.from(row.children).forEach(el=>{if(el!==btn)el.style.display='none'});
+        row.style.display='flex';
+      }
+    }else if(row){
+      row.style.display='none';
+    }
+  }
+
+  adjustSupervisionMenu();
+  new MutationObserver(adjustSupervisionMenu).observe(document.documentElement,{childList:true,subtree:true});
+
   if (isInsideApk) return;
 
   const style = document.createElement('style');
@@ -50,7 +70,7 @@
 
   function normalizeCode(v){return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,16)}
   function prettyCode(v){const s=normalizeCode(v);return s.match(/.{1,4}/g)?.join('-')||''}
-  input.addEventListener('input',()=>{const p=input.selectionStart;input.value=prettyCode(input.value);try{input.setSelectionRange(input.value.length,input.value.length)}catch(e){}});
+  input.addEventListener('input',()=>{input.value=prettyCode(input.value);try{input.setSelectionRange(input.value.length,input.value.length)}catch(e){}});
 
   function savePairing(payload){
     try{
