@@ -69,6 +69,8 @@ public class MainActivityCore extends MainActivityV200 {
                     injectAsset(view, "patch_v101.js");
                     injectAsset(view, "patch_v200.js");
                     injectAsset(view, "patch_v102.js");
+                    injectAsset(view, "patch_v105.js");
+                    injectAsset(view, "patch_v106.js");
                 }
 
                 if (local && capturingLegacy) {
@@ -94,8 +96,6 @@ public class MainActivityCore extends MainActivityV200 {
             }
         });
 
-        // Core must always become usable without waiting for Internet.
-        // Cloud mode is still available explicitly through reloadWeb().
         if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(MIGRATED, false)) {
             capturingLegacy = true;
         }
@@ -113,7 +113,7 @@ public class MainActivityCore extends MainActivityV200 {
 
     private void announceCore(WebView view, String mode) {
         view.evaluateJavascript(
-            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.4'};" +
+            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.5'};" +
             "window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));",
             null
         );
@@ -163,7 +163,7 @@ public class MainActivityCore extends MainActivityV200 {
     }
 
     public class CoreBridge {
-        @JavascriptInterface public String getCoreVersion() { return "1.0.4"; }
+        @JavascriptInterface public String getCoreVersion() { return "1.0.5"; }
         @JavascriptInterface public String getMode() { return "station"; }
 
         @JavascriptInterface
@@ -175,6 +175,7 @@ public class MainActivityCore extends MainActivityV200 {
                 o.put("notifications", true); o.put("wifi", true);
                 o.put("usb", true); o.put("nfc", true);
                 o.put("tts", true); o.put("backup", true); o.put("webUpdate", true);
+                o.put("remoteTelemetry", true);
                 return o.toString();
             } catch (Exception e) { return "{}"; }
         }
