@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#061522">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Boat Station Remote</title>
+<style>
+:root{--bg:#061522;--card:#0b2335;--card2:#0e2b40;--text:#f4f8fb;--muted:#94a7b6;--line:#17394f;--accent:#1ed7e5;--ok:#8bd332}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}.app{min-height:100vh;background:radial-gradient(circle at 70% -10%,#0d3450 0,#071c2d 34%,#061522 70%)}.topbar{position:sticky;top:0;z-index:40;height:64px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#061522f2;border-bottom:1px solid #103248}.brandwrap{display:flex;align-items:center;gap:9px}.brandlogo{width:32px;height:32px}.brand{font-weight:850;letter-spacing:.05em}.brand b{color:var(--accent)}.iconbtn{width:42px;height:42px;border:0;border-radius:12px;background:#0b2639;color:#fff;font-size:22px}.content{padding:14px 12px 90px}.stationline{padding:4px 4px 14px;color:var(--muted);font-size:13px}.stationline strong{color:var(--text)}.card{background:linear-gradient(145deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:17px;margin-bottom:11px;overflow:hidden}.card-head{height:50px;display:flex;align-items:center;gap:8px;padding:9px 11px}.dot{width:9px;height:9px;border-radius:50%;background:#718797}.dot.online{background:var(--ok)}.title{font-weight:780;flex:1}.summary{font-size:12px;color:var(--muted)}.body{padding:12px;height:150px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.metric{background:#113148;border:1px solid #173d55;border-radius:11px;padding:10px}.metric .value{font-size:21px;font-weight:800}.metric .label{font-size:11px;color:var(--muted);margin-top:5px}.empty{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted)}.sheet{position:fixed;inset:0;background:#0008;display:none;align-items:flex-end;z-index:200}.sheet.open{display:flex}.sheet-inner{width:100%;background:#0b2335;border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:17px 16px 28px;max-height:86vh;overflow:auto}.handle{width:44px;height:5px;background:#315064;border-radius:99px;margin:0 auto 16px}.option{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 2px;border-bottom:1px solid var(--line)}.btn,.select{border:1px solid #24516a;background:#102f45;color:#fff;border-radius:10px;padding:9px 11px}.statusbox{border:1px solid var(--line);border-radius:12px;background:#081c2b;padding:11px;margin:10px 0}.sub{font-size:12px;color:var(--muted)}#qrVideo{width:100%;border-radius:14px;background:#000;max-height:50vh}.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <button class="iconbtn" id="menuBtn">☰</button>
+    <div class="brandwrap"><img class="brandlogo" src="icon.svg"><div class="brand">BOAT <b>STATION</b></div></div>
+    <button class="iconbtn" id="refreshBtn">↻</button>
+  </div>
+  <div class="content">
+    <div class="stationline" id="stationLine">Boat Station Remote · <strong>Sin vincular</strong></div>
+    <div id="cards"></div>
+  </div>
+</div>
+<div class="sheet" id="menuSheet"><div class="sheet-inner"><div class="handle"></div><h3>Boat Station Remote</h3>
+  <div class="option"><span>Versión</span><small id="version">0.1.0</small></div>
+  <div class="statusbox"><b id="connectionTitle">Sin Station vinculada</b><div class="sub" id="connectionSub">Escaneá el QR mostrado por Boat Station Local.</div></div>
+  <div class="option"><span>Actualizar cada</span><select class="select" id="interval"><option value="5">5 s</option><option value="10">10 s</option><option value="30">30 s</option><option value="60">1 min</option><option value="300">5 min</option></select></div>
+  <div class="option"><span>Vinculación</span><button class="btn" id="scanBtn">Escanear QR</button></div>
+</div></div>
+<div class="sheet" id="scanSheet"><div class="sheet-inner"><div class="handle"></div><h3>Escanear QR</h3><video id="qrVideo" playsinline></video><div class="sub" id="scanMsg" style="margin-top:10px">Apuntá la cámara al QR de Boat Station Local.</div><div class="option"><button class="btn" id="cancelScan">Cancelar</button></div></div></div>
+<script>
+const $=s=>document.querySelector(s);let timer=null,stream=null;const key='boatStationRemote';let cfg=JSON.parse(localStorage.getItem(key)||'{"interval":10}');
+function render(){const linked=!!cfg.stationId;$('#stationLine').innerHTML='Boat Station Remote · <strong>'+(linked?'Conectado a '+(cfg.boatName||'Station'):'Sin vincular')+'</strong>';$('#connectionTitle').textContent=linked?'Conectado a '+(cfg.boatName||'Station'):'Sin Station vinculada';$('#connectionSub').textContent=linked?'Última actualización: '+(cfg.lastUpdate?new Date(cfg.lastUpdate).toLocaleTimeString():'sin datos'):'Escaneá el QR mostrado por Boat Station Local.';$('#interval').value=String(cfg.interval||10);const mods=(cfg.modules&&Array.isArray(cfg.modules)?cfg.modules:['GPS','Estado del teléfono','Sea State','Brújula']);$('#cards').innerHTML=mods.map(n=>`<div class="card"><div class="card-head"><span class="dot ${linked?'online':''}"></span><div class="title">${n}</div><div class="summary">${linked?'Remoto':'Sin datos'}</div></div><div class="body"><div class="empty">${linked?'Esperando datos de la Station…':'Vinculá una Boat Station para ver este módulo.'}</div></div></div>`).join('')}
+function save(){localStorage.setItem(key,JSON.stringify(cfg));render();schedule()}
+function schedule(){clearInterval(timer);timer=setInterval(refresh,(cfg.interval||10)*1000)}
+async function refresh(){if(!cfg.stationId)return;cfg.lastUpdate=Date.now();localStorage.setItem(key,JSON.stringify(cfg));render()}
+function parseQR(v){try{let o;if(v.trim().startsWith('{'))o=JSON.parse(v);else{const u=new URL(v);o={stationId:u.searchParams.get('station'),token:u.searchParams.get('token'),boatName:u.searchParams.get('name')}};if(!o.stationId)throw 0;cfg.stationId=o.stationId;cfg.token=o.token||'';cfg.boatName=o.boatName||o.name||'Station';cfg.modules=o.modules||cfg.modules;save();closeScan()}catch(e){$('#scanMsg').textContent='QR no reconocido como Boat Station.'}}
+async function startScan(){$('#menuSheet').classList.remove('open');$('#scanSheet').classList.add('open');if(!navigator.mediaDevices?.getUserMedia){$('#scanMsg').textContent='Este navegador no permite usar la cámara.';return}try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});$('#qrVideo').srcObject=stream;await $('#qrVideo').play();if('BarcodeDetector'in window){const det=new BarcodeDetector({formats:['qr_code']});const loop=async()=>{if(!stream)return;try{const r=await det.detect($('#qrVideo'));if(r.length){parseQR(r[0].rawValue);return}}catch(e){}requestAnimationFrame(loop)};loop()}else{$('#scanMsg').textContent='Tu navegador no soporta lectura QR directa todavía.'}}catch(e){$('#scanMsg').textContent='No se pudo acceder a la cámara.'}}
+function closeScan(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#scanSheet').classList.remove('open')}
+$('#menuBtn').onclick=()=>$('#menuSheet').classList.add('open');$('#menuSheet').onclick=e=>{if(e.target===$('#menuSheet'))$('#menuSheet').classList.remove('open')};$('#scanBtn').onclick=startScan;$('#cancelScan').onclick=closeScan;$('#refreshBtn').onclick=refresh;$('#interval').onchange=e=>{cfg.interval=Number(e.target.value);save()};if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');render();schedule();
+</script>
+</body></html>
