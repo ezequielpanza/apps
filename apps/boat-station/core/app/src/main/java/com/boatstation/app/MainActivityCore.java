@@ -1,13 +1,18 @@
 package com.boatstation.app;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.speech.tts.TextToSpeech;
 import android.util.Base64;
 import android.view.View;
@@ -33,15 +38,27 @@ import java.util.Locale;
 
 /** Stable native shell: Android/hardware access only. Boat Station itself lives in the PWA. */
 public class MainActivityCore extends MainActivityV100 {
-    private static final String CORE_VERSION = "1.1.0";
+    private static final String CORE_VERSION = "1.1.1";
     private static final String WEB_URL = "https://boat-station.pages.dev/?mode=station";
     private static final int REQ_EXPORT_GPX = 3101;
     private static final int REQ_IMPORT_GPX = 3102;
+    private static final long SENSOR_PUSH_MS = 80; // ~12.5 Hz, fast enough for a fluid compass without flooding WebView
 
     private WebView coreWebView;
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
     private String pendingGpx = "";
+
+    // Core-owned sensor path. We intentionally replace the legacy inherited
+    // accelerometer+magnetometer stream so the WebView is not flooded with JS calls.
+    private SensorManager coreSensorManager;
+    private Sensor coreRotationSensor;
+    private Sensor coreAccelSensor;
+    private long lastSensorPush = 0;
+    private float latestHeading = 0f;
+    private double latestMotion = 0d;
+    private boolean haveHeading = false;
+    private boolean haveMotion = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +77,12 @@ public class MainActivityCore extends MainActivityV100 {
         coreWebView.getSettings().setAllowContentAccess(true);
         coreWebView.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
 
+        coreSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        if (coreSensorManager != null) {
+            coreRotationSensor = coreSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+            coreAccelSensor = coreSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        }
+
         coreWebView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -70,6 +93,7 @@ public class MainActivityCore extends MainActivityV100 {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 announceCore(view);
+                pushSensorFrame(true);
             }
 
             @Override
@@ -79,6 +103,68 @@ public class MainActivityCore extends MainActivityV100 {
             }
         });
         coreWebView.loadUrl(WEB_URL);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (coreSensorManager != null) {
+            // Remove the inherited MainActivity registrations first. They generated
+            // multiple evaluateJavascript calls per sensor event and could backlog the UI.
+            coreSensorManager.unregisterListener(this);
+            if (coreRotationSensor != null)
+                coreSensorManager.registerListener(this, coreRotationSensor, SensorManager.SENSOR_DELAY_GAME);
+            if (coreAccelSensor != null)
+                coreSensorManager.registerListener(this, coreAccelSensor, SensorManager.SENSOR_DELAY_GAME);
+        }
+        lastSensorPush = 0;
+    }
+
+    @Override
+    protected void onPause() {
+        if (coreSensorManager != null) coreSensorManager.unregisterListener(this);
+        super.onPause();
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event == null || event.sensor == null) return;
+        int type = event.sensor.getType();
+        if (type == Sensor.TYPE_ROTATION_VECTOR) {
+            float[] r = new float[9];
+            float[] o = new float[3];
+            try {
+                SensorManager.getRotationMatrixFromVector(r, event.values);
+                SensorManager.getOrientation(r, o);
+                float h = (float) Math.toDegrees(o[0]);
+                if (h < 0) h += 360f;
+                latestHeading = h;
+                haveHeading = true;
+            } catch (Exception ignored) { }
+        } else if (type == Sensor.TYPE_ACCELEROMETER) {
+            double m = Math.sqrt(
+                event.values[0] * event.values[0] +
+                event.values[1] * event.values[1] +
+                event.values[2] * event.values[2]);
+            latestMotion = Math.abs(m - SensorManager.GRAVITY_EARTH);
+            haveMotion = true;
+        }
+        pushSensorFrame(false);
+    }
+
+    private void pushSensorFrame(boolean force) {
+        if (coreWebView == null) return;
+        long now = SystemClock.elapsedRealtime();
+        if (!force && now - lastSensorPush < SENSOR_PUSH_MS) return;
+        if (!haveHeading && !haveMotion) return;
+        lastSensorPush = now;
+        String heading = haveHeading ? String.format(Locale.US, "%.1f", latestHeading) : "null";
+        String motion = haveMotion ? String.format(Locale.US, "%.3f", latestMotion) : "null";
+        String js = "(function(){var b=window.BoatStation;if(!b)return;" +
+            "if(" + heading + "!==null&&b.updateCompass)b.updateCompass(" + heading + ");" +
+            "if(" + motion + "!==null&&b.updateMotion)b.updateMotion(" + motion + ");" +
+            "window.__bsLastNativeSensor=Date.now();})();";
+        coreWebView.post(() -> coreWebView.evaluateJavascript(js, null));
     }
 
     private void announceCore(WebView view) {
@@ -200,6 +286,20 @@ public class MainActivityCore extends MainActivityV100 {
         @JavascriptInterface public boolean isTtsReady() { return ttsReady; }
 
         @JavascriptInterface
+        public void restartSensors() {
+            runOnUiThread(() -> {
+                if (coreSensorManager == null) return;
+                coreSensorManager.unregisterListener(MainActivityCore.this);
+                if (coreRotationSensor != null)
+                    coreSensorManager.registerListener(MainActivityCore.this, coreRotationSensor, SensorManager.SENSOR_DELAY_GAME);
+                if (coreAccelSensor != null)
+                    coreSensorManager.registerListener(MainActivityCore.this, coreAccelSensor, SensorManager.SENSOR_DELAY_GAME);
+                lastSensorPush = 0;
+                pushSensorFrame(true);
+            });
+        }
+
+        @JavascriptInterface
         public void speak(final String text) {
             runOnUiThread(() -> {
                 if (tts != null && ttsReady && text != null && !text.trim().isEmpty())
@@ -254,6 +354,7 @@ public class MainActivityCore extends MainActivityV100 {
 
     @Override
     protected void onDestroy() {
+        if (coreSensorManager != null) coreSensorManager.unregisterListener(this);
         if (tts != null) { tts.stop(); tts.shutdown(); }
         super.onDestroy();
     }
