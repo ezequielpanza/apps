@@ -24,7 +24,7 @@ import java.util.Locale;
 /** Stable native container for Boat Station Web. */
 public class MainActivityCore extends MainActivityV200 {
     private static final String WEB_URL = "https://boat-station.pages.dev/?mode=station";
-    private static final String LOCAL_URL = "file:///android_asset/index_v100.html";
+    private static final String LOCAL_URL = "file:///android_asset/index_v100.html?mode=station";
     private static final String PREFS = "boat_station";
     private static final String MIGRATED = "core_web_storage_migrated_v1";
     private static final String LEGACY_STORAGE = "core_legacy_web_storage";
@@ -46,6 +46,7 @@ public class MainActivityCore extends MainActivityV200 {
         coreWebView.addJavascriptInterface(new CoreBridge(), "CoreBridge");
         coreWebView.getSettings().setDomStorageEnabled(true);
         coreWebView.getSettings().setJavaScriptEnabled(true);
+        coreWebView.getSettings().setCacheMode(android.webkit.WebSettings.LOAD_DEFAULT);
 
         coreWebView.setWebViewClient(new WebViewClient() {
             @Override
@@ -67,9 +68,8 @@ public class MainActivityCore extends MainActivityV200 {
                 if (local) {
                     injectAsset(view, "patch_v101.js");
                     injectAsset(view, "patch_v200.js");
+                    injectAsset(view, "patch_v102.js");
                 }
-
-                injectAsset(view, "patch_v102.js");
 
                 if (local && capturingLegacy) {
                     view.evaluateJavascript(
@@ -94,12 +94,12 @@ public class MainActivityCore extends MainActivityV200 {
             }
         });
 
+        // Core must always become usable without waiting for Internet.
+        // Cloud mode is still available explicitly through reloadWeb().
         if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(MIGRATED, false)) {
             capturingLegacy = true;
-            coreWebView.loadUrl(LOCAL_URL + "?coreMigration=1");
-        } else {
-            coreWebView.loadUrl(WEB_URL);
         }
+        coreWebView.loadUrl(LOCAL_URL);
     }
 
     private void restoreLegacyStorageIfNeeded(WebView view) {
@@ -107,13 +107,13 @@ public class MainActivityCore extends MainActivityV200 {
         String raw = getSharedPreferences(PREFS, MODE_PRIVATE).getString(LEGACY_STORAGE, "");
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(MIGRATED, true).apply();
         if (raw == null || raw.isEmpty()) return;
-        String js = "(function(){try{var o=JSON.parse(" + JSONObject.quote(raw) + ");Object.keys(o).forEach(function(k){if(k.indexOf('bs.')===0)localStorage.setItem(k,o[k]);});location.reload();}catch(e){}})()";
+        String js = "(function(){try{var o=JSON.parse(" + JSONObject.quote(raw) + ");Object.keys(o).forEach(function(k){if(k.indexOf('bs.')===0)localStorage.setItem(k,o[k]);});}catch(e){}})()";
         view.evaluateJavascript(js, null);
     }
 
     private void announceCore(WebView view, String mode) {
         view.evaluateJavascript(
-            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.3'};" +
+            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.4'};" +
             "window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));",
             null
         );
@@ -163,7 +163,7 @@ public class MainActivityCore extends MainActivityV200 {
     }
 
     public class CoreBridge {
-        @JavascriptInterface public String getCoreVersion() { return "1.0.3"; }
+        @JavascriptInterface public String getCoreVersion() { return "1.0.4"; }
         @JavascriptInterface public String getMode() { return "station"; }
 
         @JavascriptInterface
@@ -183,11 +183,14 @@ public class MainActivityCore extends MainActivityV200 {
 
         @JavascriptInterface
         public void saveLegacyStorage(String json) {
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(LEGACY_STORAGE, json == null ? "" : json).apply();
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString(LEGACY_STORAGE, json == null ? "" : json)
+                .putBoolean(MIGRATED, true)
+                .apply();
             runOnUiThread(() -> {
                 capturingLegacy = false;
-                fallingBack = false;
-                if (coreWebView != null) coreWebView.loadUrl(WEB_URL + "&migration=1");
+                fallingBack = true;
+                if (coreWebView != null) announceCore(coreWebView, "bundled");
             });
         }
 
