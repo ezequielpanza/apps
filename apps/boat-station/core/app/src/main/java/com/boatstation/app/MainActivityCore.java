@@ -67,17 +67,20 @@ public class MainActivityCore extends MainActivityV200 {
                 if (local) {
                     injectAsset(view, "patch_v101.js");
                     injectAsset(view, "patch_v200.js");
-                    if (capturingLegacy) {
-                        view.evaluateJavascript(
-                            "(function(){var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);o[k]=localStorage.getItem(k)}CoreBridge.saveLegacyStorage(JSON.stringify(o));})()",
-                            null
-                        );
-                        return;
-                    }
-                } else {
-                    restoreLegacyStorageIfNeeded(view);
                 }
 
+                // 1.0.2 UI/linking fixes are injected in both cloud and bundled modes.
+                injectAsset(view, "patch_v102.js");
+
+                if (local && capturingLegacy) {
+                    view.evaluateJavascript(
+                        "(function(){var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);o[k]=localStorage.getItem(k)}CoreBridge.saveLegacyStorage(JSON.stringify(o));})()",
+                        null
+                    );
+                    return;
+                }
+
+                if (!local) restoreLegacyStorageIfNeeded(view);
                 announceCore(view, local ? "bundled" : "cloud");
             }
 
@@ -111,7 +114,7 @@ public class MainActivityCore extends MainActivityV200 {
 
     private void announceCore(WebView view, String mode) {
         view.evaluateJavascript(
-            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.1'};" +
+            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.2'};" +
             "window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));",
             null
         );
@@ -161,7 +164,7 @@ public class MainActivityCore extends MainActivityV200 {
     }
 
     public class CoreBridge {
-        @JavascriptInterface public String getCoreVersion() { return "1.0.1"; }
+        @JavascriptInterface public String getCoreVersion() { return "1.0.2"; }
         @JavascriptInterface public String getMode() { return "station"; }
 
         @JavascriptInterface
