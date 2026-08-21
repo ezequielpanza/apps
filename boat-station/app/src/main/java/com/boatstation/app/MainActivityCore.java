@@ -1,15 +1,19 @@
 package com.boatstation.app;
 
-import android.app.Activity;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.speech.tts.TextToSpeech;
+import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.view.View;
-import android.view.ViewGroup;
 
 import org.json.JSONObject;
 
@@ -17,22 +21,19 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Locale;
 
-/**
- * Boat Station Core 1.x
- *
- * Stable native container. Native hardware/data bridges remain in the parent
- * activities while the user interface is loaded from Boat Station Web on
- * Cloudflare. If the network copy cannot be loaded, Core falls back to the
- * bundled UI so the Station remains usable offline.
- */
+/** Stable native container for Boat Station Web. */
 public class MainActivityCore extends MainActivityV200 {
     private static final String WEB_URL = "https://boat-station-remote.pages.dev/?mode=station";
     private static final String LOCAL_URL = "file:///android_asset/index_v100.html";
+    private static final String PREFS = "boat_station";
+    private static final String MIGRATED = "core_web_storage_migrated_v1";
+    private static final String LEGACY_STORAGE = "core_legacy_web_storage";
 
     private WebView coreWebView;
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
     private boolean fallingBack = false;
+    private boolean capturingLegacy = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,19 +49,36 @@ public class MainActivityCore extends MainActivityV200 {
 
         coreWebView.setWebViewClient(new WebViewClient() {
             @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri u = request.getUrl();
+                if (u == null) return true;
+                String scheme = u.getScheme();
+                String host = u.getHost();
+                if ("file".equals(scheme)) return false;
+                return !("https".equals(scheme) && "boat-station-remote.pages.dev".equals(host));
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                fallingBack = url != null && url.startsWith("file:///android_asset/");
-                if (fallingBack) {
+                boolean local = url != null && url.startsWith("file:///android_asset/");
+                fallingBack = local;
+
+                if (local) {
                     injectAsset(view, "patch_v101.js");
                     injectAsset(view, "patch_v200.js");
+                    if (capturingLegacy) {
+                        view.evaluateJavascript(
+                            "(function(){var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);o[k]=localStorage.getItem(k)}CoreBridge.saveLegacyStorage(JSON.stringify(o));})()",
+                            null
+                        );
+                        return;
+                    }
+                } else {
+                    restoreLegacyStorageIfNeeded(view);
                 }
-                String mode = fallingBack ? "bundled" : "cloud";
-                view.evaluateJavascript(
-                    "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.0'};" +
-                    "window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));",
-                    null
-                );
+
+                announceCore(view, local ? "bundled" : "cloud");
             }
 
             @Override
@@ -68,14 +86,38 @@ public class MainActivityCore extends MainActivityV200 {
                 super.onReceivedError(view, request, error);
                 if (request != null && request.isForMainFrame() && !fallingBack) {
                     fallingBack = true;
+                    capturingLegacy = false;
                     view.loadUrl(LOCAL_URL);
                 }
             }
         });
 
-        // The Cloudflare PWA is the normal UI. The bundled UI is only the
-        // guaranteed offline/bootstrap fallback.
-        coreWebView.loadUrl(WEB_URL);
+        // First Core launch imports the old file:// localStorage into the new
+        // https:// Web origin. Native SharedPreferences/data folders are already
+        // preserved independently.
+        if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(MIGRATED, false)) {
+            capturingLegacy = true;
+            coreWebView.loadUrl(LOCAL_URL + "?coreMigration=1");
+        } else {
+            coreWebView.loadUrl(WEB_URL);
+        }
+    }
+
+    private void restoreLegacyStorageIfNeeded(WebView view) {
+        if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(MIGRATED, false)) return;
+        String raw = getSharedPreferences(PREFS, MODE_PRIVATE).getString(LEGACY_STORAGE, "");
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(MIGRATED, true).apply();
+        if (raw == null || raw.isEmpty()) return;
+        String js = "(function(){try{var o=JSON.parse(" + JSONObject.quote(raw) + ");Object.keys(o).forEach(function(k){if(k.indexOf('bs.')===0)localStorage.setItem(k,o[k]);});location.reload();}catch(e){}})()";
+        view.evaluateJavascript(js, null);
+    }
+
+    private void announceCore(WebView view, String mode) {
+        view.evaluateJavascript(
+            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.0'};" +
+            "window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));",
+            null
+        );
     }
 
     private void initTts() {
@@ -88,6 +130,14 @@ public class MainActivityCore extends MainActivityV200 {
                 ttsReady = true;
             }
         });
+    }
+
+    private void toneFallback() {
+        try {
+            ToneGenerator tone = new ToneGenerator(AudioManager.STREAM_ALARM, 100);
+            tone.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 1200);
+            new Handler(Looper.getMainLooper()).postDelayed(tone::release, 1500);
+        } catch (Exception ignored) { }
     }
 
     private void injectAsset(WebView view, String file) {
@@ -114,60 +164,58 @@ public class MainActivityCore extends MainActivityV200 {
     }
 
     public class CoreBridge {
-        @JavascriptInterface
-        public String getCoreVersion() {
-            return "1.0.0";
-        }
-
-        @JavascriptInterface
-        public String getMode() {
-            return "station";
-        }
+        @JavascriptInterface public String getCoreVersion() { return "1.0.0"; }
+        @JavascriptInterface public String getMode() { return "station"; }
 
         @JavascriptInterface
         public String getCapabilities() {
             try {
                 JSONObject o = new JSONObject();
-                o.put("location", true);
-                o.put("bluetooth", true);
-                o.put("camera", true);
-                o.put("microphone", true);
-                o.put("notifications", true);
-                o.put("wifi", true);
-                o.put("usb", true);
-                o.put("nfc", true);
-                o.put("tts", true);
-                o.put("backup", true);
-                o.put("webUpdate", true);
+                o.put("location", true); o.put("bluetooth", true);
+                o.put("camera", true); o.put("microphone", true);
+                o.put("notifications", true); o.put("wifi", true);
+                o.put("usb", true); o.put("nfc", true);
+                o.put("tts", true); o.put("backup", true); o.put("webUpdate", true);
                 return o.toString();
-            } catch (Exception e) {
-                return "{}";
-            }
+            } catch (Exception e) { return "{}"; }
         }
 
+        @JavascriptInterface public boolean isTtsReady() { return ttsReady; }
+
         @JavascriptInterface
-        public boolean isTtsReady() {
-            return ttsReady;
+        public void saveLegacyStorage(String json) {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(LEGACY_STORAGE, json == null ? "" : json).apply();
+            runOnUiThread(() -> {
+                capturingLegacy = false;
+                fallingBack = false;
+                if (coreWebView != null) coreWebView.loadUrl(WEB_URL + "&migration=1");
+            });
         }
 
         @JavascriptInterface
         public void speak(final String text) {
             runOnUiThread(() -> {
-                if (tts != null && ttsReady && text != null && !text.trim().isEmpty()) {
-                    tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "boat-station-alarm");
-                }
+                if (tts != null && ttsReady && text != null && !text.trim().isEmpty())
+                    tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "boat-station-tts");
             });
         }
 
         @JavascriptInterface
-        public void stopSpeaking() {
-            runOnUiThread(() -> { if (tts != null) tts.stop(); });
+        public void alarm(final String text) {
+            runOnUiThread(() -> {
+                if (tts != null && ttsReady && text != null && !text.trim().isEmpty())
+                    tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "boat-station-alarm");
+                else toneFallback();
+            });
         }
+
+        @JavascriptInterface public void stopSpeaking() { runOnUiThread(() -> { if (tts != null) tts.stop(); }); }
 
         @JavascriptInterface
         public void reloadWeb() {
             runOnUiThread(() -> {
                 fallingBack = false;
+                capturingLegacy = false;
                 if (coreWebView != null) coreWebView.loadUrl(WEB_URL + "&t=" + System.currentTimeMillis());
             });
         }
@@ -176,6 +224,7 @@ public class MainActivityCore extends MainActivityV200 {
         public void useBundledWeb() {
             runOnUiThread(() -> {
                 fallingBack = true;
+                capturingLegacy = false;
                 if (coreWebView != null) coreWebView.loadUrl(LOCAL_URL);
             });
         }
@@ -183,10 +232,7 @@ public class MainActivityCore extends MainActivityV200 {
 
     @Override
     protected void onDestroy() {
-        if (tts != null) {
-            tts.stop();
-            tts.shutdown();
-        }
+        if (tts != null) { tts.stop(); tts.shutdown(); }
         super.onDestroy();
     }
 }

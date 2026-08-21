@@ -47,18 +47,40 @@ jobs:
           mkdir -p boat-station/releases
           cp boat-station/app/build/outputs/apk/debug/app-debug.apk "boat-station/releases/BoatStation-Core-${{ steps.version.outputs.version }}.apk"
 
-      - name: Publish APK in repository
-        if: github.event_name == 'push'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "boat-station/releases/BoatStation-Core-${{ steps.version.outputs.version }}.apk"
-          git diff --cached --quiet || git commit -m "Build Boat Station Core ${{ steps.version.outputs.version }} APK"
-          git push
-
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: BoatStation-Core-${{ steps.version.outputs.version }}
           path: boat-station/releases/BoatStation-Core-${{ steps.version.outputs.version }}.apk
           if-no-files-found: error
+
+      - name: Publish APK in repository
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="BoatStation-Core-${{ steps.version.outputs.version }}.apk"
+          cp "boat-station/releases/$APK" "/tmp/$APK"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git reset --hard origin/main
+          mkdir -p boat-station/releases
+          cp "/tmp/$APK" "boat-station/releases/$APK"
+          git add "boat-station/releases/$APK"
+          if git diff --cached --quiet; then
+            echo "APK already published"
+            exit 0
+          fi
+          git commit -m "Build Boat Station Core ${{ steps.version.outputs.version }} APK"
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then exit 0; fi
+            echo "Concurrent main update; rebasing publish attempt $attempt"
+            cp "boat-station/releases/$APK" "/tmp/$APK"
+            git fetch origin main
+            git reset --hard origin/main
+            cp "/tmp/$APK" "boat-station/releases/$APK"
+            git add "boat-station/releases/$APK"
+            git commit -m "Build Boat Station Core ${{ steps.version.outputs.version }} APK" || true
+          done
+          exit 1
