@@ -1,5 +1,7 @@
 package com.boatstation.app;
 
+import android.content.Intent;
+import android.graphics.Bitmap;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.net.Uri;
@@ -7,125 +9,97 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.speech.tts.TextToSpeech;
+import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.MultiFormatWriter;
+import com.google.zxing.common.BitMatrix;
+
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
-/** Stable native container for Boat Station Web. */
-public class MainActivityCore extends MainActivityV200 {
+/** Stable native shell: Android/hardware access only. Boat Station itself lives in the PWA. */
+public class MainActivityCore extends MainActivityV100 {
+    private static final String CORE_VERSION = "1.1.0";
     private static final String WEB_URL = "https://boat-station.pages.dev/?mode=station";
-    private static final String LOCAL_URL = "file:///android_asset/index_v100.html?mode=station";
-    private static final String PREFS = "boat_station";
-    private static final String MIGRATED = "core_web_storage_migrated_v1";
-    private static final String LEGACY_STORAGE = "core_legacy_web_storage";
+    private static final int REQ_EXPORT_GPX = 3101;
+    private static final int REQ_IMPORT_GPX = 3102;
 
     private WebView coreWebView;
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
-    private boolean fallingBack = false;
-    private boolean capturingLegacy = false;
+    private String pendingGpx = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         coreWebView = findWebView(getWindow().getDecorView());
         if (coreWebView == null) return;
 
+        // Parent classes still provide native bridges. Stop their legacy local UI immediately.
+        coreWebView.stopLoading();
         initTts();
         coreWebView.addJavascriptInterface(new CoreBridge(), "CoreBridge");
-        coreWebView.getSettings().setDomStorageEnabled(true);
+        coreWebView.addJavascriptInterface(new NativeToolsBridge(), "NativeToolsBridge");
         coreWebView.getSettings().setJavaScriptEnabled(true);
-        coreWebView.getSettings().setCacheMode(android.webkit.WebSettings.LOAD_DEFAULT);
+        coreWebView.getSettings().setDomStorageEnabled(true);
+        coreWebView.getSettings().setAllowFileAccess(true);
+        coreWebView.getSettings().setAllowContentAccess(true);
+        coreWebView.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
 
         coreWebView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                Uri u = request.getUrl();
-                if (u == null) return true;
-                String scheme = u.getScheme();
-                String host = u.getHost();
-                if ("file".equals(scheme)) return false;
-                return !("https".equals(scheme) && "boat-station.pages.dev".equals(host));
+                return false;
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                boolean local = url != null && url.startsWith("file:///android_asset/");
-                fallingBack = local;
-
-                if (local) {
-                    injectAsset(view, "patch_v101.js");
-                    injectAsset(view, "patch_v200.js");
-                    injectAsset(view, "patch_v102.js");
-                    injectAsset(view, "patch_v105.js");
-                    injectAsset(view, "patch_v106.js");
-                }
-
-                if (local && capturingLegacy) {
-                    view.evaluateJavascript(
-                        "(function(){var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);o[k]=localStorage.getItem(k)}CoreBridge.saveLegacyStorage(JSON.stringify(o));})()",
-                        null
-                    );
-                    return;
-                }
-
-                if (!local) restoreLegacyStorageIfNeeded(view);
-                announceCore(view, local ? "bundled" : "cloud");
+                announceCore(view);
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
-                if (request != null && request.isForMainFrame() && !fallingBack) {
-                    fallingBack = true;
-                    capturingLegacy = false;
-                    view.loadUrl(LOCAL_URL);
-                }
+                if (request != null && request.isForMainFrame()) showOfflineShell(view);
             }
         });
-
-        if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(MIGRATED, false)) {
-            capturingLegacy = true;
-        }
-        coreWebView.loadUrl(LOCAL_URL);
+        coreWebView.loadUrl(WEB_URL);
     }
 
-    private void restoreLegacyStorageIfNeeded(WebView view) {
-        if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(MIGRATED, false)) return;
-        String raw = getSharedPreferences(PREFS, MODE_PRIVATE).getString(LEGACY_STORAGE, "");
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(MIGRATED, true).apply();
-        if (raw == null || raw.isEmpty()) return;
-        String js = "(function(){try{var o=JSON.parse(" + JSONObject.quote(raw) + ");Object.keys(o).forEach(function(k){if(k.indexOf('bs.')===0)localStorage.setItem(k,o[k]);});}catch(e){}})()";
-        view.evaluateJavascript(js, null);
-    }
-
-    private void announceCore(WebView view, String mode) {
+    private void announceCore(WebView view) {
         view.evaluateJavascript(
-            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.5'};" +
-            "window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));",
-            null
-        );
+            "window.BoatStationCore={mode:'station',coreVersion:'" + CORE_VERSION + "'};" +
+            "window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));", null);
+    }
+
+    private void showOfflineShell(WebView view) {
+        String html = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>" +
+            "<style>body{margin:0;background:#061522;color:#f4f8fb;font-family:system-ui;display:grid;place-items:center;min-height:100vh}.c{max-width:360px;text-align:center;padding:24px}.b{border:1px solid #24516a;background:#102f45;color:white;border-radius:12px;padding:12px 18px;font-size:16px}</style></head>" +
+            "<body><div class='c'><h2>Boat Station</h2><p>No se pudo cargar Boat Station ni una copia en caché.</p><button class='b' onclick=\"CoreBridge.reloadWeb()\">Reintentar</button></div></body></html>";
+        view.loadDataWithBaseURL("https://boat-station.pages.dev/", html, "text/html", "UTF-8", null);
     }
 
     private void initTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 int result = tts.setLanguage(new Locale("es", "AR"));
-                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED)
                     tts.setLanguage(Locale.getDefault());
-                }
                 ttsReady = true;
             }
         });
@@ -136,17 +110,6 @@ public class MainActivityCore extends MainActivityV200 {
             ToneGenerator tone = new ToneGenerator(AudioManager.STREAM_ALARM, 100);
             tone.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 1200);
             new Handler(Looper.getMainLooper()).postDelayed(tone::release, 1500);
-        } catch (Exception ignored) { }
-    }
-
-    private void injectAsset(WebView view, String file) {
-        try {
-            BufferedReader br = new BufferedReader(new InputStreamReader(getAssets().open(file)));
-            StringBuilder js = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) js.append(line).append('\n');
-            br.close();
-            view.evaluateJavascript(js.toString(), null);
         } catch (Exception ignored) { }
     }
 
@@ -162,38 +125,79 @@ public class MainActivityCore extends MainActivityV200 {
         return null;
     }
 
+    private byte[] readBytes(InputStream in) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] b = new byte[16384];
+        int n;
+        while ((n = in.read(b)) > 0) out.write(b, 0, n);
+        return out.toByteArray();
+    }
+
+    private void chooseGpxExport() {
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.setType("application/gpx+xml");
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.putExtra(Intent.EXTRA_TITLE, "BoatStation-route.gpx");
+        startActivityForResult(i, REQ_EXPORT_GPX);
+    }
+
+    private void chooseGpxImport() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.setType("*/*");
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(i, REQ_IMPORT_GPX);
+    }
+
+    private boolean write(Uri uri, String text) {
+        try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
+            if (o == null) return false;
+            o.write((text == null ? "" : text).getBytes(StandardCharsets.UTF_8));
+            o.flush();
+            return true;
+        } catch (Exception e) { return false; }
+    }
+
+    private String read(Uri uri) {
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            return in == null ? "" : new String(readBytes(in), StandardCharsets.UTF_8);
+        } catch (Exception e) { return ""; }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        if (requestCode == REQ_EXPORT_GPX) {
+            boolean ok = write(uri, pendingGpx);
+            pendingGpx = "";
+            if (coreWebView != null) coreWebView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('boatstation-gpx-exported',{detail:{ok:" + ok + "}}));", null);
+        } else if (requestCode == REQ_IMPORT_GPX) {
+            String raw = read(uri);
+            if (coreWebView != null) coreWebView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('boatstation-gpx-imported',{detail:{gpx:" + JSONObject.quote(raw) + "}}));", null);
+        }
+    }
+
     public class CoreBridge {
-        @JavascriptInterface public String getCoreVersion() { return "1.0.5"; }
+        @JavascriptInterface public String getCoreVersion() { return CORE_VERSION; }
         @JavascriptInterface public String getMode() { return "station"; }
 
         @JavascriptInterface
         public String getCapabilities() {
             try {
                 JSONObject o = new JSONObject();
-                o.put("location", true); o.put("bluetooth", true);
-                o.put("camera", true); o.put("microphone", true);
-                o.put("notifications", true); o.put("wifi", true);
-                o.put("usb", true); o.put("nfc", true);
-                o.put("tts", true); o.put("backup", true); o.put("webUpdate", true);
-                o.put("remoteTelemetry", true);
+                o.put("location", true); o.put("bluetooth", true); o.put("sensors", true);
+                o.put("storage", true); o.put("camera", true); o.put("microphone", true);
+                o.put("notifications", true); o.put("wifi", true); o.put("usb", true);
+                o.put("nfc", true); o.put("tts", true); o.put("wakeLock", true);
+                o.put("background", true); o.put("qr", true); o.put("gpx", true);
                 return o.toString();
             } catch (Exception e) { return "{}"; }
         }
 
         @JavascriptInterface public boolean isTtsReady() { return ttsReady; }
-
-        @JavascriptInterface
-        public void saveLegacyStorage(String json) {
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                .putString(LEGACY_STORAGE, json == null ? "" : json)
-                .putBoolean(MIGRATED, true)
-                .apply();
-            runOnUiThread(() -> {
-                capturingLegacy = false;
-                fallingBack = true;
-                if (coreWebView != null) announceCore(coreWebView, "bundled");
-            });
-        }
 
         @JavascriptInterface
         public void speak(final String text) {
@@ -217,20 +221,35 @@ public class MainActivityCore extends MainActivityV200 {
         @JavascriptInterface
         public void reloadWeb() {
             runOnUiThread(() -> {
-                fallingBack = false;
-                capturingLegacy = false;
-                if (coreWebView != null) coreWebView.loadUrl(WEB_URL + "&t=" + System.currentTimeMillis());
+                if (coreWebView != null) {
+                    coreWebView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+                    coreWebView.loadUrl(WEB_URL + "&t=" + System.currentTimeMillis());
+                }
             });
+        }
+    }
+
+    public class NativeToolsBridge {
+        @JavascriptInterface
+        public String qrDataUrl(String payload) {
+            try {
+                BitMatrix m = new MultiFormatWriter().encode(payload, BarcodeFormat.QR_CODE, 640, 640);
+                Bitmap bmp = Bitmap.createBitmap(640, 640, Bitmap.Config.ARGB_8888);
+                for (int y = 0; y < 640; y++) for (int x = 0; x < 640; x++)
+                    bmp.setPixel(x, y, m.get(x, y) ? 0xFF000000 : 0xFFFFFFFF);
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
+                return "data:image/png;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+            } catch (Exception e) { return ""; }
         }
 
         @JavascriptInterface
-        public void useBundledWeb() {
-            runOnUiThread(() -> {
-                fallingBack = true;
-                capturingLegacy = false;
-                if (coreWebView != null) coreWebView.loadUrl(LOCAL_URL);
-            });
+        public void exportGpx(String gpx) {
+            pendingGpx = gpx == null ? "" : gpx;
+            runOnUiThread(MainActivityCore.this::chooseGpxExport);
         }
+
+        @JavascriptInterface public void importGpx() { runOnUiThread(MainActivityCore.this::chooseGpxImport); }
     }
 
     @Override
