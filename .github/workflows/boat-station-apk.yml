@@ -39,13 +39,28 @@ jobs:
         id: version
         run: echo "version=$(tr -d '\r\n ' < boat-station/VERSION)" >> "$GITHUB_OUTPUT"
 
-      - name: Build Boat Station Core
-        run: gradle -p boat-station :app:assembleDebug --stacktrace
+      - name: Restore permanent signing key
+        env:
+          BOAT_STATION_KEYSTORE_BASE64: ${{ secrets.BOAT_STATION_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$BOAT_STATION_KEYSTORE_BASE64"
+          printf '%s' "$BOAT_STATION_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/boatstation-release.jks"
+
+      - name: Build signed Boat Station Core
+        env:
+          BOAT_STATION_KEYSTORE_PATH: ${{ runner.temp }}/boatstation-release.jks
+          BOAT_STATION_KEYSTORE_PASSWORD: ${{ secrets.BOAT_STATION_KEYSTORE_PASSWORD }}
+          BOAT_STATION_KEY_ALIAS: boatstation
+          BOAT_STATION_KEY_PASSWORD: ${{ secrets.BOAT_STATION_KEY_PASSWORD }}
+        run: gradle -p boat-station :app:assembleRelease --stacktrace
+
+      - name: Verify APK signature
+        run: apksigner verify --verbose --print-certs boat-station/app/build/outputs/apk/release/app-release.apk
 
       - name: Stage APK
         run: |
           mkdir -p boat-station/releases
-          cp boat-station/app/build/outputs/apk/debug/app-debug.apk "boat-station/releases/BoatStation-Core-${{ steps.version.outputs.version }}.apk"
+          cp boat-station/app/build/outputs/apk/release/app-release.apk "boat-station/releases/BoatStation-Core-${{ steps.version.outputs.version }}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
