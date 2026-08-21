@@ -1,0 +1,11 @@
+name = "boat-station-backend"
+main = "src/index.js"
+compatibility_date = "2026-08-21"
+
+[[durable_objects.bindings]]
+name = "STATIONS"
+class_name = "StationState"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StationState"]
