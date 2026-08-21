@@ -26,6 +26,7 @@ jobs:
           test -f "apps/boat-station/web/index.html"
           test -f "apps/boat-station/web/sw.js"
           test -f "apps/boat-station/web/manifest.webmanifest"
+          test -f "apps/boat-station/web/remote_gate.js"
 
       - name: Stage latest APK in PWA
         shell: bash
@@ -39,6 +40,20 @@ jobs:
           else
             echo "Latest APK $APK not published yet; PWA deploy continues without replacing BoatStation.apk"
           fi
+
+      - name: Inject unified remote gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('apps/boat-station/web/index.html')
+          s=p.read_text()
+          tag='<script src="remote_gate.js"></script>'
+          if tag not in s:
+              s=s.replace('</body>', tag+'\n</body>')
+          p.write_text(s)
+          PY
 
       - name: Ensure Boat Station project exists
         env:
