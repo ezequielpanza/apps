@@ -30,6 +30,7 @@ jobs:
           test -f "apps/boat-station/web/apk_link.js"
           test -f "apps/boat-station/web/backend_url.js"
           test -f "apps/boat-station/web/remote_sync.js"
+          test -f "apps/boat-station/web/core_bridge_compat.js"
 
       - name: Stage latest APK in PWA
         shell: bash
@@ -55,6 +56,7 @@ jobs:
           s=p.read_text()
           tags=[
             '<script src="backend_url.js"></script>',
+            '<script src="core_bridge_compat.js"></script>',
             '<script src="remote_gate.js"></script>',
             '<script src="remote_sync.js"></script>',
             '<script src="apk_link.js"></script>'
