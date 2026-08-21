@@ -1,0 +1,13 @@
+{
+  "name": "Boat Station Remote",
+  "short_name": "Boat Station",
+  "description": "Remote viewer for Boat Station Local",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#061522",
+  "theme_color": "#061522",
+  "icons": [
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
