@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/boat_station_icon"
+    android:src="@drawable/boat_station_icon_v100"
     android:gravity="fill" />
