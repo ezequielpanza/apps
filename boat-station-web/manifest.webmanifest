@@ -1,0 +1,11 @@
+{
+  "name": "Boat Station",
+  "short_name": "Boat Station",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#061522",
+  "theme_color": "#061522",
+  "icons": [
+    {"src":"icon.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
