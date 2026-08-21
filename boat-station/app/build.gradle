@@ -10,8 +10,8 @@ android {
         applicationId 'com.boatstation.app'
         minSdk 26
         targetSdk 35
-        versionCode 105
-        versionName '0.1.5'
+        versionCode 200
+        versionName '0.2.0'
     }
 
     buildTypes {
@@ -20,4 +20,8 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+dependencies {
+    implementation 'com.google.zxing:core:3.5.3'
 }
