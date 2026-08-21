@@ -35,10 +35,11 @@ jobs:
           VERSION="$(tr -d '\r\n ' < apps/boat-station/core/VERSION)"
           APK="apps/boat-station/core/releases/BoatStation-Core-${VERSION}.apk"
           if [ -f "$APK" ]; then
-            cp "$APK" apps/boat-station/web/BoatStation.apk
+            cp "$APK" "apps/boat-station/web/BoatStation-Core-${VERSION}.apk"
             echo "$VERSION" > apps/boat-station/web/APK_VERSION
+            printf '%s\n' "/BoatStation.apk /BoatStation-Core-${VERSION}.apk 302" > apps/boat-station/web/_redirects
           else
-            echo "Latest APK $APK not published yet; PWA deploy continues without replacing BoatStation.apk"
+            echo "Latest APK $APK not published yet; PWA deploy continues without replacing latest APK"
           fi
 
       - name: Inject unified remote gate
