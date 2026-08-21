@@ -1,5 +1,5 @@
-const CACHE='boat-station-web-0.2.5';
-const ASSETS=['./','./index.html','./patch_v101.js','./patch_v200.js','./core_bridge_compat.js','./remote_gate.js','./remote_sync.js','./apk_link.js','./backend_url.js','./icon.png','./manifest.webmanifest','./VERSION'];
+const CACHE='boat-station-web-0.2.6';
+const ASSETS=['./','./index.html','./patch_v101.js','./patch_v200.js','./core_bridge_compat.js','./local_runtime.js','./runtime_fixes.js','./remote_gate.js','./remote_sync.js','./apk_link.js','./backend_url.js','./icon.png','./manifest.webmanifest','./VERSION'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('boat-station-web-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
