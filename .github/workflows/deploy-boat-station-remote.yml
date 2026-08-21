@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "apps/boat-station/web/**"
+      - "apps/boat-station/core/VERSION"
+      - "apps/boat-station/core/releases/BoatStation-Core-*.apk"
       - ".github/workflows/deploy-boat-station-remote.yml"
   workflow_dispatch:
 
@@ -24,6 +26,19 @@ jobs:
           test -f "apps/boat-station/web/index.html"
           test -f "apps/boat-station/web/sw.js"
           test -f "apps/boat-station/web/manifest.webmanifest"
+
+      - name: Stage latest APK in PWA
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n ' < apps/boat-station/core/VERSION)"
+          APK="apps/boat-station/core/releases/BoatStation-Core-${VERSION}.apk"
+          if [ -f "$APK" ]; then
+            cp "$APK" apps/boat-station/web/BoatStation.apk
+            echo "$VERSION" > apps/boat-station/web/APK_VERSION
+          else
+            echo "Latest APK $APK not published yet; PWA deploy continues without replacing BoatStation.apk"
+          fi
 
       - name: Ensure Boat Station project exists
         env:
