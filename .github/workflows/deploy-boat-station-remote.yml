@@ -1,16 +1,16 @@
-name: Deploy Boat Station Web + Remote
+name: Deploy Boat Station Web
 
 on:
   push:
     branches: [main]
     paths:
-      - "boat-station-web/**"
-      - "boat-station-remote/**"
+      - "apps/boat-station/web/**"
+      - "apps/boat-station/remote/**"
       - ".github/workflows/deploy-boat-station-remote.yml"
   workflow_dispatch:
 
 jobs:
-  deploy-station-web:
+  deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -18,53 +18,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate Station Web
+      - name: Validate Boat Station PWAs
+        shell: bash
         run: |
           set -euo pipefail
-          test -f boat-station-web/index.html
-          test -f boat-station-web/sw.js
-          test -f boat-station-web/manifest.webmanifest
-          test -f boat-station-web/VERSION
-          echo "Deploying Boat Station Web $(cat boat-station-web/VERSION)"
+          for dir in apps/boat-station/web apps/boat-station/remote; do
+            test -f "$dir/index.html"
+            test -f "$dir/sw.js"
+            test -f "$dir/manifest.webmanifest"
+          done
 
-      - name: Ensure Station Web Pages project exists
+      - name: Ensure Cloudflare Pages projects exist
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@latest pages project create boat-station-web --production-branch=main || true
-
-      - name: Deploy Station Web
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@latest pages deploy boat-station-web --project-name=boat-station-web --branch=main
-
-  deploy-remote:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Validate Remote PWA
         run: |
-          set -euo pipefail
-          test -f boat-station-remote/index.html
-          test -f boat-station-remote/sw.js
-          test -f boat-station-remote/manifest.webmanifest
-          test -f boat-station-remote/VERSION
-          grep -q "Sin Station vinculada" boat-station-remote/index.html
-          echo "Deploying Boat Station Remote $(cat boat-station-remote/VERSION)"
+          npx --yes wrangler@latest pages project create boat-station-web --production-branch=main || true
+          npx --yes wrangler@latest pages project create boat-station-remote --production-branch=main || true
 
-      - name: Ensure Remote Pages project exists
+      - name: Deploy Station Web to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@latest pages project create boat-station-remote --production-branch=main || true
+        run: npx --yes wrangler@latest pages deploy apps/boat-station/web --project-name=boat-station-web --branch=main
 
-      - name: Deploy locked Remote PWA
+      - name: Deploy Remote PWA to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@latest pages deploy boat-station-remote --project-name=boat-station-remote --branch=main
+        run: npx --yes wrangler@latest pages deploy apps/boat-station/remote --project-name=boat-station-remote --branch=main
