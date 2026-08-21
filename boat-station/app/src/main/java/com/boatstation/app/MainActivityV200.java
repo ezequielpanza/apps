@@ -92,7 +92,7 @@ public class MainActivityV200 extends MainActivityV100 {
 
     public class V200Bridge {
         @JavascriptInterface public String qrDataUrl(String payload){
-            try{BitMatrix m=new MultiFormatWriter().encode(payload,BarcodeFormat.QR_CODE,640,640);Bitmap bmp=Bitmap.createBitmap(640,640,Bitmap.Config.ARGB_8888);for(int y=0;y<640;y++)for(int x=0;x<640;x++)bmp.setPixel(x,y,m.get(x)?0xFF000000:0xFFFFFFFF);ByteArrayOutputStream out=new ByteArrayOutputStream();bmp.compress(Bitmap.CompressFormat.PNG,100,out);return "data:image/png;base64,"+Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);}catch(Exception e){return "";}
+            try{BitMatrix m=new MultiFormatWriter().encode(payload,BarcodeFormat.QR_CODE,640,640);Bitmap bmp=Bitmap.createBitmap(640,640,Bitmap.Config.ARGB_8888);for(int y=0;y<640;y++)for(int x=0;x<640;x++)bmp.setPixel(x,y,m.get(x,y)?0xFF000000:0xFFFFFFFF);ByteArrayOutputStream out=new ByteArrayOutputStream();bmp.compress(Bitmap.CompressFormat.PNG,100,out);return "data:image/png;base64,"+Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);}catch(Exception e){return "";}
         }
         @JavascriptInterface public void exportZip(String json){pendingZipJson=json==null?"":json;runOnUiThread(MainActivityV200.this::chooseZip);}
         @JavascriptInterface public void exportGpx(String gpx){pendingGpx=gpx==null?"":gpx;runOnUiThread(MainActivityV200.this::chooseGpxExport);}
