@@ -1,0 +1,89 @@
+name: Bootstrap Boat Station Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/boat-station-web-bootstrap.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create independent Boat Station Web source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p boat-station-web
+          cp boat-station/app/src/main/assets/index_v100.html boat-station-web/index.html
+          cp boat-station/app/src/main/assets/patch_v101.js boat-station-web/patch_v101.js
+          cp boat-station/app/src/main/assets/patch_v200.js boat-station-web/patch_v200.js
+          cp boat-station/app/src/main/assets/boat_station_logo.png boat-station-web/icon.png
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('boat-station-web/index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('<title>Boat Station</title>', '<title>Boat Station</title><meta name="theme-color" content="#061522"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.png" type="image/png">')
+          scripts = '''\n<script src="patch_v101.js"></script>\n<script src="patch_v200.js"></script>\n<script>\nwindow.BOAT_STATION_WEB_VERSION='0.2.0';\nwindow.BOAT_STATION_RUNTIME=(window.CoreBridge?'station':'remote');\nif('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(function(){});}\n</script>\n'''
+          s = s.replace('</body>', scripts + '</body>')
+          # Keep the visible UI version independent from the Android Core version.
+          s = s.replace('<small>0.1.0</small>', '<small id="webVersion">Web 0.2.0</small>')
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          cat > boat-station-web/manifest.webmanifest <<'EOF'
+          {
+            "name": "Boat Station",
+            "short_name": "Boat Station",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#061522",
+            "theme_color": "#061522",
+            "icons": [
+              {"src":"icon.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+            ]
+          }
+          EOF
+
+          cat > boat-station-web/sw.js <<'EOF'
+          const CACHE='boat-station-web-0.2.0';
+          const ASSETS=['./','./index.html','./patch_v101.js','./patch_v200.js','./icon.png','./manifest.webmanifest','./VERSION'];
+          self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
+          self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('boat-station-web-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+          self.addEventListener('fetch',event=>{
+            if(event.request.method!=='GET') return;
+            event.respondWith(fetch(event.request).then(response=>{
+              const copy=response.clone();
+              caches.open(CACHE).then(cache=>cache.put(event.request,copy));
+              return response;
+            }).catch(()=>caches.match(event.request).then(r=>r||caches.match('./index.html'))));
+          });
+          EOF
+
+          printf '0.2.0\n' > boat-station-web/VERSION
+
+      - name: Commit independent Web source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- boat-station-web && [ -d boat-station-web ]; then
+            git add boat-station-web
+          else
+            git add boat-station-web
+          fi
+          if git diff --cached --quiet; then
+            echo "Boat Station Web already bootstrapped"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bootstrap Boat Station Web 0.2.0"
+          git push
