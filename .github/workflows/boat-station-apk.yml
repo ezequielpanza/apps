@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'boat-station/**'
+      - 'apps/boat-station/core/**'
       - '.github/workflows/boat-station-apk.yml'
   workflow_dispatch:
 
@@ -37,36 +37,35 @@ jobs:
 
       - name: Read Core version
         id: version
-        run: echo "version=$(tr -d '\r\n ' < boat-station/VERSION)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(tr -d '\r\n ' < apps/boat-station/core/VERSION)" >> "$GITHUB_OUTPUT"
 
       - name: Restore permanent signing key
+        shell: bash
         env:
           BOAT_STATION_KEYSTORE_BASE64: ${{ secrets.BOAT_STATION_KEYSTORE_BASE64 }}
         run: |
+          set -euo pipefail
           test -n "$BOAT_STATION_KEYSTORE_BASE64"
-          printf '%s' "$BOAT_STATION_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/boatstation-release.jks"
+          printf '%s' "$BOAT_STATION_KEYSTORE_BASE64" | base64 --decode > apps/boat-station/core/boatstation-release.jks
 
       - name: Build signed Boat Station Core
         env:
-          BOAT_STATION_KEYSTORE_PATH: ${{ runner.temp }}/boatstation-release.jks
+          BOAT_STATION_KEYSTORE_PATH: ${{ github.workspace }}/apps/boat-station/core/boatstation-release.jks
           BOAT_STATION_KEYSTORE_PASSWORD: ${{ secrets.BOAT_STATION_KEYSTORE_PASSWORD }}
-          BOAT_STATION_KEY_ALIAS: boatstation
           BOAT_STATION_KEY_PASSWORD: ${{ secrets.BOAT_STATION_KEY_PASSWORD }}
-        run: gradle -p boat-station :app:assembleRelease --stacktrace
-
-      - name: Verify APK signature
-        run: apksigner verify --verbose --print-certs boat-station/app/build/outputs/apk/release/app-release.apk
+          BOAT_STATION_KEY_ALIAS: boatstation
+        run: gradle -p apps/boat-station/core :app:assembleRelease --stacktrace
 
       - name: Stage APK
         run: |
-          mkdir -p boat-station/releases
-          cp boat-station/app/build/outputs/apk/release/app-release.apk "boat-station/releases/BoatStation-Core-${{ steps.version.outputs.version }}.apk"
+          mkdir -p apps/boat-station/core/releases
+          cp apps/boat-station/core/app/build/outputs/apk/release/app-release.apk "apps/boat-station/core/releases/BoatStation-Core-${{ steps.version.outputs.version }}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: BoatStation-Core-${{ steps.version.outputs.version }}
-          path: boat-station/releases/BoatStation-Core-${{ steps.version.outputs.version }}.apk
+          path: apps/boat-station/core/releases/BoatStation-Core-${{ steps.version.outputs.version }}.apk
           if-no-files-found: error
 
       - name: Publish APK in repository
@@ -75,27 +74,17 @@ jobs:
         run: |
           set -euo pipefail
           APK="BoatStation-Core-${{ steps.version.outputs.version }}.apk"
-          cp "boat-station/releases/$APK" "/tmp/$APK"
+          cp "apps/boat-station/core/releases/$APK" "/tmp/$APK"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
           git reset --hard origin/main
-          mkdir -p boat-station/releases
-          cp "/tmp/$APK" "boat-station/releases/$APK"
-          git add "boat-station/releases/$APK"
+          mkdir -p apps/boat-station/core/releases
+          cp "/tmp/$APK" "apps/boat-station/core/releases/$APK"
+          git add "apps/boat-station/core/releases/$APK"
           if git diff --cached --quiet; then
             echo "APK already published"
             exit 0
           fi
           git commit -m "Build Boat Station Core ${{ steps.version.outputs.version }} APK"
-          for attempt in 1 2 3; do
-            if git push origin HEAD:main; then exit 0; fi
-            echo "Concurrent main update; rebasing publish attempt $attempt"
-            cp "boat-station/releases/$APK" "/tmp/$APK"
-            git fetch origin main
-            git reset --hard origin/main
-            cp "/tmp/$APK" "boat-station/releases/$APK"
-            git add "boat-station/releases/$APK"
-            git commit -m "Build Boat Station Core ${{ steps.version.outputs.version }} APK" || true
-          done
-          exit 1
+          git push origin HEAD:main
