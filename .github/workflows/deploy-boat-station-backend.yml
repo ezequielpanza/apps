@@ -1,0 +1,45 @@
+name: Deploy Boat Station Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/boat-station/backend/**'
+      - '.github/workflows/deploy-boat-station-backend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy backend worker
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/boat-station/backend
+          npx --yes wrangler@latest deploy 2>&1 | tee /tmp/boat-station-worker.txt
+          URL="$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' /tmp/boat-station-worker.txt | tail -1 || true)"
+          if [ -z "$URL" ]; then
+            echo 'Could not determine workers.dev URL' >&2
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+      - name: Publish backend URL to web app
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf "window.BOAT_STATION_BACKEND=%q;\n" "${{ steps.deploy.outputs.url }}" | sed "s/^window.BOAT_STATION_BACKEND='\?\(.*\)'\?;$/window.BOAT_STATION_BACKEND='\1';/" > apps/boat-station/web/backend_url.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/boat-station/web/backend_url.js
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Update Boat Station backend URL'
+          git push origin HEAD:main
