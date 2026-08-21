@@ -23,7 +23,7 @@ import java.util.Locale;
 
 /** Stable native container for Boat Station Web. */
 public class MainActivityCore extends MainActivityV200 {
-    private static final String WEB_URL = "https://boat-station-web.pages.dev/?mode=station";
+    private static final String WEB_URL = "https://boat-station.pages.dev/?mode=station";
     private static final String LOCAL_URL = "file:///android_asset/index_v100.html";
     private static final String PREFS = "boat_station";
     private static final String MIGRATED = "core_web_storage_migrated_v1";
@@ -55,7 +55,7 @@ public class MainActivityCore extends MainActivityV200 {
                 String scheme = u.getScheme();
                 String host = u.getHost();
                 if ("file".equals(scheme)) return false;
-                return !("https".equals(scheme) && "boat-station-web.pages.dev".equals(host));
+                return !("https".equals(scheme) && "boat-station.pages.dev".equals(host));
             }
 
             @Override
@@ -69,7 +69,6 @@ public class MainActivityCore extends MainActivityV200 {
                     injectAsset(view, "patch_v200.js");
                 }
 
-                // 1.0.2 UI/linking fixes are injected in both cloud and bundled modes.
                 injectAsset(view, "patch_v102.js");
 
                 if (local && capturingLegacy) {
@@ -114,7 +113,7 @@ public class MainActivityCore extends MainActivityV200 {
 
     private void announceCore(WebView view, String mode) {
         view.evaluateJavascript(
-            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.2'};" +
+            "window.BoatStationCore={mode:'" + mode + "',coreVersion:'1.0.3'};" +
             "window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));",
             null
         );
@@ -164,7 +163,7 @@ public class MainActivityCore extends MainActivityV200 {
     }
 
     public class CoreBridge {
-        @JavascriptInterface public String getCoreVersion() { return "1.0.2"; }
+        @JavascriptInterface public String getCoreVersion() { return "1.0.3"; }
         @JavascriptInterface public String getMode() { return "station"; }
 
         @JavascriptInterface
