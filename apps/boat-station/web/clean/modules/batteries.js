@@ -1,7 +1,8 @@
 export function createBatteriesModule(requestRender,openManager){
   const read=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||'null');return v??fallback}catch(_){return fallback}};
   const saved=read('bs.batteries.state',null);
-  const state=saved&&typeof saved==='object'?saved:{bankName:'Banco principal',capacityAh:620,batteries:[],history:[],root:null};
+  const state=saved&&typeof saved==='object'?saved:{bankName:'Banco principal',batteries:[],history:[],root:null};
+  delete state.capacityAh;
   state.root=null;
   state.history=Array.isArray(state.history)?state.history:[];
   state.batteries=Array.isArray(state.batteries)?state.batteries:[];
@@ -17,19 +18,18 @@ export function createBatteriesModule(requestRender,openManager){
       const a=num(b.current);if(a!==null)current+=a;
       const v=num(b.voltage);if(v!==null){voltageSum+=v;voltageN++}
     }
-    if(!cap)cap=num(state.capacityAh)||0;
     const voltage=voltageN?voltageSum/voltageN:null;
     const soc=cap>0?Math.max(0,Math.min(100,rem/cap*100)):null;
     return{cap,rem,current,voltage,soc,power:voltage===null?null:voltage*current,connected:connected.length,total:list.length};
   }
-  function summary(){const s=stats();return s.soc===null?'Sin datos':`${Math.round(s.soc)}% · ${Math.round(s.rem)}/${Math.round(s.cap)} Ah`}
+  function summary(){const s=stats();return s.soc===null?(s.cap?`${Math.round(s.cap)} Ah`:'Sin datos'):`${Math.round(s.soc)}% · ${Math.round(s.rem)}/${Math.round(s.cap)} Ah`}
   function metric(value,label){return `<div class="metric"><div class="value">${value}</div><div class="label">${label}</div></div>`}
   function page(index){
     const s=stats();
     if(index===0)return `<div class="battery-hero"><div class="battery-ring" style="--soc:${s.soc??0}"><div><strong>${s.soc===null?'—':Math.round(s.soc)+'%'}</strong><span>Carga</span></div></div><div class="battery-bank-name">${esc(state.bankName)}</div><div class="battery-ah">${Math.round(s.rem)} / ${Math.round(s.cap)} Ah</div></div><div class="metric-grid three">${metric(s.voltage===null?'—':s.voltage.toFixed(2)+' V','Voltaje')}${metric(s.current.toFixed(1)+' A','Corriente')}${metric(s.power===null?'—':Math.round(s.power)+' W','Potencia')}</div><div class="battery-connected">${s.connected} de ${s.total} baterías conectadas</div>`;
     if(index===1){
-      if(!state.batteries.length)return `<div class="battery-empty"><div>No hay baterías vinculadas</div><button class="gps-action primary" type="button" data-battery-manage>Administrar baterías</button></div>`;
-      return `<div class="battery-list">${state.batteries.map(b=>{const soc=num(b.soc),v=num(b.voltage),a=num(b.current);return `<div class="battery-item"><div class="battery-item-top"><span class="battery-name">${esc(b.name||b.deviceName||'Batería')}</span><span class="battery-soc">${soc===null?'—':Math.round(soc)+'%'}</span></div><div class="battery-item-sub"><span>${v===null?'—':v.toFixed(2)+' V'}</span><span>${a===null?'—':a.toFixed(1)+' A'}</span><span class="${b.connected===false?'offline':'online'}">${b.connected===false?'Offline':'Conectada'}</span></div></div>`}).join('')}</div>`;
+      if(!state.batteries.length)return `<div class="battery-empty"><div>No hay baterías vinculadas</div><button class="gps-action primary" type="button" data-battery-manage>Administrar Banco de Baterías</button></div>`;
+      return `<div class="battery-list">${state.batteries.map(b=>{const soc=num(b.soc),v=num(b.voltage),a=num(b.current),c=num(b.capacityAh);return `<div class="battery-item"><div class="battery-item-top"><span class="battery-name">${esc(b.name||b.deviceName||'Batería')}</span><span class="battery-soc">${soc===null?'—':Math.round(soc)+'%'}</span></div><div class="battery-item-sub"><span>${c===null?'— Ah':Math.round(c)+' Ah'}</span><span>${v===null?'—':v.toFixed(2)+' V'}</span><span>${a===null?'—':a.toFixed(1)+' A'}</span><span class="${b.connected===false?'offline':'online'}">${b.connected===false?'Offline':'Conectada'}</span></div></div>`}).join('')}</div>`;
     }
     return `<div class="battery-history"><canvas data-battery-chart></canvas><div class="battery-history-note">Historial de carga del banco</div></div>`;
   }
@@ -46,6 +46,5 @@ export function createBatteriesModule(requestRender,openManager){
   function addBattery(device){const id=String(device.id||device.address||device.deviceId||device.mac||device.name||Date.now());if(state.batteries.some(b=>String(b.id)===id))return;state.batteries.push({id,name:device.name||device.deviceName||'Batería',deviceName:device.name||device.deviceName||'',address:device.address||device.mac||'',capacityAh:num(device.capacityAh)||0,connected:false});save();requestRender('batteries')}
   function removeBattery(id){state.batteries=state.batteries.filter(b=>String(b.id)!==String(id));save();requestRender('batteries')}
   function renameBank(name){const n=String(name||'').trim();if(!n)return;state.bankName=n;save();requestRender('batteries')}
-  function setCapacity(v){const n=Number(v);if(!Number.isFinite(n)||n<=0)return;state.capacityAh=n;save();requestRender('batteries')}
-  return {id:'batteries',name:'Baterías',pages:3,summary,page,afterRender,state,updateBattery,addBattery,removeBattery,renameBank,setCapacity,stats};
+  return {id:'batteries',name:'Baterías',pages:3,summary,page,afterRender,state,updateBattery,addBattery,removeBattery,renameBank,stats};
 }
