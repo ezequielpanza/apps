@@ -2,6 +2,8 @@
   const api=window.BoatStation;
   if(!api||window.BoatStationDataSync)return;
 
+  const params=new URLSearchParams(location.search);
+  const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
   const state={gps:null,phone:null,compass:null,motion:null,batteries:{}};
   const copy=value=>{try{return JSON.parse(JSON.stringify(value))}catch{return value}};
   const wrap=(name,store)=>{
@@ -18,8 +20,29 @@
   if(batteryHandler)wrap(batteryHandler,value=>{if(!value)return;const id=String(value.id||value.address||value.deviceId||value.mac||value.name||'battery');state.batteries[id]={...(state.batteries[id]||{}),...copy(value)}});
   if(typeof api.onBatteryConnection==='function')wrap('onBatteryConnection',value=>{if(!value)return;const id=String(value.id||value.address||value.deviceId||value.mac||value.name||'battery');state.batteries[id]={...(state.batteries[id]||{}),...copy(value)}});
 
-  function exportSnapshot(){return{version:1,time:Date.now(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy)}}
+  function stationLayout(){
+    const order=[...document.querySelectorAll('#cards .card[data-id]')].map(card=>card.dataset.id).filter(Boolean);
+    return{order};
+  }
+
+  function exportSnapshot(){return{version:2,time:Date.now(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy),layout:stationLayout()}}
+
+  function seedRemoteLayoutOnce(snapshot){
+    if(isLocal||!snapshot?.layout||!Array.isArray(snapshot.layout.order))return false;
+    const stationId=localStorage.getItem('bs.remote.activeStation')||'';
+    if(!stationId)return false;
+    const marker='bs.remote.layoutSeeded.'+stationId;
+    if(localStorage.getItem(marker)==='1')return false;
+    const allowed=['gps','batteries','phone','seastate','compass'];
+    const order=snapshot.layout.order.filter(id=>allowed.includes(id));
+    if(order.length)localStorage.setItem('bs.ui.order',JSON.stringify(order));
+    localStorage.setItem(marker,'1');
+    if(order.length){location.reload();return true}
+    return false;
+  }
+
   function applyNow(snapshot){
+    if(seedRemoteLayoutOnce(snapshot))return true;
     window.dispatchEvent(new CustomEvent('boatstation-data-update-start'));
     try{
       if(snapshot.gps)api.updateGPS?.(snapshot.gps);
