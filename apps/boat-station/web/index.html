@@ -40,6 +40,13 @@
   }else{
     document.getElementById('cards').innerHTML='';
     document.getElementById('addBtn').style.display='none';
+    const inner=document.querySelector('#menuSheet .sheet-inner');
+    if(inner){
+      const row=document.createElement('div');
+      row.className='option';
+      row.innerHTML='<span>Boat Station APK<br><small class="sub">Última versión disponible</small></span><a class="btn" href="/BoatStation.apk" download>Descargar</a>';
+      inner.appendChild(row);
+    }
   }
   await import('./stations.js');
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Boat Station SW',err));
