@@ -8,8 +8,8 @@
     if(!version)return;
     document.querySelectorAll('a[href="/BoatStation.apk"],a[href$="/BoatStation.apk"]').forEach(a=>{
       a.textContent='Descargar versión '+version;
-      a.setAttribute('download','BoatStation-Core-'+version+'.apk');
-      a.title='Boat Station Core '+version;
+      a.setAttribute('download','BoatStation-'+version+'.apk');
+      a.title='Boat Station '+version;
     });
   }
   updateApkLinks();
