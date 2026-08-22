@@ -44,7 +44,6 @@
     window.__bsNativeQueue=[];
     queued.forEach(([name,value])=>{try{window.BoatStation?.[name]?.(value)}catch(err){console.error('Boat Station native event error',name,err)}});
   }else{
-    document.getElementById('addBtn').style.display='none';
     const inner=menu.querySelector('.sheet-inner');
     if(inner){
       const row=document.createElement('div');
