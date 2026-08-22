@@ -98,4 +98,33 @@ cards.addEventListener('pointercancel',()=>{swipe=null;finishResize();finishReor
 cards.addEventListener('click',e=>{const more=e.target.closest('.more');if(more){e.stopPropagation();const card=more.closest('.card');alert('Configurar '+modules[card.dataset.id].name)}});
 window.addEventListener('resize',()=>cards.querySelectorAll('.card').forEach(c=>{measure(c);modules[c.dataset.id].afterRender?.(c)}));
 
+// Pull-up-to-refresh at the bottom of the main module list.
+const refreshHint=document.createElement('div');
+refreshHint.textContent='Seguí deslizando para actualizar';
+Object.assign(refreshHint.style,{position:'fixed',left:'50%',bottom:'18px',transform:'translate(-50%,18px)',padding:'9px 13px',borderRadius:'12px',background:'#102f45',border:'1px solid #24516a',color:'#d9edf5',fontSize:'12px',fontWeight:'700',opacity:'0',pointerEvents:'none',zIndex:'45',transition:'opacity .12s ease,transform .12s ease',whiteSpace:'nowrap'});
+document.body.appendChild(refreshHint);
+let bottomPull=null;
+function atBottom(){return window.innerHeight+window.scrollY>=document.documentElement.scrollHeight-2}
+function hideRefreshHint(){refreshHint.style.opacity='0';refreshHint.style.transform='translate(-50%,18px)'}
+function showRefreshHint(progress,armed){refreshHint.textContent=armed?'Soltá para actualizar':'Seguí deslizando para actualizar';refreshHint.style.opacity=String(Math.min(1,.25+progress));refreshHint.style.transform=`translate(-50%,${Math.max(0,18-progress*18)}px)`}
+document.addEventListener('pointerdown',e=>{
+  if(document.body.classList.contains('menu-open')||!atBottom())return;
+  if(e.target.closest('.card,.topbar,.sheet,button,input'))return;
+  bottomPull={pointerId:e.pointerId,startY:e.clientY,armed:false};
+},{capture:true});
+document.addEventListener('pointermove',e=>{
+  if(!bottomPull||e.pointerId!==bottomPull.pointerId)return;
+  const distance=Math.max(0,bottomPull.startY-e.clientY),progress=Math.min(1,distance/90);
+  bottomPull.armed=distance>=90;
+  showRefreshHint(progress,bottomPull.armed);
+},{capture:true});
+document.addEventListener('pointerup',e=>{
+  if(!bottomPull||e.pointerId!==bottomPull.pointerId)return;
+  const armed=bottomPull.armed;bottomPull=null;
+  if(!armed){hideRefreshHint();return}
+  refreshHint.textContent='Actualizando…';refreshHint.style.opacity='1';refreshHint.style.transform='translate(-50%,0)';
+  setTimeout(()=>window.location.reload(),120);
+},{capture:true});
+document.addEventListener('pointercancel',()=>{bottomPull=null;hideRefreshHint()},{capture:true});
+
 window.BoatStation={updateGPS:data=>modules.gps.update(data)};
