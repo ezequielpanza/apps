@@ -29,7 +29,8 @@ export class StationState {
       if (request.method === 'POST') {
         const body = await request.json();
         const command = String(body?.command||'');
-        if (!['gps.new','gps.resume','gps.stop','gps.clear','gps.import'].includes(command)) return json({error:'invalid command'},400);
+        const allowed = ['gps.new','gps.resume','gps.stop','gps.clear','gps.import','battery.scan','battery.add','battery.remove','battery.renameBank','battery.edit'];
+        if (!allowed.includes(command)) return json({error:'invalid command'},400);
         const commands = (await this.state.storage.get('commands')) || [];
         commands.push({id:crypto.randomUUID(),command,payload:body?.payload??null,createdAt:Date.now()});
         while (commands.length>50) commands.shift();
