@@ -1,5 +1,5 @@
-// Legacy root service worker retirement.
-// Boat Station now runs from /clean/ and must not serve the old cached UI.
+// Boat Station service worker retirement.
+// The shared Web/Core PWA now runs directly from the web root.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -11,11 +11,11 @@ self.addEventListener('activate', event => {
     await self.registration.unregister();
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of clients) {
-      try { client.navigate('/clean/?v=20260822-1516'); } catch (_) {}
+      try { client.navigate('/'); } catch (_) {}
     }
   })());
 });
 
 self.addEventListener('fetch', event => {
-  // Do not intercept anything while this legacy worker is being retired.
+  // Do not intercept anything while this retiring worker unregisters itself.
 });
