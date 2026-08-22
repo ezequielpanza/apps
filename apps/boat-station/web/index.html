@@ -71,6 +71,15 @@
       row.className='option remote-apk-row';
       row.innerHTML='<span>Boat Station APK<br><small class="sub">Última versión disponible</small></span><a class="btn" href="/BoatStation.apk" download>Descargar</a>';
       inner.appendChild(row);
+      try{
+        const versionResponse=await fetch('/APK_VERSION',{cache:'no-store'});
+        if(versionResponse.ok){
+          const version=(await versionResponse.text()).trim();
+          if(version)row.querySelector('.btn').textContent='Descargar '+version;
+        }
+      }catch(err){
+        console.warn('Boat Station APK version unavailable',err);
+      }
     }
     try{
       await import('./remote-client-ui.js');
