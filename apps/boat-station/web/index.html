@@ -34,8 +34,9 @@
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
   const menu=document.getElementById('menuSheet');
 
-  // The UI runtime is shared by Core and Remote. Native hardware adapters remain Core-only.
+  // Core and Remote share the same UI runtime. Only telemetry crosses the backend.
   await import('./app.js');
+  await import('./data-sync.js');
 
   if(isLocal){
     await import('./native-bluetooth.js');
