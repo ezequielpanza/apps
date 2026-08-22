@@ -1,20 +1,14 @@
 /VERSION
   Cache-Control: no-store, no-cache, must-revalidate
 
+/APK_VERSION
+  Cache-Control: no-store, no-cache, must-revalidate
+
 /sw.js
   Cache-Control: no-store, no-cache, must-revalidate
 
 /index.html
   Cache-Control: no-cache, must-revalidate
 
-/clean/
-  Cache-Control: no-store, no-cache, must-revalidate
-
-/clean/index.html
-  Cache-Control: no-store, no-cache, must-revalidate
-
-/clean/*.js
-  Cache-Control: no-store, no-cache, must-revalidate
-
-/clean/*.css
-  Cache-Control: no-store, no-cache, must-revalidate
+/manifest.webmanifest
+  Cache-Control: no-cache, must-revalidate
