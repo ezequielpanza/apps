@@ -46,21 +46,21 @@ cards.addEventListener('pointercancel',()=>{swipe=null;finishResize();finishReor
 cards.addEventListener('click',e=>{const more=e.target.closest('.more');if(more){e.stopPropagation();const card=more.closest('.card');alert('Configurar '+modules[card.dataset.id].name)}});
 window.addEventListener('resize',()=>cards.querySelectorAll('.card').forEach(c=>{measure(c);modules[c.dataset.id].afterRender?.(c)}));
 
-// Bottom pull-to-refresh. Rebuilt as a touch gesture so Android WebView keeps
-// reporting movement after the document has reached its maximum scroll.
-const refreshHint=document.createElement('div');
-refreshHint.className='bottom-refresh-hint';
-refreshHint.textContent='Seguí deslizando para actualizar';
-document.body.appendChild(refreshHint);
+// Pull-to-refresh from the top. The refresh control behaves like a hidden tab
+// above the header: pulling downward progressively reveals it.
+const refreshTab=document.createElement('div');
+refreshTab.className='top-refresh-tab';
+refreshTab.textContent='Actualizar';
+document.body.appendChild(refreshTab);
 const REFRESH_DISTANCE=72;
 let refreshGesture=null;
-function atBottom(){const root=document.scrollingElement||document.documentElement;return root.scrollTop+root.clientHeight>=root.scrollHeight-3}
-function canStartRefresh(target){if(document.body.classList.contains('menu-open')||!atBottom())return false;if(target.closest('.sheet,.topbar,.drag-handle,.resize-handle,button,input,textarea,select,a'))return false;return true}
-function showRefresh(distance){const progress=Math.min(1,distance/REFRESH_DISTANCE),armed=distance>=REFRESH_DISTANCE;refreshHint.textContent=armed?'Soltá para actualizar':'Seguí deslizando para actualizar';refreshHint.classList.add('visible');refreshHint.classList.toggle('armed',armed);refreshHint.style.setProperty('--pull',String(progress));return armed}
-function hideRefresh(){refreshHint.classList.remove('visible','armed');refreshHint.style.removeProperty('--pull')}
+function atTop(){const root=document.scrollingElement||document.documentElement;return root.scrollTop<=1}
+function canStartRefresh(target){if(document.body.classList.contains('menu-open')||!atTop())return false;if(target.closest('.sheet,.drag-handle,.resize-handle,button,input,textarea,select,a'))return false;return true}
+function revealRefresh(distance){const progress=Math.min(1,distance/REFRESH_DISTANCE),armed=distance>=REFRESH_DISTANCE;refreshTab.style.setProperty('--pull',String(progress));refreshTab.classList.add('visible');refreshTab.classList.toggle('armed',armed);return armed}
+function hideRefresh(){refreshTab.classList.remove('visible','armed');refreshTab.style.removeProperty('--pull')}
 function beginRefreshGesture(touch,target){if(!canStartRefresh(target))return;refreshGesture={id:touch.identifier,startY:touch.clientY,armed:false}}
-function moveRefreshGesture(touch,event){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const distance=Math.max(0,refreshGesture.startY-touch.clientY);if(distance<4)return;if(!atBottom()){refreshGesture=null;hideRefresh();return}refreshGesture.armed=showRefresh(distance);if(distance>0){event.preventDefault();swipe=null}}
-function endRefreshGesture(touch){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const armed=refreshGesture.armed;refreshGesture=null;if(!armed){hideRefresh();return}refreshHint.textContent='Actualizando…';refreshHint.classList.add('visible','armed');setTimeout(()=>{const url=new URL(window.location.href);url.searchParams.set('_refresh',Date.now().toString());window.location.replace(url.toString())},100)}
+function moveRefreshGesture(touch,event){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const distance=Math.max(0,touch.clientY-refreshGesture.startY);if(distance<4)return;if(!atTop()){refreshGesture=null;hideRefresh();return}refreshGesture.armed=revealRefresh(distance);if(distance>0){event.preventDefault();swipe=null}}
+function endRefreshGesture(touch){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const armed=refreshGesture.armed;refreshGesture=null;if(!armed){hideRefresh();return}refreshTab.classList.add('refreshing');refreshTab.textContent='Actualizando…';setTimeout(()=>{const url=new URL(window.location.href);url.searchParams.set('_refresh',Date.now().toString());window.location.replace(url.toString())},120)}
 function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
 document.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;beginRefreshGesture(e.touches[0],e.target)},{capture:true,passive:true});
 document.addEventListener('touchmove',e=>{if(!refreshGesture)return;const t=touchById(e.touches,refreshGesture.id);if(t)moveRefreshGesture(t,e)},{capture:true,passive:false});
