@@ -25,8 +25,8 @@ export function createBatteriesModule(requestRender,openManager){
     const socText=soc===null?'—':Math.round(soc)+'%';
     const vText=v===null?'—':v.toFixed(2)+' V';
     const aText=a===null?'—':(a>=0?'+':'')+a.toFixed(1)+' A';
-    const ahText=shownRem===null?'—':`${Math.round(shownRem)}/${Math.round(cap)} Ah`;
-    return `<div class="battery-mini ${online?'online':'offline'}"><div class="battery-mini-head"><strong>${esc(b.name||b.deviceName||`Batería ${i+1}`)}</strong><span class="battery-mini-link">${online?'⌁':'×'}</span></div><div class="battery-mini-body"><div class="battery-mini-ring" style="--soc:${soc??0}"><span>${socText}</span></div><div class="battery-mini-values"><span>${vText}</span><span>${aText}</span><span class="battery-mini-ah">${ahText}</span></div></div></div>`;
+    const ahText=shownRem===null?'—':`${Math.round(shownRem)} / ${Math.round(cap)} Ah`;
+    return `<div class="battery-mini ${online?'online':'offline'}"><div class="battery-mini-head"><strong>${esc(b.name||b.deviceName||`Batería ${i+1}`)}</strong><span class="battery-mini-link">${online?'⌁':'×'}</span></div><div class="battery-mini-body"><div class="battery-mini-ring" style="--soc:${soc??0}"><span>${socText}</span></div><div class="battery-mini-right"><div class="battery-mini-top"><div><b>${vText}</b><small>Voltaje</small></div><div><b>${aText}</b><small>Corriente</small></div></div><div class="battery-mini-charge"><span>${ahText}</span><small>Carga</small></div></div></div></div>`;
   }
   function historyRangeLabel(){const h=Number(state.historyHours);if(h<24)return `${h} ${h===1?'hora':'horas'}`;const d=h/24;return `${d} ${d===1?'día':'días'}`}
   function page(index){
