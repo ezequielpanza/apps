@@ -17,7 +17,6 @@ function pager(count,current){let h='<div class="pager">';for(let i=0;i<count;i+
 function dragHandle(){return `<button class="drag-handle" type="button" aria-label="Mover módulo"><i></i><i></i><i></i><i></i><i></i><i></i></button>`}
 function resizeHandle(){return `<button class="resize-handle" type="button" aria-label="Cambiar tamaño del módulo"><i></i><i></i><i></i></button>`}
 function moduleHtml(id){const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1);let pages='';for(let i=0;i<m.pages;i++)pages+=`<div class="page" data-page="${i}">${m.page(i)}${pager(m.pages,p)}</div>`;return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${m.name}</span><span class="summary">${m.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track" style="transform:translateX(-${p*100}%)">${pages}</div></div></div>${resizeHandle()}</section>`}
-
 function saveHeights(){localStorage.setItem('bs.clean.heights',JSON.stringify(ui.heights))}
 function saveOrder(){localStorage.setItem('bs.clean.order',JSON.stringify(ui.order))}
 function pageHeight(id,page){const stored=ui.heights[id];if(stored&&typeof stored==='object'&&Number.isFinite(Number(stored[page])))return Number(stored[page]);if(Number.isFinite(Number(stored))&&page===0)return Number(stored);return null}
@@ -31,10 +30,9 @@ renderAll();
 const menu=document.getElementById('menuSheet'),add=document.getElementById('addSheet');
 const moduleMenu=document.createElement('div');
 moduleMenu.className='sheet';
-moduleMenu.innerHTML='<div class="sheet-inner"><div class="handle" aria-label="Arrastrar para cerrar"></div><h3 data-module-menu-title>Módulo</h3><button class="option sheet-option" type="button" data-module-config>Configuración</button><button class="option sheet-option danger" type="button" data-module-delete>Eliminar módulo</button></div>';
+moduleMenu.innerHTML='<div class="sheet-inner compact-sheet"><div class="handle" aria-label="Arrastrar para cerrar"></div><h3 data-module-menu-title>Módulo</h3><button class="option sheet-option danger" type="button" data-module-delete>Eliminar</button></div>';
 document.body.appendChild(moduleMenu);
-let moduleMenuId=null;
-let lockedScrollY=0;
+let moduleMenuId=null,lockedScrollY=0,sheetDrag=null;
 function anySheetOpen(){return [...document.querySelectorAll('.sheet')].some(s=>s.classList.contains('open'))}
 function lockModuleScroll(){if(document.body.classList.contains('menu-open'))return;lockedScrollY=window.scrollY||document.documentElement.scrollTop||0;document.body.classList.add('menu-open');document.body.style.top=`-${lockedScrollY}px`}
 function unlockModuleScroll(){if(anySheetOpen())return;if(!document.body.classList.contains('menu-open'))return;document.body.classList.remove('menu-open');document.body.style.top='';window.scrollTo(0,lockedScrollY)}
@@ -42,39 +40,18 @@ function openSheet(sheet){const inner=sheet.querySelector('.sheet-inner');if(inn
 function closeSheet(sheet){const inner=sheet.querySelector('.sheet-inner');if(inner){inner.style.transform='';inner.style.transition=''}sheet.classList.remove('open');unlockModuleScroll()}
 function openModuleMenu(id){moduleMenuId=id;moduleMenu.querySelector('[data-module-menu-title]').textContent=modules[id].name;openSheet(moduleMenu)}
 function deleteModule(id){if(!id)return;ui.order=ui.order.filter(x=>x!==id);delete ui.collapsed[id];delete ui.page[id];saveOrder();closeSheet(moduleMenu);moduleMenuId=null;renderAll()}
+function renderAddSheet(){const inner=add.querySelector('.sheet-inner');if(!inner)return;inner.innerHTML='<div class="handle" aria-label="Arrastrar para cerrar"></div><h3>Agregar módulo</h3>'+ALL_MODULE_IDS.map(id=>{const present=ui.order.includes(id);return `<button class="add-module-row" type="button" data-add-module="${id}" ${present?'disabled':''}><span>${modules[id].name}</span><span class="add-module-state ${present?'present':''}">${present?'✓':'+'}</span></button>`}).join('');bindSheetHandle(add)}
+function bindSheetHandle(sheet){const handle=sheet.querySelector('.handle'),inner=sheet.querySelector('.sheet-inner');if(!handle||!inner||handle.dataset.bound)return;handle.dataset.bound='1';handle.addEventListener('pointerdown',e=>{if(!sheet.classList.contains('open'))return;e.preventDefault();e.stopPropagation();sheetDrag={sheet,inner,startY:e.clientY,pointerId:e.pointerId};inner.style.transition='none';try{handle.setPointerCapture(e.pointerId)}catch(_){}})}
+
 document.getElementById('menuBtn').onclick=()=>openSheet(menu);
-document.getElementById('addBtn').onclick=()=>openSheet(add);
+document.getElementById('addBtn').onclick=()=>{renderAddSheet();openSheet(add)};
 [menu,add,moduleMenu].forEach(s=>s.addEventListener('click',e=>{if(e.target===s)closeSheet(s)}));
 moduleMenu.querySelector('[data-module-delete]').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();deleteModule(moduleMenuId)});
-moduleMenu.querySelector('[data-module-config]').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const id=moduleMenuId;closeSheet(moduleMenu);moduleMenuId=null;if(id)alert('Configurar '+modules[id].name)});
+add.addEventListener('click',e=>{const btn=e.target.closest('[data-add-module]');if(!btn||btn.disabled)return;const id=btn.dataset.addModule;if(!ui.order.includes(id)){ui.order.push(id);saveOrder();renderAll();renderAddSheet()}});
+[menu,moduleMenu].forEach(bindSheetHandle);
 
-// Bottom-sheet grab: dragging the handle downward moves the whole sheet and
-// closes it after a deliberate pull. The content itself keeps normal scrolling.
-let sheetDrag=null;
-for(const sheet of [menu,add,moduleMenu]){
-  const handle=sheet.querySelector('.handle'),inner=sheet.querySelector('.sheet-inner');
-  if(!handle||!inner)continue;
-  handle.addEventListener('pointerdown',e=>{
-    if(!sheet.classList.contains('open'))return;
-    e.preventDefault();e.stopPropagation();
-    sheetDrag={sheet,inner,startY:e.clientY,pointerId:e.pointerId};
-    inner.style.transition='none';
-    try{handle.setPointerCapture(e.pointerId)}catch(_){}
-  });
-}
-document.addEventListener('pointermove',e=>{
-  if(!sheetDrag||e.pointerId!==sheetDrag.pointerId)return;
-  e.preventDefault();
-  const dy=Math.max(0,e.clientY-sheetDrag.startY);
-  sheetDrag.inner.style.transform=`translateY(${dy}px)`;
-},{passive:false});
-document.addEventListener('pointerup',e=>{
-  if(!sheetDrag||e.pointerId!==sheetDrag.pointerId)return;
-  const d=sheetDrag,dy=Math.max(0,e.clientY-d.startY);sheetDrag=null;
-  d.inner.style.transition='transform .16s ease';
-  if(dy>=72){d.inner.style.transform='translateY(110%)';setTimeout(()=>closeSheet(d.sheet),160)}
-  else{d.inner.style.transform='translateY(0)';setTimeout(()=>{d.inner.style.transition='';d.inner.style.transform=''},160)}
-});
+document.addEventListener('pointermove',e=>{if(!sheetDrag||e.pointerId!==sheetDrag.pointerId)return;e.preventDefault();sheetDrag.inner.style.transform=`translateY(${Math.max(0,e.clientY-sheetDrag.startY)}px)`},{passive:false});
+document.addEventListener('pointerup',e=>{if(!sheetDrag||e.pointerId!==sheetDrag.pointerId)return;const d=sheetDrag,dy=Math.max(0,e.clientY-d.startY);sheetDrag=null;d.inner.style.transition='transform .16s ease';if(dy>=72){d.inner.style.transform='translateY(110%)';setTimeout(()=>closeSheet(d.sheet),160)}else{d.inner.style.transform='translateY(0)';setTimeout(()=>{d.inner.style.transition='';d.inner.style.transform=''},160)}});
 document.addEventListener('pointercancel',()=>{if(!sheetDrag)return;const d=sheetDrag;sheetDrag=null;d.inner.style.transition='transform .16s ease';d.inner.style.transform='translateY(0)';setTimeout(()=>{d.inner.style.transition='';d.inner.style.transform=''},160)});
 
 let swipe=null,reorder=null,resize=null;
@@ -84,30 +61,20 @@ cards.addEventListener('pointerdown',e=>{if(document.body.classList.contains('me
 cards.addEventListener('pointermove',e=>{if(resize){e.preventDefault();const max=Math.max(120,window.innerHeight*.78),next=Math.max(70,Math.min(max,resize.startH+(e.clientY-resize.startY)));resize.body.style.height=`${next}px`;setPageHeight(resize.id,resize.page,next);return}if(!reorder)return;e.preventDefault();const moving=reorder.card,others=[...cards.querySelectorAll('.card')].filter(c=>c!==moving);let before=null;for(const c of others){const r=c.getBoundingClientRect();if(e.clientY<r.top+r.height/2){before=c;break}}if(before)cards.insertBefore(moving,before);else cards.appendChild(moving)});
 cards.addEventListener('pointerup',e=>{if(resize){finishResize();return}if(reorder){finishReorder();return}if(!swipe)return;const g=swipe;swipe=null;const dx=e.clientX-g.x,dy=e.clientY-g.y,m=modules[g.id];if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2&&m.pages>1){const cur=ui.page[g.id]||0;ui.page[g.id]=dx<0?Math.min(m.pages-1,cur+1):Math.max(0,cur-1);const track=g.card.querySelector('.track');track.style.transform=`translateX(-${ui.page[g.id]*100}%)`;setTimeout(()=>{measure(g.card);m.afterRender?.(g.card)},190);return}if(Math.abs(dx)<8&&Math.abs(dy)<8&&Date.now()-g.t<350){ui.collapsed[g.id]=!ui.collapsed[g.id];g.card.classList.toggle('collapsed',ui.collapsed[g.id]);if(!ui.collapsed[g.id])measure(g.card)}});
 cards.addEventListener('pointercancel',()=>{swipe=null;finishResize();finishReorder()});
-cards.addEventListener('click',e=>{const more=e.target.closest('.more');if(more){e.stopPropagation();const card=more.closest('.card');openModuleMenu(card.dataset.id)}});
+cards.addEventListener('click',e=>{const more=e.target.closest('.more');if(more){e.stopPropagation();openModuleMenu(more.closest('.card').dataset.id)}});
 window.addEventListener('resize',()=>cards.querySelectorAll('.card').forEach(c=>{measure(c);modules[c.dataset.id].afterRender?.(c)}));
 
-const deck=document.createElement('div');
-deck.className='module-deck';
-cards.parentNode.insertBefore(deck,cards);
-deck.appendChild(cards);
-const refreshTab=document.createElement('div');
-refreshTab.className='hidden-refresh-module';
-refreshTab.textContent='Actualizar';
-deck.insertBefore(refreshTab,cards);
-const REFRESH_DISTANCE=72;
-const REFRESH_REVEAL=50;
-const DIRECTION_LOCK=12;
-let refreshGesture=null;
+const deck=document.createElement('div');deck.className='module-deck';cards.parentNode.insertBefore(deck,cards);deck.appendChild(cards);const refreshTab=document.createElement('div');refreshTab.className='hidden-refresh-module';refreshTab.textContent='Actualizar';deck.insertBefore(refreshTab,cards);
+const REFRESH_DISTANCE=72,REFRESH_REVEAL=50,DIRECTION_LOCK=12;let refreshGesture=null;
 function atTop(){const root=document.scrollingElement||document.documentElement;return root.scrollTop<=1}
 function canStartRefresh(target){if(document.body.classList.contains('menu-open')||!atTop())return false;if(target.closest('.sheet,.drag-handle,.resize-handle,button,input,textarea,select,a'))return false;return true}
-function revealRefresh(distance){const progress=Math.min(1,distance/REFRESH_DISTANCE),armed=distance>=REFRESH_DISTANCE,reveal=progress*REFRESH_REVEAL;deck.style.setProperty('--deck-pull',`${reveal}px`);refreshTab.classList.toggle('armed',armed);deck.classList.add('pulling');return armed}
+function revealRefresh(distance){const progress=Math.min(1,distance/REFRESH_DISTANCE),armed=distance>=REFRESH_DISTANCE;deck.style.setProperty('--deck-pull',`${progress*REFRESH_REVEAL}px`);refreshTab.classList.toggle('armed',armed);deck.classList.add('pulling');return armed}
 function hideRefresh(){deck.classList.remove('pulling','refreshing');deck.style.removeProperty('--deck-pull');refreshTab.classList.remove('armed');refreshTab.textContent='Actualizar'}
 function beginRefreshGesture(touch,target){if(!canStartRefresh(target))return;refreshGesture={id:touch.identifier,startX:touch.clientX,startY:touch.clientY,armed:false,mode:'pending'}}
-function moveRefreshGesture(touch,event){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const dx=touch.clientX-refreshGesture.startX,dy=touch.clientY-refreshGesture.startY;if(refreshGesture.mode==='pending'){if(Math.abs(dx)<DIRECTION_LOCK&&Math.abs(dy)<DIRECTION_LOCK)return;if(Math.abs(dx)>=Math.abs(dy)*1.15||dy<=0){refreshGesture.mode='cancelled';return}refreshGesture.mode='refresh'}if(refreshGesture.mode!=='refresh')return;if(!atTop()){refreshGesture=null;hideRefresh();return}const distance=Math.max(0,dy);refreshGesture.armed=revealRefresh(distance);event.preventDefault();swipe=null}
+function moveRefreshGesture(touch,event){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const dx=touch.clientX-refreshGesture.startX,dy=touch.clientY-refreshGesture.startY;if(refreshGesture.mode==='pending'){if(Math.abs(dx)<DIRECTION_LOCK&&Math.abs(dy)<DIRECTION_LOCK)return;if(Math.abs(dx)>=Math.abs(dy)*1.15||dy<=0){refreshGesture.mode='cancelled';return}refreshGesture.mode='refresh'}if(refreshGesture.mode!=='refresh')return;if(!atTop()){refreshGesture=null;hideRefresh();return}refreshGesture.armed=revealRefresh(Math.max(0,dy));event.preventDefault();swipe=null}
 function endRefreshGesture(touch){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const armed=refreshGesture.mode==='refresh'&&refreshGesture.armed;refreshGesture=null;if(!armed){hideRefresh();return}deck.classList.add('refreshing');deck.style.setProperty('--deck-pull',`${REFRESH_REVEAL}px`);refreshTab.textContent='Actualizando…';setTimeout(()=>{const url=new URL(window.location.href);url.searchParams.set('_refresh',Date.now().toString());window.location.replace(url.toString())},120)}
 function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
-document.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;beginRefreshGesture(e.touches[0],e.target)},{capture:true,passive:true});
+document.addEventListener('touchstart',e=>{if(e.touches.length===1)beginRefreshGesture(e.touches[0],e.target)},{capture:true,passive:true});
 document.addEventListener('touchmove',e=>{if(!refreshGesture)return;const t=touchById(e.touches,refreshGesture.id);if(t)moveRefreshGesture(t,e)},{capture:true,passive:false});
 document.addEventListener('touchend',e=>{if(!refreshGesture)return;const t=touchById(e.changedTouches,refreshGesture.id);if(t)endRefreshGesture(t)},{capture:true,passive:true});
 document.addEventListener('touchcancel',()=>{refreshGesture=null;hideRefresh()},{capture:true,passive:true});
