@@ -1,4 +1,4 @@
-const CACHE='boat-station-v4';
+const CACHE='boat-station-v5';
 const APP_SHELL=['./','./index.html','./styles.css','./battery-overview.css','./stations.css','./remote-client-ui.css','./app.js','./data-sync.js','./manifest.webmanifest','./icon.png','./remote_landing.js','./remote-client-ui.js','./stations.js','./native-tools-adapter.js','./native-bluetooth.js','./modules/gps.js','./modules/batteries.js','./modules/phone.js','./modules/seastate.js','./modules/compass.js'];
 
 self.addEventListener('install',event=>{
@@ -13,7 +13,7 @@ self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET')return;
   const url=new URL(event.request.url);
   if(url.origin!==self.location.origin)return;
-  event.respondWith(fetch(event.request).then(response=>{
+  event.respondWith(fetch(event.request,{cache:'no-store'}).then(response=>{
     if(response&&response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}
     return response;
   }).catch(async()=>{
