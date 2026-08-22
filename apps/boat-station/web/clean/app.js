@@ -21,11 +21,31 @@ function renderModule(id){const old=cards.querySelector(`.card[data-id="${id}"]`
 renderAll();
 
 const menu=document.getElementById('menuSheet'),add=document.getElementById('addSheet');
-document.getElementById('menuBtn').onclick=()=>menu.classList.add('open');document.getElementById('addBtn').onclick=()=>add.classList.add('open');[menu,add].forEach(s=>s.addEventListener('click',e=>{if(e.target===s)s.classList.remove('open')}));
+let lockedScrollY=0;
+function anySheetOpen(){return [...document.querySelectorAll('.sheet')].some(s=>s.classList.contains('open'))}
+function lockModuleScroll(){
+  if(document.body.classList.contains('menu-open'))return;
+  lockedScrollY=window.scrollY||document.documentElement.scrollTop||0;
+  document.body.classList.add('menu-open');
+  document.body.style.top=`-${lockedScrollY}px`;
+}
+function unlockModuleScroll(){
+  if(anySheetOpen())return;
+  if(!document.body.classList.contains('menu-open'))return;
+  document.body.classList.remove('menu-open');
+  document.body.style.top='';
+  window.scrollTo(0,lockedScrollY);
+}
+function openSheet(sheet){sheet.classList.add('open');lockModuleScroll()}
+function closeSheet(sheet){sheet.classList.remove('open');unlockModuleScroll()}
+
+document.getElementById('menuBtn').onclick=()=>openSheet(menu);
+document.getElementById('addBtn').onclick=()=>openSheet(add);
+[menu,add].forEach(s=>s.addEventListener('click',e=>{if(e.target===s)closeSheet(s)}));
 
 let swipe=null,reorder=null;
 function finishReorder(){if(!reorder)return;reorder.card.classList.remove('reordering');ui.order=[...cards.querySelectorAll('.card')].map(c=>c.dataset.id);reorder=null;cards.querySelectorAll('.card').forEach(measure)}
-cards.addEventListener('pointerdown',e=>{const card=e.target.closest('.card');if(!card)return;const drag=e.target.closest('.drag-handle');if(drag){e.preventDefault();reorder={card,pointerId:e.pointerId};card.classList.add('reordering');try{drag.setPointerCapture(e.pointerId)}catch(_){};return}if(e.target.closest('button,input'))return;swipe={id:card.dataset.id,card,x:e.clientX,y:e.clientY,t:Date.now()}});
+cards.addEventListener('pointerdown',e=>{if(document.body.classList.contains('menu-open'))return;const card=e.target.closest('.card');if(!card)return;const drag=e.target.closest('.drag-handle');if(drag){e.preventDefault();reorder={card,pointerId:e.pointerId};card.classList.add('reordering');try{drag.setPointerCapture(e.pointerId)}catch(_){};return}if(e.target.closest('button,input'))return;swipe={id:card.dataset.id,card,x:e.clientX,y:e.clientY,t:Date.now()}});
 cards.addEventListener('pointermove',e=>{if(!reorder)return;e.preventDefault();const moving=reorder.card,others=[...cards.querySelectorAll('.card')].filter(c=>c!==moving);let before=null;for(const c of others){const r=c.getBoundingClientRect();if(e.clientY<r.top+r.height/2){before=c;break}}if(before)cards.insertBefore(moving,before);else cards.appendChild(moving)});
 cards.addEventListener('pointerup',e=>{if(reorder){finishReorder();return}if(!swipe)return;const g=swipe;swipe=null;const dx=e.clientX-g.x,dy=e.clientY-g.y,m=modules[g.id];if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2&&m.pages>1){const cur=ui.page[g.id]||0;ui.page[g.id]=dx<0?Math.min(m.pages-1,cur+1):Math.max(0,cur-1);const track=g.card.querySelector('.track');track.style.transform=`translateX(-${ui.page[g.id]*(100/m.pages)}%)`;setTimeout(()=>{measure(g.card);m.afterRender?.(g.card)},190);return}if(Math.abs(dx)<8&&Math.abs(dy)<8&&Date.now()-g.t<350){ui.collapsed[g.id]=!ui.collapsed[g.id];g.card.classList.toggle('collapsed',ui.collapsed[g.id]);if(!ui.collapsed[g.id])measure(g.card)}});
 cards.addEventListener('pointercancel',()=>{swipe=null;finishReorder()});
