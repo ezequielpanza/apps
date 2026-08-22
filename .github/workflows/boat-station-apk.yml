@@ -81,9 +81,10 @@ jobs:
           git reset --hard origin/main
           mkdir -p apps/boat-station/core/releases apps/boat-station/web
           cp "/tmp/$APK" "apps/boat-station/core/releases/$APK"
+          cp "/tmp/$APK" "apps/boat-station/web/$APK"
           cp "/tmp/$APK" "apps/boat-station/web/BoatStation.apk"
           printf '%s\n' "${{ steps.version.outputs.version }}" > apps/boat-station/web/APK_VERSION
-          git add "apps/boat-station/core/releases/$APK" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION
+          git add "apps/boat-station/core/releases/$APK" "apps/boat-station/web/$APK" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION
           if git diff --cached --quiet; then
             echo "APK already published"
             exit 0
