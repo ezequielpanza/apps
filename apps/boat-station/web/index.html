@@ -9,6 +9,7 @@
 <link rel="icon" href="./icon.png">
 <link rel="stylesheet" href="./styles.css">
 <link rel="stylesheet" href="./battery-overview.css">
+<link rel="stylesheet" href="./stations.css">
 <script>
 (function(){
   if(window.__bsNativeQueue)return;
@@ -21,14 +22,7 @@
 </script>
 </head>
 <body>
-<div class="app">
-  <div class="topbar">
-    <button id="menuBtn" class="iconbtn">☰</button>
-    <div class="brand">BOAT <b>STATION</b></div>
-    <button id="addBtn" class="iconbtn">＋</button>
-  </div>
-  <main id="cards" class="content"></main>
-</div>
+<div class="app"><div class="topbar"><button id="menuBtn" class="iconbtn">☰</button><div class="brand">BOAT <b>STATION</b></div><button id="addBtn" class="iconbtn">＋</button></div><main id="cards" class="content"></main></div>
 <div id="menuSheet" class="sheet"><div class="sheet-inner"><div class="handle"></div><h3>Boat Station</h3></div></div>
 <div id="addSheet" class="sheet"><div class="sheet-inner"><div class="handle"></div><h3>Agregar módulo</h3></div></div>
 <script src="./remote_landing.js"></script>
@@ -37,32 +31,21 @@
 (async function(){
   const params=new URLSearchParams(location.search);
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
-
   if(isLocal){
     await import('./app.js');
+    await import('./native-bluetooth.js');
     const queued=window.__bsNativeQueue||[];
     window.__bsNativeQueue=[];
     queued.forEach(([name,value])=>{try{window.BoatStation?.[name]?.(value)}catch(err){console.error('Boat Station native event error',name,err)}});
-    await import('./native-bluetooth.js');
   }else{
     document.getElementById('cards').innerHTML='';
     document.getElementById('addBtn').style.display='none';
   }
-
   await import('./stations.js');
-  await import('./stations-menu-style.js');
-
-  if('serviceWorker' in navigator && location.protocol==='https:'){
-    navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Boat Station SW',err));
-  }
+  if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Boat Station SW',err));
 })().catch(err=>{
   console.error('Boat Station bootstrap error',err);
-  if(!document.getElementById('remoteLanding')){
-    const box=document.createElement('div');
-    box.style.cssText='padding:24px;color:#fff;font-family:system-ui';
-    box.textContent='No se pudo iniciar Boat Station. Recargá la página.';
-    document.body.appendChild(box);
-  }
+  if(!document.getElementById('remoteLanding')){const box=document.createElement('div');box.style.cssText='padding:24px;color:#fff;font-family:system-ui';box.textContent='No se pudo iniciar Boat Station. Recargá la página.';document.body.appendChild(box)}
 });
 </script>
 </body>
