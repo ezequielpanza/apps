@@ -17,25 +17,9 @@ function resizeHandle(){return `<button class="resize-handle" type="button" aria
 function moduleHtml(id){const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1);let pages='';for(let i=0;i<m.pages;i++)pages+=`<div class="page" data-page="${i}">${m.page(i)}${pager(m.pages,p)}</div>`;return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${m.name}</span><span class="summary">${m.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track" style="transform:translateX(-${p*100}%)">${pages}</div></div></div>${resizeHandle()}</section>`}
 
 function saveHeights(){localStorage.setItem('bs.clean.heights',JSON.stringify(ui.heights))}
-function pageHeight(id,page){
-  const stored=ui.heights[id];
-  if(stored&&typeof stored==='object'&&Number.isFinite(Number(stored[page])))return Number(stored[page]);
-  if(Number.isFinite(Number(stored))&&page===0)return Number(stored);
-  return null;
-}
-function setPageHeight(id,page,height){
-  const current=(ui.heights[id]&&typeof ui.heights[id]==='object')?ui.heights[id]:{};
-  ui.heights[id]={...current,[page]:Math.round(height)};
-}
-function measure(card){
-  if(!card||card.classList.contains('collapsed'))return;
-  const id=card.dataset.id,body=card.querySelector('.card-body');
-  if(!body)return;
-  const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1),fixed=pageHeight(id,p);
-  if(fixed!==null){body.style.height=`${fixed}px`;return;}
-  const page=card.querySelector(`.page[data-page="${p}"]`);
-  if(page)body.style.height=page.scrollHeight+'px';
-}
+function pageHeight(id,page){const stored=ui.heights[id];if(stored&&typeof stored==='object'&&Number.isFinite(Number(stored[page])))return Number(stored[page]);if(Number.isFinite(Number(stored))&&page===0)return Number(stored);return null}
+function setPageHeight(id,page,height){const current=(ui.heights[id]&&typeof ui.heights[id]==='object')?ui.heights[id]:{};ui.heights[id]={...current,[page]:Math.round(height)}}
+function measure(card){if(!card||card.classList.contains('collapsed'))return;const id=card.dataset.id,body=card.querySelector('.card-body');if(!body)return;const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1),fixed=pageHeight(id,p);if(fixed!==null){body.style.height=`${fixed}px`;return}const page=card.querySelector(`.page[data-page="${p}"]`);if(page)body.style.height=page.scrollHeight+'px'}
 function hydrate(card){const m=modules[card.dataset.id];m.afterRender?.(card);requestAnimationFrame(()=>measure(card))}
 function renderAll(){cards.innerHTML=ui.order.map(moduleHtml).join('');cards.querySelectorAll('.card').forEach(hydrate)}
 function renderModule(id){const old=cards.querySelector(`.card[data-id="${id}"]`);if(!old)return;const holder=document.createElement('div');holder.innerHTML=moduleHtml(id);const fresh=holder.firstElementChild;old.replaceWith(fresh);hydrate(fresh)}
@@ -55,76 +39,32 @@ document.getElementById('addBtn').onclick=()=>openSheet(add);
 let swipe=null,reorder=null,resize=null;
 function finishReorder(){if(!reorder)return;reorder.card.classList.remove('reordering');ui.order=[...cards.querySelectorAll('.card')].map(c=>c.dataset.id);reorder=null;cards.querySelectorAll('.card').forEach(measure)}
 function finishResize(){if(!resize)return;resize.card.classList.remove('resizing');saveHeights();resize=null}
-cards.addEventListener('pointerdown',e=>{
-  if(document.body.classList.contains('menu-open'))return;
-  const card=e.target.closest('.card');if(!card)return;
-  const resizeGrip=e.target.closest('.resize-handle');
-  if(resizeGrip){
-    e.preventDefault();e.stopPropagation();
-    const body=card.querySelector('.card-body'),id=card.dataset.id,page=Math.min(ui.page[id]||0,modules[id].pages-1);
-    resize={card,body,id,page,startY:e.clientY,startH:body.getBoundingClientRect().height,pointerId:e.pointerId};
-    card.classList.add('resizing');
-    try{resizeGrip.setPointerCapture(e.pointerId)}catch(_){}
-    return;
-  }
-  const drag=e.target.closest('.drag-handle');
-  if(drag){e.preventDefault();reorder={card,pointerId:e.pointerId};card.classList.add('reordering');try{drag.setPointerCapture(e.pointerId)}catch(_){};return}
-  if(e.target.closest('button,input'))return;
-  swipe={id:card.dataset.id,card,x:e.clientX,y:e.clientY,t:Date.now()};
-});
-cards.addEventListener('pointermove',e=>{
-  if(resize){
-    e.preventDefault();
-    const max=Math.max(120,window.innerHeight*.78),next=Math.max(70,Math.min(max,resize.startH+(e.clientY-resize.startY)));
-    resize.body.style.height=`${next}px`;
-    setPageHeight(resize.id,resize.page,next);
-    return;
-  }
-  if(!reorder)return;
-  e.preventDefault();
-  const moving=reorder.card,others=[...cards.querySelectorAll('.card')].filter(c=>c!==moving);let before=null;
-  for(const c of others){const r=c.getBoundingClientRect();if(e.clientY<r.top+r.height/2){before=c;break}}
-  if(before)cards.insertBefore(moving,before);else cards.appendChild(moving);
-});
-cards.addEventListener('pointerup',e=>{
-  if(resize){finishResize();return}
-  if(reorder){finishReorder();return}
-  if(!swipe)return;
-  const g=swipe;swipe=null;const dx=e.clientX-g.x,dy=e.clientY-g.y,m=modules[g.id];
-  if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2&&m.pages>1){const cur=ui.page[g.id]||0;ui.page[g.id]=dx<0?Math.min(m.pages-1,cur+1):Math.max(0,cur-1);const track=g.card.querySelector('.track');track.style.transform=`translateX(-${ui.page[g.id]*100}%)`;setTimeout(()=>{measure(g.card);m.afterRender?.(g.card)},190);return}
-  if(Math.abs(dx)<8&&Math.abs(dy)<8&&Date.now()-g.t<350){ui.collapsed[g.id]=!ui.collapsed[g.id];g.card.classList.toggle('collapsed',ui.collapsed[g.id]);if(!ui.collapsed[g.id])measure(g.card)}
-});
+cards.addEventListener('pointerdown',e=>{if(document.body.classList.contains('menu-open'))return;const card=e.target.closest('.card');if(!card)return;const resizeGrip=e.target.closest('.resize-handle');if(resizeGrip){e.preventDefault();e.stopPropagation();const body=card.querySelector('.card-body'),id=card.dataset.id,page=Math.min(ui.page[id]||0,modules[id].pages-1);resize={card,body,id,page,startY:e.clientY,startH:body.getBoundingClientRect().height,pointerId:e.pointerId};card.classList.add('resizing');try{resizeGrip.setPointerCapture(e.pointerId)}catch(_){};return}const drag=e.target.closest('.drag-handle');if(drag){e.preventDefault();reorder={card,pointerId:e.pointerId};card.classList.add('reordering');try{drag.setPointerCapture(e.pointerId)}catch(_){};return}if(e.target.closest('button,input'))return;swipe={id:card.dataset.id,card,x:e.clientX,y:e.clientY,t:Date.now()}});
+cards.addEventListener('pointermove',e=>{if(resize){e.preventDefault();const max=Math.max(120,window.innerHeight*.78),next=Math.max(70,Math.min(max,resize.startH+(e.clientY-resize.startY)));resize.body.style.height=`${next}px`;setPageHeight(resize.id,resize.page,next);return}if(!reorder)return;e.preventDefault();const moving=reorder.card,others=[...cards.querySelectorAll('.card')].filter(c=>c!==moving);let before=null;for(const c of others){const r=c.getBoundingClientRect();if(e.clientY<r.top+r.height/2){before=c;break}}if(before)cards.insertBefore(moving,before);else cards.appendChild(moving)});
+cards.addEventListener('pointerup',e=>{if(resize){finishResize();return}if(reorder){finishReorder();return}if(!swipe)return;const g=swipe;swipe=null;const dx=e.clientX-g.x,dy=e.clientY-g.y,m=modules[g.id];if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2&&m.pages>1){const cur=ui.page[g.id]||0;ui.page[g.id]=dx<0?Math.min(m.pages-1,cur+1):Math.max(0,cur-1);const track=g.card.querySelector('.track');track.style.transform=`translateX(-${ui.page[g.id]*100}%)`;setTimeout(()=>{measure(g.card);m.afterRender?.(g.card)},190);return}if(Math.abs(dx)<8&&Math.abs(dy)<8&&Date.now()-g.t<350){ui.collapsed[g.id]=!ui.collapsed[g.id];g.card.classList.toggle('collapsed',ui.collapsed[g.id]);if(!ui.collapsed[g.id])measure(g.card)}});
 cards.addEventListener('pointercancel',()=>{swipe=null;finishResize();finishReorder()});
 cards.addEventListener('click',e=>{const more=e.target.closest('.more');if(more){e.stopPropagation();const card=more.closest('.card');alert('Configurar '+modules[card.dataset.id].name)}});
 window.addEventListener('resize',()=>cards.querySelectorAll('.card').forEach(c=>{measure(c);modules[c.dataset.id].afterRender?.(c)}));
 
-// Pull-up-to-refresh at the bottom of the main module list.
+// Bottom pull-to-refresh. Rebuilt as a touch gesture so Android WebView keeps
+// reporting movement after the document has reached its maximum scroll.
 const refreshHint=document.createElement('div');
+refreshHint.className='bottom-refresh-hint';
 refreshHint.textContent='Seguí deslizando para actualizar';
-Object.assign(refreshHint.style,{position:'fixed',left:'50%',bottom:'18px',transform:'translate(-50%,18px)',padding:'9px 13px',borderRadius:'12px',background:'#102f45',border:'1px solid #24516a',color:'#d9edf5',fontSize:'12px',fontWeight:'700',opacity:'0',pointerEvents:'none',zIndex:'45',transition:'opacity .12s ease,transform .12s ease',whiteSpace:'nowrap'});
 document.body.appendChild(refreshHint);
-let bottomPull=null;
-function atBottom(){return window.innerHeight+window.scrollY>=document.documentElement.scrollHeight-2}
-function hideRefreshHint(){refreshHint.style.opacity='0';refreshHint.style.transform='translate(-50%,18px)'}
-function showRefreshHint(progress,armed){refreshHint.textContent=armed?'Soltá para actualizar':'Seguí deslizando para actualizar';refreshHint.style.opacity=String(Math.min(1,.25+progress));refreshHint.style.transform=`translate(-50%,${Math.max(0,18-progress*18)}px)`}
-document.addEventListener('pointerdown',e=>{
-  if(document.body.classList.contains('menu-open')||!atBottom())return;
-  if(e.target.closest('.card,.topbar,.sheet,button,input'))return;
-  bottomPull={pointerId:e.pointerId,startY:e.clientY,armed:false};
-},{capture:true});
-document.addEventListener('pointermove',e=>{
-  if(!bottomPull||e.pointerId!==bottomPull.pointerId)return;
-  const distance=Math.max(0,bottomPull.startY-e.clientY),progress=Math.min(1,distance/90);
-  bottomPull.armed=distance>=90;
-  showRefreshHint(progress,bottomPull.armed);
-},{capture:true});
-document.addEventListener('pointerup',e=>{
-  if(!bottomPull||e.pointerId!==bottomPull.pointerId)return;
-  const armed=bottomPull.armed;bottomPull=null;
-  if(!armed){hideRefreshHint();return}
-  refreshHint.textContent='Actualizando…';refreshHint.style.opacity='1';refreshHint.style.transform='translate(-50%,0)';
-  setTimeout(()=>window.location.reload(),120);
-},{capture:true});
-document.addEventListener('pointercancel',()=>{bottomPull=null;hideRefreshHint()},{capture:true});
+const REFRESH_DISTANCE=72;
+let refreshGesture=null;
+function atBottom(){const root=document.scrollingElement||document.documentElement;return root.scrollTop+root.clientHeight>=root.scrollHeight-3}
+function canStartRefresh(target){if(document.body.classList.contains('menu-open')||!atBottom())return false;if(target.closest('.sheet,.topbar,.drag-handle,.resize-handle,button,input,textarea,select,a'))return false;return true}
+function showRefresh(distance){const progress=Math.min(1,distance/REFRESH_DISTANCE),armed=distance>=REFRESH_DISTANCE;refreshHint.textContent=armed?'Soltá para actualizar':'Seguí deslizando para actualizar';refreshHint.classList.add('visible');refreshHint.classList.toggle('armed',armed);refreshHint.style.setProperty('--pull',String(progress));return armed}
+function hideRefresh(){refreshHint.classList.remove('visible','armed');refreshHint.style.removeProperty('--pull')}
+function beginRefreshGesture(touch,target){if(!canStartRefresh(target))return;refreshGesture={id:touch.identifier,startY:touch.clientY,armed:false}}
+function moveRefreshGesture(touch,event){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const distance=Math.max(0,refreshGesture.startY-touch.clientY);if(distance<4)return;if(!atBottom()){refreshGesture=null;hideRefresh();return}refreshGesture.armed=showRefresh(distance);if(distance>0){event.preventDefault();swipe=null}}
+function endRefreshGesture(touch){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const armed=refreshGesture.armed;refreshGesture=null;if(!armed){hideRefresh();return}refreshHint.textContent='Actualizando…';refreshHint.classList.add('visible','armed');setTimeout(()=>{const url=new URL(window.location.href);url.searchParams.set('_refresh',Date.now().toString());window.location.replace(url.toString())},100)}
+function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
+document.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;beginRefreshGesture(e.touches[0],e.target)},{capture:true,passive:true});
+document.addEventListener('touchmove',e=>{if(!refreshGesture)return;const t=touchById(e.touches,refreshGesture.id);if(t)moveRefreshGesture(t,e)},{capture:true,passive:false});
+document.addEventListener('touchend',e=>{if(!refreshGesture)return;const t=touchById(e.changedTouches,refreshGesture.id);if(t)endRefreshGesture(t)},{capture:true,passive:true});
+document.addEventListener('touchcancel',()=>{refreshGesture=null;hideRefresh()},{capture:true,passive:true});
 
 window.BoatStation={updateGPS:data=>modules.gps.update(data)};
