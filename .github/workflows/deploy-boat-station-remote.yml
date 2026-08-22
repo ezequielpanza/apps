@@ -6,7 +6,7 @@ on:
     paths:
       - "apps/boat-station/web/**"
       - "apps/boat-station/core/VERSION"
-      - "apps/boat-station/core/releases/BoatStation-Core-*.apk"
+      - "apps/boat-station/core/releases/BoatStation-*.apk"
       - ".github/workflows/deploy-boat-station-remote.yml"
   workflow_dispatch:
 
@@ -24,11 +24,11 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="$(tr -d '\r\n ' < apps/boat-station/core/VERSION)"
-          APK="apps/boat-station/core/releases/BoatStation-Core-${VERSION}.apk"
+          APK="apps/boat-station/core/releases/BoatStation-${VERSION}.apk"
           if [ -f "$APK" ]; then
-            cp "$APK" "apps/boat-station/web/BoatStation-Core-${VERSION}.apk"
+            cp "$APK" "apps/boat-station/web/BoatStation-${VERSION}.apk"
             echo "$VERSION" > apps/boat-station/web/APK_VERSION
-            printf '%s\n' "/BoatStation.apk /BoatStation-Core-${VERSION}.apk 302" > apps/boat-station/web/_redirects
+            printf '%s\n' "/BoatStation.apk /BoatStation-${VERSION}.apk 302" > apps/boat-station/web/_redirects
           fi
 
       - name: Validate canonical Boat Station web
@@ -38,8 +38,9 @@ jobs:
           test -f apps/boat-station/web/index.html
           test -f apps/boat-station/web/app.js
           test -f apps/boat-station/web/styles.css
+          test -f apps/boat-station/web/stations.css
           ! grep -R "/clean/" apps/boat-station/web --exclude='*.apk'
-          ! find apps/boat-station/web -maxdepth 1 -type f -name 'patch_*' | grep -q .
+          ! find apps/boat-station/web -type f -name 'patch_*' | grep -q .
 
       - name: Ensure Boat Station project exists
         env:
