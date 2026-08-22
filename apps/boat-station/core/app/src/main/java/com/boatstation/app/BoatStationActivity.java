@@ -17,12 +17,12 @@ import org.json.JSONObject;
  * Production Boat Station native shell.
  *
  * Native responsibilities are limited to Android/hardware access. Application logic and UI
- * live in the PWA. The inherited core provides GPS, motion/orientation sensors, BLE/GATT,
- * selected-folder storage, GPX/file pickers and native utilities.
+ * live in the canonical PWA root. The inherited core provides GPS, motion/orientation sensors,
+ * BLE/GATT, storage, GPX/file pickers and native utilities.
  */
 public class BoatStationActivity extends MainActivityCore {
     private static final String VERSION = "1.2.0";
-    private static final String URL = "https://boat-station.pages.dev/clean/?mode=station";
+    private static final String URL = "https://boat-station.pages.dev/?mode=station";
 
     private WebView stationWebView;
 
