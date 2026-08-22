@@ -1,11 +1,13 @@
 export function createBatteriesModule(requestRender,openManager){
   const read=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||'null');return v??fallback}catch(_){return fallback}};
   const saved=read('bs.batteries.state',null);
-  const state=saved&&typeof saved==='object'?saved:{bankName:'Banco principal',batteries:[],history:[],root:null};
+  const state=saved&&typeof saved==='object'?saved:{bankName:'Banco principal',batteries:[],history:[],historyDays:7,root:null};
   delete state.capacityAh;
   state.root=null;
   state.history=Array.isArray(state.history)?state.history:[];
   state.batteries=Array.isArray(state.batteries)?state.batteries:[];
+  const HISTORY_DAY_LEVELS=[1,2,3,7,14,30,60,90];
+  if(!HISTORY_DAY_LEVELS.includes(Number(state.historyDays)))state.historyDays=7;
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const num=v=>Number.isFinite(Number(v))?Number(v):null;
   function save(){try{const copy={...state,root:undefined};localStorage.setItem('bs.batteries.state',JSON.stringify(copy))}catch(_){}}
@@ -31,14 +33,31 @@ export function createBatteriesModule(requestRender,openManager){
       if(!state.batteries.length)return `<div class="battery-empty"><div>No hay baterías vinculadas</div><button class="gps-action primary" type="button" data-battery-manage>Administrar Banco de Baterías</button></div>`;
       return `<div class="battery-list">${state.batteries.map(b=>{const soc=num(b.soc),v=num(b.voltage),a=num(b.current),c=num(b.capacityAh);return `<div class="battery-item"><div class="battery-item-top"><span class="battery-name">${esc(b.name||b.deviceName||'Batería')}</span><span class="battery-soc">${soc===null?'—':Math.round(soc)+'%'}</span></div><div class="battery-item-sub"><span>${c===null?'— Ah':Math.round(c)+' Ah'}</span><span>${v===null?'—':v.toFixed(2)+' V'}</span><span>${a===null?'—':a.toFixed(1)+' A'}</span><span class="${b.connected===false?'offline':'online'}">${b.connected===false?'Offline':'Conectada'}</span></div></div>`}).join('')}</div>`;
     }
-    return `<div class="battery-history"><canvas data-battery-chart></canvas><div class="battery-history-note">Historial de carga del banco</div></div>`;
+    return `<div class="battery-history-wrap"><div class="battery-history"><canvas data-battery-chart></canvas><div class="battery-history-note">Historial de carga del banco · <span data-history-range>${state.historyDays} ${state.historyDays===1?'día':'días'}</span></div></div><div class="battery-history-zoom" aria-label="Zoom del historial"><button type="button" data-history-zoom="out" aria-label="Mostrar más días">+</button><button type="button" data-history-zoom="in" aria-label="Mostrar menos días">−</button></div></div>`;
   }
+  function historyPoints(){
+    const cutoff=Date.now()-Number(state.historyDays)*86400000;
+    return state.history.filter(p=>Number(p.time)>=cutoff);
+  }
+  function updateHistoryLabel(root){const el=root?.querySelector('[data-history-range]');if(el)el.textContent=`${state.historyDays} ${state.historyDays===1?'día':'días'}`}
   function drawChart(root){
     const canvas=root.querySelector('[data-battery-chart]');if(!canvas)return;
     const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;const dpr=window.devicePixelRatio||1;canvas.width=Math.round(r.width*dpr);canvas.height=Math.round(r.height*dpr);const c=canvas.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,r.width,r.height);c.strokeStyle='#17394f';c.lineWidth=1;for(let i=1;i<5;i++){const y=i*r.height/5;c.beginPath();c.moveTo(0,y);c.lineTo(r.width,y);c.stroke()}
-    const pts=state.history.slice(-120);if(pts.length<2)return;c.strokeStyle='#1ed7e5';c.lineWidth=2;c.beginPath();pts.forEach((p,i)=>{const x=i/(pts.length-1)*r.width,y=r.height-(Math.max(0,Math.min(100,Number(p.soc)||0))/100*r.height);i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();
+    const pts=historyPoints();if(pts.length<2)return;
+    const start=Date.now()-Number(state.historyDays)*86400000,end=Date.now(),span=Math.max(1,end-start);
+    c.strokeStyle='#1ed7e5';c.lineWidth=2;c.beginPath();pts.forEach((p,i)=>{const x=Math.max(0,Math.min(r.width,((Number(p.time)-start)/span)*r.width)),y=r.height-(Math.max(0,Math.min(100,Number(p.soc)||0))/100*r.height);i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();
   }
-  function afterRender(root){state.root=root;drawChart(root);root.querySelectorAll('[data-battery-manage]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openManager?.()}))}
+  function changeHistoryZoom(direction,root){
+    const i=HISTORY_DAY_LEVELS.indexOf(Number(state.historyDays));
+    const next=direction==='out'?Math.min(HISTORY_DAY_LEVELS.length-1,i+1):Math.max(0,i-1);
+    if(next===i)return;
+    state.historyDays=HISTORY_DAY_LEVELS[next];save();updateHistoryLabel(root);drawChart(root);
+  }
+  function afterRender(root){
+    state.root=root;drawChart(root);
+    root.querySelectorAll('[data-battery-manage]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openManager?.()}));
+    root.querySelectorAll('[data-history-zoom]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();changeHistoryZoom(b.dataset.historyZoom,root)}));
+  }
   function updateBattery(data){
     if(!data)return;const id=String(data.id||data.address||data.deviceId||data.mac||data.name||'battery');let b=state.batteries.find(x=>String(x.id)===id);if(!b){b={id,name:data.name||data.deviceName||'Batería',capacityAh:num(data.capacityAh)||0,connected:true};state.batteries.push(b)}Object.assign(b,data,{id,connected:data.connected!==false});
     const s=stats();if(s.soc!==null){const now=Date.now(),last=state.history[state.history.length-1];if(!last||now-last.time>30000)state.history.push({time:now,soc:s.soc});if(state.history.length>1000)state.history.splice(0,state.history.length-1000)}save();requestRender('batteries');
