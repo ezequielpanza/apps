@@ -22,7 +22,11 @@ export function createBatteriesModule(requestRender,openManager){
   function individualBattery(b,i){
     const soc=num(b.soc),v=num(b.voltage),a=num(b.current),cap=num(b.capacityAh)||0,rem=num(b.remainingAh);
     const shownRem=rem!==null?rem:(soc!==null&&cap?cap*soc/100:null),online=b.connected!==false&&v!==null;
-    return `<div class="battery-mini ${online?'online':'offline'}"><div class="battery-mini-head"><strong>${esc(b.name||b.deviceName||`Batería ${i+1}`)}</strong><span class="battery-mini-link">${online?'⌁':'×'}</span></div><div class="battery-mini-center"><div class="battery-mini-soc">${soc===null?'—':Math.round(soc)+'%'}</div><div class="battery-mini-row"><span>${v===null?'—':v.toFixed(2)+' V'}</span><small>Voltaje</small></div><div class="battery-mini-row"><span>${a===null?'—':(a>=0?'+':'')+a.toFixed(1)+' A'}</span><small>Corriente</small></div><div class="battery-mini-ah">${shownRem===null?'—':Math.round(shownRem)} / ${Math.round(cap)} Ah</div></div></div>`;
+    const socText=soc===null?'—':Math.round(soc)+'%';
+    const vText=v===null?'—':v.toFixed(2)+' V';
+    const aText=a===null?'—':(a>=0?'+':'')+a.toFixed(1)+' A';
+    const ahText=shownRem===null?'—':`${Math.round(shownRem)}/${Math.round(cap)} Ah`;
+    return `<div class="battery-mini ${online?'online':'offline'}"><div class="battery-mini-head"><strong>${esc(b.name||b.deviceName||`Batería ${i+1}`)}</strong><span class="battery-mini-link">${online?'⌁':'×'}</span></div><div class="battery-mini-line"><span class="battery-mini-soc">${socText}</span><span>${vText}</span><span>${aText}</span><span class="battery-mini-ah">${ahText}</span></div></div>`;
   }
   function historyRangeLabel(){const h=Number(state.historyHours);if(h<24)return `${h} ${h===1?'hora':'horas'}`;const d=h/24;return `${d} ${d===1?'día':'días'}`}
   function page(index){
