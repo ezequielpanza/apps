@@ -2,7 +2,8 @@ import {createGpsModule} from './modules/gps.js';
 
 const cards=document.getElementById('cards');
 const modules={};
-const ui={order:['gps','phone','seastate','compass'],collapsed:{},page:{}};
+const savedHeights=(()=>{try{return JSON.parse(localStorage.getItem('bs.clean.heights')||'{}')}catch(_){return {}}})();
+const ui={order:['gps','phone','seastate','compass'],collapsed:{},page:{},heights:savedHeights};
 
 function requestRender(id){renderModule(id)}
 modules.gps=createGpsModule(requestRender);
@@ -12,9 +13,18 @@ modules.compass={id:'compass',name:'Brújula',pages:2,summary:()=> 'Pendiente',p
 
 function pager(count,current){let h='<div class="pager">';for(let i=0;i<count;i++)h+=`<span class="${i===current?'on':''}">●</span> `;return h+'</div>'}
 function dragHandle(){return `<button class="drag-handle" type="button" aria-label="Mover módulo"><i></i><i></i><i></i><i></i><i></i><i></i></button>`}
-function moduleHtml(id){const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1);let pages='';for(let i=0;i<m.pages;i++)pages+=`<div class="page" data-page="${i}">${m.page(i)}${pager(m.pages,p)}</div>`;return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${m.name}</span><span class="summary">${m.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track" style="width:${m.pages*100}%;transform:translateX(-${p*(100/m.pages)}%)">${pages}</div></div></div></section>`}
+function resizeHandle(){return `<button class="resize-handle" type="button" aria-label="Cambiar tamaño del módulo"><i></i><i></i><i></i></button>`}
+function moduleHtml(id){const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1);let pages='';for(let i=0;i<m.pages;i++)pages+=`<div class="page" data-page="${i}">${m.page(i)}${pager(m.pages,p)}</div>`;return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${m.name}</span><span class="summary">${m.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track" style="width:${m.pages*100}%;transform:translateX(-${p*(100/m.pages)}%)">${pages}</div></div></div>${resizeHandle()}</section>`}
 
-function measure(card){if(!card||card.classList.contains('collapsed'))return;const id=card.dataset.id,m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1),page=card.querySelector(`.page[data-page="${p}"]`),body=card.querySelector('.card-body');if(page&&body)body.style.height=page.scrollHeight+'px'}
+function saveHeights(){localStorage.setItem('bs.clean.heights',JSON.stringify(ui.heights))}
+function measure(card){
+  if(!card||card.classList.contains('collapsed'))return;
+  const id=card.dataset.id,body=card.querySelector('.card-body');
+  if(!body)return;
+  if(Number.isFinite(Number(ui.heights[id]))){body.style.height=`${ui.heights[id]}px`;return;}
+  const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1),page=card.querySelector(`.page[data-page="${p}"]`);
+  if(page)body.style.height=page.scrollHeight+'px';
+}
 function hydrate(card){const m=modules[card.dataset.id];m.afterRender?.(card);requestAnimationFrame(()=>measure(card))}
 function renderAll(){cards.innerHTML=ui.order.map(moduleHtml).join('');cards.querySelectorAll('.card').forEach(hydrate)}
 function renderModule(id){const old=cards.querySelector(`.card[data-id="${id}"]`);if(!old)return;const holder=document.createElement('div');holder.innerHTML=moduleHtml(id);const fresh=holder.firstElementChild;old.replaceWith(fresh);hydrate(fresh)}
@@ -23,35 +33,58 @@ renderAll();
 const menu=document.getElementById('menuSheet'),add=document.getElementById('addSheet');
 let lockedScrollY=0;
 function anySheetOpen(){return [...document.querySelectorAll('.sheet')].some(s=>s.classList.contains('open'))}
-function lockModuleScroll(){
-  if(document.body.classList.contains('menu-open'))return;
-  lockedScrollY=window.scrollY||document.documentElement.scrollTop||0;
-  document.body.classList.add('menu-open');
-  document.body.style.top=`-${lockedScrollY}px`;
-}
-function unlockModuleScroll(){
-  if(anySheetOpen())return;
-  if(!document.body.classList.contains('menu-open'))return;
-  document.body.classList.remove('menu-open');
-  document.body.style.top='';
-  window.scrollTo(0,lockedScrollY);
-}
+function lockModuleScroll(){if(document.body.classList.contains('menu-open'))return;lockedScrollY=window.scrollY||document.documentElement.scrollTop||0;document.body.classList.add('menu-open');document.body.style.top=`-${lockedScrollY}px`}
+function unlockModuleScroll(){if(anySheetOpen())return;if(!document.body.classList.contains('menu-open'))return;document.body.classList.remove('menu-open');document.body.style.top='';window.scrollTo(0,lockedScrollY)}
 function openSheet(sheet){sheet.classList.add('open');lockModuleScroll()}
 function closeSheet(sheet){sheet.classList.remove('open');unlockModuleScroll()}
-
 document.getElementById('menuBtn').onclick=()=>openSheet(menu);
 document.getElementById('addBtn').onclick=()=>openSheet(add);
 [menu,add].forEach(s=>s.addEventListener('click',e=>{if(e.target===s)closeSheet(s)}));
 
-let swipe=null,reorder=null;
+let swipe=null,reorder=null,resize=null;
 function finishReorder(){if(!reorder)return;reorder.card.classList.remove('reordering');ui.order=[...cards.querySelectorAll('.card')].map(c=>c.dataset.id);reorder=null;cards.querySelectorAll('.card').forEach(measure)}
-cards.addEventListener('pointerdown',e=>{if(document.body.classList.contains('menu-open'))return;const card=e.target.closest('.card');if(!card)return;const drag=e.target.closest('.drag-handle');if(drag){e.preventDefault();reorder={card,pointerId:e.pointerId};card.classList.add('reordering');try{drag.setPointerCapture(e.pointerId)}catch(_){};return}if(e.target.closest('button,input'))return;swipe={id:card.dataset.id,card,x:e.clientX,y:e.clientY,t:Date.now()}});
-cards.addEventListener('pointermove',e=>{if(!reorder)return;e.preventDefault();const moving=reorder.card,others=[...cards.querySelectorAll('.card')].filter(c=>c!==moving);let before=null;for(const c of others){const r=c.getBoundingClientRect();if(e.clientY<r.top+r.height/2){before=c;break}}if(before)cards.insertBefore(moving,before);else cards.appendChild(moving)});
-cards.addEventListener('pointerup',e=>{if(reorder){finishReorder();return}if(!swipe)return;const g=swipe;swipe=null;const dx=e.clientX-g.x,dy=e.clientY-g.y,m=modules[g.id];if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2&&m.pages>1){const cur=ui.page[g.id]||0;ui.page[g.id]=dx<0?Math.min(m.pages-1,cur+1):Math.max(0,cur-1);const track=g.card.querySelector('.track');track.style.transform=`translateX(-${ui.page[g.id]*(100/m.pages)}%)`;setTimeout(()=>{measure(g.card);m.afterRender?.(g.card)},190);return}if(Math.abs(dx)<8&&Math.abs(dy)<8&&Date.now()-g.t<350){ui.collapsed[g.id]=!ui.collapsed[g.id];g.card.classList.toggle('collapsed',ui.collapsed[g.id]);if(!ui.collapsed[g.id])measure(g.card)}});
-cards.addEventListener('pointercancel',()=>{swipe=null;finishReorder()});
+function finishResize(){if(!resize)return;resize.card.classList.remove('resizing');saveHeights();resize=null}
+cards.addEventListener('pointerdown',e=>{
+  if(document.body.classList.contains('menu-open'))return;
+  const card=e.target.closest('.card');if(!card)return;
+  const resizeGrip=e.target.closest('.resize-handle');
+  if(resizeGrip){
+    e.preventDefault();e.stopPropagation();
+    const body=card.querySelector('.card-body');
+    resize={card,body,id:card.dataset.id,startY:e.clientY,startH:body.getBoundingClientRect().height,pointerId:e.pointerId};
+    card.classList.add('resizing');
+    try{resizeGrip.setPointerCapture(e.pointerId)}catch(_){}
+    return;
+  }
+  const drag=e.target.closest('.drag-handle');
+  if(drag){e.preventDefault();reorder={card,pointerId:e.pointerId};card.classList.add('reordering');try{drag.setPointerCapture(e.pointerId)}catch(_){};return}
+  if(e.target.closest('button,input'))return;
+  swipe={id:card.dataset.id,card,x:e.clientX,y:e.clientY,t:Date.now()};
+});
+cards.addEventListener('pointermove',e=>{
+  if(resize){
+    e.preventDefault();
+    const max=Math.max(120,window.innerHeight*.78),next=Math.max(70,Math.min(max,resize.startH+(e.clientY-resize.startY)));
+    resize.body.style.height=`${next}px`;
+    ui.heights[resize.id]=Math.round(next);
+    return;
+  }
+  if(!reorder)return;
+  e.preventDefault();
+  const moving=reorder.card,others=[...cards.querySelectorAll('.card')].filter(c=>c!==moving);let before=null;
+  for(const c of others){const r=c.getBoundingClientRect();if(e.clientY<r.top+r.height/2){before=c;break}}
+  if(before)cards.insertBefore(moving,before);else cards.appendChild(moving);
+});
+cards.addEventListener('pointerup',e=>{
+  if(resize){finishResize();return}
+  if(reorder){finishReorder();return}
+  if(!swipe)return;
+  const g=swipe;swipe=null;const dx=e.clientX-g.x,dy=e.clientY-g.y,m=modules[g.id];
+  if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2&&m.pages>1){const cur=ui.page[g.id]||0;ui.page[g.id]=dx<0?Math.min(m.pages-1,cur+1):Math.max(0,cur-1);const track=g.card.querySelector('.track');track.style.transform=`translateX(-${ui.page[g.id]*(100/m.pages)}%)`;setTimeout(()=>{measure(g.card);m.afterRender?.(g.card)},190);return}
+  if(Math.abs(dx)<8&&Math.abs(dy)<8&&Date.now()-g.t<350){ui.collapsed[g.id]=!ui.collapsed[g.id];g.card.classList.toggle('collapsed',ui.collapsed[g.id]);if(!ui.collapsed[g.id])measure(g.card)}
+});
+cards.addEventListener('pointercancel',()=>{swipe=null;finishResize();finishReorder()});
 cards.addEventListener('click',e=>{const more=e.target.closest('.more');if(more){e.stopPropagation();const card=more.closest('.card');alert('Configurar '+modules[card.dataset.id].name)}});
 window.addEventListener('resize',()=>cards.querySelectorAll('.card').forEach(c=>{measure(c);modules[c.dataset.id].afterRender?.(c)}));
 
-window.BoatStation={
-  updateGPS:data=>modules.gps.update(data)
-};
+window.BoatStation={updateGPS:data=>modules.gps.update(data)};
