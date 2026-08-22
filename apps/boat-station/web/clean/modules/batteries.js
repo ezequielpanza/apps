@@ -26,7 +26,7 @@ export function createBatteriesModule(requestRender,openManager){
     const vText=v===null?'—':v.toFixed(2)+' V';
     const aText=a===null?'—':(a>=0?'+':'')+a.toFixed(1)+' A';
     const ahText=shownRem===null?'—':`${Math.round(shownRem)}/${Math.round(cap)} Ah`;
-    return `<div class="battery-mini ${online?'online':'offline'}"><div class="battery-mini-head"><strong>${esc(b.name||b.deviceName||`Batería ${i+1}`)}</strong><span class="battery-mini-link">${online?'⌁':'×'}</span></div><div class="battery-mini-line"><span class="battery-mini-soc">${socText}</span><span>${vText}</span><span>${aText}</span><span class="battery-mini-ah">${ahText}</span></div></div>`;
+    return `<div class="battery-mini ${online?'online':'offline'}"><div class="battery-mini-head"><strong>${esc(b.name||b.deviceName||`Batería ${i+1}`)}</strong><span class="battery-mini-link">${online?'⌁':'×'}</span></div><div class="battery-mini-body"><div class="battery-mini-ring" style="--soc:${soc??0}"><span>${socText}</span></div><div class="battery-mini-values"><span>${vText}</span><span>${aText}</span><span class="battery-mini-ah">${ahText}</span></div></div></div>`;
   }
   function historyRangeLabel(){const h=Number(state.historyHours);if(h<24)return `${h} ${h===1?'hora':'horas'}`;const d=h/24;return `${d} ${d===1?'día':'días'}`}
   function page(index){
