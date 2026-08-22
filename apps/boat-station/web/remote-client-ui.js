@@ -31,44 +31,49 @@ function applyAll(){cards?.querySelectorAll('.card').forEach(applyCardState)}
 function setPage(card,page){if(!card)return;const id=card.dataset.id,count=pageCount(card);if(!id||count<2)return;page=Math.max(0,Math.min(count-1,page));const state=pages();state[id]=page;writeJson(PAGE_KEY,state);applyCardState(card)}
 
 let swipe=null;
+let interactionDepth=0;
+let pendingSnapshot='';
+function beginInteraction(){interactionDepth++}
+function endInteraction(){interactionDepth=Math.max(0,interactionDepth-1);if(interactionDepth===0&&pendingSnapshot){const html=pendingSnapshot;pendingSnapshot='';applySnapshotNow(html)}}
+function isBusy(){return interactionDepth>0||!!cards?.querySelector('.resizing,.reordering')}
+function applySnapshotNow(html){if(!cards)return;cards.innerHTML=html||'';lastSnapshotAt=Date.now();renderFreshness();requestAnimationFrame(applyAll)}
+function applySnapshot(html){if(isBusy()){pendingSnapshot=html||'';lastSnapshotAt=Date.now();renderFreshness();return false}applySnapshotNow(html);return true}
+window.BoatStationRemoteUI={applySnapshot,isBusy};
+
 cards?.addEventListener('pointerdown',event=>{
+  if(event.button!==0&&event.pointerType!=='touch')return;
+  if(event.target.closest('.resize-handle,.drag-handle')){beginInteraction();return}
   if(event.pointerType==='touch')return;
-  if(event.button!==0)return;
-  if(event.target.closest('.drag-handle,.resize-handle,button,input,textarea,select,a'))return;
+  if(event.target.closest('button,input,textarea,select,a'))return;
   const card=event.target.closest('.card');
   if(!card||pageCount(card)<2)return;
   swipe={pointerId:event.pointerId,card,startX:event.clientX,startY:event.clientY,active:false};
+  beginInteraction();
 });
 cards?.addEventListener('pointermove',event=>{
   if(!swipe||event.pointerId!==swipe.pointerId)return;
   const dx=event.clientX-swipe.startX,dy=event.clientY-swipe.startY;
   if(!swipe.active){
     if(Math.abs(dx)<10&&Math.abs(dy)<10)return;
-    if(Math.abs(dx)<=Math.abs(dy)*1.15){swipe=null;return}
+    if(Math.abs(dx)<=Math.abs(dy)*1.15){swipe=null;endInteraction();return}
     swipe.active=true;
   }
   event.preventDefault();
 },{passive:false});
 cards?.addEventListener('pointerup',event=>{
-  if(!swipe||event.pointerId!==swipe.pointerId)return;
-  const gesture=swipe;swipe=null;
-  if(!gesture.active)return;
-  const dx=event.clientX-gesture.startX,dy=event.clientY-gesture.startY;
-  if(Math.abs(dx)<38||Math.abs(dx)<=Math.abs(dy)*1.1)return;
-  const current=currentPage(gesture.card);
-  setPage(gesture.card,dx<0?current+1:current-1);
-});
-cards?.addEventListener('pointercancel',()=>{swipe=null});
-
-// Core snapshots replace module markup as data changes. Reapply this browser's
-// presentation state after each replacement without affecting station-side state.
-const observer=new MutationObserver(mutations=>{
-  if(mutations.some(m=>m.type==='childList')){
-    lastSnapshotAt=Date.now();
-    renderFreshness();
+  if(swipe&&event.pointerId===swipe.pointerId){
+    const gesture=swipe;swipe=null;
+    if(gesture.active){const dx=event.clientX-gesture.startX,dy=event.clientY-gesture.startY;if(Math.abs(dx)>=38&&Math.abs(dx)>Math.abs(dy)*1.1){const current=currentPage(gesture.card);setPage(gesture.card,dx<0?current+1:current-1)}}
+    endInteraction();
+    return;
   }
-  requestAnimationFrame(applyAll);
+  if(interactionDepth>0)endInteraction();
 });
+cards?.addEventListener('pointercancel',()=>{swipe=null;if(interactionDepth>0)endInteraction()});
+window.addEventListener('pointerup',()=>{if(interactionDepth>0&&!swipe)endInteraction()});
+window.addEventListener('pointercancel',()=>{if(interactionDepth>0)endInteraction()});
+
+const observer=new MutationObserver(()=>requestAnimationFrame(applyAll));
 if(cards)observer.observe(cards,{childList:true,subtree:false});
 window.addEventListener('resize',applyAll);
 applyAll();
