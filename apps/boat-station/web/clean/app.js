@@ -31,22 +31,51 @@ renderAll();
 const menu=document.getElementById('menuSheet'),add=document.getElementById('addSheet');
 const moduleMenu=document.createElement('div');
 moduleMenu.className='sheet';
-moduleMenu.innerHTML='<div class="sheet-inner"><div class="handle"></div><h3 data-module-menu-title>Módulo</h3><div class="option" data-module-config>Configuración</div><div class="option" data-module-delete style="color:#ff8b8b;font-weight:750">Eliminar módulo</div></div>';
+moduleMenu.innerHTML='<div class="sheet-inner"><div class="handle" aria-label="Arrastrar para cerrar"></div><h3 data-module-menu-title>Módulo</h3><button class="option sheet-option" type="button" data-module-config>Configuración</button><button class="option sheet-option danger" type="button" data-module-delete>Eliminar módulo</button></div>';
 document.body.appendChild(moduleMenu);
 let moduleMenuId=null;
 let lockedScrollY=0;
 function anySheetOpen(){return [...document.querySelectorAll('.sheet')].some(s=>s.classList.contains('open'))}
 function lockModuleScroll(){if(document.body.classList.contains('menu-open'))return;lockedScrollY=window.scrollY||document.documentElement.scrollTop||0;document.body.classList.add('menu-open');document.body.style.top=`-${lockedScrollY}px`}
 function unlockModuleScroll(){if(anySheetOpen())return;if(!document.body.classList.contains('menu-open'))return;document.body.classList.remove('menu-open');document.body.style.top='';window.scrollTo(0,lockedScrollY)}
-function openSheet(sheet){sheet.classList.add('open');lockModuleScroll()}
-function closeSheet(sheet){sheet.classList.remove('open');unlockModuleScroll()}
+function openSheet(sheet){const inner=sheet.querySelector('.sheet-inner');if(inner){inner.style.transform='';inner.style.transition=''}sheet.classList.add('open');lockModuleScroll()}
+function closeSheet(sheet){const inner=sheet.querySelector('.sheet-inner');if(inner){inner.style.transform='';inner.style.transition=''}sheet.classList.remove('open');unlockModuleScroll()}
 function openModuleMenu(id){moduleMenuId=id;moduleMenu.querySelector('[data-module-menu-title]').textContent=modules[id].name;openSheet(moduleMenu)}
 function deleteModule(id){if(!id)return;ui.order=ui.order.filter(x=>x!==id);delete ui.collapsed[id];delete ui.page[id];saveOrder();closeSheet(moduleMenu);moduleMenuId=null;renderAll()}
 document.getElementById('menuBtn').onclick=()=>openSheet(menu);
 document.getElementById('addBtn').onclick=()=>openSheet(add);
 [menu,add,moduleMenu].forEach(s=>s.addEventListener('click',e=>{if(e.target===s)closeSheet(s)}));
-moduleMenu.querySelector('[data-module-delete]').addEventListener('click',e=>{e.stopPropagation();deleteModule(moduleMenuId)});
-moduleMenu.querySelector('[data-module-config]').addEventListener('click',e=>{e.stopPropagation();const id=moduleMenuId;closeSheet(moduleMenu);moduleMenuId=null;if(id)alert('Configurar '+modules[id].name)});
+moduleMenu.querySelector('[data-module-delete]').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();deleteModule(moduleMenuId)});
+moduleMenu.querySelector('[data-module-config]').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const id=moduleMenuId;closeSheet(moduleMenu);moduleMenuId=null;if(id)alert('Configurar '+modules[id].name)});
+
+// Bottom-sheet grab: dragging the handle downward moves the whole sheet and
+// closes it after a deliberate pull. The content itself keeps normal scrolling.
+let sheetDrag=null;
+for(const sheet of [menu,add,moduleMenu]){
+  const handle=sheet.querySelector('.handle'),inner=sheet.querySelector('.sheet-inner');
+  if(!handle||!inner)continue;
+  handle.addEventListener('pointerdown',e=>{
+    if(!sheet.classList.contains('open'))return;
+    e.preventDefault();e.stopPropagation();
+    sheetDrag={sheet,inner,startY:e.clientY,pointerId:e.pointerId};
+    inner.style.transition='none';
+    try{handle.setPointerCapture(e.pointerId)}catch(_){}
+  });
+}
+document.addEventListener('pointermove',e=>{
+  if(!sheetDrag||e.pointerId!==sheetDrag.pointerId)return;
+  e.preventDefault();
+  const dy=Math.max(0,e.clientY-sheetDrag.startY);
+  sheetDrag.inner.style.transform=`translateY(${dy}px)`;
+},{passive:false});
+document.addEventListener('pointerup',e=>{
+  if(!sheetDrag||e.pointerId!==sheetDrag.pointerId)return;
+  const d=sheetDrag,dy=Math.max(0,e.clientY-d.startY);sheetDrag=null;
+  d.inner.style.transition='transform .16s ease';
+  if(dy>=72){d.inner.style.transform='translateY(110%)';setTimeout(()=>closeSheet(d.sheet),160)}
+  else{d.inner.style.transform='translateY(0)';setTimeout(()=>{d.inner.style.transition='';d.inner.style.transform=''},160)}
+});
+document.addEventListener('pointercancel',()=>{if(!sheetDrag)return;const d=sheetDrag;sheetDrag=null;d.inner.style.transition='transform .16s ease';d.inner.style.transform='translateY(0)';setTimeout(()=>{d.inner.style.transition='';d.inner.style.transform=''},160)});
 
 let swipe=null,reorder=null,resize=null;
 function finishReorder(){if(!reorder)return;reorder.card.classList.remove('reordering');ui.order=[...cards.querySelectorAll('.card')].map(c=>c.dataset.id);saveOrder();reorder=null;cards.querySelectorAll('.card').forEach(measure)}
@@ -58,8 +87,6 @@ cards.addEventListener('pointercancel',()=>{swipe=null;finishResize();finishReor
 cards.addEventListener('click',e=>{const more=e.target.closest('.more');if(more){e.stopPropagation();const card=more.closest('.card');openModuleMenu(card.dataset.id)}});
 window.addEventListener('resize',()=>cards.querySelectorAll('.card').forEach(c=>{measure(c);modules[c.dataset.id].afterRender?.(c)}));
 
-// Hidden refresh module above the deck. It is outside normal layout and only
-// appears after a deliberate vertical overscroll. Horizontal card swipes keep priority.
 const deck=document.createElement('div');
 deck.className='module-deck';
 cards.parentNode.insertBefore(deck,cards);
@@ -77,21 +104,7 @@ function canStartRefresh(target){if(document.body.classList.contains('menu-open'
 function revealRefresh(distance){const progress=Math.min(1,distance/REFRESH_DISTANCE),armed=distance>=REFRESH_DISTANCE,reveal=progress*REFRESH_REVEAL;deck.style.setProperty('--deck-pull',`${reveal}px`);refreshTab.classList.toggle('armed',armed);deck.classList.add('pulling');return armed}
 function hideRefresh(){deck.classList.remove('pulling','refreshing');deck.style.removeProperty('--deck-pull');refreshTab.classList.remove('armed');refreshTab.textContent='Actualizar'}
 function beginRefreshGesture(touch,target){if(!canStartRefresh(target))return;refreshGesture={id:touch.identifier,startX:touch.clientX,startY:touch.clientY,armed:false,mode:'pending'}}
-function moveRefreshGesture(touch,event){
-  if(!refreshGesture||touch.identifier!==refreshGesture.id)return;
-  const dx=touch.clientX-refreshGesture.startX,dy=touch.clientY-refreshGesture.startY;
-  if(refreshGesture.mode==='pending'){
-    if(Math.abs(dx)<DIRECTION_LOCK&&Math.abs(dy)<DIRECTION_LOCK)return;
-    if(Math.abs(dx)>=Math.abs(dy)*1.15||dy<=0){refreshGesture.mode='cancelled';return;}
-    refreshGesture.mode='refresh';
-  }
-  if(refreshGesture.mode!=='refresh')return;
-  if(!atTop()){refreshGesture=null;hideRefresh();return;}
-  const distance=Math.max(0,dy);
-  refreshGesture.armed=revealRefresh(distance);
-  event.preventDefault();
-  swipe=null;
-}
+function moveRefreshGesture(touch,event){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const dx=touch.clientX-refreshGesture.startX,dy=touch.clientY-refreshGesture.startY;if(refreshGesture.mode==='pending'){if(Math.abs(dx)<DIRECTION_LOCK&&Math.abs(dy)<DIRECTION_LOCK)return;if(Math.abs(dx)>=Math.abs(dy)*1.15||dy<=0){refreshGesture.mode='cancelled';return}refreshGesture.mode='refresh'}if(refreshGesture.mode!=='refresh')return;if(!atTop()){refreshGesture=null;hideRefresh();return}const distance=Math.max(0,dy);refreshGesture.armed=revealRefresh(distance);event.preventDefault();swipe=null}
 function endRefreshGesture(touch){if(!refreshGesture||touch.identifier!==refreshGesture.id)return;const armed=refreshGesture.mode==='refresh'&&refreshGesture.armed;refreshGesture=null;if(!armed){hideRefresh();return}deck.classList.add('refreshing');deck.style.setProperty('--deck-pull',`${REFRESH_REVEAL}px`);refreshTab.textContent='Actualizando…';setTimeout(()=>{const url=new URL(window.location.href);url.searchParams.set('_refresh',Date.now().toString());window.location.replace(url.toString())},120)}
 function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
 document.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;beginRefreshGesture(e.touches[0],e.target)},{capture:true,passive:true});
