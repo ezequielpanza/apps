@@ -75,7 +75,12 @@
         const versionResponse=await fetch('/APK_VERSION',{cache:'no-store'});
         if(versionResponse.ok){
           const version=(await versionResponse.text()).trim();
-          if(version)row.querySelector('.btn').textContent='Descargar '+version;
+          if(version){
+            const download=row.querySelector('.btn');
+            download.textContent='Descargar '+version;
+            download.href='/BoatStation-'+version+'.apk';
+            download.setAttribute('download','BoatStation-'+version+'.apk');
+          }
         }
       }catch(err){
         console.warn('Boat Station APK version unavailable',err);
