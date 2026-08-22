@@ -34,8 +34,6 @@
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
   const menu=document.getElementById('menuSheet');
 
-  // app.js is the only mandatory UI runtime. Auxiliary subsystems must never
-  // prevent the rest of Boat Station from starting.
   try{
     await import('./app.js');
   }catch(err){
@@ -49,8 +47,6 @@
     console.warn('Boat Station data sync unavailable',err);
   }
 
-  // Station management is a first-class UI feature, independent of Bluetooth
-  // and of telemetry synchronization.
   try{
     await import('./stations.js');
   }catch(err){
@@ -72,7 +68,7 @@
     const inner=menu.querySelector('.sheet-inner');
     if(inner){
       const row=document.createElement('div');
-      row.className='option';
+      row.className='option remote-apk-row';
       row.innerHTML='<span>Boat Station APK<br><small class="sub">Última versión disponible</small></span><a class="btn" href="/BoatStation.apk" download>Descargar</a>';
       inner.appendChild(row);
     }
