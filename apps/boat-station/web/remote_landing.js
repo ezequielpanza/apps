@@ -9,12 +9,12 @@
   const stations=()=>{try{const a=JSON.parse(localStorage.getItem('bs.remote.stations')||'[]');return Array.isArray(a)?a:[]}catch{return[]}};
   const active=()=>{const a=stations(),id=localStorage.getItem('bs.remote.activeStation');return a.find(x=>x.stationId===id)||a[0]||null};
 
-  // stations.js is the single owner of remote synchronization. This file only handles
-  // the first-pairing screen when no remote station has been configured yet.
+  // stations.js owns synchronization. This landing is the public entry point to the suite
+  // when no station has been linked yet: install the Android app first or link an existing one.
   if(active())return;
 
   const gate=document.createElement('div');gate.id='remoteLanding';
-  gate.innerHTML='<div class="rl-card"><img class="rl-logo" src="./icon.png" alt="Boat Station"><h1>Boat Station</h1><p>Ingresá el código de vinculación que muestra la estación del barco.</p><input id="rlCode" maxlength="19" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="one-time-code"><button id="rlConnect">Vincular estación</button><div class="rl-status" id="rlStatus"></div></div>';
+  gate.innerHTML='<div class="rl-card"><img class="rl-logo" src="./icon.png" alt="Boat Station"><h1>Boat Station</h1><p class="rl-intro">Accedé a Boat Station desde la web o instalá la app Android para convertir un teléfono en la estación del barco.</p><a class="rl-apk" href="/BoatStation.apk" download>Descargar Boat Station APK</a><div class="rl-separator"><span>Ya tenés la app</span></div><p class="rl-pair-copy">Ingresá el código de vinculación que muestra Boat Station en el teléfono.</p><input id="rlCode" maxlength="19" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="one-time-code"><button id="rlConnect">Vincular estación</button><div class="rl-status" id="rlStatus"></div></div>';
   document.body.appendChild(gate);
   const input=gate.querySelector('#rlCode'),status=gate.querySelector('#rlStatus');
   input.addEventListener('input',()=>input.value=pretty(input.value));
