@@ -3,8 +3,15 @@ const native=()=>window.NativeBridge;
 const seen=new Map();
 let scanList=[];
 
+function linkedAddresses(){
+  try{
+    const list=JSON.parse(native()?.getSavedBatteries?.()||'[]');
+    return new Set((Array.isArray(list)?list:[]).map(b=>String(b.address||'').toUpperCase()).filter(Boolean));
+  }catch(_){return new Set()}
+}
 function publishScan(){
-  scanList=[...seen.values()].sort((a,b)=>(b.rssi??-999)-(a.rssi??-999));
+  const linked=linkedAddresses();
+  scanList=[...seen.values()].filter(d=>!linked.has(String(d.address||d.mac||'').toUpperCase())).sort((a,b)=>(b.rssi??-999)-(a.rssi??-999));
   window.BoatStation?.bluetoothDevices?.(scanList);
 }
 
@@ -46,7 +53,6 @@ attachCallbacks();
 // The scanner is PWA UI; scanning itself is exclusively performed by the Core.
 document.addEventListener('click',e=>{
   if(e.target.closest('[data-open-scanner]')){
-    // app.js calls BoatStationCore.openBluetoothScanner as part of the same action.
     exposeCoreAdapter();
     return;
   }
@@ -56,6 +62,8 @@ document.addEventListener('click',e=>{
     if(!device||!native())return;
     e.preventDefault();e.stopImmediatePropagation();
     try{
+      const address=String(device.address||device.mac||'');
+      if(address&&linkedAddresses().has(address.toUpperCase())){publishScan();return;}
       let bankId=1;
       const banks=JSON.parse(native().getSavedBanks?.()||'[]');
       if(Array.isArray(banks)&&banks.length)bankId=Number(banks[0].id)||1;
@@ -63,8 +71,10 @@ document.addEventListener('click',e=>{
       const name=device.name||device.deviceName||'Batería';
       const id=Number(native().addBattery?.(bankId,name,0,'auto'));
       if(id>0){
-        window.BoatStation?.updateBattery?.({id,name,address:device.address||device.mac||'',capacityAh:0,connected:false});
-        native().setBatteryAddress?.(id,device.address||device.mac||'');
+        window.BoatStation?.updateBattery?.({id,name,address,capacityAh:0,connected:false});
+        native().setBatteryAddress?.(id,address);
+        seen.delete(String(device.address||device.id||device.name||''));
+        publishScan();
         stopNativeScan();
         document.querySelectorAll('.fullscreen-sheet.open').forEach(s=>s.classList.remove('open'));
       }
