@@ -10,8 +10,8 @@ import android.webkit.WebViewClient;
 
 /** Temporary diagnostic shell: no hardware, permissions or legacy initialization. */
 public class MainActivityUiTest extends Activity {
-    private static final String VERSION = "1.1.3-test";
-    private static final String URL = "https://boat-station.pages.dev/ui-test.html?mode=station";
+    private static final String VERSION = "1.1.4-test";
+    private static final String URL = "https://boat-station.pages.dev/clean/?mode=station";
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
