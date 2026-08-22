@@ -16,7 +16,18 @@
   <main id="cards" class="content"></main>
 </div>
 <div id="menuSheet" class="sheet"><div class="sheet-inner"><div class="handle"></div><h3>Boat Station</h3><div class="option">Menú operativo</div><div class="option">Arquitectura limpia por módulos</div></div></div>
-<div id="addSheet" class="sheet"><div class="sheet-inner"><div class="handle"></div><h3>Agregar módulo</h3><div class="option">Los módulos se irán restaurando uno por uno</div></div></div>
+<div id="addSheet" class="sheet"><div class="sheet-inner"><div class="handle"></div><h3>Agregar módulo</h3><div class="option" data-add-module="gps" role="button">GPS <span data-add-state></span></div><div class="option" data-add-module="phone" role="button">Estado del teléfono <span data-add-state></span></div><div class="option" data-add-module="seastate" role="button">Sea State <span data-add-state></span></div><div class="option" data-add-module="compass" role="button">Brújula <span data-add-state></span></div></div></div>
 <script type="module" src="./app.js"></script>
+<script>
+(function(){
+  const all=['gps','phone','seastate','compass'];
+  const sheet=document.getElementById('addSheet');
+  function order(){try{const v=JSON.parse(localStorage.getItem('bs.clean.order')||'null');return Array.isArray(v)?v.filter(id=>all.includes(id)):all.slice()}catch(_){return all.slice()}}
+  function refresh(){const active=order();sheet.querySelectorAll('[data-add-module]').forEach(row=>{const id=row.dataset.addModule,on=active.includes(id),state=row.querySelector('[data-add-state]');row.dataset.active=on?'1':'0';row.style.opacity=on?'.5':'1';if(state)state.textContent=on?' · agregado':' · agregar'})}
+  document.getElementById('addBtn').addEventListener('click',refresh);
+  sheet.addEventListener('click',e=>{const row=e.target.closest('[data-add-module]');if(!row)return;const id=row.dataset.addModule,current=order();if(current.includes(id))return;current.push(id);localStorage.setItem('bs.clean.order',JSON.stringify(current));location.reload()});
+  refresh();
+})();
+</script>
 </body>
 </html>
