@@ -32,8 +32,11 @@
   const params=new URLSearchParams(location.search);
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
   const menu=document.getElementById('menuSheet');
+
+  // The UI runtime is shared by Core and Remote. Native hardware adapters remain Core-only.
+  await import('./app.js');
+
   if(isLocal){
-    await import('./app.js');
     await import('./native-bluetooth.js');
     const queued=window.__bsNativeQueue||[];
     window.__bsNativeQueue=[];
@@ -41,8 +44,6 @@
   }else{
     document.getElementById('cards').innerHTML='';
     document.getElementById('addBtn').style.display='none';
-    document.getElementById('menuBtn').onclick=()=>menu.classList.add('open');
-    menu.addEventListener('click',e=>{if(e.target===menu)menu.classList.remove('open')});
     const inner=menu.querySelector('.sheet-inner');
     if(inner){
       const row=document.createElement('div');
@@ -51,6 +52,7 @@
       inner.appendChild(row);
     }
   }
+
   await import('./stations.js');
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Boat Station SW',err));
 })().catch(err=>{
