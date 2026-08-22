@@ -44,7 +44,7 @@
   }
 
   const gate=document.createElement('div');gate.id='remoteLanding';
-  gate.innerHTML='<div class="rl-card"><img class="rl-logo" src="../icon.png" alt="Boat Station"><h1>Boat Station</h1><p>Ingresá el código de vinculación que muestra la estación del barco.</p><input id="rlCode" maxlength="19" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="one-time-code"><button id="rlConnect">Vincular estación</button><div class="rl-status" id="rlStatus"></div></div>';
+  gate.innerHTML='<div class="rl-card"><img class="rl-logo" src="./icon.png" alt="Boat Station"><h1>Boat Station</h1><p>Ingresá el código de vinculación que muestra la estación del barco.</p><input id="rlCode" maxlength="19" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="one-time-code"><button id="rlConnect">Vincular estación</button><div class="rl-status" id="rlStatus"></div></div>';
   document.body.appendChild(gate);
   const input=gate.querySelector('#rlCode'),status=gate.querySelector('#rlStatus');
   input.addEventListener('input',()=>input.value=pretty(input.value));
