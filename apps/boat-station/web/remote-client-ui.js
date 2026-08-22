@@ -1,4 +1,5 @@
 const cards=document.getElementById('cards');
+const addSheet=document.getElementById('addSheet');
 const PAGE_KEY='bs.remote.ui.pages';
 const HEIGHT_KEY='bs.ui.heights';
 
@@ -6,6 +7,20 @@ function readJson(key,fallback){try{const value=JSON.parse(localStorage.getItem(
 function writeJson(key,value){localStorage.setItem(key,JSON.stringify(value))}
 function pages(){return readJson(PAGE_KEY,{})}
 function heights(){return readJson(HEIGHT_KEY,{})}
+function activeStationId(){return localStorage.getItem('bs.remote.activeStation')||''}
+function availableModules(){const id=activeStationId();return id?readJson('bs.remote.availableModules.'+id,[]):[]}
+function filterAddSheet(){
+  if(!addSheet)return;
+  const allowed=new Set(availableModules());
+  addSheet.querySelectorAll('[data-add-module]').forEach(btn=>{
+    btn.style.display=allowed.has(btn.dataset.addModule)?'':'none';
+  });
+  const any=[...addSheet.querySelectorAll('[data-add-module]')].some(btn=>btn.style.display!=='none');
+  let empty=addSheet.querySelector('[data-remote-no-modules]');
+  if(!any){
+    if(!empty){empty=document.createElement('div');empty.dataset.remoteNoModules='1';empty.className='subtle';empty.textContent='Esperando módulos activos de la estación…';addSheet.querySelector('.sheet-inner')?.appendChild(empty)}
+  }else empty?.remove();
+}
 
 const freshness=document.createElement('div');
 freshness.id='remoteFreshness';
@@ -49,6 +64,9 @@ window.addEventListener('pointercancel',()=>{activeResize=null;if(interactionDep
 
 const observer=new MutationObserver(()=>requestAnimationFrame(applyAll));
 if(cards)observer.observe(cards,{childList:true,subtree:false});
+const addObserver=new MutationObserver(()=>requestAnimationFrame(filterAddSheet));
+if(addSheet)addObserver.observe(addSheet,{childList:true,subtree:true});
+window.addEventListener('boatstation-module-catalog-updated',filterAddSheet);
 window.addEventListener('resize',applyAll);
-window.BoatStationRemoteUI={isBusy,scheduleData,markUpdated,applyAll};
-applyAll();renderFreshness();
+window.BoatStationRemoteUI={isBusy,scheduleData,markUpdated,applyAll,filterAddSheet};
+applyAll();filterAddSheet();renderFreshness();
