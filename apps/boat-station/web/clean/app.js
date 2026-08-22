@@ -11,10 +11,10 @@ modules.phone={id:'phone',name:'Estado del teléfono',pages:2,summary:()=> 'Pend
 modules.seastate={id:'seastate',name:'Sea State',pages:2,summary:()=> 'Pendiente',page:i=>`<div class="placeholder">Sea State · página ${i+1}</div>`};
 modules.compass={id:'compass',name:'Brújula',pages:2,summary:()=> 'Pendiente',page:i=>`<div class="placeholder">Brújula · página ${i+1}</div>`};
 
-function pager(count,current){let h='<div class="pager">';for(let i=0;i<count;i++)h+=`<span class="${i===current?'on':''}">●</span> `;return h+'</div>'}
+function pager(count,current){let h='<div class="pager">';for(let i=0;i<count;i++)h+=`<span class="${i===current?'on':''}">●</span>`;return h+'</div>'}
 function dragHandle(){return `<button class="drag-handle" type="button" aria-label="Mover módulo"><i></i><i></i><i></i><i></i><i></i><i></i></button>`}
 function resizeHandle(){return `<button class="resize-handle" type="button" aria-label="Cambiar tamaño del módulo"><i></i><i></i><i></i></button>`}
-function moduleHtml(id){const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1);let pages='';for(let i=0;i<m.pages;i++)pages+=`<div class="page" data-page="${i}">${m.page(i)}${pager(m.pages,p)}</div>`;return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${m.name}</span><span class="summary">${m.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track" style="width:${m.pages*100}%;transform:translateX(-${p*(100/m.pages)}%)">${pages}</div></div></div>${resizeHandle()}</section>`}
+function moduleHtml(id){const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1);let pages='';for(let i=0;i<m.pages;i++)pages+=`<div class="page" data-page="${i}">${m.page(i)}${pager(m.pages,p)}</div>`;return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${m.name}</span><span class="summary">${m.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track" style="transform:translateX(-${p*100}%)">${pages}</div></div></div>${resizeHandle()}</section>`}
 
 function saveHeights(){localStorage.setItem('bs.clean.heights',JSON.stringify(ui.heights))}
 function measure(card){
@@ -80,7 +80,7 @@ cards.addEventListener('pointerup',e=>{
   if(reorder){finishReorder();return}
   if(!swipe)return;
   const g=swipe;swipe=null;const dx=e.clientX-g.x,dy=e.clientY-g.y,m=modules[g.id];
-  if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2&&m.pages>1){const cur=ui.page[g.id]||0;ui.page[g.id]=dx<0?Math.min(m.pages-1,cur+1):Math.max(0,cur-1);const track=g.card.querySelector('.track');track.style.transform=`translateX(-${ui.page[g.id]*(100/m.pages)}%)`;setTimeout(()=>{measure(g.card);m.afterRender?.(g.card)},190);return}
+  if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2&&m.pages>1){const cur=ui.page[g.id]||0;ui.page[g.id]=dx<0?Math.min(m.pages-1,cur+1):Math.max(0,cur-1);const track=g.card.querySelector('.track');track.style.transform=`translateX(-${ui.page[g.id]*100}%)`;setTimeout(()=>{measure(g.card);m.afterRender?.(g.card)},190);return}
   if(Math.abs(dx)<8&&Math.abs(dy)<8&&Date.now()-g.t<350){ui.collapsed[g.id]=!ui.collapsed[g.id];g.card.classList.toggle('collapsed',ui.collapsed[g.id]);if(!ui.collapsed[g.id])measure(g.card)}
 });
 cards.addEventListener('pointercancel',()=>{swipe=null;finishResize();finishReorder()});
