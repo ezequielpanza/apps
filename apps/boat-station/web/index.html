@@ -31,6 +31,7 @@
 (async function(){
   const params=new URLSearchParams(location.search);
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
+  const menu=document.getElementById('menuSheet');
   if(isLocal){
     await import('./app.js');
     await import('./native-bluetooth.js');
@@ -40,7 +41,9 @@
   }else{
     document.getElementById('cards').innerHTML='';
     document.getElementById('addBtn').style.display='none';
-    const inner=document.querySelector('#menuSheet .sheet-inner');
+    document.getElementById('menuBtn').onclick=()=>menu.classList.add('open');
+    menu.addEventListener('click',e=>{if(e.target===menu)menu.classList.remove('open')});
+    const inner=menu.querySelector('.sheet-inner');
     if(inner){
       const row=document.createElement('div');
       row.className='option';
