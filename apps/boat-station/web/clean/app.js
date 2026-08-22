@@ -17,12 +17,23 @@ function resizeHandle(){return `<button class="resize-handle" type="button" aria
 function moduleHtml(id){const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1);let pages='';for(let i=0;i<m.pages;i++)pages+=`<div class="page" data-page="${i}">${m.page(i)}${pager(m.pages,p)}</div>`;return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${m.name}</span><span class="summary">${m.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track" style="transform:translateX(-${p*100}%)">${pages}</div></div></div>${resizeHandle()}</section>`}
 
 function saveHeights(){localStorage.setItem('bs.clean.heights',JSON.stringify(ui.heights))}
+function pageHeight(id,page){
+  const stored=ui.heights[id];
+  if(stored&&typeof stored==='object'&&Number.isFinite(Number(stored[page])))return Number(stored[page]);
+  if(Number.isFinite(Number(stored))&&page===0)return Number(stored);
+  return null;
+}
+function setPageHeight(id,page,height){
+  const current=(ui.heights[id]&&typeof ui.heights[id]==='object')?ui.heights[id]:{};
+  ui.heights[id]={...current,[page]:Math.round(height)};
+}
 function measure(card){
   if(!card||card.classList.contains('collapsed'))return;
   const id=card.dataset.id,body=card.querySelector('.card-body');
   if(!body)return;
-  if(Number.isFinite(Number(ui.heights[id]))){body.style.height=`${ui.heights[id]}px`;return;}
-  const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1),page=card.querySelector(`.page[data-page="${p}"]`);
+  const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1),fixed=pageHeight(id,p);
+  if(fixed!==null){body.style.height=`${fixed}px`;return;}
+  const page=card.querySelector(`.page[data-page="${p}"]`);
   if(page)body.style.height=page.scrollHeight+'px';
 }
 function hydrate(card){const m=modules[card.dataset.id];m.afterRender?.(card);requestAnimationFrame(()=>measure(card))}
@@ -50,8 +61,8 @@ cards.addEventListener('pointerdown',e=>{
   const resizeGrip=e.target.closest('.resize-handle');
   if(resizeGrip){
     e.preventDefault();e.stopPropagation();
-    const body=card.querySelector('.card-body');
-    resize={card,body,id:card.dataset.id,startY:e.clientY,startH:body.getBoundingClientRect().height,pointerId:e.pointerId};
+    const body=card.querySelector('.card-body'),id=card.dataset.id,page=Math.min(ui.page[id]||0,modules[id].pages-1);
+    resize={card,body,id,page,startY:e.clientY,startH:body.getBoundingClientRect().height,pointerId:e.pointerId};
     card.classList.add('resizing');
     try{resizeGrip.setPointerCapture(e.pointerId)}catch(_){}
     return;
@@ -66,7 +77,7 @@ cards.addEventListener('pointermove',e=>{
     e.preventDefault();
     const max=Math.max(120,window.innerHeight*.78),next=Math.max(70,Math.min(max,resize.startH+(e.clientY-resize.startY)));
     resize.body.style.height=`${next}px`;
-    ui.heights[resize.id]=Math.round(next);
+    setPageHeight(resize.id,resize.page,next);
     return;
   }
   if(!reorder)return;
