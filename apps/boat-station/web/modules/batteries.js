@@ -10,6 +10,7 @@ export function createBatteriesModule(requestRender,openManager){
   delete state.historyDays;if(!HISTORY_HOUR_LEVELS.includes(Number(state.historyHours)))state.historyHours=168;
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const num=v=>Number.isFinite(Number(v))?Number(v):null;
+  const clone=v=>{try{return JSON.parse(JSON.stringify(v))}catch{return v}};
   function save(){try{const copy={...state,root:undefined};localStorage.setItem('bs.batteries.state',JSON.stringify(copy))}catch(_){}}
   function stats(){
     const list=state.batteries,connected=list.filter(b=>b.connected!==false&&num(b.voltage)!==null);let cap=0,rem=0,current=0,voltageSum=0,voltageN=0;
@@ -44,8 +45,11 @@ export function createBatteriesModule(requestRender,openManager){
   function changeHistoryZoom(direction,root){const i=HISTORY_HOUR_LEVELS.indexOf(Number(state.historyHours)),next=direction==='out'?Math.min(HISTORY_HOUR_LEVELS.length-1,i+1):Math.max(0,i-1);if(next===i)return;state.historyHours=HISTORY_HOUR_LEVELS[next];save();updateHistoryLabel(root);drawChart(root)}
   function afterRender(root){state.root=root;drawChart(root);root.querySelectorAll('[data-battery-manage]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openManager?.()}));root.querySelectorAll('[data-history-zoom]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();changeHistoryZoom(b.dataset.historyZoom,root)}))}
   function updateBattery(data){if(!data)return;const id=String(data.id||data.address||data.deviceId||data.mac||data.name||'battery');let b=state.batteries.find(x=>String(x.id)===id);if(!b){b={id,name:data.name||data.deviceName||'Batería',capacityAh:num(data.capacityAh)||0,connected:true};state.batteries.push(b)}Object.assign(b,data,{id,connected:data.connected!==false});const s=stats();if(s.soc!==null){const now=Date.now(),last=state.history[state.history.length-1];if(!last||now-last.time>30000)state.history.push({time:now,soc:s.soc});if(state.history.length>1000)state.history.splice(0,state.history.length-1000)}save();requestRender('batteries')}
+  function exportRemoteState(){return{bankName:String(state.bankName||'Banco principal'),batteries:clone(state.batteries),history:clone(state.history)}}
+  function applyRemoteState(remote){if(!remote||typeof remote!=='object')return;const localHours=state.historyHours;if(typeof remote.bankName==='string'&&remote.bankName.trim())state.bankName=remote.bankName.trim();if(Array.isArray(remote.batteries))state.batteries=clone(remote.batteries);if(Array.isArray(remote.history))state.history=clone(remote.history).filter(p=>Number.isFinite(Number(p?.time))&&Number.isFinite(Number(p?.soc)));state.historyHours=localHours;save();requestRender('batteries')}
   function addBattery(device){const id=String(device.id||device.address||device.deviceId||device.mac||device.name||Date.now());if(state.batteries.some(b=>String(b.id)===id))return;state.batteries.push({id,name:device.name||device.deviceName||'Batería',deviceName:device.name||device.deviceName||'',address:device.address||device.mac||'',capacityAh:num(device.capacityAh)||0,connected:false});save();requestRender('batteries')}
   function removeBattery(id){state.batteries=state.batteries.filter(b=>String(b.id)!==String(id));save();requestRender('batteries')}
   function renameBank(name){const n=String(name||'').trim();if(!n)return;state.bankName=n;save();requestRender('batteries')}
-  return {id:'batteries',name:'Baterías',pages:3,summary,page,afterRender,state,updateBattery,addBattery,removeBattery,renameBank,stats};
+  window.BoatStationBatteryState={exportRemoteState,applyRemoteState};
+  return {id:'batteries',name:'Baterías',pages:3,summary,page,afterRender,state,updateBattery,addBattery,removeBattery,renameBank,stats,exportRemoteState,applyRemoteState};
 }
