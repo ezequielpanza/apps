@@ -25,6 +25,23 @@ export class StationState {
       }
       return json((await this.state.storage.get('state')) || {updatedAt:0,boatName:'Boat Station',snapshot:{}});
     }
+    if (url.pathname.endsWith('/commands')) {
+      if (request.method === 'POST') {
+        const body = await request.json();
+        const command = String(body?.command||'');
+        if (!['gps.start','gps.stop','gps.clear'].includes(command)) return json({error:'invalid command'},400);
+        const commands = (await this.state.storage.get('commands')) || [];
+        commands.push({id:crypto.randomUUID(),command,createdAt:Date.now()});
+        while (commands.length>50) commands.shift();
+        await this.state.storage.put('commands', commands);
+        return json({ok:true});
+      }
+      if (request.method === 'GET') {
+        const commands = (await this.state.storage.get('commands')) || [];
+        await this.state.storage.put('commands', []);
+        return json({commands});
+      }
+    }
     if (request.method === 'GET' && url.pathname.endsWith('/clients')) {
       const clients = (await this.state.storage.get('clients')) || {};
       const now=Date.now();
@@ -41,7 +58,7 @@ export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return json({ok:true});
     const url = new URL(request.url);
-    const m = url.pathname.match(/^\/api\/station\/([^/]+)\/(state|clients)$/);
+    const m = url.pathname.match(/^\/api\/station\/([^/]+)\/(state|clients|commands)$/);
     if (!m) return json({error:'not found'},404);
     const id = env.STATIONS.idFromName(decodeURIComponent(m[1]));
     return env.STATIONS.get(id).fetch(request);
