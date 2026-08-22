@@ -30,7 +30,17 @@
     return n||'Estación';
   }
 
-  function exportSnapshot(){return{version:3,time:Date.now(),stationName:stationName(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy),layout:stationLayout()}}
+  function exportSnapshot(){return{version:4,time:Date.now(),stationName:stationName(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy),layout:stationLayout()}}
+
+  function syncRemoteModuleCatalog(snapshot){
+    if(isLocal||!snapshot?.layout||!Array.isArray(snapshot.layout.order))return;
+    const stationId=localStorage.getItem('bs.remote.activeStation')||'';
+    if(!stationId)return;
+    const allowed=['gps','batteries','phone','seastate','compass'];
+    const order=snapshot.layout.order.filter(id=>allowed.includes(id));
+    localStorage.setItem('bs.remote.availableModules.'+stationId,JSON.stringify(order));
+    window.dispatchEvent(new CustomEvent('boatstation-module-catalog-updated',{detail:{stationId,modules:order}}));
+  }
 
   function seedRemoteLayoutOnce(snapshot){
     if(isLocal||!snapshot?.layout||!Array.isArray(snapshot.layout.order))return false;
@@ -67,6 +77,7 @@
 
   function applyNow(snapshot){
     syncRemoteStationName(snapshot);
+    syncRemoteModuleCatalog(snapshot);
     if(seedRemoteLayoutOnce(snapshot))return true;
     window.dispatchEvent(new CustomEvent('boatstation-data-update-start'));
     try{
