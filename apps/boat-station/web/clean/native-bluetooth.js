@@ -8,8 +8,30 @@ function publishScan(){
   window.BoatStation?.bluetoothDevices?.(scanList);
 }
 
+function startNativeScan(){
+  seen.clear();scanList=[];publishScan();
+  try{
+    const n=native();
+    if(n&&typeof n.startBatteryScan==='function'){
+      n.startBatteryScan();
+      return true;
+    }
+  }catch(_){}
+  return false;
+}
+function stopNativeScan(){try{native()?.stopBatteryScan?.()}catch(_){}}
+
+function exposeCoreAdapter(){
+  window.BoatStationCore=window.BoatStationCore||{};
+  window.BoatStationCore.openBluetoothScanner=startNativeScan;
+  window.BoatStationCore.stopBluetoothScanner=stopNativeScan;
+}
+window.addEventListener('boatstation-core-ready',exposeCoreAdapter);
+exposeCoreAdapter();
+
 function attachCallbacks(){
   if(!window.BoatStation){setTimeout(attachCallbacks,50);return;}
+  exposeCoreAdapter();
   window.BoatStation.onBleScanResult=device=>{
     if(!device)return;
     const key=String(device.address||device.id||device.name||Math.random());
@@ -24,8 +46,8 @@ attachCallbacks();
 // The scanner is PWA UI; scanning itself is exclusively performed by the Core.
 document.addEventListener('click',e=>{
   if(e.target.closest('[data-open-scanner]')){
-    seen.clear();scanList=[];
-    setTimeout(()=>{try{native()?.startBatteryScan?.()}catch(_){}},0);
+    // app.js calls BoatStationCore.openBluetoothScanner as part of the same action.
+    exposeCoreAdapter();
     return;
   }
   const deviceButton=e.target.closest('[data-scan-device]');
@@ -43,7 +65,7 @@ document.addEventListener('click',e=>{
       if(id>0){
         window.BoatStation?.updateBattery?.({id,name,address:device.address||device.mac||'',capacityAh:0,connected:false});
         native().setBatteryAddress?.(id,device.address||device.mac||'');
-        native().stopBatteryScan?.();
+        stopNativeScan();
         document.querySelectorAll('.fullscreen-sheet.open').forEach(s=>s.classList.remove('open'));
       }
     }catch(_){}
@@ -51,4 +73,5 @@ document.addEventListener('click',e=>{
   }
   const remove=e.target.closest('[data-remove-battery]');
   if(remove){try{native()?.deleteBattery?.(Number(remove.dataset.removeBattery))}catch(_){}}
+  if(e.target.closest('[data-scanner-back]'))stopNativeScan();
 },true);
