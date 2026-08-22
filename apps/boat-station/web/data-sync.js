@@ -30,7 +30,10 @@
     return n||'Estación';
   }
 
-  function exportSnapshot(){return{version:5,time:Date.now(),stationName:stationName(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy),layout:stationLayout()}}
+  function exportSnapshot(){
+    const batteryState=window.BoatStationBatteryState?.exportRemoteState?.()||null;
+    return{version:6,time:Date.now(),stationName:stationName(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy),batteryState:copy(batteryState),layout:stationLayout()}
+  }
 
   function syncRemoteModuleSet(snapshot){
     if(isLocal||!snapshot?.layout||!Array.isArray(snapshot.layout.order))return false;
@@ -72,7 +75,11 @@
       if(snapshot.phone)api.updatePhone?.(snapshot.phone);
       if(Number.isFinite(Number(snapshot.compass)))api.updateCompass?.(Number(snapshot.compass));
       if(Number.isFinite(Number(snapshot.motion)))api.updateMotion?.(Number(snapshot.motion));
-      if(Array.isArray(snapshot.batteries))snapshot.batteries.forEach(b=>api.updateBattery?.(b));
+      if(snapshot.batteryState&&window.BoatStationBatteryState?.applyRemoteState){
+        window.BoatStationBatteryState.applyRemoteState(snapshot.batteryState);
+      }else if(Array.isArray(snapshot.batteries)){
+        snapshot.batteries.forEach(b=>api.updateBattery?.(b));
+      }
       return true;
     }finally{
       window.dispatchEvent(new CustomEvent('boatstation-data-update-end',{detail:{time:Number(snapshot.time)||Date.now(),stationName:String(snapshot.stationName||'')}}));
