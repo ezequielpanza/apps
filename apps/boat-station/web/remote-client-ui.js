@@ -7,6 +7,20 @@ function writeJson(key,value){localStorage.setItem(key,JSON.stringify(value))}
 function pages(){return readJson(PAGE_KEY,{})}
 function heights(){return readJson(HEIGHT_KEY,{})}
 
+const freshness=document.createElement('div');
+freshness.id='remoteFreshness';
+freshness.className='remote-freshness';
+freshness.textContent='Esperando actualización…';
+if(cards?.parentNode)cards.parentNode.insertBefore(freshness,cards);
+let lastSnapshotAt=0;
+function renderFreshness(){
+  if(!lastSnapshotAt){freshness.textContent='Esperando actualización…';freshness.classList.add('waiting');return}
+  const seconds=Math.max(0,Math.floor((Date.now()-lastSnapshotAt)/1000));
+  freshness.classList.remove('waiting');
+  freshness.textContent=seconds<=0?'Actualizado ahora':`Actualizado hace ${seconds} s`;
+}
+setInterval(renderFreshness,1000);
+
 function pageCount(card){return card?.querySelectorAll('.page').length||0}
 function currentPage(card){const id=card?.dataset.id;if(!id)return 0;const count=pageCount(card);return Math.max(0,Math.min(Math.max(0,count-1),Number(pages()[id])||0))}
 function storedHeight(id,page){const all=heights(),value=all[id];if(value&&typeof value==='object'&&Number.isFinite(Number(value[page])))return Number(value[page]);if(Number.isFinite(Number(value))&&page===0)return Number(value);return null}
@@ -48,7 +62,14 @@ cards?.addEventListener('pointercancel',()=>{swipe=null});
 
 // Core snapshots replace module markup as data changes. Reapply this browser's
 // presentation state after each replacement without affecting station-side state.
-const observer=new MutationObserver(()=>requestAnimationFrame(applyAll));
+const observer=new MutationObserver(mutations=>{
+  if(mutations.some(m=>m.type==='childList')){
+    lastSnapshotAt=Date.now();
+    renderFreshness();
+  }
+  requestAnimationFrame(applyAll);
+});
 if(cards)observer.observe(cards,{childList:true,subtree:false});
 window.addEventListener('resize',applyAll);
 applyAll();
+renderFreshness();
