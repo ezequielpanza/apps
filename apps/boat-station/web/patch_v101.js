@@ -13,7 +13,6 @@
     .card{position:relative!important}.card.edit-selected{outline:2px solid var(--accent)!important;box-shadow:0 0 0 3px #25d6e625!important}.card.edit-selected .card-head{background:#10354b!important}
     .card-body{transition:none!important}.resize-grip{position:absolute!important;left:0!important;right:0!important;bottom:0!important;height:30px!important;margin:0!important;border:0!important;opacity:0!important;z-index:20!important}.card.edit-selected .resize-grip{opacity:1!important}.card.edit-selected .resize-grip:after{content:'↕';display:block;text-align:center;font-size:22px;font-weight:800;color:var(--accent)}
     .danger{color:var(--danger)!important}.backup-status{border-color:#1b4058!important;background:#081c2b!important;border-radius:16px!important}
-    .qr-wrap{text-align:center}.qr-card{display:inline-block;background:#fff;border-radius:18px;padding:16px;margin:8px auto 16px}.qr-card img{display:block;width:260px;height:260px}.qr-fallback{word-break:break-all;font-size:11px;color:#9fb4c2;margin-top:10px}
   `;document.head.appendChild(st);
 
   function decorateButtons(){qa('.btn').forEach(function(b){var t=(b.textContent||'').trim().toLowerCase();b.classList.remove('action-accent','action-add','action-save','action-danger');if(t==='configurar')b.classList.add('action-accent');else if(t.indexOf('batería')>=0&&t.indexOf('guardar')<0)b.classList.add('action-add');else if(t.indexOf('guardar')===0)b.classList.add('action-save');else if(t.indexOf('eliminar')===0)b.classList.add('action-danger')})}
@@ -23,11 +22,12 @@
 
   function backupMenu(){var ch=q('#changeFolder');if(ch){var row=ch.closest('.option');if(row)row.remove()}var r=q('#restoreBackup');if(r)r.textContent='Restaurar';var container=q('#backupNow')&&q('#backupNow').closest('.option');if(!container||q('#exportZip'))return;var row=document.createElement('div');row.className='option';row.innerHTML='<button class="btn" id="exportZip">Exportar ZIP</button><button class="btn" id="importZip">Importar ZIP</button>';container.after(row);q('#exportZip').onclick=function(){if(!window.StorageBridge)return;var raw=StorageBridge.loadBackup();StorageBridge.exportZip(raw||'')};q('#importZip').onclick=function(){if(window.StorageBridge)StorageBridge.importZip()}}
 
-  function pairingQR(){if(q('#pairingSheet'))return;var menu=q('#menuSheet .sheet-inner');if(!menu)return;var row=document.createElement('div');row.className='option';row.innerHTML='<span>Supervisión remota</span><button class="btn" id="showQrBtn">Mostrar QR</button>';menu.appendChild(row);var s=document.createElement('div');s.className='sheet';s.id='pairingSheet';s.innerHTML='<div class="sheet-inner"><div class="handle"></div><div class="subsheet-head"><button class="btn" id="pairingBack">‹</button><h3 style="margin:0">Supervisión remota</h3></div><div class="qr-wrap"><div class="qr-card"><img id="pairingQr" alt="QR de vinculación"></div><div class="qr-fallback" id="pairingRaw"></div></div></div>';document.body.appendChild(s);q('#pairingBack').onclick=function(){s.classList.remove('open');q('#menuSheet').classList.add('open')}}
+  function loadStationsRuntime(){
+    if(window.__bsStationsLoading)return;window.__bsStationsLoading=true;
+    function load(src,next){var s=document.createElement('script');s.src=src;s.onload=function(){if(next)next()};s.onerror=function(){if(next)next()};document.body.appendChild(s)}
+    load('backend_url.js',function(){load('remote_gate.js',function(){load('remote_sync.js')})});
+  }
 
-  ensureBluetoothSheet();backupMenu();pairingQR();decorateButtons();hookBattery();
-  // IMPORTANT: no global pointer/touch handlers here. The base PWA owns tap,
-  // hold, swipe, reorder and resize. Duplicate capture listeners were a source
-  // of interaction starvation on slower WebViews.
+  ensureBluetoothSheet();backupMenu();decorateButtons();hookBattery();loadStationsRuntime();
   window.addEventListener('boatstation-ui-refresh',function(){decorateButtons();hookBattery()});
 })();
