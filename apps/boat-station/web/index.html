@@ -34,12 +34,35 @@
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
   const menu=document.getElementById('menuSheet');
 
-  // Core and Remote share the same persistent UI. Only telemetry crosses the backend.
-  await import('./app.js');
-  await import('./data-sync.js');
+  // app.js is the only mandatory UI runtime. Auxiliary subsystems must never
+  // prevent the rest of Boat Station from starting.
+  try{
+    await import('./app.js');
+  }catch(err){
+    console.error('Boat Station UI failed to start',err);
+    return;
+  }
+
+  try{
+    await import('./data-sync.js');
+  }catch(err){
+    console.warn('Boat Station data sync unavailable',err);
+  }
+
+  // Station management is a first-class UI feature, independent of Bluetooth
+  // and of telemetry synchronization.
+  try{
+    await import('./stations.js');
+  }catch(err){
+    console.error('Boat Station station management unavailable',err);
+  }
 
   if(isLocal){
-    await import('./native-bluetooth.js');
+    try{
+      await import('./native-bluetooth.js');
+    }catch(err){
+      console.warn('Boat Station Bluetooth adapter unavailable',err);
+    }
     const queued=window.__bsNativeQueue||[];
     window.__bsNativeQueue=[];
     queued.forEach(([name,value])=>{try{window.BoatStation?.[name]?.(value)}catch(err){console.error('Boat Station native event error',name,err)}});
@@ -53,15 +76,17 @@
       row.innerHTML='<span>Boat Station APK<br><small class="sub">Última versión disponible</small></span><a class="btn" href="/BoatStation.apk" download>Descargar</a>';
       inner.appendChild(row);
     }
-    await import('./remote-client-ui.js');
+    try{
+      await import('./remote-client-ui.js');
+    }catch(err){
+      console.warn('Boat Station Remote UI extras unavailable',err);
+    }
   }
 
-  await import('./stations.js');
-  if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Boat Station SW',err));
-})().catch(err=>{
-  console.error('Boat Station bootstrap error',err);
-  if(!document.getElementById('remoteLanding')){const box=document.createElement('div');box.style.cssText='padding:24px;color:#fff;font-family:system-ui';box.textContent='No se pudo iniciar Boat Station. Recargá la página.';document.body.appendChild(box)}
-});
+  if('serviceWorker' in navigator&&location.protocol==='https:'){
+    navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Boat Station SW',err));
+  }
+})().catch(err=>console.error('Boat Station bootstrap error',err));
 </script>
 </body>
 </html>
