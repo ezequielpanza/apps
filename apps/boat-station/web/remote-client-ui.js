@@ -23,16 +23,33 @@ function filterAddSheet(){
 
 const freshness=document.createElement('div');
 freshness.id='remoteFreshness';
-freshness.className='remote-freshness';
-freshness.textContent='Esperando actualización…';
+freshness.className='remote-freshness waiting';
+freshness.innerHTML='<span class="remote-connection-dot" aria-hidden="true"></span><span class="remote-connection-text">Sin conexión</span><span class="remote-connection-detail">· esperando al Core</span>';
 if(cards?.parentNode)cards.parentNode.insertBefore(freshness,cards);
 let lastSnapshotAt=0;
-function markUpdated(){lastSnapshotAt=Date.now();renderFreshness()}
+const CONNECTED_MAX_AGE_MS=7000;
+function elapsedLabel(ms){
+  const seconds=Math.max(0,Math.floor(ms/1000));
+  if(seconds<60)return `hace ${seconds} s`;
+  const minutes=Math.floor(seconds/60);if(minutes<60)return `hace ${minutes} min`;
+  const hours=Math.floor(minutes/60);if(hours<24)return `hace ${hours} h`;
+  const days=Math.floor(hours/24);return `hace ${days} d`;
+}
+function markUpdated(time){
+  const remoteTime=Number(time);
+  lastSnapshotAt=Number.isFinite(remoteTime)&&remoteTime>0?Math.min(Date.now(),remoteTime):Date.now();
+  renderFreshness();
+}
 function renderFreshness(){
-  if(!lastSnapshotAt){freshness.textContent='Esperando actualización…';freshness.classList.add('waiting');return}
-  const seconds=Math.max(0,Math.floor((Date.now()-lastSnapshotAt)/1000));
-  freshness.classList.remove('waiting');
-  freshness.textContent=seconds<=0?'Actualizado ahora':`Actualizado hace ${seconds} s`;
+  const text=freshness.querySelector('.remote-connection-text'),detail=freshness.querySelector('.remote-connection-detail');
+  if(!lastSnapshotAt){
+    freshness.classList.remove('connected','disconnected');freshness.classList.add('waiting');
+    if(text)text.textContent='Sin conexión';if(detail)detail.textContent='· esperando al Core';return;
+  }
+  const age=Math.max(0,Date.now()-lastSnapshotAt),connected=age<=CONNECTED_MAX_AGE_MS;
+  freshness.classList.toggle('connected',connected);freshness.classList.toggle('disconnected',!connected);freshness.classList.remove('waiting');
+  if(text)text.textContent=connected?'Conectado':'Sin conexión';
+  if(detail)detail.textContent=connected?`· datos ${elapsedLabel(age)}`:`· última conexión ${elapsedLabel(age)}`;
 }
 setInterval(renderFreshness,1000);
 
@@ -85,7 +102,7 @@ function beginInteraction(){interactionDepth++}
 function flushPending(){if(interactionDepth||!pendingApply)return;const apply=pendingApply,data=pendingData;pendingApply=null;pendingData=null;apply(data);requestAnimationFrame(applyAll)}
 function endInteraction(){interactionDepth=Math.max(0,interactionDepth-1);flushPending()}
 function isBusy(){return interactionDepth>0||!!cards?.querySelector('.resizing,.reordering')}
-function scheduleData(data,apply){markUpdated();if(isBusy()){pendingData=data;pendingApply=apply;return false}apply(data);requestAnimationFrame(applyAll);return true}
+function scheduleData(data,apply){markUpdated(data?.time);if(isBusy()){pendingData=data;pendingApply=apply;return false}apply(data);requestAnimationFrame(applyAll);return true}
 
 let mouseSwipe=null,remoteResize=null;
 function finishMouseSwipe(event,cancel=false){
@@ -153,8 +170,6 @@ cards?.addEventListener('pointercancel',event=>{
   if(finishMouseSwipe(event,true))event.stopImmediatePropagation();
 },{capture:true});
 
-// Touch page changes remain handled by app.js. Persist the page it chose so a
-// later telemetry render restores the same page without replaying an animation.
 cards?.addEventListener('touchend',event=>{
   const card=event.target.closest('.card');if(!card||pageCount(card)<2)return;
   setTimeout(()=>{
