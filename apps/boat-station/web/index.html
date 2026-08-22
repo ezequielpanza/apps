@@ -34,7 +34,7 @@
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
   const menu=document.getElementById('menuSheet');
 
-  // Core and Remote share the same UI runtime. Only telemetry crosses the backend.
+  // Core and Remote share the same persistent UI. Only telemetry crosses the backend.
   await import('./app.js');
   await import('./data-sync.js');
 
@@ -44,7 +44,6 @@
     window.__bsNativeQueue=[];
     queued.forEach(([name,value])=>{try{window.BoatStation?.[name]?.(value)}catch(err){console.error('Boat Station native event error',name,err)}});
   }else{
-    document.getElementById('cards').innerHTML='';
     document.getElementById('addBtn').style.display='none';
     const inner=menu.querySelector('.sheet-inner');
     if(inner){
