@@ -75,7 +75,9 @@ public class MainActivityCore extends MainActivityV100 {
         coreWebView.getSettings().setDomStorageEnabled(true);
         coreWebView.getSettings().setAllowFileAccess(true);
         coreWebView.getSettings().setAllowContentAccess(true);
-        coreWebView.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        // The PWA/service worker owns offline caching. Never prefer a stale native
+        // WebView cache entry over the network, or HTML/JS/CSS releases can diverge.
+        coreWebView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
 
         coreSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         if (coreSensorManager != null) {
