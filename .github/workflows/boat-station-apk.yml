@@ -68,7 +68,7 @@ jobs:
           path: apps/boat-station/core/releases/BoatStation-${{ steps.version.outputs.version }}.apk
           if-no-files-found: error
 
-      - name: Publish APK in repository
+      - name: Publish APK in repository and Pages web root
         if: github.event_name == 'push'
         shell: bash
         run: |
@@ -79,9 +79,11 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
           git reset --hard origin/main
-          mkdir -p apps/boat-station/core/releases
+          mkdir -p apps/boat-station/core/releases apps/boat-station/web
           cp "/tmp/$APK" "apps/boat-station/core/releases/$APK"
-          git add "apps/boat-station/core/releases/$APK"
+          cp "/tmp/$APK" "apps/boat-station/web/BoatStation.apk"
+          printf '%s\n' "${{ steps.version.outputs.version }}" > apps/boat-station/web/APK_VERSION
+          git add "apps/boat-station/core/releases/$APK" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION
           if git diff --cached --quiet; then
             echo "APK already published"
             exit 0
