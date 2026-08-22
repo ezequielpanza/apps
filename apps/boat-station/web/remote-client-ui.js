@@ -49,7 +49,7 @@ function renderFreshness(){
   const age=Math.max(0,Date.now()-lastSnapshotAt),connected=age<=CONNECTED_MAX_AGE_MS;
   freshness.classList.toggle('connected',connected);freshness.classList.toggle('disconnected',!connected);freshness.classList.remove('waiting');
   if(text)text.textContent=connected?'Conectado':'Sin conexión';
-  if(detail)detail.textContent=connected?`· datos ${elapsedLabel(age)}`:`· última conexión ${elapsedLabel(age)}`;
+  if(detail)detail.textContent=connected?'':`· última conexión ${elapsedLabel(age)}`;
 }
 setInterval(renderFreshness,1000);
 
