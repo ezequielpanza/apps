@@ -1,5 +1,5 @@
-const CACHE='boat-station-v1';
-const APP_SHELL=['./','./index.html','./styles.css','./battery-overview.css','./app.js','./manifest.webmanifest','./icon.png','./remote_landing.js','./stations.js','./stations-menu-style.js','./native-tools-adapter.js','./native-bluetooth.js','./modules/gps.js','./modules/batteries.js','./modules/phone.js','./modules/seastate.js','./modules/compass.js'];
+const CACHE='boat-station-v2';
+const APP_SHELL=['./','./index.html','./styles.css','./battery-overview.css','./stations.css','./app.js','./manifest.webmanifest','./icon.png','./remote_landing.js','./stations.js','./native-tools-adapter.js','./native-bluetooth.js','./modules/gps.js','./modules/batteries.js','./modules/phone.js','./modules/seastate.js','./modules/compass.js'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting()));
