@@ -1,3 +1,6 @@
+/*
+  Cache-Control: no-cache, must-revalidate
+
 /VERSION
   Cache-Control: no-store, no-cache, must-revalidate
 
@@ -7,8 +10,5 @@
 /sw.js
   Cache-Control: no-store, no-cache, must-revalidate
 
-/index.html
-  Cache-Control: no-cache, must-revalidate
-
-/manifest.webmanifest
-  Cache-Control: no-cache, must-revalidate
+/BoatStation.apk
+  Cache-Control: no-store, no-cache, must-revalidate
