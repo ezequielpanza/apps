@@ -19,8 +19,7 @@
   if(typeof api.onBatteryConnection==='function')wrap('onBatteryConnection',value=>{if(!value)return;const id=String(value.id||value.address||value.deviceId||value.mac||value.name||'battery');state.batteries[id]={...(state.batteries[id]||{}),...copy(value)}});
 
   function exportSnapshot(){return{version:1,time:Date.now(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy)}}
-  function applySnapshot(snapshot){
-    if(!snapshot||typeof snapshot!=='object')return false;
+  function applyNow(snapshot){
     window.dispatchEvent(new CustomEvent('boatstation-data-update-start'));
     try{
       if(snapshot.gps)api.updateGPS?.(snapshot.gps);
@@ -32,6 +31,12 @@
     }finally{
       window.dispatchEvent(new CustomEvent('boatstation-data-update-end',{detail:{time:Number(snapshot.time)||Date.now()}}));
     }
+  }
+  function applySnapshot(snapshot){
+    if(!snapshot||typeof snapshot!=='object')return false;
+    const remoteUi=window.BoatStationRemoteUI;
+    if(remoteUi?.scheduleData)return remoteUi.scheduleData(snapshot,applyNow);
+    return applyNow(snapshot);
   }
 
   window.BoatStationDataSync={exportSnapshot,applySnapshot};
