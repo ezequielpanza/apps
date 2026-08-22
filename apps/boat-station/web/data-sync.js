@@ -24,15 +24,14 @@
     const order=[...document.querySelectorAll('#cards .card[data-id]')].map(card=>card.dataset.id).filter(Boolean);
     return{order};
   }
-
   function stationName(){
     const n=String(localStorage.getItem('bs.stationName')||'').trim();
     return n||'Estación';
   }
-
   function exportSnapshot(){
     const batteryState=window.BoatStationBatteryState?.exportRemoteState?.()||null;
-    return{version:6,time:Date.now(),stationName:stationName(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy),batteryState:copy(batteryState),layout:stationLayout()}
+    const gpsState=window.BoatStationGpsState?.exportRemoteState?.()||null;
+    return{version:7,time:Date.now(),stationName:stationName(),gps:copy(state.gps),gpsState:copy(gpsState),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy),batteryState:copy(batteryState),layout:stationLayout()}
   }
 
   function syncRemoteModuleSet(snapshot){
@@ -72,6 +71,7 @@
     window.dispatchEvent(new CustomEvent('boatstation-data-update-start'));
     try{
       if(snapshot.gps)api.updateGPS?.(snapshot.gps);
+      if(snapshot.gpsState&&window.BoatStationGpsState?.applyRemoteState)window.BoatStationGpsState.applyRemoteState(snapshot.gpsState);
       if(snapshot.phone)api.updatePhone?.(snapshot.phone);
       if(Number.isFinite(Number(snapshot.compass)))api.updateCompass?.(Number(snapshot.compass));
       if(Number.isFinite(Number(snapshot.motion)))api.updateMotion?.(Number(snapshot.motion));
