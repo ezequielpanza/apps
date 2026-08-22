@@ -1,16 +1,21 @@
 import {createGpsModule} from './modules/gps.js';
+import {createBatteriesModule} from './modules/batteries.js';
 
 const cards=document.getElementById('cards');
 const menu=document.getElementById('menuSheet');
 const add=document.getElementById('addSheet');
-const ALL_MODULE_IDS=['gps','phone','seastate','compass'];
-const modules={};
+const ALL_MODULE_IDS=['gps','batteries','phone','seastate','compass'];
 const readJson=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||'null');return v??fallback}catch(_){return fallback}};
 const savedOrder=readJson('bs.clean.order',null);
 const ui={order:Array.isArray(savedOrder)?savedOrder.filter(id=>ALL_MODULE_IDS.includes(id)):[...ALL_MODULE_IDS],collapsed:{},page:{},heights:readJson('bs.clean.heights',{})};
+const modules={};
+let lockedScrollY=0,sheetDrag=null,moduleMenuId=null;
+let reorder=null,resize=null,tapCandidate=null,touchSwipe=null,lastTouchSwipeAt=0,refreshGesture=null;
 
 function requestRender(id){renderModule(id)}
+function openBatteryManager(){renderBatteryManager();openSheet(batteryManager)}
 modules.gps=createGpsModule(requestRender);
+modules.batteries=createBatteriesModule(requestRender,openBatteryManager);
 modules.phone={id:'phone',name:'Estado del teléfono',pages:2,summary:()=> 'Pendiente',page:i=>`<div class="placeholder">Estado del teléfono · página ${i+1}</div>`};
 modules.seastate={id:'seastate',name:'Sea State',pages:2,summary:()=> 'Pendiente',page:i=>`<div class="placeholder">Sea State · página ${i+1}</div>`};
 modules.compass={id:'compass',name:'Brújula',pages:2,summary:()=> 'Pendiente',page:i=>`<div class="placeholder">Brújula · página ${i+1}</div>`};
@@ -19,7 +24,11 @@ function pager(count,current){return `<div class="pager">${Array.from({length:co
 function updatePager(card,current){card.querySelectorAll('.pager').forEach(p=>p.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===current)))}
 function dragHandle(){return '<button class="drag-handle" type="button" aria-label="Mover módulo"><i></i><i></i><i></i><i></i><i></i><i></i></button>'}
 function resizeHandle(){return '<button class="resize-handle" type="button" aria-label="Cambiar tamaño del módulo"><i></i><i></i><i></i></button>'}
-function moduleHtml(id){const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1);const pages=Array.from({length:m.pages},(_,i)=>`<div class="page" data-page="${i}">${m.page(i)}${pager(m.pages,p)}</div>`).join('');return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${m.name}</span><span class="summary">${m.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track" style="transform:translateX(-${p*100}%)">${pages}</div></div></div>${resizeHandle()}</section>`}
+function moduleHtml(id){
+  const m=modules[id],p=Math.min(ui.page[id]||0,m.pages-1);
+  const pages=Array.from({length:m.pages},(_,i)=>`<div class="page" data-page="${i}">${m.page(i)}${pager(m.pages,p)}</div>`).join('');
+  return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${m.name}</span><span class="summary">${m.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track" style="transform:translateX(-${p*100}%)">${pages}</div></div></div>${resizeHandle()}</section>`;
+}
 function saveOrder(){localStorage.setItem('bs.clean.order',JSON.stringify(ui.order))}
 function saveHeights(){localStorage.setItem('bs.clean.heights',JSON.stringify(ui.heights))}
 function pageHeight(id,page){const stored=ui.heights[id];if(stored&&typeof stored==='object'&&Number.isFinite(Number(stored[page])))return Number(stored[page]);if(Number.isFinite(Number(stored))&&page===0)return Number(stored);return null}
@@ -28,62 +37,71 @@ function measure(card){if(!card||card.classList.contains('collapsed'))return;con
 function hydrate(card){const id=card.dataset.id;modules[id].afterRender?.(card);updatePager(card,ui.page[id]||0);requestAnimationFrame(()=>measure(card))}
 function renderAll(){cards.innerHTML=ui.order.map(moduleHtml).join('');cards.querySelectorAll('.card').forEach(hydrate)}
 function renderModule(id){const old=cards.querySelector(`.card[data-id="${id}"]`);if(!old)return;const holder=document.createElement('div');holder.innerHTML=moduleHtml(id);old.replaceWith(holder.firstElementChild);hydrate(cards.querySelector(`.card[data-id="${id}"]`))}
-renderAll();
+function setModulePage(card,next){if(!card)return;const id=card.dataset.id,m=modules[id];if(!m||m.pages<2)return;const page=Math.max(0,Math.min(m.pages-1,next));if(page===(ui.page[id]||0))return;ui.page[id]=page;card.querySelector('.track').style.transform=`translateX(-${page*100}%)`;updatePager(card,page);setTimeout(()=>{measure(card);m.afterRender?.(card)},190)}
 
-let lockedScrollY=0,sheetDrag=null,moduleMenuId=null;
 function anySheetOpen(){return [...document.querySelectorAll('.sheet')].some(s=>s.classList.contains('open'))}
 function lockModuleScroll(){if(document.body.classList.contains('menu-open'))return;lockedScrollY=window.scrollY||document.documentElement.scrollTop||0;document.body.classList.add('menu-open');document.body.style.top=`-${lockedScrollY}px`}
 function unlockModuleScroll(){if(anySheetOpen()||!document.body.classList.contains('menu-open'))return;document.body.classList.remove('menu-open');document.body.style.top='';window.scrollTo(0,lockedScrollY)}
 function openSheet(sheet){const inner=sheet.querySelector('.sheet-inner');if(inner){inner.style.transform='';inner.style.transition=''}sheet.classList.add('open');lockModuleScroll()}
 function closeSheet(sheet){const inner=sheet.querySelector('.sheet-inner');if(inner){inner.style.transform='';inner.style.transition=''}sheet.classList.remove('open');unlockModuleScroll()}
-function bindSheetHandle(sheet){const handle=sheet.querySelector('.handle'),inner=sheet.querySelector('.sheet-inner');if(!handle||!inner||handle.dataset.bound)return;handle.dataset.bound='1';handle.addEventListener('pointerdown',e=>{if(!sheet.classList.contains('open'))return;e.preventDefault();e.stopPropagation();sheetDrag={sheet,inner,startY:e.clientY,pointerId:e.pointerId};inner.style.transition='none';try{handle.setPointerCapture(e.pointerId)}catch(_){}})}
+function bindSheetHandle(sheet){const handle=sheet.querySelector('.handle'),inner=sheet.querySelector('.sheet-inner');if(!handle||!inner||handle.dataset.bound)return;handle.dataset.bound='1';handle.addEventListener('pointerdown',e=>{if(!sheet.classList.contains('open')||sheet.classList.contains('fullscreen-sheet'))return;e.preventDefault();e.stopPropagation();sheetDrag={sheet,inner,startY:e.clientY,pointerId:e.pointerId};inner.style.transition='none';try{handle.setPointerCapture(e.pointerId)}catch(_){}})}
+function makeSheet(full=false){const s=document.createElement('div');s.className='sheet'+(full?' fullscreen-sheet':'');document.body.appendChild(s);return s}
+function fullHeader(title,backAttr='data-full-back'){return `<div class="fullscreen-head"><button class="fullscreen-back" type="button" ${backAttr}>‹</button><h3>${title}</h3></div>`}
 
-const moduleMenu=document.createElement('div');moduleMenu.className='sheet';document.body.appendChild(moduleMenu);
-const unitsMenu=document.createElement('div');unitsMenu.className='sheet';document.body.appendChild(unitsMenu);
-const coordMenu=document.createElement('div');coordMenu.className='sheet';document.body.appendChild(coordMenu);
-function renderModuleMenu(id){const isGps=id==='gps';moduleMenu.innerHTML=`<div class="sheet-inner compact-sheet"><div class="handle" aria-label="Arrastrar para cerrar"></div><h3>${modules[id].name}</h3>${isGps?'<button class="option sheet-option" type="button" data-gps-units>Cambiar unidades</button><button class="option sheet-option" type="button" data-gps-coords>Formato de coordenadas</button>':''}<button class="option sheet-option danger" type="button" data-module-delete>Eliminar</button></div>`;bindSheetHandle(moduleMenu)}
+const moduleMenu=makeSheet(false);
+const unitsMenu=makeSheet(true);
+const coordMenu=makeSheet(true);
+const batteryManager=makeSheet(true);
+const bluetoothScanner=makeSheet(true);
+let scanDevices=[];
+
+function renderModuleMenu(id){const isGps=id==='gps',isBat=id==='batteries';moduleMenu.innerHTML=`<div class="sheet-inner compact-sheet"><div class="handle"></div><h3>${modules[id].name}</h3>${isGps?'<button class="option sheet-option" type="button" data-gps-units>Cambiar unidades</button><button class="option sheet-option" type="button" data-gps-coords>Formato de coordenadas</button>':''}${isBat?'<button class="option sheet-option" type="button" data-battery-manage-open>Administrar baterías</button>':''}<button class="option sheet-option danger" type="button" data-module-delete>Eliminar</button></div>`;bindSheetHandle(moduleMenu)}
 function openModuleMenu(id){moduleMenuId=id;renderModuleMenu(id);openSheet(moduleMenu)}
-function renderUnitsMenu(){const gps=modules.gps,current=gps.getUnits();unitsMenu.innerHTML=`<div class="sheet-inner compact-sheet"><div class="handle" aria-label="Arrastrar para cerrar"></div><h3>Unidades GPS</h3>${gps.getUnitOptions().map(o=>`<button class="add-module-row" type="button" data-unit="${o.id}"><span>${o.label}</span><span class="add-module-state ${o.id===current?'present':''}">${o.id===current?'✓':''}</span></button>`).join('')}</div>`;bindSheetHandle(unitsMenu)}
+function renderUnitsMenu(){const gps=modules.gps,current=gps.getUnits();unitsMenu.innerHTML=`<div class="sheet-inner fullscreen-inner">${fullHeader('Unidades GPS','data-units-back')}${gps.getUnitOptions().map(o=>`<button class="add-module-row" type="button" data-unit="${o.id}"><span>${o.label}</span><span class="add-module-state ${o.id===current?'present':''}">${o.id===current?'✓':''}</span></button>`).join('')}</div>`}
 function openUnitsMenu(){closeSheet(moduleMenu);renderUnitsMenu();openSheet(unitsMenu)}
-function renderCoordMenu(){const gps=modules.gps,current=gps.getCoordFormat();coordMenu.innerHTML=`<div class="sheet-inner compact-sheet"><div class="handle" aria-label="Arrastrar para cerrar"></div><h3>Formato de coordenadas</h3>${gps.getCoordFormatOptions().map(o=>`<button class="add-module-row" type="button" data-coord-format="${o.id}"><span>${o.label}</span><span class="add-module-state ${o.id===current?'present':''}">${o.id===current?'✓':''}</span></button>`).join('')}</div>`;bindSheetHandle(coordMenu)}
+function renderCoordMenu(){const gps=modules.gps,current=gps.getCoordFormat();coordMenu.innerHTML=`<div class="sheet-inner fullscreen-inner">${fullHeader('Formato de coordenadas','data-coord-back')}${gps.getCoordFormatOptions().map(o=>`<button class="add-module-row" type="button" data-coord-format="${o.id}"><span>${o.label}</span><span class="add-module-state ${o.id===current?'present':''}">${o.id===current?'✓':''}</span></button>`).join('')}</div>`}
 function openCoordMenu(){closeSheet(moduleMenu);renderCoordMenu();openSheet(coordMenu)}
 function deleteModule(id){if(!id)return;ui.order=ui.order.filter(x=>x!==id);delete ui.collapsed[id];delete ui.page[id];saveOrder();closeSheet(moduleMenu);moduleMenuId=null;renderAll()}
-function renderAddSheet(){const inner=add.querySelector('.sheet-inner');if(!inner)return;inner.innerHTML='<div class="handle" aria-label="Arrastrar para cerrar"></div><h3>Agregar módulo</h3>'+ALL_MODULE_IDS.map(id=>{const present=ui.order.includes(id);return `<button class="add-module-row" type="button" data-add-module="${id}" ${present?'disabled':''}><span>${modules[id].name}</span><span class="add-module-state ${present?'present':''}">${present?'✓':'+'}</span></button>`}).join('');bindSheetHandle(add)}
+function renderAddSheet(){const inner=add.querySelector('.sheet-inner');if(!inner)return;inner.innerHTML='<div class="handle"></div><h3>Agregar módulo</h3>'+ALL_MODULE_IDS.map(id=>{const present=ui.order.includes(id);return `<button class="add-module-row" type="button" data-add-module="${id}" ${present?'disabled':''}><span>${modules[id].name}</span><span class="add-module-state ${present?'present':''}">${present?'✓':'+'}</span></button>`}).join('');bindSheetHandle(add)}
+
+function renderBatteryManager(){const b=modules.batteries.state;batteryManager.innerHTML=`<div class="sheet-inner fullscreen-inner">${fullHeader('Baterías','data-battery-manager-back')}<div class="full-section"><label class="full-label">Nombre del banco</label><input class="full-input" data-bank-name value="${String(b.bankName||'').replace(/"/g,'&quot;')}"><label class="full-label">Capacidad del banco (Ah)</label><input class="full-input" data-bank-capacity inputmode="decimal" value="${Number(b.capacityAh)||''}"></div><div class="full-section"><div class="full-section-title">Baterías vinculadas</div>${b.batteries.length?b.batteries.map(x=>`<div class="battery-manage-row"><div><strong>${x.name||x.deviceName||'Batería'}</strong><small>${x.address||x.id||''}</small></div><button class="mini-danger" type="button" data-remove-battery="${x.id}">Eliminar</button></div>`).join(''):'<div class="subtle">No hay baterías vinculadas.</div>'}<button class="primary-full-button" type="button" data-open-scanner>Vincular batería</button></div></div>`}
+function renderBluetoothScanner(status='Escaneando dispositivos Bluetooth…'){bluetoothScanner.innerHTML=`<div class="sheet-inner fullscreen-inner">${fullHeader('Bluetooth','data-scanner-back')}<div class="scanner-status">${status}</div><div class="scanner-list">${scanDevices.length?scanDevices.map((d,i)=>`<button class="scanner-device" type="button" data-scan-device="${i}"><span><strong>${d.name||d.deviceName||'Dispositivo Bluetooth'}</strong><small>${d.address||d.id||d.mac||''}</small></span><span class="add-module-state">+</span></button>`).join(''):'<div class="scanner-empty">Los dispositivos aparecerán acá cuando el Core los detecte.</div>'}</div></div>`}
+function requestBluetoothScan(){scanDevices=[];renderBluetoothScanner();openSheet(bluetoothScanner);let called=false;try{if(window.BoatStationCore?.openBluetoothScanner){window.BoatStationCore.openBluetoothScanner();called=true}else if(window.Android?.openBluetoothScanner){window.Android.openBluetoothScanner();called=true}else if(window.Android?.scanBluetooth){window.Android.scanBluetooth();called=true}}catch(_){}if(!called)renderBluetoothScanner('Esperando acceso Bluetooth del Core…')}
+
+renderAll();
 
 document.getElementById('menuBtn').onclick=()=>openSheet(menu);
 document.getElementById('addBtn').onclick=()=>{renderAddSheet();openSheet(add)};
-[menu,add,moduleMenu,unitsMenu,coordMenu].forEach(s=>s.addEventListener('click',e=>{if(e.target===s)closeSheet(s)}));
-moduleMenu.addEventListener('click',e=>{if(e.target.closest('[data-module-delete]')){e.preventDefault();deleteModule(moduleMenuId)}else if(e.target.closest('[data-gps-units]')){e.preventDefault();openUnitsMenu()}else if(e.target.closest('[data-gps-coords]')){e.preventDefault();openCoordMenu()}});
-unitsMenu.addEventListener('click',e=>{const btn=e.target.closest('[data-unit]');if(!btn)return;modules.gps.setUnits(btn.dataset.unit);renderUnitsMenu()});
-coordMenu.addEventListener('click',e=>{const btn=e.target.closest('[data-coord-format]');if(!btn)return;modules.gps.setCoordFormat(btn.dataset.coordFormat);renderCoordMenu()});
+[menu,add,moduleMenu].forEach(s=>s.addEventListener('click',e=>{if(e.target===s)closeSheet(s)}));
+moduleMenu.addEventListener('click',e=>{if(e.target.closest('[data-module-delete]')){e.preventDefault();deleteModule(moduleMenuId)}else if(e.target.closest('[data-gps-units]')){e.preventDefault();openUnitsMenu()}else if(e.target.closest('[data-gps-coords]')){e.preventDefault();openCoordMenu()}else if(e.target.closest('[data-battery-manage-open]')){e.preventDefault();closeSheet(moduleMenu);openBatteryManager()}});
+unitsMenu.addEventListener('click',e=>{if(e.target.closest('[data-units-back]')){closeSheet(unitsMenu);openModuleMenu('gps');return}const btn=e.target.closest('[data-unit]');if(btn){modules.gps.setUnits(btn.dataset.unit);renderUnitsMenu()}});
+coordMenu.addEventListener('click',e=>{if(e.target.closest('[data-coord-back]')){closeSheet(coordMenu);openModuleMenu('gps');return}const btn=e.target.closest('[data-coord-format]');if(btn){modules.gps.setCoordFormat(btn.dataset.coordFormat);renderCoordMenu()}});
 add.addEventListener('click',e=>{const btn=e.target.closest('[data-add-module]');if(!btn||btn.disabled)return;const id=btn.dataset.addModule;if(!ui.order.includes(id)){ui.order.push(id);saveOrder();renderAll();renderAddSheet()}});
-[menu].forEach(bindSheetHandle);
+batteryManager.addEventListener('click',e=>{if(e.target.closest('[data-battery-manager-back]')){closeSheet(batteryManager);return}if(e.target.closest('[data-open-scanner]')){closeSheet(batteryManager);requestBluetoothScan();return}const rm=e.target.closest('[data-remove-battery]');if(rm){modules.batteries.removeBattery(rm.dataset.removeBattery);renderBatteryManager()}});
+batteryManager.addEventListener('change',e=>{if(e.target.matches('[data-bank-name]'))modules.batteries.renameBank(e.target.value);if(e.target.matches('[data-bank-capacity]'))modules.batteries.setCapacity(e.target.value)});
+bluetoothScanner.addEventListener('click',e=>{if(e.target.closest('[data-scanner-back]')){closeSheet(bluetoothScanner);openBatteryManager();return}const btn=e.target.closest('[data-scan-device]');if(btn){const d=scanDevices[Number(btn.dataset.scanDevice)];if(d){modules.batteries.addBattery(d);closeSheet(bluetoothScanner);openBatteryManager()}}});
+[menu,add,moduleMenu].forEach(bindSheetHandle);
 
 document.addEventListener('pointermove',e=>{if(!sheetDrag||e.pointerId!==sheetDrag.pointerId)return;e.preventDefault();sheetDrag.inner.style.transform=`translateY(${Math.max(0,e.clientY-sheetDrag.startY)}px)`},{passive:false});
 document.addEventListener('pointerup',e=>{if(!sheetDrag||e.pointerId!==sheetDrag.pointerId)return;const d=sheetDrag,dy=Math.max(0,e.clientY-d.startY);sheetDrag=null;d.inner.style.transition='transform .16s ease';if(dy>=72){d.inner.style.transform='translateY(110%)';setTimeout(()=>closeSheet(d.sheet),160)}else{d.inner.style.transform='translateY(0)';setTimeout(()=>{d.inner.style.transition='';d.inner.style.transform=''},160)}});
 document.addEventListener('pointercancel',()=>{if(!sheetDrag)return;const d=sheetDrag;sheetDrag=null;d.inner.style.transition='transform .16s ease';d.inner.style.transform='translateY(0)';setTimeout(()=>{d.inner.style.transition='';d.inner.style.transform=''},160)});
 
-let reorder=null,resize=null,tapCandidate=null,touchSwipe=null,lastTouchSwipeAt=0;
 function finishReorder(){if(!reorder)return;reorder.card.classList.remove('reordering');ui.order=[...cards.querySelectorAll('.card')].map(c=>c.dataset.id);saveOrder();reorder=null;cards.querySelectorAll('.card').forEach(measure)}
 function finishResize(){if(!resize)return;resize.card.classList.remove('resizing');saveHeights();resize=null}
-function setModulePage(card,next){if(!card)return;const id=card.dataset.id,m=modules[id];if(!m||m.pages<2)return;const page=Math.max(0,Math.min(m.pages-1,next));if(page===(ui.page[id]||0))return;ui.page[id]=page;const track=card.querySelector('.track');if(track)track.style.transform=`translateX(-${page*100}%)`;updatePager(card,page);setTimeout(()=>{measure(card);m.afterRender?.(card)},190)}
 function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
-
 cards.addEventListener('pointerdown',e=>{if(document.body.classList.contains('menu-open'))return;const card=e.target.closest('.card');if(!card)return;const grip=e.target.closest('.resize-handle');if(grip){e.preventDefault();e.stopPropagation();const body=card.querySelector('.card-body'),id=card.dataset.id,page=Math.min(ui.page[id]||0,modules[id].pages-1);resize={card,body,id,page,startY:e.clientY,startH:body.getBoundingClientRect().height,pointerId:e.pointerId};card.classList.add('resizing');try{grip.setPointerCapture(e.pointerId)}catch(_){};return}const drag=e.target.closest('.drag-handle');if(drag){e.preventDefault();reorder={card,pointerId:e.pointerId};card.classList.add('reordering');try{drag.setPointerCapture(e.pointerId)}catch(_){};return}if(e.target.closest('button,input'))return;tapCandidate={id:card.dataset.id,card,x:e.clientX,y:e.clientY,t:Date.now(),pointerType:e.pointerType}});
 cards.addEventListener('pointermove',e=>{if(resize){e.preventDefault();const next=Math.max(70,Math.min(Math.max(120,window.innerHeight*.78),resize.startH+(e.clientY-resize.startY)));resize.body.style.height=`${next}px`;setPageHeight(resize.id,resize.page,next);return}if(reorder){e.preventDefault();const moving=reorder.card,others=[...cards.querySelectorAll('.card')].filter(c=>c!==moving);let before=null;for(const c of others){const r=c.getBoundingClientRect();if(e.clientY<r.top+r.height/2){before=c;break}}if(before)cards.insertBefore(moving,before);else cards.appendChild(moving);return}if(tapCandidate&&(Math.abs(e.clientX-tapCandidate.x)>10||Math.abs(e.clientY-tapCandidate.y)>10))tapCandidate=null});
 cards.addEventListener('pointerup',e=>{if(resize){finishResize();return}if(reorder){finishReorder();return}if(!tapCandidate)return;const g=tapCandidate;tapCandidate=null;if(g.pointerType==='touch'&&Date.now()-lastTouchSwipeAt<400)return;if(Math.abs(e.clientX-g.x)<8&&Math.abs(e.clientY-g.y)<8&&Date.now()-g.t<350){ui.collapsed[g.id]=!ui.collapsed[g.id];g.card.classList.toggle('collapsed',ui.collapsed[g.id]);if(!ui.collapsed[g.id])measure(g.card)}});
 cards.addEventListener('pointercancel',()=>{tapCandidate=null;finishResize();finishReorder()});
-
-cards.addEventListener('touchstart',e=>{if(document.body.classList.contains('menu-open')||e.touches.length!==1)return;if(e.target.closest('.drag-handle,.resize-handle,button,input,textarea,select,a'))return;const card=e.target.closest('.card');if(!card||modules[card.dataset.id].pages<2)return;const t=e.touches[0];touchSwipe={id:t.identifier,card,moduleId:card.dataset.id,startX:t.clientX,startY:t.clientY,lastX:t.clientX,lastY:t.clientY,mode:'pending'}},{passive:true});
-cards.addEventListener('touchmove',e=>{if(!touchSwipe)return;const t=touchById(e.touches,touchSwipe.id);if(!t)return;touchSwipe.lastX=t.clientX;touchSwipe.lastY=t.clientY;const dx=t.clientX-touchSwipe.startX,dy=t.clientY-touchSwipe.startY;if(touchSwipe.mode==='pending'){if(Math.abs(dx)<10&&Math.abs(dy)<10)return;if(Math.abs(dx)>Math.abs(dy)*1.15)touchSwipe.mode='horizontal';else{touchSwipe=null;return}}if(touchSwipe?.mode==='horizontal'){e.preventDefault();refreshGesture=null;hideRefresh()}},{passive:false});
+cards.addEventListener('touchstart',e=>{if(document.body.classList.contains('menu-open')||e.touches.length!==1)return;if(e.target.closest('.drag-handle,.resize-handle,button,input,textarea,select,a'))return;const card=e.target.closest('.card');if(!card||modules[card.dataset.id].pages<2)return;const t=e.touches[0];touchSwipe={id:t.identifier,card,moduleId:card.dataset.id,startX:t.clientX,startY:t.clientY,mode:'pending'}},{passive:true});
+cards.addEventListener('touchmove',e=>{if(!touchSwipe)return;const t=touchById(e.touches,touchSwipe.id);if(!t)return;const dx=t.clientX-touchSwipe.startX,dy=t.clientY-touchSwipe.startY;if(touchSwipe.mode==='pending'){if(Math.abs(dx)<10&&Math.abs(dy)<10)return;if(Math.abs(dx)>Math.abs(dy)*1.15)touchSwipe.mode='horizontal';else{touchSwipe=null;return}}if(touchSwipe?.mode==='horizontal'){e.preventDefault();refreshGesture=null;hideRefresh()}},{passive:false});
 cards.addEventListener('touchend',e=>{if(!touchSwipe)return;const t=touchById(e.changedTouches,touchSwipe.id);if(!t){touchSwipe=null;return}const g=touchSwipe;touchSwipe=null;if(g.mode!=='horizontal')return;const dx=t.clientX-g.startX,dy=t.clientY-g.startY;if(Math.abs(dx)<38||Math.abs(dx)<=Math.abs(dy)*1.1)return;const cur=ui.page[g.moduleId]||0;setModulePage(g.card,dx<0?cur+1:cur-1);lastTouchSwipeAt=Date.now()},{passive:true});
 cards.addEventListener('touchcancel',()=>{touchSwipe=null});
-
 cards.addEventListener('click',e=>{const more=e.target.closest('.more');if(more){e.stopPropagation();openModuleMenu(more.closest('.card').dataset.id)}});
 window.addEventListener('resize',()=>cards.querySelectorAll('.card').forEach(c=>{measure(c);modules[c.dataset.id].afterRender?.(c)}));
 
 const deck=document.createElement('div');deck.className='module-deck';cards.parentNode.insertBefore(deck,cards);deck.appendChild(cards);const refreshTab=document.createElement('div');refreshTab.className='hidden-refresh-module';refreshTab.textContent='Actualizar';deck.insertBefore(refreshTab,cards);
-const REFRESH_DISTANCE=72,REFRESH_REVEAL=50,DIRECTION_LOCK=12;let refreshGesture=null;
+const REFRESH_DISTANCE=72,REFRESH_REVEAL=50,DIRECTION_LOCK=12;
 function atTop(){const root=document.scrollingElement||document.documentElement;return root.scrollTop<=1}
 function canStartRefresh(target){if(document.body.classList.contains('menu-open')||!atTop())return false;if(target.closest('.sheet,.drag-handle,.resize-handle,button,input,textarea,select,a'))return false;return true}
 function revealRefresh(distance){const progress=Math.min(1,distance/REFRESH_DISTANCE),armed=distance>=REFRESH_DISTANCE;deck.style.setProperty('--deck-pull',`${progress*REFRESH_REVEAL}px`);refreshTab.classList.toggle('armed',armed);deck.classList.add('pulling');return armed}
@@ -96,4 +114,8 @@ document.addEventListener('touchmove',e=>{if(!refreshGesture)return;const t=touc
 document.addEventListener('touchend',e=>{if(!refreshGesture)return;const t=touchById(e.changedTouches,refreshGesture.id);if(t)endRefreshGesture(t)},{capture:true,passive:true});
 document.addEventListener('touchcancel',()=>{refreshGesture=null;hideRefresh()},{capture:true,passive:true});
 
-window.BoatStation={updateGPS:data=>modules.gps.update(data)};
+window.BoatStation={
+  updateGPS:data=>modules.gps.update(data),
+  updateBattery:data=>modules.batteries.updateBattery(data),
+  bluetoothDevices:list=>{scanDevices=Array.isArray(list)?list:[];if(bluetoothScanner.classList.contains('open'))renderBluetoothScanner(scanDevices.length?`${scanDevices.length} dispositivo${scanDevices.length===1?'':'s'} encontrado${scanDevices.length===1?'':'s'}`:'Escaneando dispositivos Bluetooth…')}
+};
