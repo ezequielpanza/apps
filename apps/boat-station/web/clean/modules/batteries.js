@@ -12,7 +12,7 @@ export function createBatteriesModule(requestRender,openManager){
   const num=v=>Number.isFinite(Number(v))?Number(v):null;
   function save(){try{const copy={...state,root:undefined};localStorage.setItem('bs.batteries.state',JSON.stringify(copy))}catch(_){}}
   function stats(){
-    const list=state.batteries,connected=list.filter(b=>b.connected!==false);let cap=0,rem=0,current=0,voltageSum=0,voltageN=0;
+    const list=state.batteries,connected=list.filter(b=>b.connected!==false&&num(b.voltage)!==null);let cap=0,rem=0,current=0,voltageSum=0,voltageN=0;
     for(const b of list){const c=num(b.capacityAh)||0,s=num(b.soc),r=num(b.remainingAh);cap+=c;rem+=r!==null?r:(s!==null&&c?s*c/100:0);const a=num(b.current);if(a!==null)current+=a;const v=num(b.voltage);if(v!==null){voltageSum+=v;voltageN++}}
     const voltage=voltageN?voltageSum/voltageN:null,soc=cap>0?Math.max(0,Math.min(100,rem/cap*100)):null;
     return{cap,rem,current,voltage,soc,power:voltage===null?null:voltage*current,connected:connected.length,total:list.length};
@@ -21,8 +21,8 @@ export function createBatteriesModule(requestRender,openManager){
   function metric(value,label){return `<div class="metric"><div class="value">${value}</div><div class="label">${label}</div></div>`}
   function individualBattery(b,i){
     const soc=num(b.soc),v=num(b.voltage),a=num(b.current),cap=num(b.capacityAh)||0,rem=num(b.remainingAh);
-    const shownRem=rem!==null?rem:(soc!==null&&cap?cap*soc/100:null),online=b.connected!==false;
-    return `<div class="battery-mini ${online?'online':'offline'}"><div class="battery-mini-head"><strong>${esc(b.name||b.deviceName||`Batería ${i+1}`)}</strong><span class="battery-mini-link">${online?'⌁':'×'}</span></div><div class="battery-mini-body"><div class="battery-mini-ring" style="--soc:${soc??0}"><span>${soc===null?'—':Math.round(soc)+'%'}</span></div><div class="battery-mini-values"><b>${v===null?'—':v.toFixed(2)+' V'}</b><small>Voltaje</small><b>${a===null?'—':(a>=0?'+':'')+a.toFixed(1)+' A'}</b><small>Corriente</small></div></div><div class="battery-mini-ah">${shownRem===null?'—':Math.round(shownRem)} / ${Math.round(cap)} Ah</div></div>`;
+    const shownRem=rem!==null?rem:(soc!==null&&cap?cap*soc/100:null),online=b.connected!==false&&v!==null;
+    return `<div class="battery-mini ${online?'online':'offline'}"><div class="battery-mini-head"><strong>${esc(b.name||b.deviceName||`Batería ${i+1}`)}</strong><span class="battery-mini-link">${online?'⌁':'×'}</span></div><div class="battery-mini-center"><div class="battery-mini-soc">${soc===null?'—':Math.round(soc)+'%'}</div><div class="battery-mini-row"><span>${v===null?'—':v.toFixed(2)+' V'}</span><small>Voltaje</small></div><div class="battery-mini-row"><span>${a===null?'—':(a>=0?'+':'')+a.toFixed(1)+' A'}</span><small>Corriente</small></div><div class="battery-mini-ah">${shownRem===null?'—':Math.round(shownRem)} / ${Math.round(cap)} Ah</div></div></div>`;
   }
   function historyRangeLabel(){const h=Number(state.historyHours);if(h<24)return `${h} ${h===1?'hora':'horas'}`;const d=h/24;return `${d} ${d===1?'día':'días'}`}
   function page(index){
