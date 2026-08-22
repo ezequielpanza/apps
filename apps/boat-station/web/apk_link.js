@@ -6,10 +6,13 @@
       if(r.ok) version=(await r.text()).trim();
     }catch(e){}
     if(!version)return;
-    document.querySelectorAll('a[href="/BoatStation.apk"],a[href$="/BoatStation.apk"]').forEach(a=>{
+    const file='BoatStation-'+version+'.apk';
+    document.querySelectorAll('a[href="/BoatStation.apk"],a[href$="/BoatStation.apk"],a[data-boatstation-apk]').forEach(a=>{
+      a.href='/'+file;
       a.textContent='Descargar versión '+version;
-      a.setAttribute('download','BoatStation-'+version+'.apk');
+      a.setAttribute('download',file);
       a.title='Boat Station '+version;
+      a.setAttribute('data-boatstation-apk','1');
     });
   }
   updateApkLinks();
