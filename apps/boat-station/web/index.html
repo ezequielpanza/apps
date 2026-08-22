@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="./styles.css">
 <link rel="stylesheet" href="./battery-overview.css">
 <link rel="stylesheet" href="./stations.css">
+<link rel="stylesheet" href="./remote-client-ui.css">
 <script>
 (function(){
   if(window.__bsNativeQueue)return;
@@ -51,6 +52,7 @@
       row.innerHTML='<span>Boat Station APK<br><small class="sub">Última versión disponible</small></span><a class="btn" href="/BoatStation.apk" download>Descargar</a>';
       inner.appendChild(row);
     }
+    await import('./remote-client-ui.js');
   }
 
   await import('./stations.js');
