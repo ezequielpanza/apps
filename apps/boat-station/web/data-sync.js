@@ -25,7 +25,12 @@
     return{order};
   }
 
-  function exportSnapshot(){return{version:2,time:Date.now(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy),layout:stationLayout()}}
+  function stationName(){
+    const n=String(localStorage.getItem('bs.stationName')||'').trim();
+    return n||'Estación';
+  }
+
+  function exportSnapshot(){return{version:3,time:Date.now(),stationName:stationName(),gps:copy(state.gps),phone:copy(state.phone),compass:state.compass,motion:state.motion,batteries:Object.values(state.batteries).map(copy),layout:stationLayout()}}
 
   function seedRemoteLayoutOnce(snapshot){
     if(isLocal||!snapshot?.layout||!Array.isArray(snapshot.layout.order))return false;
@@ -41,7 +46,27 @@
     return false;
   }
 
+  function syncRemoteStationName(snapshot){
+    if(isLocal)return;
+    const stationId=localStorage.getItem('bs.remote.activeStation')||'';
+    const nextName=String(snapshot?.stationName||'').trim();
+    if(!stationId||!nextName)return;
+    try{
+      const list=JSON.parse(localStorage.getItem('bs.remote.stations')||'[]');
+      if(!Array.isArray(list))return;
+      let changed=false;
+      for(const row of list){
+        if(row&&row.stationId===stationId&&row.name!==nextName){row.name=nextName;changed=true}
+      }
+      if(changed){
+        localStorage.setItem('bs.remote.stations',JSON.stringify(list));
+        window.dispatchEvent(new CustomEvent('boatstation-station-name-updated',{detail:{stationId,name:nextName}}));
+      }
+    }catch(_){ }
+  }
+
   function applyNow(snapshot){
+    syncRemoteStationName(snapshot);
     if(seedRemoteLayoutOnce(snapshot))return true;
     window.dispatchEvent(new CustomEvent('boatstation-data-update-start'));
     try{
@@ -52,7 +77,7 @@
       if(Array.isArray(snapshot.batteries))snapshot.batteries.forEach(b=>api.updateBattery?.(b));
       return true;
     }finally{
-      window.dispatchEvent(new CustomEvent('boatstation-data-update-end',{detail:{time:Number(snapshot.time)||Date.now()}}));
+      window.dispatchEvent(new CustomEvent('boatstation-data-update-end',{detail:{time:Number(snapshot.time)||Date.now(),stationName:String(snapshot.stationName||'')}}));
     }
   }
   function applySnapshot(snapshot){
