@@ -4,6 +4,7 @@
   if(isLocal)return;
 
   document.documentElement.classList.add('bs-remote');
+  const backend='https://boat-station-backend.ezequielpanza.workers.dev';
   const norm=v=>String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,16);
   const pretty=v=>(norm(v).match(/.{1,4}/g)||[]).join('-');
   function stations(){try{const a=JSON.parse(localStorage.getItem('bs.remote.stations')||'[]');return Array.isArray(a)?a:[]}catch{return[]}}
@@ -24,7 +25,24 @@
   `;
   document.head.appendChild(css);
 
-  if(active()) return;
+  const current=active();
+  if(current){
+    const clientId=localStorage.getItem('bs.remote.clientId')||('web-'+Math.random().toString(36).slice(2)+Date.now().toString(36));
+    localStorage.setItem('bs.remote.clientId',clientId);
+    async function sync(){
+      try{
+        const r=await fetch(`${backend}/api/station/${encodeURIComponent(current.stationId)}/state?clientId=${encodeURIComponent(clientId)}&clientName=${encodeURIComponent(localStorage.getItem('bs.stationName')||'Web')}`,{headers:{Authorization:'Bearer '+current.token},cache:'no-store'});
+        if(!r.ok)return;
+        const d=await r.json();
+        if(!d.snapshot?.cardsHtml)return;
+        const cards=document.getElementById('cards');if(cards)cards.innerHTML=d.snapshot.cardsHtml;
+        document.documentElement.classList.remove('bs-remote');
+      }catch{}
+    }
+    setTimeout(sync,100);setInterval(sync,2000);
+    return;
+  }
+
   const gate=document.createElement('div');gate.id='remoteLanding';
   gate.innerHTML='<div class="rl-card"><img class="rl-logo" src="../icon.png" alt="Boat Station"><h1>Boat Station</h1><p>Ingresá el código de vinculación que muestra la estación del barco.</p><input id="rlCode" maxlength="19" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="one-time-code"><button id="rlConnect">Vincular estación</button><div class="rl-status" id="rlStatus"></div></div>';
   document.body.appendChild(gate);
