@@ -1,7 +1,7 @@
 export function createGpsModule(requestRender){
   const state={fix:null,recording:false,route:[],importName:'',root:null};
   const fmt=(v,n=6)=>Number.isFinite(Number(v))?Number(v).toFixed(n):'—';
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
 
   function summary(){
     if(!state.fix)return 'Sin señal';
@@ -82,18 +82,78 @@ export function createGpsModule(requestRender){
   }
 
   function draw(root){
-    const canvas=root.querySelector('[data-gps-map]');if(!canvas)return;
-    const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
-    const dpr=window.devicePixelRatio||1;canvas.width=Math.max(1,Math.round(rect.width*dpr));canvas.height=Math.max(1,Math.round(rect.height*dpr));
-    const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);const w=rect.width,h=rect.height;
-    ctx.clearRect(0,0,w,h);ctx.strokeStyle='#17394f';ctx.lineWidth=1;
-    for(let i=1;i<5;i++){const x=i*w/5,y=i*h/5;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
-    const pts=state.route.length?state.route:(state.fix?[{lat:state.fix.lat,lon:state.fix.lon}]:[]);
-    if(!pts.length){ctx.fillStyle='#94a7b6';ctx.font='13px sans-serif';ctx.fillText('Sin ruta GPS',12,22);return}
-    const lats=pts.map(p=>p.lat),lons=pts.map(p=>p.lon),minLat=Math.min(...lats),maxLat=Math.max(...lats),minLon=Math.min(...lons),maxLon=Math.max(...lons),pad=18;
-    const sx=v=>pad+(w-pad*2)*(v-minLon)/Math.max(0.000001,maxLon-minLon),sy=v=>h-pad-(h-pad*2)*(v-minLat)/Math.max(0.000001,maxLat-minLat);
-    ctx.strokeStyle='#1ed7e5';ctx.lineWidth=2.5;ctx.beginPath();pts.forEach((p,i)=>{const x=sx(p.lon),y=sy(p.lat);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();
-    const last=pts[pts.length-1];ctx.fillStyle='#8bd332';ctx.beginPath();ctx.arc(sx(last.lon),sy(last.lat),5,0,Math.PI*2);ctx.fill();
+    const canvas=root.querySelector('[data-gps-map]');
+    if(!canvas)return;
+
+    const rect=canvas.getBoundingClientRect();
+    if(!rect.width||!rect.height)return;
+
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=Math.max(1,Math.round(rect.width*dpr));
+    canvas.height=Math.max(1,Math.round(rect.height*dpr));
+
+    const ctx=canvas.getContext('2d');
+    const w=rect.width,h=rect.height;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+
+    ctx.strokeStyle='#17394f';
+    ctx.lineWidth=1;
+    for(let i=1;i<5;i++){
+      const x=i*w/5,y=i*h/5;
+      ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
+    }
+
+    const route=state.route.slice();
+    const center=state.fix
+      ? {lat:state.fix.lat,lon:state.fix.lon}
+      : route.length
+        ? route[route.length-1]
+        : null;
+
+    if(!center){
+      ctx.fillStyle='#94a7b6';
+      ctx.font='13px sans-serif';
+      ctx.fillText('Sin posición GPS',12,22);
+      return;
+    }
+
+    const latScale=Math.max(0.2,Math.cos(center.lat*Math.PI/180));
+    let maxDx=0,maxDy=0;
+    for(const p of route){
+      maxDx=Math.max(maxDx,Math.abs((p.lon-center.lon)*latScale));
+      maxDy=Math.max(maxDy,Math.abs(p.lat-center.lat));
+    }
+
+    const minHalfSpan=0.00045;
+    const halfSpan=Math.max(minHalfSpan,maxDx,maxDy)*1.18;
+    const usable=Math.max(40,Math.min(w,h)-36);
+    const pxPerDegree=usable/(halfSpan*2);
+    const cx=w/2,cy=h/2;
+    const sx=lon=>cx+((lon-center.lon)*latScale)*pxPerDegree;
+    const sy=lat=>cy-((lat-center.lat)*pxPerDegree);
+
+    if(route.length>1){
+      ctx.save();
+      ctx.beginPath();ctx.rect(0,0,w,h);ctx.clip();
+      ctx.strokeStyle='#1ed7e5';
+      ctx.lineWidth=2.5;
+      ctx.lineJoin='round';
+      ctx.lineCap='round';
+      ctx.beginPath();
+      route.forEach((p,i)=>i?ctx.lineTo(sx(p.lon),sy(p.lat)):ctx.moveTo(sx(p.lon),sy(p.lat)));
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.fillStyle='#8bd332';
+    ctx.beginPath();
+    ctx.arc(cx,cy,6,0,Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle='#dfffb9';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
   }
 
   function afterRender(root){
