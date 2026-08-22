@@ -34,9 +34,9 @@ public class BoatStationActivity extends MainActivityCore {
 
         stationWebView.stopLoading();
         stationWebView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
-        stationWebView.addJavascriptInterface(new ProductionBridge(), "BoatStationCoreNative");
-        // Override the legacy informational CoreBridge name with the production version.
-        stationWebView.addJavascriptInterface(new ProductionBridge(), "CoreBridgeInfo");
+        ProductionBridge bridge = new ProductionBridge();
+        stationWebView.addJavascriptInterface(bridge, "BoatStationCoreNative");
+        stationWebView.addJavascriptInterface(bridge, "CoreBridge");
         stationWebView.loadUrl(URL + "&t=" + System.currentTimeMillis());
     }
 
