@@ -1,7 +1,7 @@
 (function(){
   const params=new URLSearchParams(location.search);
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
-  let localVersion='—',coreApkVersion='—',corePwaVersion='—',wrappedSync=false,wrappedRemote=false,wrappedCommand=false,refreshing=false,pull=null,refreshStatusTimer=0;
+  let localVersion='—',coreApkVersion='—',corePwaVersion='—',wrappedSync=false,wrappedRemote=false,wrappedCommand=false,refreshing=false,serverRefreshing=false,pull=null,refreshStatusTimer=0;
 
   function refreshLabel(source){return isLocal&&source==='remote-command'?'Actualización remota':'Actualizando'}
   function enforceRefreshText(label){const host=document.getElementById('remoteFreshness'),text=host?.querySelector('.remote-connection-text');if(text)text.textContent=label}
@@ -12,6 +12,7 @@
     if(on){enforceRefreshText(label);refreshStatusTimer=setInterval(()=>enforceRefreshText(label),200)}
     else window.BoatStationRemoteUI?.markUpdated?.(Date.now());
   }
+  function setServerRefreshUi(on){const button=document.querySelector('.remote-server-refresh-button');if(!button)return;button.disabled=!!on;button.textContent=on?'Actualizando servidor…':'Actualizar servidor'}
   function animateCoreRemotePull(label){
     if(!isLocal)return Promise.resolve();
     const deck=document.querySelector('.module-deck'),tab=deck?.querySelector('.hidden-refresh-module');
@@ -57,8 +58,20 @@
       button.addEventListener('click',()=>runSystemRefresh({source:'desktop',sendCore:false}));
       host.appendChild(button);
     }
+    if(!isLocal&&!host.querySelector('.remote-server-refresh-button')){
+      const button=document.createElement('button');
+      button.type='button';button.className='remote-refresh-button remote-server-refresh-button';button.textContent='Actualizar servidor';
+      button.addEventListener('click',refreshServer);
+      host.appendChild(button);
+    }
   }
   async function refreshServiceWorker(){if(!('serviceWorker'in navigator))return;try{const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.update()}catch(_){}}
+  async function refreshServer(){
+    if(isLocal||serverRefreshing)return false;
+    serverRefreshing=true;setServerRefreshUi(true);
+    try{await window.BoatStationRemoteCommand?.send?.('system.refresh',{source:'desktop-server'});setTimeout(()=>{serverRefreshing=false;setServerRefreshUi(false)},1800);return true}
+    catch(_){serverRefreshing=false;setServerRefreshUi(false);return false}
+  }
   async function runSystemRefresh(options={}){
     if(refreshing)return false;const source=options.source||'local',label=refreshLabel(source),remoteCore=isLocal&&source==='remote-command';refreshing=true;setRefreshUi(true,label);
     try{
@@ -68,7 +81,7 @@
     }catch(_){clearCoreRemotePull();setRefreshUi(false,label);refreshing=false;return false}
   }
   function executeRemoteCommand(command){if(command==='system.refresh'){runSystemRefresh({source:'remote-command',sendCore:false});return true}return false}
-  window.BoatStationSystem={runSystemRefresh,executeRemoteCommand,getPwaVersion:()=>localVersion};
+  window.BoatStationSystem={runSystemRefresh,refreshServer,executeRemoteCommand,getPwaVersion:()=>localVersion};
 
   function wrapDataSync(){if(wrappedSync||!window.BoatStationDataSync)return;const sync=window.BoatStationDataSync;if(typeof sync.exportSnapshot!=='function')return;const original=sync.exportSnapshot.bind(sync);sync.exportSnapshot=function(){const snapshot=original()||{};snapshot.pwaVersion=localVersion;return snapshot};wrappedSync=true}
   function wrapRemoteUi(){
