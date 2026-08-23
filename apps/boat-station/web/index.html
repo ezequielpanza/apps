@@ -50,6 +50,12 @@
   }
 
   try{
+    await import('./battery-flow-ui.js');
+  }catch(err){
+    console.warn('Boat Station battery flow indicator unavailable',err);
+  }
+
+  try{
     await import('./data-sync.js');
   }catch(err){
     console.warn('Boat Station data sync unavailable',err);
