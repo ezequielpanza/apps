@@ -11,16 +11,47 @@
     if(on){enforceRefreshText(label);refreshStatusTimer=setInterval(()=>enforceRefreshText(label),200)}
     else window.BoatStationRemoteUI?.markUpdated?.(Date.now());
   }
+  function animateCoreRemotePull(label){
+    if(!isLocal)return Promise.resolve();
+    const deck=document.querySelector('.module-deck'),tab=deck?.querySelector('.hidden-refresh-module');
+    if(!deck||!tab)return Promise.resolve();
+    return new Promise(resolve=>{
+      deck.classList.remove('refreshing');
+      deck.classList.add('pulling');
+      deck.style.setProperty('--deck-pull','0px');
+      tab.classList.remove('armed');
+      tab.textContent=label;
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        deck.style.setProperty('--deck-pull','50px');
+        tab.classList.add('armed');
+        setTimeout(()=>{
+          deck.classList.remove('pulling');
+          deck.classList.add('refreshing');
+          tab.textContent=label;
+          resolve();
+        },240);
+      }));
+    });
+  }
+  function clearCoreRemotePull(){
+    const deck=document.querySelector('.module-deck'),tab=deck?.querySelector('.hidden-refresh-module');
+    if(!deck||!tab)return;
+    deck.classList.remove('pulling','refreshing');
+    deck.style.removeProperty('--deck-pull');
+    tab.classList.remove('armed');
+    tab.textContent='Actualizar';
+  }
   async function fetchVersion(){try{const r=await fetch('./PWA_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(r.ok)return(await r.text()).trim()}catch(_){}return''}
   async function loadLocalVersion(){const v=await fetchVersion();if(v)localVersion=v;render()}
   function render(){const host=document.getElementById('remoteFreshness');if(!host)return;let el=host.querySelector('.remote-pwa-versions');if(!el){el=document.createElement('span');el.className='remote-pwa-versions';host.appendChild(el)}const mismatch=localVersion!=='—'&&coreVersion!=='—'&&localVersion!==coreVersion;el.textContent=` · Remote ${localVersion} · Core ${coreVersion}${mismatch?' · actualización pendiente':''}`;el.classList.toggle('mismatch',mismatch)}
   async function refreshServiceWorker(){if(!('serviceWorker'in navigator))return;try{const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.update()}catch(_){}}
   async function runSystemRefresh(options={}){
-    if(refreshing)return false;const source=options.source||'local',label=refreshLabel(source);refreshing=true;setRefreshUi(true,label);
+    if(refreshing)return false;const source=options.source||'local',label=refreshLabel(source),remoteCore=isLocal&&source==='remote-command';refreshing=true;setRefreshUi(true,label);
     try{
+      if(remoteCore)await animateCoreRemotePull(label);
       if(!isLocal&&options.sendCore!==false)try{await window.BoatStationRemoteCommand?.send?.('system.refresh',{source:'remote'})}catch(_){}
-      await refreshServiceWorker();const latest=await fetchVersion();await new Promise(r=>setTimeout(r,650));if(latest)localVersion=latest;render();setRefreshUi(true,label);setTimeout(()=>location.reload(),180);return true;
-    }catch(_){setRefreshUi(false,label);refreshing=false;return false}
+      await refreshServiceWorker();const latest=await fetchVersion();await new Promise(r=>setTimeout(r,remoteCore?500:650));if(latest)localVersion=latest;render();setRefreshUi(true,label);setTimeout(()=>location.reload(),remoteCore?260:180);return true;
+    }catch(_){clearCoreRemotePull();setRefreshUi(false,label);refreshing=false;return false}
   }
   function executeRemoteCommand(command){if(command==='system.refresh'){runSystemRefresh({source:'remote-command',sendCore:false});return true}return false}
   window.BoatStationSystem={runSystemRefresh,executeRemoteCommand,getPwaVersion:()=>localVersion};
