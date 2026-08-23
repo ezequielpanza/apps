@@ -53,6 +53,7 @@ function scheduleData(data,apply){markUpdated(data?.time);if(isBusy()){pendingDa
 window.BoatStationPageAdapter={
   getPage:currentPage,
   setPage,
+  getHeight:(card,page)=>storedHeight(card?.dataset?.id,page),
   begin:()=>beginInteraction(),
   cancel:()=>endInteraction(),
   end:()=>endInteractionAfter(220)
