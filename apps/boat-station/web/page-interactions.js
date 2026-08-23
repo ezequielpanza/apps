@@ -6,6 +6,7 @@
   const LOCK=10;
   const FALLBACK_KEY='bs.ui.pageInteractions.pages';
   let swipe=null;
+  let touchGate=null;
 
   function readFallback(){try{const v=JSON.parse(localStorage.getItem(FALLBACK_KEY)||'{}');return v&&typeof v==='object'?v:{}}catch{return {}}}
   function writeFallback(state){try{localStorage.setItem(FALLBACK_KEY,JSON.stringify(state))}catch{}}
@@ -44,6 +45,38 @@
   function restoreAll(){cards.querySelectorAll('.card').forEach(restoreCard)}
   function blocked(target){return !!target.closest('.card-head,.drag-handle,.resize-handle,button,input,textarea,select,a,.sheet,.station-manager')}
   function primary(e){return e.isPrimary!==false&&(e.pointerType!=='mouse'||e.button===0)}
+  function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
+
+  // The shared engine is the single owner of horizontal paging on touch devices.
+  // Capture-phase touch arbitration prevents the legacy card touch recognizer from
+  // competing with PointerEvent dragging while still allowing normal vertical scroll.
+  cards.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1||document.body.classList.contains('menu-open')||blocked(e.target))return;
+    const card=e.target.closest('.card');if(!card||pageCount(card)<2)return;
+    const t=e.touches[0];
+    touchGate={id:t.identifier,startX:t.clientX,startY:t.clientY,mode:'pending'};
+  },{capture:true,passive:true});
+  cards.addEventListener('touchmove',e=>{
+    if(!touchGate)return;
+    const t=touchById(e.touches,touchGate.id);if(!t)return;
+    const dx=t.clientX-touchGate.startX,dy=t.clientY-touchGate.startY;
+    if(touchGate.mode==='pending'){
+      if(Math.abs(dx)<LOCK&&Math.abs(dy)<LOCK)return;
+      if(Math.abs(dx)>Math.abs(dy)*1.15)touchGate.mode='horizontal';
+      else{touchGate=null;return}
+    }
+    if(touchGate?.mode==='horizontal'){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  },{capture:true,passive:false});
+  for(const type of ['touchend','touchcancel'])cards.addEventListener(type,e=>{
+    if(!touchGate)return;
+    const t=touchById(e.changedTouches,touchGate.id);if(!t&&type==='touchend')return;
+    const horizontal=touchGate.mode==='horizontal';
+    touchGate=null;
+    if(horizontal)e.stopImmediatePropagation();
+  },{capture:true,passive:true});
 
   cards.addEventListener('pointerdown',e=>{
     if(!primary(e)||document.body.classList.contains('menu-open')||blocked(e.target))return;
