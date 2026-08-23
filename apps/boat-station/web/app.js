@@ -17,7 +17,7 @@ let reorder=null,resize=null,tapCandidate=null,touchSwipe=null,lastTouchSwipeAt=
 
 const pendingRenders=new Set();
 let renderTimer=0,lastRenderAt=0;
-const ACTIVE_RENDER_MS=120,HIDDEN_RENDER_MS=500;
+const ACTIVE_RENDER_MS=200,HIDDEN_RENDER_MS=750;
 function flushRenders(){
   renderTimer=0;lastRenderAt=performance.now();
   const ids=[...pendingRenders];pendingRenders.clear();
@@ -52,16 +52,19 @@ function setPageHeight(id,page,height){const current=ui.heights[id]&&typeof ui.h
 function measure(card){if(!card||card.classList.contains('collapsed'))return;const id=card.dataset.id,body=card.querySelector('.card-body');if(!body)return;const p=Math.min(ui.page[id]||0,modules[id].pages-1),fixed=pageHeight(id,p);if(fixed!==null){body.style.height=`${fixed}px`;return}const page=card.querySelector(`.page[data-page="${p}"]`);if(page)body.style.height=page.scrollHeight+'px'}
 function hydrate(card,measureLayout=true){const id=card.dataset.id;modules[id].afterRender?.(card);updatePager(card,ui.page[id]||0);if(measureLayout)requestAnimationFrame(()=>measure(card))}
 function renderAll(){cards.innerHTML=ui.order.map(moduleHtml).join('');cards.querySelectorAll('.card').forEach(card=>hydrate(card,true))}
+function renderPageContent(card,id,page){const m=modules[id],el=card.querySelector(`.page[data-page="${page}"]`);if(!m||!el)return;el.innerHTML=`${m.page(page)}${pager(m.pages,page)}`}
 function renderModule(id,preserveLayout=false){
-  const old=cards.querySelector(`.card[data-id="${id}"]`);if(!old)return;
-  const oldBody=old.querySelector('.card-body');
-  const oldHeight=preserveLayout&&oldBody&&!old.classList.contains('collapsed')?oldBody.getBoundingClientRect().height:0;
-  const holder=document.createElement('div');holder.innerHTML=moduleHtml(id);
-  const next=holder.firstElementChild;
-  if(oldHeight>0){const body=next.querySelector('.card-body');if(body)body.style.height=`${oldHeight}px`}
-  old.replaceWith(next);hydrate(next,!preserveLayout);
+  const card=cards.querySelector(`.card[data-id="${id}"]`);if(!card)return;
+  const m=modules[id],page=Math.min(ui.page[id]||0,m.pages-1);
+  const summary=card.querySelector('.summary');if(summary)summary.textContent=m.summary();
+  if(preserveLayout){
+    renderPageContent(card,id,page);
+    m.afterRender?.(card);updatePager(card,page);
+    return;
+  }
+  const holder=document.createElement('div');holder.innerHTML=moduleHtml(id);const next=holder.firstElementChild;card.replaceWith(next);hydrate(next,true);
 }
-function setModulePage(card,next){if(!card)return;const id=card.dataset.id,m=modules[id];if(!m||m.pages<2)return;const page=Math.max(0,Math.min(m.pages-1,next));if(page===(ui.page[id]||0))return;ui.page[id]=page;card.querySelector('.track').style.transform=`translateX(-${page*100}%)`;updatePager(card,page);setTimeout(()=>{measure(card);m.afterRender?.(card)},190)}
+function setModulePage(card,next){if(!card)return;const id=card.dataset.id,m=modules[id];if(!m||m.pages<2)return;const page=Math.max(0,Math.min(m.pages-1,next));if(page===(ui.page[id]||0))return;renderPageContent(card,id,page);ui.page[id]=page;card.querySelector('.track').style.transform=`translateX(-${page*100}%)`;updatePager(card,page);setTimeout(()=>{measure(card);m.afterRender?.(card)},190)}
 
 function anySheetOpen(){return [...document.querySelectorAll('.sheet')].some(s=>s.classList.contains('open'))}
 function lockModuleScroll(){if(document.body.classList.contains('menu-open'))return;lockedScrollY=window.scrollY||document.documentElement.scrollTop||0;document.body.classList.add('menu-open');document.body.style.top=`-${lockedScrollY}px`}
