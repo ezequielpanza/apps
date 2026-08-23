@@ -5,6 +5,7 @@
   const THRESHOLD=38;
   const LOCK=10;
   const FALLBACK_KEY='bs.ui.pageInteractions.pages';
+  const HEIGHT_KEY='bs.ui.heights';
   let swipe=null;
   let touchGate=null;
   let restoreQueued=false;
@@ -15,11 +16,14 @@
   function writeFallback(state){try{localStorage.setItem(FALLBACK_KEY,JSON.stringify(state))}catch{}}
   function fallbackPage(card){const id=card?.dataset.id;if(!id)return 0;return Number(readFallback()[id])||0}
   function saveFallbackPage(card,page){const id=card?.dataset.id;if(!id)return;const state=readFallback();state[id]=page;writeFallback(state)}
+  function readHeights(){try{const v=JSON.parse(localStorage.getItem(HEIGHT_KEY)||'{}');return v&&typeof v==='object'?v:{}}catch{return {}}}
 
   function adapter(){return window.BoatStationPageAdapter||null}
   function pageCount(card){return card?.querySelectorAll('.page').length||0}
   function currentPage(card){const count=pageCount(card);if(!count)return 0;const a=adapter(),external=a?.getPage?.(card);if(Number.isFinite(Number(external)))return Math.max(0,Math.min(count-1,Number(external)));const stored=fallbackPage(card);if(Number.isFinite(stored))return Math.max(0,Math.min(count-1,stored));const dots=[...card.querySelectorAll('.pager span')],active=dots.findIndex(x=>x.classList.contains('on'));return Math.max(0,active>=0?active:0)}
-  function renderPage(card,page,animate=true){const count=pageCount(card);if(!count)return;page=Math.max(0,Math.min(count-1,page));const track=card.querySelector('.track');if(track){track.style.transition=animate?'':'none';track.style.transform=`translate3d(-${page*100}%,0,0)`;if(!animate){track.getBoundingClientRect();track.style.transition=''}}card.querySelectorAll('.pager').forEach(p=>p.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===page)))}
+  function localHeight(card,page){const id=card?.dataset.id;if(!id)return null;const value=readHeights()[id];if(value&&typeof value==='object'&&Number.isFinite(Number(value[page])))return Number(value[page]);if(page===0&&Number.isFinite(Number(value)))return Number(value);return null}
+  function pageHeight(card,page){const external=adapter()?.getHeight?.(card,page);if(Number.isFinite(Number(external)))return Number(external);return localHeight(card,page)}
+  function renderPage(card,page,animate=true){const count=pageCount(card);if(!count)return;page=Math.max(0,Math.min(count-1,page));const track=card.querySelector('.track');if(track){track.style.transition=animate?'':'none';track.style.transform=`translate3d(-${page*100}%,0,0)`;if(!animate){track.getBoundingClientRect();track.style.transition=''}}card.querySelectorAll('.pager').forEach(p=>p.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===page)));const body=card.querySelector('.card-body'),height=pageHeight(card,page);if(body&&height!==null&&!card.classList.contains('resizing'))body.style.height=`${Math.round(height)}px`}
   function commit(card,page){const count=pageCount(card);if(!count)return;page=Math.max(0,Math.min(count-1,page));const a=adapter();if(a?.setPage){a.setPage(card,page);return}saveFallbackPage(card,page);renderPage(card,page,true)}
   function restoreCard(card){if(!card||pageCount(card)<1)return;renderPage(card,currentPage(card),false)}
   function restoreAll(){if(swipe)return;cards.querySelectorAll('.card').forEach(restoreCard)}
@@ -42,8 +46,8 @@
   function finish(e,cancel=false){if(!swipe||e.pointerId!==swipe.pointerId)return;const g=swipe;swipe=null;const dx=e.clientX-g.startX,dy=e.clientY-g.startY;let target=g.page;if(!cancel&&g.mode==='horizontal'){const decisive=Math.abs(dx)>=THRESHOLD&&Math.abs(dx)>Math.abs(dy)*1.1,flick=Math.abs(g.vx)>.45&&Math.abs(dx)>18;if(decisive||flick)target=g.page+(dx<0?1:-1)}target=Math.max(0,Math.min(pageCount(g.card)-1,target));commit(g.card,target);adapter()?.end?.(g.card,target);if(g.interactionStarted)setTimeout(()=>{endModuleInteraction(g.card);queueRestore()},220)}
   cards.addEventListener('pointerup',e=>finish(e,false),{capture:true});cards.addEventListener('pointercancel',e=>finish(e,true),{capture:true});
 
-  // Sensor updates can replace a card many times per second. Restoring the page while
-  // the pointer is down resets its transform and produces the visible flash on a slow drag.
+  // Sensor updates can replace a card many times per second. Restore page and its saved
+  // height together before paint so a rerender cannot briefly jump to another page size.
   const observer=new MutationObserver(queueRestore);observer.observe(cards,{childList:true,subtree:false});window.addEventListener('resize',queueRestore);requestAnimationFrame(restoreAll);
   window.BoatStationPageInteractions={renderPage,currentPage,restoreAll,isInteracting:id=>activeModules.has(String(id||'')),requestRender:requestModuleRender};
 })();
