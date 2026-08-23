@@ -24,7 +24,10 @@ function isConfiguredBattery(data){
 }
 function publishScan(){
   const linked=linkedAddresses();
-  scanList=[...seen.values()].filter(d=>!linked.has(String(d.address||d.mac||'').toUpperCase())).sort((a,b)=>(b.rssi??-999)-(a.rssi??-999));
+  // Keep discovery order stable for the whole scan session. Updating RSSI/name
+  // for an already-seen MAC does not change its Map insertion position, so rows
+  // never jump while the user is trying to select a device.
+  scanList=[...seen.values()].filter(d=>!linked.has(String(d.address||d.mac||'').toUpperCase()));
   window.BoatStation?.bluetoothDevices?.(scanList);
 }
 
