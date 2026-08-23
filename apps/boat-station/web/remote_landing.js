@@ -8,7 +8,7 @@
   const pretty=v=>(norm(v).match(/.{1,4}/g)||[]).join('-');
   const stations=()=>{try{const a=JSON.parse(localStorage.getItem('bs.remote.stations')||'[]');return Array.isArray(a)?a:[]}catch{return[]}};
   const active=()=>{const a=stations(),id=localStorage.getItem('bs.remote.activeStation');return a.find(x=>x.stationId===id)||a[0]||null};
-  const apkVersion=async()=>{try{const r=await fetch('/APK_VERSION',{cache:'no-store'});if(!r.ok)return'';return (await r.text()).trim()}catch{return''}};
+  const apkVersion=async()=>{try{const r=await fetch('/APK_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(!r.ok)return'';return (await r.text()).trim()}catch{return''}};
 
   if(active())return;
 
