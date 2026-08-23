@@ -17,6 +17,12 @@
   }
   function menuInner(){return document.querySelector('#menuSheet .sheet-inner')}
   function removeRow(){document.querySelectorAll('[data-core-apk-update]').forEach(el=>el.remove())}
+  function download(version){
+    const path=`/BoatStation-${encodeURIComponent(version)}.apk`;
+    const url=new URL(path,location.origin).href;
+    try{if(window.CoreBridge&&typeof CoreBridge.downloadApk==='function'){CoreBridge.downloadApk(url);return}}catch(_){}
+    try{location.href=url}catch(_){window.open(url,'_self')}
+  }
   function render(){
     removeRow();
     if(!installed||!latest||!newer(latest,installed))return;
@@ -26,10 +32,7 @@
     button.className='option sheet-option';
     button.dataset.coreApkUpdate='1';
     button.innerHTML=`<span>Descargar nueva versión ${latest}<br><small class="sub">APK instalada: ${installed}</small></span>`;
-    button.addEventListener('click',()=>{
-      const url=`/BoatStation-${encodeURIComponent(latest)}.apk`;
-      try{location.href=url}catch(_){window.open(url,'_self')}
-    });
+    button.addEventListener('click',()=>download(latest));
     const title=inner.querySelector('h3');
     if(title&&title.nextSibling)inner.insertBefore(button,title.nextSibling);else inner.appendChild(button);
   }
@@ -54,9 +57,10 @@
     function wrapped(value){capture(value);return original.call(api,value)}
     wrapped.__apkUpdateWrapped=true;api.updatePhone=wrapped;return true;
   }
+  try{if(window.CoreBridge&&typeof CoreBridge.getApkVersion==='function')installed=String(CoreBridge.getApkVersion()||'').trim()}catch(_){}
   if(!wrapPhone()){const timer=setInterval(()=>{if(wrapPhone())clearInterval(timer)},50);setTimeout(()=>clearInterval(timer),10000)}
   document.getElementById('menuBtn')?.addEventListener('click',()=>check(true),true);
-  window.addEventListener('boatstation-core-ready',()=>check(true));
+  window.addEventListener('boatstation-core-ready',()=>{try{if(window.CoreBridge&&typeof CoreBridge.getApkVersion==='function')installed=String(CoreBridge.getApkVersion()||'').trim()}catch(_){}check(true)});
   window.addEventListener('focus',()=>check(false));
   setTimeout(()=>check(true),1000);
   window.BoatStationApkUpdate={check:()=>check(true),getInstalled:()=>installed,getLatest:()=>latest};
