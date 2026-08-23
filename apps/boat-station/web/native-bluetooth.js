@@ -2,12 +2,23 @@
 const native=()=>window.NativeBridge;
 const seen=new Map();
 let scanList=[];
+let scanEpoch=0;
+let scanRetryTimer=0;
 
-function linkedAddresses(){
+function savedBatteries(){
   try{
     const list=JSON.parse(native()?.getSavedBatteries?.()||'[]');
-    return new Set((Array.isArray(list)?list:[]).map(b=>String(b.address||'').toUpperCase()).filter(Boolean));
-  }catch(_){return new Set()}
+    return Array.isArray(list)?list:[];
+  }catch(_){return []}
+}
+function linkedAddresses(){
+  return new Set(savedBatteries().map(b=>String(b.address||'').toUpperCase()).filter(Boolean));
+}
+function isConfiguredBattery(data){
+  if(!data)return false;
+  const id=String(data.id??'');
+  const address=String(data.address||data.mac||'').toUpperCase();
+  return savedBatteries().some(b=>(id&&String(b.id)===id)||(address&&String(b.address||'').toUpperCase()===address));
 }
 function publishScan(){
   const linked=linkedAddresses();
@@ -15,18 +26,36 @@ function publishScan(){
   window.BoatStation?.bluetoothDevices?.(scanList);
 }
 
-function startNativeScan(){
-  seen.clear();scanList=[];publishScan();
+function nativeStart(){
   try{
     const n=native();
-    if(n&&typeof n.startBatteryScan==='function'){
-      n.startBatteryScan();
-      return true;
-    }
+    if(n&&typeof n.startBatteryScan==='function'){n.startBatteryScan();return true}
   }catch(_){}
   return false;
 }
-function stopNativeScan(){try{native()?.stopBatteryScan?.()}catch(_){}}
+function stopNativeScan(){
+  scanEpoch++;
+  clearTimeout(scanRetryTimer);scanRetryTimer=0;
+  try{native()?.stopBatteryScan?.()}catch(_){ }
+}
+function startNativeScan(){
+  const epoch=++scanEpoch;
+  clearTimeout(scanRetryTimer);scanRetryTimer=0;
+  seen.clear();scanList=[];publishScan();
+  // Android BLE scanners can remain in a transient state immediately after a
+  // previous device was selected. Explicitly stop the prior session and start
+  // a fresh one on the next turn instead of reusing the old scan lifecycle.
+  try{native()?.stopBatteryScan?.()}catch(_){ }
+  setTimeout(()=>{if(epoch!==scanEpoch)return;nativeStart()},120);
+  // If Android silently rejected the immediate restart, retry once. This also
+  // recovers from an old native scan timeout that happened to fire meanwhile.
+  scanRetryTimer=setTimeout(()=>{
+    if(epoch!==scanEpoch||scanList.length)return;
+    try{native()?.stopBatteryScan?.()}catch(_){ }
+    setTimeout(()=>{if(epoch===scanEpoch)nativeStart()},180);
+  },1800);
+  return true;
+}
 
 function exposeCoreAdapter(){
   window.BoatStationCore=window.BoatStationCore||{};
@@ -57,8 +86,16 @@ function attachCallbacks(){
     seen.set(key,device);
     publishScan();
   };
-  window.BoatStation.onBatteryData=data=>window.BoatStation?.updateBattery?.(normalizeBatteryData(data));
-  window.BoatStation.onBatteryConnection=data=>window.BoatStation?.updateBattery?.(data);
+  window.BoatStation.onBatteryData=data=>{
+    // A GATT callback can arrive after the user deleted a battery. Never allow
+    // that stale callback to recreate a removed battery in the PWA model.
+    if(!isConfiguredBattery(data))return;
+    window.BoatStation?.updateBattery?.(normalizeBatteryData(data));
+  };
+  window.BoatStation.onBatteryConnection=data=>{
+    if(!isConfiguredBattery(data))return;
+    window.BoatStation?.updateBattery?.(data);
+  };
 }
 attachCallbacks();
 
