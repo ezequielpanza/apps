@@ -58,7 +58,7 @@
       if(!item)return;
       const pct=Math.max(0,Math.min(100,item.soc)),h=Math.max(1,pct/100*plotH),x=(i+.5)*slot;
       const inside=h>=18,y=inside?plotH-h+Math.min(h/2,12):Math.max(8,plotH-h-7);
-      c.fillStyle=item.estimated?(inside?'#eef4ee':'#b8c9cd'):(inside?'#ffffff':'#d9edf5');
+      c.fillStyle=inside?'#000000':(item.estimated?'#b8c9cd':'#d9edf5');
       c.fillText(`${Math.round(pct)}%`,x,y);
     });
     c.restore();
