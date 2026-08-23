@@ -34,10 +34,31 @@
   function wrapRemoteUi(){if(wrappedRemote||!window.BoatStationRemoteUI)return;const ui=window.BoatStationRemoteUI;if(typeof ui.scheduleData!=='function')return;const original=ui.scheduleData.bind(ui);ui.scheduleData=function(snapshot,apply){if(snapshot&&typeof snapshot.pwaVersion==='string'&&snapshot.pwaVersion.trim())coreVersion=snapshot.pwaVersion.trim();render();return original(snapshot,apply)};wrappedRemote=true;render()}
   function wrapCommandSink(){if(wrappedCommand||!window.BoatStationGpsState||typeof window.BoatStationGpsState.executeRemoteCommand!=='function')return;const original=window.BoatStationGpsState.executeRemoteCommand.bind(window.BoatStationGpsState);window.BoatStationGpsState.executeRemoteCommand=function(command,payload){if(executeRemoteCommand(command,payload))return true;return original(command,payload)};wrappedCommand=true}
 
+  function pullTargetBlocked(target){return !!target.closest('input,textarea,select,button,a,.drag-handle,.resize-handle,.handle,.sheet.open,.station-manager.open')}
   function installPullRefresh(){
-    document.addEventListener('touchstart',e=>{if(refreshing||window.scrollY>1||e.touches.length!==1||e.target.closest('input,textarea,select,.sheet.open,.station-manager.open'))return;const t=e.touches[0];pull={x:t.clientX,y:t.clientY,armed:false}},{passive:true});
-    document.addEventListener('touchmove',e=>{if(!pull||e.touches.length!==1)return;const t=e.touches[0],dx=t.clientX-pull.x,dy=t.clientY-pull.y;if(dy<0||Math.abs(dx)>Math.abs(dy)*.8){pull=null;return}pull.armed=dy>=82},{passive:true});
-    document.addEventListener('touchend',()=>{if(!pull)return;const armed=pull.armed;pull=null;if(armed)runSystemRefresh({source:isLocal?'local':'remote',sendCore:!isLocal})},{passive:true});
+    document.addEventListener('touchstart',e=>{
+      if(refreshing||window.scrollY>1||e.touches.length!==1||pullTargetBlocked(e.target))return;
+      const t=e.touches[0];pull={x:t.clientX,y:t.clientY,armed:false,claimed:false};
+    },{passive:true,capture:true});
+    document.addEventListener('touchmove',e=>{
+      if(!pull||e.touches.length!==1)return;
+      const t=e.touches[0],dx=t.clientX-pull.x,dy=t.clientY-pull.y;
+      if(dy<=0){pull=null;return}
+      if(!pull.claimed){
+        if(Math.abs(dx)<8&&dy<8)return;
+        if(Math.abs(dx)>dy*.65){pull=null;return}
+        pull.claimed=true;
+      }
+      if(window.scrollY>1){pull=null;return}
+      e.preventDefault();e.stopPropagation();
+      pull.armed=dy>=82;
+    },{passive:false,capture:true});
+    document.addEventListener('touchend',e=>{
+      if(!pull)return;
+      const armed=pull.claimed&&pull.armed;pull=null;
+      if(armed){e.preventDefault();e.stopPropagation();runSystemRefresh({source:isLocal?'local':'remote',sendCore:!isLocal})}
+    },{passive:false,capture:true});
+    document.addEventListener('touchcancel',()=>{pull=null},{passive:true,capture:true});
   }
 
   loadLocalVersion();installPullRefresh();
