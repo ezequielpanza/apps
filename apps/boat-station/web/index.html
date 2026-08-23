@@ -50,9 +50,15 @@
   }
 
   try{
-    await import('./battery-flow-ui.js');
+    await import('./battery-flow-status.js');
   }catch(err){
-    console.warn('Boat Station battery flow indicator unavailable',err);
+    console.warn('Boat Station battery flow status unavailable',err);
+  }
+
+  try{
+    await import('./battery-manager-status.js');
+  }catch(err){
+    console.warn('Boat Station battery manager status unavailable',err);
   }
 
   try{
