@@ -136,6 +136,7 @@ cards?.addEventListener('pointerdown',event=>{
     return;
   }
   if(event.target.closest('.drag-handle,button,input,textarea,select,a'))return;
+  if(event.target.closest('.card-head'))return;
   const card=event.target.closest('.card');if(!card||pageCount(card)<2)return;
   event.stopImmediatePropagation();
   swipe={pointerId:event.pointerId,pointerType:event.pointerType,card,page:currentPage(card),startX:event.clientX,startY:event.clientY,horizontal:false};
