@@ -97,21 +97,22 @@ function setPage(card,page){
   applyCardState(card,{animate:true});
 }
 
-let interactionDepth=0,pendingData=null,pendingApply=null;
-function beginInteraction(){interactionDepth++}
+let interactionDepth=0,pendingData=null,pendingApply=null,interactionReleaseTimer=0;
+function beginInteraction(){clearTimeout(interactionReleaseTimer);interactionReleaseTimer=0;interactionDepth++}
 function flushPending(){if(interactionDepth||!pendingApply)return;const apply=pendingApply,data=pendingData;pendingApply=null;pendingData=null;apply(data);requestAnimationFrame(applyAll)}
 function endInteraction(){interactionDepth=Math.max(0,interactionDepth-1);flushPending()}
+function endInteractionAfter(ms){clearTimeout(interactionReleaseTimer);interactionReleaseTimer=setTimeout(()=>{interactionReleaseTimer=0;endInteraction()},Math.max(0,ms||0))}
 function isBusy(){return interactionDepth>0||!!cards?.querySelector('.resizing,.reordering')}
 function scheduleData(data,apply){markUpdated(data?.time);if(isBusy()){pendingData=data;pendingApply=apply;return false}apply(data);requestAnimationFrame(applyAll);return true}
 
-let mouseSwipe=null,remoteResize=null;
+let mouseSwipe=null,remoteResize=null,remoteTouch=null;
 function finishMouseSwipe(event,cancel=false){
   if(!mouseSwipe||event.pointerId!==mouseSwipe.pointerId)return false;
   const g=mouseSwipe;mouseSwipe=null;
   const dx=event.clientX-g.startX,dy=event.clientY-g.startY;
   if(!cancel&&g.horizontal&&Math.abs(dx)>=38&&Math.abs(dx)>Math.abs(dy)*1.1)setPage(g.card,dx<0?g.page+1:g.page-1);
   else applyCardState(g.card,{animate:true});
-  endInteraction();return true;
+  endInteractionAfter(210);return true;
 }
 function finishRemoteResize(event){
   if(!remoteResize||event.pointerId!==remoteResize.pointerId)return false;
@@ -119,6 +120,17 @@ function finishRemoteResize(event){
   g.card.classList.remove('resizing');
   const body=g.card.querySelector('.card-body');if(body)saveHeight(g.id,g.page,body.getBoundingClientRect().height);
   endInteraction();return true;
+}
+function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
+function finishRemoteTouch(event,cancel=false){
+  if(!remoteTouch)return false;
+  const t=touchById(event.changedTouches,remoteTouch.id);if(!t&&!cancel)return false;
+  const g=remoteTouch;remoteTouch=null;
+  const endX=t?t.clientX:g.lastX,endY=t?t.clientY:g.lastY,dx=endX-g.startX,dy=endY-g.startY;
+  if(!cancel&&g.mode==='horizontal'&&Math.abs(dx)>=38&&Math.abs(dx)>Math.abs(dy)*1.1)setPage(g.card,dx<0?g.page+1:g.page-1);
+  else applyCardState(g.card,{animate:true});
+  endInteractionAfter(g.mode==='horizontal'?220:0);
+  return true;
 }
 
 cards?.addEventListener('pointerdown',event=>{
@@ -170,15 +182,44 @@ cards?.addEventListener('pointercancel',event=>{
   if(finishMouseSwipe(event,true))event.stopImmediatePropagation();
 },{capture:true});
 
-cards?.addEventListener('touchend',event=>{
+cards?.addEventListener('touchstart',event=>{
+  if(event.touches.length!==1||event.target.closest('.drag-handle,.resize-handle,button,input,textarea,select,a'))return;
   const card=event.target.closest('.card');if(!card||pageCount(card)<2)return;
-  setTimeout(()=>{
-    const track=card.querySelector('.track');if(!track)return;
-    const match=track.style.transform.match(/translateX\(-([\d.]+)%\)/);if(!match)return;
-    const page=Math.round(Number(match[1])/100),state=pages();state[card.dataset.id]=page;writeJson(pageKey(),state);
-    applyCardState(card,{animate:false});
-  },230);
-},{passive:true});
+  const t=event.touches[0];
+  remoteTouch={id:t.identifier,card,page:currentPage(card),startX:t.clientX,startY:t.clientY,lastX:t.clientX,lastY:t.clientY,mode:'pending'};
+  beginInteraction();
+  event.stopImmediatePropagation();
+},{capture:true,passive:true});
+
+cards?.addEventListener('touchmove',event=>{
+  if(!remoteTouch)return;
+  const t=touchById(event.touches,remoteTouch.id);if(!t)return;
+  remoteTouch.lastX=t.clientX;remoteTouch.lastY=t.clientY;
+  const dx=t.clientX-remoteTouch.startX,dy=t.clientY-remoteTouch.startY;
+  if(remoteTouch.mode==='pending'){
+    if(Math.abs(dx)<10&&Math.abs(dy)<10)return;
+    if(Math.abs(dx)>Math.abs(dy)*1.15)remoteTouch.mode='horizontal';
+    else{const g=remoteTouch;remoteTouch=null;applyCardState(g.card,{animate:false});endInteraction();return}
+  }
+  if(remoteTouch.mode!=='horizontal')return;
+  event.preventDefault();event.stopImmediatePropagation();
+  const track=remoteTouch.card.querySelector('.track');
+  if(track){
+    track.style.transition='none';
+    const width=Math.max(1,remoteTouch.card.querySelector('.viewport')?.clientWidth||remoteTouch.card.clientWidth);
+    let pct=(-remoteTouch.page*100)+(dx/width*100);
+    const min=-(pageCount(remoteTouch.card)-1)*100;
+    pct=Math.max(min-18,Math.min(18,pct));
+    track.style.transform=`translateX(${pct}%)`;
+  }
+},{capture:true,passive:false});
+
+cards?.addEventListener('touchend',event=>{
+  if(finishRemoteTouch(event)){event.stopImmediatePropagation()}
+},{capture:true,passive:true});
+cards?.addEventListener('touchcancel',event=>{
+  if(finishRemoteTouch(event,true))event.stopImmediatePropagation();
+},{capture:true,passive:true});
 
 const observer=new MutationObserver(records=>{
   for(const record of records){for(const node of record.addedNodes){if(node.nodeType===1&&node.matches?.('.card'))applyCardState(node,{animate:false})}}
