@@ -1,5 +1,5 @@
-const CACHE='boat-station-v6';
-const APP_SHELL=['./','./index.html','./styles.css','./battery-overview.css','./stations.css','./remote-client-ui.css','./page-interactions.css','./app.js','./page-interactions.js','./data-sync.js','./manifest.webmanifest','./icon.png','./remote_landing.js','./remote-client-ui-v2.js','./stations.js','./native-tools-adapter.js','./native-bluetooth.js','./modules/gps.js','./modules/batteries.js','./modules/phone.js','./modules/seastate.js','./modules/compass.js'];
+const CACHE='boat-station-v7';
+const APP_SHELL=['./','./index.html','./styles.css','./battery-overview.css','./stations.css','./remote-client-ui.css','./page-interactions.css','./app.js','./page-interactions.js','./battery-flow-ui.js','./data-sync.js','./manifest.webmanifest','./icon.png','./remote_landing.js','./remote-client-ui-v2.js','./stations.js','./native-tools-adapter.js','./native-bluetooth.js','./modules/gps.js','./modules/batteries.js','./modules/phone.js','./modules/seastate.js','./modules/compass.js'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting()));
