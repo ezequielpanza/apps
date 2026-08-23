@@ -84,10 +84,18 @@ jobs:
           cp "/tmp/$APK" "apps/boat-station/web/$APK"
           cp "/tmp/$APK" "apps/boat-station/web/BoatStation.apk"
           printf '%s\n' "${{ steps.version.outputs.version }}" > apps/boat-station/web/APK_VERSION
-          git add "apps/boat-station/core/releases/$APK" "apps/boat-station/web/$APK" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION
-          if git diff --cached --quiet; then
+          printf '%s\n' "/BoatStation.apk /$APK 302" > apps/boat-station/web/_redirects
+          git add "apps/boat-station/core/releases/$APK" "apps/boat-station/web/$APK" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION apps/boat-station/web/_redirects
+          if ! git diff --cached --quiet; then
+            git commit -m "Build Boat Station ${{ steps.version.outputs.version }} APK"
+            git push origin HEAD:main
+          else
             echo "APK already published"
-            exit 0
           fi
-          git commit -m "Build Boat Station ${{ steps.version.outputs.version }} APK"
-          git push origin HEAD:main
+
+      - name: Deploy updated Boat Station web to Cloudflare Pages
+        if: github.event_name == 'push'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@latest pages deploy apps/boat-station/web --project-name=boat-station --branch=main
