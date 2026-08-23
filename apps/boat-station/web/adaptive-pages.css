@@ -7,26 +7,20 @@
 .card-body>.viewport>.track>.page>.pager{flex:0 0 auto;margin-top:auto;padding-top:8px;padding-bottom:1px}
 .resize-handle{bottom:1px;right:1px}
 
-/* Shared field behavior: values and labels remain centered while geometry compresses. */
 .card .metric,.card .gps-coord{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:0}
 .card .metric .value,.card .metric .label,.card .gps-coord .value,.card .gps-coord .label{text-align:center;width:100%}
 
-/* GPS · summary */
 .card[data-id="gps"] .page[data-page="0"]>.gps-coords{flex:1 1 0;align-items:stretch;margin-bottom:clamp(4px,2cqh,8px)}
 .card[data-id="gps"] .page[data-page="0"]>.metric-grid{flex:1 1 0;align-items:stretch;align-content:stretch}
-.card[data-id="gps"] .page[data-page="0"] .gps-coord,
-.card[data-id="gps"] .page[data-page="0"] .metric{padding-block:clamp(4px,3cqh,10px);padding-inline:clamp(5px,2cqw,10px)}
-.card[data-id="gps"] .page[data-page="0"] .gps-coords,
-.card[data-id="gps"] .page[data-page="0"] .metric-grid{gap:clamp(4px,1.5cqh,8px)}
+.card[data-id="gps"] .page[data-page="0"] .gps-coord,.card[data-id="gps"] .page[data-page="0"] .metric{padding-block:clamp(4px,3cqh,10px);padding-inline:clamp(5px,2cqw,10px)}
+.card[data-id="gps"] .page[data-page="0"] .gps-coords,.card[data-id="gps"] .page[data-page="0"] .metric-grid{gap:clamp(4px,1.5cqh,8px)}
 
-/* GPS · map */
 .card[data-id="gps"] .page[data-page="1"]>.gps-map{flex:1 1 150px;min-height:92px;height:auto;aspect-ratio:auto}
 .card[data-id="gps"] .page[data-page="1"]>.gps-actions,.card[data-id="gps"] .page[data-page="1"]>.gps-status{flex:0 0 auto}
 .card[data-id="gps"] .gps-actions{gap:clamp(4px,1.4cqh,8px);margin-top:clamp(4px,1.5cqh,9px)}
 .card[data-id="gps"] .gps-action{justify-content:center;text-align:center;padding-block:clamp(4px,2.2cqh,9px);padding-inline:clamp(5px,2cqw,11px);min-height:clamp(32px,9cqh,44px)}
 .card[data-id="gps"] .gps-status{text-align:center;margin-top:clamp(3px,1.2cqh,7px)}
 
-/* Battery overview */
 .card[data-id="batteries"] .page[data-page="0"]>.battery-overview{flex:1 1 auto;min-height:0}
 .card[data-id="batteries"] .page[data-page="0"] .battery-bank-panel{display:flex;flex-direction:column;justify-content:center;min-height:0;padding-block:clamp(5px,2.5cqh,10px)}
 .card[data-id="batteries"] .page[data-page="0"] .battery-hero{padding-bottom:clamp(3px,2cqh,8px)}
@@ -40,60 +34,45 @@
 .card[data-id="batteries"] .page[data-page="0"] .battery-mini-right{gap:clamp(1px,1cqh,4px)}
 .card[data-id="batteries"] .page[data-page="0"] .battery-mini-charge{padding-top:clamp(1px,1cqh,4px)}
 
-/* Battery history + Sea State history */
-.card[data-id="batteries"] .page[data-page="1"]>.battery-history-wrap,
-.card[data-id="seastate"] .page[data-page="1"]>.battery-history-wrap{flex:1 1 170px;min-height:130px}
-.card[data-id="batteries"] .page[data-page="1"] .battery-history,
-.card[data-id="seastate"] .page[data-page="1"] .battery-history{height:auto;min-height:0;display:flex;flex-direction:column}
-.card[data-id="batteries"] .page[data-page="1"] .battery-history canvas,
-.card[data-id="seastate"] .page[data-page="1"] .battery-history canvas{flex:1 1 auto;min-height:86px;height:auto}
-.card[data-id="batteries"] .page[data-page="1"] .battery-history-note,
-.card[data-id="seastate"] .page[data-page="1"] .battery-history-note{flex:0 0 auto}
+.card[data-id="batteries"] .page[data-page="1"]>.battery-history-wrap,.card[data-id="seastate"] .page[data-page="1"]>.battery-history-wrap{flex:1 1 170px;min-height:130px}
+.card[data-id="batteries"] .page[data-page="1"] .battery-history,.card[data-id="seastate"] .page[data-page="1"] .battery-history{height:auto;min-height:0;display:flex;flex-direction:column}
+.card[data-id="batteries"] .page[data-page="1"] .battery-history canvas,.card[data-id="seastate"] .page[data-page="1"] .battery-history canvas{flex:1 1 auto;min-height:86px;height:auto}
+.card[data-id="batteries"] .page[data-page="1"] .battery-history-note,.card[data-id="seastate"] .page[data-page="1"] .battery-history-note{flex:0 0 auto}
 
-/* Battery statistics: maximum height can expose every selected field. */
 .card[data-id="batteries"] .page[data-page="2"]>.battery-list{flex:1 1 auto;min-height:0;gap:clamp(4px,1.2cqh,8px)}
 .card[data-id="batteries"] .page[data-page="2"] .battery-item{padding-block:clamp(6px,1.7cqh,11px)}
 .card[data-id="batteries"] .page[data-page="2"] .battery-item-top{min-height:24px;align-items:center}
+.card[data-id="batteries"] .page[data-page="2"] .battery-item-sub{display:none}
 
-/* Connected batteries */
 .card[data-id="batteries"] .page[data-page="3"]>.battery-list{flex:1 1 auto;min-height:0;gap:clamp(3px,1.4cqh,8px)}
 .card[data-id="batteries"] .page[data-page="3"] .battery-item{padding-block:clamp(4px,2cqh,11px)}
 .card[data-id="batteries"] .page[data-page="3"] .battery-item-top{align-items:center}
 .card[data-id="batteries"] .page[data-page="3"] .battery-soc{align-self:center}
 
-/* Phone */
 .card[data-id="phone"] .page>.metric-grid{flex:1 1 auto;align-items:stretch;gap:clamp(4px,1.8cqh,8px)}
 .card[data-id="phone"] .page>.metric-grid .metric{padding-block:clamp(4px,3cqh,10px);padding-inline:clamp(4px,2cqw,10px)}
 .card[data-id="phone"] .page>.metric-grid+ .metric-grid{margin-top:clamp(4px,1.8cqh,8px)!important}
 
-/* Sea State current */
 .card[data-id="seastate"] .page[data-page="0"]>.battery-hero{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;padding-block:clamp(2px,2cqh,12px)}
 .card[data-id="seastate"] .page[data-page="0"]>.battery-hero .battery-bank-name{font-size:clamp(24px,18cqh,48px)!important;line-height:1}
 .card[data-id="seastate"] .page[data-page="0"]>.metric-grid{flex:1 1 auto;align-items:stretch;gap:clamp(4px,1.8cqh,8px)}
 .card[data-id="seastate"] .page[data-page="0"]>.metric-grid .metric{padding-block:clamp(4px,3cqh,10px)}
 
-/* Compass */
 .card[data-id="compass"] .page>.battery-hero{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0}
 .card[data-id="compass"] .page .battery-ring{width:clamp(72px,60cqh,180px);height:clamp(72px,60cqh,180px)}
 
-/* Compact states selected only by available module height. */
 @container modulebody (max-height:240px){
   .card[data-id="batteries"] .page[data-page="0"] .compact-bank-metrics .metric .label{display:none}
   .card[data-id="batteries"] .page[data-page="0"] .compact-bank-metrics .metric{padding-block:3px}
-  .card[data-id="batteries"] .page[data-page="0"] .battery-mini-top small,
-  .card[data-id="batteries"] .page[data-page="0"] .battery-mini-charge small{display:none}
+  .card[data-id="batteries"] .page[data-page="0"] .battery-mini-top small,.card[data-id="batteries"] .page[data-page="0"] .battery-mini-charge small{display:none}
 }
 @container modulebody (max-height:210px){
-  .card[data-id="gps"] .page[data-page="0"] .gps-coord,
-  .card[data-id="gps"] .page[data-page="0"] .metric,
-  .card[data-id="phone"] .page .metric,
-  .card[data-id="seastate"] .page[data-page="0"] .metric{padding-block:3px}
+  .card[data-id="gps"] .page[data-page="0"] .gps-coord,.card[data-id="gps"] .page[data-page="0"] .metric,.card[data-id="phone"] .page .metric,.card[data-id="seastate"] .page[data-page="0"] .metric{padding-block:3px}
   .card[data-id="gps"] .page[data-page="1"] .gps-action{min-height:30px;padding-block:3px}
 }
 @container modulebody (max-height:260px){
   .card[data-id="batteries"] .page[data-page="3"] .battery-item{display:grid;grid-template-columns:minmax(80px,1fr) auto auto auto auto auto;column-gap:8px;align-items:center;padding:5px 7px}
-  .card[data-id="batteries"] .page[data-page="3"] .battery-item-top,
-  .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub{display:contents}
+  .card[data-id="batteries"] .page[data-page="3"] .battery-item-top,.card[data-id="batteries"] .page[data-page="3"] .battery-item-sub{display:contents}
   .card[data-id="batteries"] .page[data-page="3"] .battery-name{grid-column:1;grid-row:1;align-self:center}
   .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub span:nth-child(1){grid-column:2;grid-row:1}
   .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub span:nth-child(2){grid-column:3;grid-row:1}
