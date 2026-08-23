@@ -1,6 +1,7 @@
 // Thin PWA <-> Android Core bridge for battery BLE. Native remains responsible for BLE logic.
 const native=()=>window.NativeBridge;
-const scannerNative=()=>window.BatteryScannerBridge||window.NativeBridge;
+const dedicatedScanner=()=>window.BatteryScannerBridge;
+const scannerNative=()=>dedicatedScanner()||window.NativeBridge;
 const seen=new Map();
 let scanList=[];
 let scanEpoch=0;
@@ -43,6 +44,16 @@ function startNativeScan(){
   const epoch=++scanEpoch;
   clearTimeout(scanRetryTimer);scanRetryTimer=0;
   seen.clear();scanList=[];publishScan();
+
+  // The dedicated 1.2.7+ scanner owns its complete lifecycle. Do not externally
+  // stop/restart it: doing so used to abort a valid scan after 2.5 seconds when
+  // no advertisement had arrived yet.
+  if(dedicatedScanner()){
+    nativeStart();
+    return true;
+  }
+
+  // Compatibility path for older APKs that only expose NativeBridge.
   try{scannerNative()?.stopBatteryScan?.()}catch(_){ }
   setTimeout(()=>{if(epoch!==scanEpoch)return;nativeStart()},120);
   scanRetryTimer=setTimeout(()=>{
