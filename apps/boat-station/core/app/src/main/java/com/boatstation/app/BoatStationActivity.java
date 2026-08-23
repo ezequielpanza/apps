@@ -1,8 +1,12 @@
 package com.boatstation.app;
 
+import android.app.DownloadManager;
+import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
@@ -53,6 +57,29 @@ public class BoatStationActivity extends MainActivityCore {
                     .putExtra(BoatStationCoreService.EXTRA_BACKEND, backend)
                     .putExtra(BoatStationCoreService.EXTRA_STATION_NAME, stationName);
             startCoreServiceIntent(intent);
+        }
+
+        @JavascriptInterface
+        public boolean downloadApk(String url, String version) {
+            if (url == null || url.trim().isEmpty()) return false;
+            try {
+                String v = version == null || version.trim().isEmpty() ? "update" : version.trim();
+                String fileName = "BoatStation-" + v + ".apk";
+                DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+                request.setTitle("Boat Station " + v);
+                request.setDescription("Descargando actualización");
+                request.setMimeType("application/vnd.android.package-archive");
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setAllowedOverMetered(true);
+                request.setAllowedOverRoaming(true);
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+                DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+                if (dm == null) return false;
+                dm.enqueue(request);
+                return true;
+            } catch (Exception ignored) {
+                return false;
+            }
         }
     }
 }
