@@ -1,0 +1,119 @@
+/* Adaptive page sizing: the resize handle changes the useful space of the current page,
+   while typography remains stable and the pager defines the bottom of the page. */
+.card-body>.viewport,
+.card-body>.viewport>.track,
+.card-body>.viewport>.track>.page{height:100%;min-height:0}
+
+.card-body>.viewport>.track>.page{
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding:10px 12px 9px;
+}
+
+.card-body>.viewport>.track>.page>.pager{
+  flex:0 0 auto;
+  margin-top:auto;
+  padding-top:10px;
+  padding-bottom:1px;
+}
+
+/* The corner still belongs to the page, not to a generic outer blank area. */
+.resize-handle{bottom:1px;right:1px}
+
+/* GPS · data page: keep typography fixed and let spacing consume extra room. */
+.card[data-id="gps"] .page[data-page="0"]>.gps-coords{flex:0 0 auto}
+.card[data-id="gps"] .page[data-page="0"]>.metric-grid{flex:1 1 auto;align-items:stretch;align-content:center}
+.card[data-id="gps"] .page[data-page="0"]>.metric-grid .metric{display:flex;flex-direction:column;justify-content:center}
+
+/* GPS · map page: map is the elastic component between header/content controls and pager. */
+.card[data-id="gps"] .page[data-page="1"]>.gps-map{
+  flex:1 1 150px;
+  min-height:120px;
+  height:auto;
+  aspect-ratio:auto;
+}
+.card[data-id="gps"] .page[data-page="1"]>.gps-actions,
+.card[data-id="gps"] .page[data-page="1"]>.gps-status{flex:0 0 auto}
+
+/* Battery overview: panels stretch with the page, without scaling their text. */
+.card[data-id="batteries"] .page[data-page="0"]>.battery-overview{
+  flex:1 1 auto;
+  min-height:0;
+}
+.card[data-id="batteries"] .page[data-page="0"] .battery-bank-panel{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.card[data-id="batteries"] .page[data-page="0"] .battery-mini-column{height:100%}
+
+/* Battery history and Sea State history share the same elastic chart shell. */
+.card[data-id="batteries"] .page[data-page="1"]>.battery-history-wrap,
+.card[data-id="seastate"] .page[data-page="1"]>.battery-history-wrap{
+  flex:1 1 170px;
+  min-height:145px;
+}
+.card[data-id="batteries"] .page[data-page="1"] .battery-history,
+.card[data-id="seastate"] .page[data-page="1"] .battery-history{
+  height:auto;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+}
+.card[data-id="batteries"] .page[data-page="1"] .battery-history canvas,
+.card[data-id="seastate"] .page[data-page="1"] .battery-history canvas{
+  flex:1 1 auto;
+  min-height:100px;
+  height:auto;
+}
+.card[data-id="batteries"] .page[data-page="1"] .battery-history-note,
+.card[data-id="seastate"] .page[data-page="1"] .battery-history-note{flex:0 0 auto}
+
+/* Battery statistics/list pages: use available vertical space for rhythm, not font scaling. */
+.card[data-id="batteries"] .page[data-page="2"]>.battery-list,
+.card[data-id="batteries"] .page[data-page="3"]>.battery-list{
+  flex:1 1 auto;
+  min-height:0;
+}
+
+/* Phone pages: cards expand vertically and keep values/labels at their normal font sizes. */
+.card[data-id="phone"] .page>.metric-grid{
+  flex:1 1 auto;
+  align-items:stretch;
+}
+.card[data-id="phone"] .page>.metric-grid .metric{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+/* Sea State current page: distribute extra height around the instrument and metrics. */
+.card[data-id="seastate"] .page[data-page="0"]>.battery-hero{
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.card[data-id="seastate"] .page[data-page="0"]>.metric-grid{
+  flex:0 0 auto;
+}
+
+/* Compass: center the instrument in any page height; its labels remain unchanged. */
+.card[data-id="compass"] .page>.battery-hero{
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+/* Give controls slightly more/less breathing room through available geometry, never font-size. */
+.card[data-id="gps"] .gps-actions{row-gap:clamp(6px,1.5vh,12px)}
+.card[data-id="gps"] .gps-action{padding-block:clamp(8px,1.3vh,13px)}
+
+/* Preserve a few pixels between pager and the physical module edge. */
+.card[data-id="batteries"] .page,
+.card[data-id="gps"] .page,
+.card[data-id="phone"] .page,
+.card[data-id="seastate"] .page,
+.card[data-id="compass"] .page{padding-bottom:9px}
