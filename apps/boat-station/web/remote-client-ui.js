@@ -4,6 +4,7 @@ const addSheet=document.getElementById('addSheet');
 function readJson(key,fallback){try{const value=JSON.parse(localStorage.getItem(key)||'null');return value??fallback}catch{return fallback}}
 function writeJson(key,value){localStorage.setItem(key,JSON.stringify(value))}
 function activeStationId(){return localStorage.getItem('bs.remote.activeStation')||'default'}
+function activeStationName(){const id=activeStationId(),list=readJson('bs.remote.stations',[]);const station=Array.isArray(list)?list.find(x=>x?.stationId===id):null;return String(station?.name||'Estación').trim()||'Estación'}
 function pageKey(){return 'bs.remote.ui.pages.'+activeStationId()}
 function heightKey(){return 'bs.remote.ui.heights.'+activeStationId()}
 function pages(){return readJson(pageKey(),readJson('bs.remote.ui.pages',{}))}
@@ -48,7 +49,7 @@ function renderFreshness(){
   }
   const age=Math.max(0,Date.now()-lastSnapshotAt),connected=age<=CONNECTED_MAX_AGE_MS;
   freshness.classList.toggle('connected',connected);freshness.classList.toggle('disconnected',!connected);freshness.classList.remove('waiting');
-  if(text)text.textContent=connected?'Conectado':'Sin conexión';
+  if(text)text.textContent=connected?`Conectado a ${activeStationName()}`:'Sin conexión';
   if(detail)detail.textContent=connected?'':`· última conexión ${elapsedLabel(age)}`;
 }
 setInterval(renderFreshness,1000);
