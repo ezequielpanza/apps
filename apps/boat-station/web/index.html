@@ -62,6 +62,12 @@
   }
 
   try{
+    await import('./battery-chart-labels.js');
+  }catch(err){
+    console.warn('Boat Station battery chart labels unavailable',err);
+  }
+
+  try{
     await import('./data-sync.js');
   }catch(err){
     console.warn('Boat Station data sync unavailable',err);
