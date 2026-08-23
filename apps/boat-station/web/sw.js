@@ -1,4 +1,4 @@
-const CACHE='boat-station-v14';
+const CACHE='boat-station-v15';
 const APP_SHELL=['./','./index.html','./styles.css','./battery-overview.css','./stations.css','./remote-client-ui.css','./page-interactions.css','./adaptive-pages.css','./app.js','./page-interactions.js','./battery-flow-status.js','./battery-manager-status.js','./battery-chart-labels.js','./battery-stat-settings.js','./data-sync.js','./manifest.webmanifest','./icon.png','./remote_landing.js','./remote-client-ui-v2.js','./stations.js','./native-tools-adapter.js','./native-bluetooth.js','./modules/gps.js','./modules/batteries.js','./modules/phone.js','./modules/seastate.js','./modules/compass.js'];
 
 self.addEventListener('install',event=>{
