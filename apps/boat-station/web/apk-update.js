@@ -27,14 +27,17 @@
     removeRow();
     if(!installed||!latest||!newer(latest,installed))return;
     const inner=menuInner();if(!inner)return;
-    const button=document.createElement('button');
-    button.type='button';
-    button.className='option sheet-option';
-    button.dataset.coreApkUpdate='1';
-    button.innerHTML=`<span>Descargar nueva versión ${latest}<br><small class="sub">APK instalada: ${installed}</small></span>`;
-    button.addEventListener('click',()=>download(latest));
+    const row=document.createElement('div');
+    row.className='option remote-apk-row';
+    row.dataset.coreApkUpdate='1';
+    row.style.display='flex';
+    row.style.alignItems='center';
+    row.style.justifyContent='space-between';
+    row.style.gap='12px';
+    row.innerHTML=`<span style="min-width:0;flex:1">Nueva versión ${latest}<br><small class="sub">APK instalada: ${installed}</small></span><button type="button" class="btn" data-core-apk-download>Descargar</button>`;
+    row.querySelector('[data-core-apk-download]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();download(latest)});
     const title=inner.querySelector('h3');
-    if(title&&title.nextSibling)inner.insertBefore(button,title.nextSibling);else inner.appendChild(button);
+    if(title&&title.nextSibling)inner.insertBefore(row,title.nextSibling);else inner.appendChild(row);
   }
   async function check(force=false){
     if(checking)return;
