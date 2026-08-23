@@ -1,7 +1,7 @@
 (function(){
   const params=new URLSearchParams(location.search);
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
-  let localVersion='—',coreVersion='—',wrappedSync=false,wrappedRemote=false,wrappedCommand=false,refreshing=false,pull=null,refreshStatusTimer=0;
+  let localVersion='—',coreApkVersion='—',corePwaVersion='—',wrappedSync=false,wrappedRemote=false,wrappedCommand=false,refreshing=false,pull=null,refreshStatusTimer=0;
 
   function refreshLabel(source){return isLocal&&source==='remote-command'?'Actualización remota':'Actualizando'}
   function enforceRefreshText(label){const host=document.getElementById('remoteFreshness'),text=host?.querySelector('.remote-connection-text');if(text)text.textContent=label}
@@ -43,7 +43,14 @@
   }
   async function fetchVersion(){try{const r=await fetch('./PWA_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(r.ok)return(await r.text()).trim()}catch(_){}return''}
   async function loadLocalVersion(){const v=await fetchVersion();if(v)localVersion=v;render()}
-  function render(){const host=document.getElementById('remoteFreshness');if(!host)return;let el=host.querySelector('.remote-pwa-versions');if(!el){el=document.createElement('span');el.className='remote-pwa-versions';host.appendChild(el)}const mismatch=localVersion!=='—'&&coreVersion!=='—'&&localVersion!==coreVersion;el.textContent=` · Remote ${localVersion} · Core ${coreVersion}${mismatch?' · actualización pendiente':''}`;el.classList.toggle('mismatch',mismatch)}
+  function render(){
+    const host=document.getElementById('remoteFreshness');if(!host)return;
+    let el=host.querySelector('.remote-pwa-versions');
+    if(!el){el=document.createElement('span');el.className='remote-pwa-versions';host.appendChild(el)}
+    const mismatch=localVersion!=='—'&&corePwaVersion!=='—'&&localVersion!==corePwaVersion;
+    el.textContent=` · Remote ${localVersion} · Core ${coreApkVersion}${mismatch?' · actualización pendiente':''}`;
+    el.classList.toggle('mismatch',mismatch);
+  }
   async function refreshServiceWorker(){if(!('serviceWorker'in navigator))return;try{const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.update()}catch(_){}}
   async function runSystemRefresh(options={}){
     if(refreshing)return false;const source=options.source||'local',label=refreshLabel(source),remoteCore=isLocal&&source==='remote-command';refreshing=true;setRefreshUi(true,label);
@@ -57,7 +64,19 @@
   window.BoatStationSystem={runSystemRefresh,executeRemoteCommand,getPwaVersion:()=>localVersion};
 
   function wrapDataSync(){if(wrappedSync||!window.BoatStationDataSync)return;const sync=window.BoatStationDataSync;if(typeof sync.exportSnapshot!=='function')return;const original=sync.exportSnapshot.bind(sync);sync.exportSnapshot=function(){const snapshot=original()||{};snapshot.pwaVersion=localVersion;return snapshot};wrappedSync=true}
-  function wrapRemoteUi(){if(wrappedRemote||!window.BoatStationRemoteUI)return;const ui=window.BoatStationRemoteUI;if(typeof ui.scheduleData!=='function')return;const original=ui.scheduleData.bind(ui);ui.scheduleData=function(snapshot,apply){if(snapshot&&typeof snapshot.pwaVersion==='string'&&snapshot.pwaVersion.trim())coreVersion=snapshot.pwaVersion.trim();render();return original(snapshot,apply)};wrappedRemote=true;render()}
+  function wrapRemoteUi(){
+    if(wrappedRemote||!window.BoatStationRemoteUI)return;
+    const ui=window.BoatStationRemoteUI;if(typeof ui.scheduleData!=='function')return;
+    const original=ui.scheduleData.bind(ui);
+    ui.scheduleData=function(snapshot,apply){
+      if(snapshot&&typeof snapshot.pwaVersion==='string'&&snapshot.pwaVersion.trim())corePwaVersion=snapshot.pwaVersion.trim();
+      const apk=String(snapshot?.phone?.version||'').trim();
+      if(apk)coreApkVersion=apk;
+      render();
+      return original(snapshot,apply);
+    };
+    wrappedRemote=true;render();
+  }
   function wrapCommandSink(){if(wrappedCommand||!window.BoatStationGpsState||typeof window.BoatStationGpsState.executeRemoteCommand!=='function')return;const original=window.BoatStationGpsState.executeRemoteCommand.bind(window.BoatStationGpsState);window.BoatStationGpsState.executeRemoteCommand=function(command,payload){if(executeRemoteCommand(command,payload))return true;return original(command,payload)};wrappedCommand=true}
 
   function pullTargetBlocked(target){return !!target.closest('input,textarea,select,button,a,.drag-handle,.resize-handle,.handle,.sheet.open,.station-manager.open')}
