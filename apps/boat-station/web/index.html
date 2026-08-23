@@ -69,6 +69,12 @@
   }
 
   try{
+    await import('./battery-stat-settings.js');
+  }catch(err){
+    console.warn('Boat Station battery statistic settings unavailable',err);
+  }
+
+  try{
     await import('./data-sync.js');
   }catch(err){
     console.warn('Boat Station data sync unavailable',err);
