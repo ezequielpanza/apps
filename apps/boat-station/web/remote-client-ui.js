@@ -105,14 +105,16 @@ function endInteractionAfter(ms){clearTimeout(interactionReleaseTimer);interacti
 function isBusy(){return interactionDepth>0||!!cards?.querySelector('.resizing,.reordering')}
 function scheduleData(data,apply){markUpdated(data?.time);if(isBusy()){pendingData=data;pendingApply=apply;return false}apply(data);requestAnimationFrame(applyAll);return true}
 
-let mouseSwipe=null,remoteResize=null,remoteTouch=null;
-function finishMouseSwipe(event,cancel=false){
-  if(!mouseSwipe||event.pointerId!==mouseSwipe.pointerId)return false;
-  const g=mouseSwipe;mouseSwipe=null;
+let swipe=null,remoteResize=null;
+function inputIsPrimary(event){return event.isPrimary!==false&&(event.pointerType!=='mouse'||event.button===0)}
+function finishSwipe(event,cancel=false){
+  if(!swipe||event.pointerId!==swipe.pointerId)return false;
+  const g=swipe;swipe=null;
   const dx=event.clientX-g.startX,dy=event.clientY-g.startY;
   if(!cancel&&g.horizontal&&Math.abs(dx)>=38&&Math.abs(dx)>Math.abs(dy)*1.1)setPage(g.card,dx<0?g.page+1:g.page-1);
   else applyCardState(g.card,{animate:true});
-  endInteractionAfter(210);return true;
+  endInteractionAfter(g.horizontal?220:0);
+  return true;
 }
 function finishRemoteResize(event){
   if(!remoteResize||event.pointerId!==remoteResize.pointerId)return false;
@@ -121,20 +123,9 @@ function finishRemoteResize(event){
   const body=g.card.querySelector('.card-body');if(body)saveHeight(g.id,g.page,body.getBoundingClientRect().height);
   endInteraction();return true;
 }
-function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
-function finishRemoteTouch(event,cancel=false){
-  if(!remoteTouch)return false;
-  const t=touchById(event.changedTouches,remoteTouch.id);if(!t&&!cancel)return false;
-  const g=remoteTouch;remoteTouch=null;
-  const endX=t?t.clientX:g.lastX,endY=t?t.clientY:g.lastY,dx=endX-g.startX,dy=endY-g.startY;
-  if(!cancel&&g.mode==='horizontal'&&Math.abs(dx)>=38&&Math.abs(dx)>Math.abs(dy)*1.1)setPage(g.card,dx<0?g.page+1:g.page-1);
-  else applyCardState(g.card,{animate:true});
-  endInteractionAfter(g.mode==='horizontal'?220:0);
-  return true;
-}
 
 cards?.addEventListener('pointerdown',event=>{
-  if(event.pointerType==='touch'||event.button!==0)return;
+  if(!inputIsPrimary(event))return;
   const resizeHandle=event.target.closest('.resize-handle');
   if(resizeHandle){
     const card=resizeHandle.closest('.card'),body=card?.querySelector('.card-body');if(!card||!body)return;
@@ -147,9 +138,9 @@ cards?.addEventListener('pointerdown',event=>{
   if(event.target.closest('.drag-handle,button,input,textarea,select,a'))return;
   const card=event.target.closest('.card');if(!card||pageCount(card)<2)return;
   event.stopImmediatePropagation();
-  mouseSwipe={pointerId:event.pointerId,card,page:currentPage(card),startX:event.clientX,startY:event.clientY,horizontal:false};
+  swipe={pointerId:event.pointerId,pointerType:event.pointerType,card,page:currentPage(card),startX:event.clientX,startY:event.clientY,horizontal:false};
   beginInteraction();
-  try{card.setPointerCapture(event.pointerId)}catch{}
+  if(event.pointerType==='mouse')try{card.setPointerCapture(event.pointerId)}catch{}
 },{capture:true});
 
 cards?.addEventListener('pointermove',event=>{
@@ -161,65 +152,39 @@ cards?.addEventListener('pointermove',event=>{
     saveHeight(remoteResize.id,remoteResize.page,next);
     return;
   }
-  if(!mouseSwipe||event.pointerId!==mouseSwipe.pointerId)return;
-  const dx=event.clientX-mouseSwipe.startX,dy=event.clientY-mouseSwipe.startY;
-  if(!mouseSwipe.horizontal){
+  if(!swipe||event.pointerId!==swipe.pointerId)return;
+  const dx=event.clientX-swipe.startX,dy=event.clientY-swipe.startY;
+  if(!swipe.horizontal){
     if(Math.abs(dx)<10&&Math.abs(dy)<10)return;
-    if(Math.abs(dx)<=Math.abs(dy)*1.15){const g=mouseSwipe;mouseSwipe=null;applyCardState(g.card,{animate:false});endInteraction();return}
-    mouseSwipe.horizontal=true;
+    if(Math.abs(dx)<=Math.abs(dy)*1.15){const g=swipe;swipe=null;applyCardState(g.card,{animate:false});endInteraction();return}
+    swipe.horizontal=true;
+    try{swipe.card.setPointerCapture(event.pointerId)}catch{}
   }
   event.preventDefault();event.stopImmediatePropagation();
-  const track=mouseSwipe.card.querySelector('.track');
-  if(track){track.style.transition='none';const width=Math.max(1,mouseSwipe.card.querySelector('.viewport')?.clientWidth||mouseSwipe.card.clientWidth);const pct=(-mouseSwipe.page*100)+(dx/width*100);track.style.transform=`translateX(${pct}%)`}
-},{capture:true,passive:false});
-
-cards?.addEventListener('pointerup',event=>{
-  if(finishRemoteResize(event)){event.preventDefault();event.stopImmediatePropagation();return}
-  if(finishMouseSwipe(event)){event.preventDefault();event.stopImmediatePropagation()}
-},{capture:true});
-cards?.addEventListener('pointercancel',event=>{
-  if(finishRemoteResize(event)){event.stopImmediatePropagation();return}
-  if(finishMouseSwipe(event,true))event.stopImmediatePropagation();
-},{capture:true});
-
-cards?.addEventListener('touchstart',event=>{
-  if(event.touches.length!==1||event.target.closest('.drag-handle,.resize-handle,button,input,textarea,select,a'))return;
-  const card=event.target.closest('.card');if(!card||pageCount(card)<2)return;
-  const t=event.touches[0];
-  remoteTouch={id:t.identifier,card,page:currentPage(card),startX:t.clientX,startY:t.clientY,lastX:t.clientX,lastY:t.clientY,mode:'pending'};
-  beginInteraction();
-  event.stopImmediatePropagation();
-},{capture:true,passive:true});
-
-cards?.addEventListener('touchmove',event=>{
-  if(!remoteTouch)return;
-  const t=touchById(event.touches,remoteTouch.id);if(!t)return;
-  remoteTouch.lastX=t.clientX;remoteTouch.lastY=t.clientY;
-  const dx=t.clientX-remoteTouch.startX,dy=t.clientY-remoteTouch.startY;
-  if(remoteTouch.mode==='pending'){
-    if(Math.abs(dx)<10&&Math.abs(dy)<10)return;
-    if(Math.abs(dx)>Math.abs(dy)*1.15)remoteTouch.mode='horizontal';
-    else{const g=remoteTouch;remoteTouch=null;applyCardState(g.card,{animate:false});endInteraction();return}
-  }
-  if(remoteTouch.mode!=='horizontal')return;
-  event.preventDefault();event.stopImmediatePropagation();
-  const track=remoteTouch.card.querySelector('.track');
+  const track=swipe.card.querySelector('.track');
   if(track){
     track.style.transition='none';
-    const width=Math.max(1,remoteTouch.card.querySelector('.viewport')?.clientWidth||remoteTouch.card.clientWidth);
-    let pct=(-remoteTouch.page*100)+(dx/width*100);
-    const min=-(pageCount(remoteTouch.card)-1)*100;
+    const width=Math.max(1,swipe.card.querySelector('.viewport')?.clientWidth||swipe.card.clientWidth);
+    let pct=(-swipe.page*100)+(dx/width*100);
+    const min=-(pageCount(swipe.card)-1)*100;
     pct=Math.max(min-18,Math.min(18,pct));
     track.style.transform=`translateX(${pct}%)`;
   }
 },{capture:true,passive:false});
 
-cards?.addEventListener('touchend',event=>{
-  if(finishRemoteTouch(event)){event.stopImmediatePropagation()}
-},{capture:true,passive:true});
-cards?.addEventListener('touchcancel',event=>{
-  if(finishRemoteTouch(event,true))event.stopImmediatePropagation();
-},{capture:true,passive:true});
+cards?.addEventListener('pointerup',event=>{
+  if(finishRemoteResize(event)){event.preventDefault();event.stopImmediatePropagation();return}
+  if(finishSwipe(event)){event.preventDefault();event.stopImmediatePropagation()}
+},{capture:true});
+cards?.addEventListener('pointercancel',event=>{
+  if(finishRemoteResize(event)){event.stopImmediatePropagation();return}
+  if(finishSwipe(event,true))event.stopImmediatePropagation();
+},{capture:true});
+
+// app.js still contains the Core touch implementation. In Remote we suppress only
+// those card-level legacy touch handlers so every pointing device uses the pointer
+// engine above. Native vertical scrolling remains available through touch-action:pan-y.
+for(const type of ['touchstart','touchmove','touchend','touchcancel'])cards?.addEventListener(type,event=>event.stopImmediatePropagation(),{capture:true,passive:type!=='touchmove'});
 
 const observer=new MutationObserver(records=>{
   for(const record of records){for(const node of record.addedNodes){if(node.nodeType===1&&node.matches?.('.card'))applyCardState(node,{animate:false})}}
