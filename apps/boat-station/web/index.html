@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="./battery-overview.css">
 <link rel="stylesheet" href="./stations.css">
 <link rel="stylesheet" href="./remote-client-ui.css">
+<link rel="stylesheet" href="./page-interactions.css">
 <script>
 (function(){
   if(window.__bsNativeQueue)return;
@@ -40,6 +41,12 @@
   }catch(err){
     console.error('Boat Station UI failed to start',err);
     return;
+  }
+
+  try{
+    await import('./page-interactions.js');
+  }catch(err){
+    console.warn('Boat Station page interactions unavailable',err);
   }
 
   try{
@@ -94,7 +101,7 @@
       }
     }
     try{
-      await import('./remote-client-ui.js');
+      await import('./remote-client-ui-v2.js');
     }catch(err){
       console.warn('Boat Station Remote UI extras unavailable',err);
     }
