@@ -42,15 +42,13 @@ public class MainActivityCore extends MainActivityV100 {
     private static final String WEB_URL = "https://boat-station.pages.dev/?mode=station";
     private static final int REQ_EXPORT_GPX = 3101;
     private static final int REQ_IMPORT_GPX = 3102;
-    private static final long SENSOR_PUSH_MS = 80; // ~12.5 Hz, fast enough for a fluid compass without flooding WebView
+    private static final long SENSOR_PUSH_MS = 80;
 
     private WebView coreWebView;
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
     private String pendingGpx = "";
 
-    // Core-owned sensor path. We intentionally replace the legacy inherited
-    // accelerometer+magnetometer stream so the WebView is not flooded with JS calls.
     private SensorManager coreSensorManager;
     private Sensor coreRotationSensor;
     private Sensor coreAccelSensor;
@@ -66,7 +64,6 @@ public class MainActivityCore extends MainActivityV100 {
         coreWebView = findWebView(getWindow().getDecorView());
         if (coreWebView == null) return;
 
-        // Parent classes still provide native bridges. Stop their legacy local UI immediately.
         coreWebView.stopLoading();
         initTts();
         coreWebView.addJavascriptInterface(new CoreBridge(), "CoreBridge");
@@ -75,8 +72,6 @@ public class MainActivityCore extends MainActivityV100 {
         coreWebView.getSettings().setDomStorageEnabled(true);
         coreWebView.getSettings().setAllowFileAccess(true);
         coreWebView.getSettings().setAllowContentAccess(true);
-        // The PWA/service worker owns offline caching. Never prefer a stale native
-        // WebView cache entry over the network, or HTML/JS/CSS releases can diverge.
         coreWebView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
 
         coreSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -111,8 +106,6 @@ public class MainActivityCore extends MainActivityV100 {
     protected void onResume() {
         super.onResume();
         if (coreSensorManager != null) {
-            // Remove the inherited MainActivity registrations first. They generated
-            // multiple evaluateJavascript calls per sensor event and could backlog the UI.
             coreSensorManager.unregisterListener(this);
             if (coreRotationSensor != null)
                 coreSensorManager.registerListener(this, coreRotationSensor, SensorManager.SENSOR_DELAY_GAME);
@@ -171,7 +164,7 @@ public class MainActivityCore extends MainActivityV100 {
 
     private void announceCore(WebView view) {
         view.evaluateJavascript(
-            "window.BoatStationCore={mode:'station',coreVersion:'" + CORE_VERSION + "'};" +
+            "window.BoatStationCore={mode:'station',coreVersion:'" + CORE_VERSION + "',apkVersion:'" + BuildConfig.VERSION_NAME + "'};" +
             "window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));", null);
     }
 
@@ -270,7 +263,20 @@ public class MainActivityCore extends MainActivityV100 {
 
     public class CoreBridge {
         @JavascriptInterface public String getCoreVersion() { return CORE_VERSION; }
+        @JavascriptInterface public String getApkVersion() { return BuildConfig.VERSION_NAME; }
         @JavascriptInterface public String getMode() { return "station"; }
+
+        @JavascriptInterface
+        public void downloadApk(final String url) {
+            if (url == null || url.trim().isEmpty()) return;
+            runOnUiThread(() -> {
+                try {
+                    Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(i);
+                } catch (Exception ignored) { }
+            });
+        }
 
         @JavascriptInterface
         public String getCapabilities() {
