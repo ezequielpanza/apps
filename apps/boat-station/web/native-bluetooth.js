@@ -36,6 +36,18 @@ function exposeCoreAdapter(){
 window.addEventListener('boatstation-core-ready',exposeCoreAdapter);
 exposeCoreAdapter();
 
+function normalizeBatteryData(data){
+  if(!data||typeof data!=='object')return data;
+  const out={...data,connected:true};
+  // Native Humsienk frames expose the BMS nominal/full capacity as totalAh.
+  // The PWA battery model uses capacityAh. Keep the transport field too, but
+  // normalize it here so all UI/bank calculations use one canonical name.
+  const capacity=Number(data.capacityAh);
+  const total=Number(data.totalAh);
+  if((!Number.isFinite(capacity)||capacity<=0)&&Number.isFinite(total)&&total>0)out.capacityAh=total;
+  return out;
+}
+
 function attachCallbacks(){
   if(!window.BoatStation){setTimeout(attachCallbacks,50);return;}
   exposeCoreAdapter();
@@ -45,7 +57,7 @@ function attachCallbacks(){
     seen.set(key,device);
     publishScan();
   };
-  window.BoatStation.onBatteryData=data=>window.BoatStation?.updateBattery?.({...data,connected:true});
+  window.BoatStation.onBatteryData=data=>window.BoatStation?.updateBattery?.(normalizeBatteryData(data));
   window.BoatStation.onBatteryConnection=data=>window.BoatStation?.updateBattery?.(data);
 }
 attachCallbacks();
