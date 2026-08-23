@@ -4,14 +4,23 @@
 
   const THRESHOLD=38;
   const LOCK=10;
+  const FALLBACK_KEY='bs.ui.pageInteractions.pages';
   let swipe=null;
+
+  function readFallback(){try{const v=JSON.parse(localStorage.getItem(FALLBACK_KEY)||'{}');return v&&typeof v==='object'?v:{}}catch{return {}}}
+  function writeFallback(state){try{localStorage.setItem(FALLBACK_KEY,JSON.stringify(state))}catch{}}
+  function fallbackPage(card){const id=card?.dataset.id;if(!id)return 0;return Number(readFallback()[id])||0}
+  function saveFallbackPage(card,page){const id=card?.dataset.id;if(!id)return;const state=readFallback();state[id]=page;writeFallback(state)}
 
   function adapter(){return window.BoatStationPageAdapter||null}
   function pageCount(card){return card?.querySelectorAll('.page').length||0}
   function currentPage(card){
+    const count=pageCount(card);if(!count)return 0;
     const a=adapter();
     const external=a?.getPage?.(card);
-    if(Number.isFinite(Number(external)))return Math.max(0,Math.min(pageCount(card)-1,Number(external)));
+    if(Number.isFinite(Number(external)))return Math.max(0,Math.min(count-1,Number(external)));
+    const stored=fallbackPage(card);
+    if(Number.isFinite(stored))return Math.max(0,Math.min(count-1,stored));
     const dots=[...card.querySelectorAll('.pager span')];
     const active=dots.findIndex(x=>x.classList.contains('on'));
     return Math.max(0,active>=0?active:0);
@@ -24,14 +33,15 @@
     card.querySelectorAll('.pager').forEach(p=>p.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===page)));
   }
   function commit(card,page){
+    const count=pageCount(card);if(!count)return;
+    page=Math.max(0,Math.min(count-1,page));
     const a=adapter();
-    if(a?.setPage){a.setPage(card,page);return true}
-    // Core keeps its existing page-state commit on touchend. The shared engine owns
-    // only gesture physics here, so we render the snap immediately and let that
-    // existing state path persist the exact same target a moment later.
+    if(a?.setPage){a.setPage(card,page);return}
+    saveFallbackPage(card,page);
     renderPage(card,page,true);
-    return false;
   }
+  function restoreCard(card){if(!card||pageCount(card)<1)return;renderPage(card,currentPage(card),false)}
+  function restoreAll(){cards.querySelectorAll('.card').forEach(restoreCard)}
   function blocked(target){return !!target.closest('.card-head,.drag-handle,.resize-handle,button,input,textarea,select,a,.sheet,.station-manager')}
   function primary(e){return e.isPrimary!==false&&(e.pointerType!=='mouse'||e.button===0)}
 
@@ -81,5 +91,10 @@
   cards.addEventListener('pointerup',e=>finish(e,false),{capture:true});
   cards.addEventListener('pointercancel',e=>finish(e,true),{capture:true});
 
-  window.BoatStationPageInteractions={renderPage,currentPage};
+  const observer=new MutationObserver(()=>requestAnimationFrame(restoreAll));
+  observer.observe(cards,{childList:true,subtree:false});
+  window.addEventListener('resize',restoreAll);
+  requestAnimationFrame(restoreAll);
+
+  window.BoatStationPageInteractions={renderPage,currentPage,restoreAll};
 })();
