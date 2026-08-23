@@ -51,12 +51,6 @@
   }
 
   try{
-    await import('./extended-page-resize.js');
-  }catch(err){
-    console.warn('Boat Station extended page resize unavailable',err);
-  }
-
-  try{
     await import('./battery-flow-status.js');
   }catch(err){
     console.warn('Boat Station battery flow status unavailable',err);
