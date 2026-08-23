@@ -8,12 +8,13 @@
     const style=document.createElement('style');style.textContent='@keyframes bsRefreshSpin{to{transform:rotate(360deg)}}#systemRefreshIndicator{position:fixed;z-index:5000;left:50%;top:58px;transform:translate(-50%,-70px);transition:transform .2s ease;display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:18px;background:#0b2637;color:#d7eef7;font:600 12px system-ui,sans-serif;box-shadow:0 5px 18px #0007;pointer-events:none}#systemRefreshIndicator.show{transform:translate(-50%,0)}#systemRefreshIndicator .spin{display:inline-block;font-size:15px;animation:bsRefreshSpin .8s linear infinite}';document.head.appendChild(style);
     el=document.createElement('div');el.id='systemRefreshIndicator';el.innerHTML='<span class="spin">↻</span><span class="label">Actualizando</span>';document.body.appendChild(el);return el;
   }
-  function enforceRefreshText(remote){const host=document.getElementById('remoteFreshness'),text=host?.querySelector('.remote-connection-text');if(text)text.textContent=remote?'Actualización remota':'Actualizando'}
-  function setRefreshUi(on,remote){
-    const indicator=ensureIndicator();indicator.querySelector('.label').textContent=remote?'Actualización remota':'Actualizando';indicator.classList.toggle('show',!!on);
+  function refreshLabel(source){return isLocal&&source==='remote-command'?'Actualización remota':'Actualizando'}
+  function enforceRefreshText(label){const host=document.getElementById('remoteFreshness'),text=host?.querySelector('.remote-connection-text');if(text)text.textContent=label}
+  function setRefreshUi(on,label){
+    const indicator=ensureIndicator();indicator.querySelector('.label').textContent=label;indicator.classList.toggle('show',!!on);
     clearInterval(refreshStatusTimer);refreshStatusTimer=0;
     const host=document.getElementById('remoteFreshness');if(host)host.classList.toggle('refreshing',!!on);
-    if(on){enforceRefreshText(remote);refreshStatusTimer=setInterval(()=>enforceRefreshText(remote),200)}
+    if(on){enforceRefreshText(label);refreshStatusTimer=setInterval(()=>enforceRefreshText(label),200)}
     else window.BoatStationRemoteUI?.markUpdated?.(Date.now());
   }
   async function fetchVersion(){try{const r=await fetch('./PWA_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(r.ok)return(await r.text()).trim()}catch(_){}return''}
@@ -21,11 +22,11 @@
   function render(){const host=document.getElementById('remoteFreshness');if(!host)return;let el=host.querySelector('.remote-pwa-versions');if(!el){el=document.createElement('span');el.className='remote-pwa-versions';host.appendChild(el)}const mismatch=localVersion!=='—'&&coreVersion!=='—'&&localVersion!==coreVersion;el.textContent=` · Remote ${localVersion} · Core ${coreVersion}${mismatch?' · actualización pendiente':''}`;el.classList.toggle('mismatch',mismatch)}
   async function refreshServiceWorker(){if(!('serviceWorker'in navigator))return;try{const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.update()}catch(_){}}
   async function runSystemRefresh(options={}){
-    if(refreshing)return false;const remote=options.source==='remote'||options.source==='remote-command'||(!isLocal&&options.sendCore!==false);refreshing=true;setRefreshUi(true,remote);
+    if(refreshing)return false;const source=options.source||'local',label=refreshLabel(source);refreshing=true;setRefreshUi(true,label);
     try{
       if(!isLocal&&options.sendCore!==false)try{await window.BoatStationRemoteCommand?.send?.('system.refresh',{source:'remote'})}catch(_){}
-      await refreshServiceWorker();const latest=await fetchVersion();await new Promise(r=>setTimeout(r,650));if(latest)localVersion=latest;render();setRefreshUi(true,remote);setTimeout(()=>location.reload(),180);return true;
-    }catch(_){setRefreshUi(false,remote);refreshing=false;return false}
+      await refreshServiceWorker();const latest=await fetchVersion();await new Promise(r=>setTimeout(r,650));if(latest)localVersion=latest;render();setRefreshUi(true,label);setTimeout(()=>location.reload(),180);return true;
+    }catch(_){setRefreshUi(false,label);refreshing=false;return false}
   }
   function executeRemoteCommand(command){if(command==='system.refresh'){runSystemRefresh({source:'remote-command',sendCore:false});return true}return false}
   window.BoatStationSystem={runSystemRefresh,executeRemoteCommand,getPwaVersion:()=>localVersion};
