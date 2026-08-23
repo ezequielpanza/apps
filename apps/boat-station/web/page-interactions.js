@@ -7,6 +7,7 @@
   const FALLBACK_KEY='bs.ui.pageInteractions.pages';
   let swipe=null;
   let touchGate=null;
+  let restoreQueued=false;
   const activeModules=new Set();
   const pendingRenders=new Map();
 
@@ -17,34 +18,12 @@
 
   function adapter(){return window.BoatStationPageAdapter||null}
   function pageCount(card){return card?.querySelectorAll('.page').length||0}
-  function currentPage(card){
-    const count=pageCount(card);if(!count)return 0;
-    const a=adapter();
-    const external=a?.getPage?.(card);
-    if(Number.isFinite(Number(external)))return Math.max(0,Math.min(count-1,Number(external)));
-    const stored=fallbackPage(card);
-    if(Number.isFinite(stored))return Math.max(0,Math.min(count-1,stored));
-    const dots=[...card.querySelectorAll('.pager span')];
-    const active=dots.findIndex(x=>x.classList.contains('on'));
-    return Math.max(0,active>=0?active:0);
-  }
-  function renderPage(card,page,animate=true){
-    const count=pageCount(card);if(!count)return;
-    page=Math.max(0,Math.min(count-1,page));
-    const track=card.querySelector('.track');
-    if(track){track.style.transition=animate?'':'none';track.style.transform=`translateX(-${page*100}%)`;if(!animate){track.getBoundingClientRect();track.style.transition=''}}
-    card.querySelectorAll('.pager').forEach(p=>p.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===page)));
-  }
-  function commit(card,page){
-    const count=pageCount(card);if(!count)return;
-    page=Math.max(0,Math.min(count-1,page));
-    const a=adapter();
-    if(a?.setPage){a.setPage(card,page);return}
-    saveFallbackPage(card,page);
-    renderPage(card,page,true);
-  }
+  function currentPage(card){const count=pageCount(card);if(!count)return 0;const a=adapter(),external=a?.getPage?.(card);if(Number.isFinite(Number(external)))return Math.max(0,Math.min(count-1,Number(external)));const stored=fallbackPage(card);if(Number.isFinite(stored))return Math.max(0,Math.min(count-1,stored));const dots=[...card.querySelectorAll('.pager span')],active=dots.findIndex(x=>x.classList.contains('on'));return Math.max(0,active>=0?active:0)}
+  function renderPage(card,page,animate=true){const count=pageCount(card);if(!count)return;page=Math.max(0,Math.min(count-1,page));const track=card.querySelector('.track');if(track){track.style.transition=animate?'':'none';track.style.transform=`translate3d(-${page*100}%,0,0)`;if(!animate){track.getBoundingClientRect();track.style.transition=''}}card.querySelectorAll('.pager').forEach(p=>p.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===page)))}
+  function commit(card,page){const count=pageCount(card);if(!count)return;page=Math.max(0,Math.min(count-1,page));const a=adapter();if(a?.setPage){a.setPage(card,page);return}saveFallbackPage(card,page);renderPage(card,page,true)}
   function restoreCard(card){if(!card||pageCount(card)<1)return;renderPage(card,currentPage(card),false)}
-  function restoreAll(){cards.querySelectorAll('.card').forEach(restoreCard)}
+  function restoreAll(){if(swipe)return;cards.querySelectorAll('.card').forEach(restoreCard)}
+  function queueRestore(){if(restoreQueued)return;restoreQueued=true;requestAnimationFrame(()=>{restoreQueued=false;restoreAll()})}
   function blocked(target){return !!target.closest('.card-head,.drag-handle,.resize-handle,button,input,textarea,select,a,.sheet,.station-manager')}
   function primary(e){return e.isPrimary!==false&&(e.pointerType!=='mouse'||e.button===0)}
   function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
@@ -53,81 +32,18 @@
   function endModuleInteraction(card){const id=moduleId(card);if(!id)return;activeModules.delete(id);const pending=pendingRenders.get(id);pendingRenders.delete(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-end',{detail:{id}}));if(pending)requestAnimationFrame(()=>{try{pending()}catch(e){console.warn('Boat Station deferred render',e)}})}
   function requestModuleRender(id,render){id=String(id||'');if(!id||typeof render!=='function')return false;if(activeModules.has(id)){pendingRenders.set(id,render);return false}render();return true}
 
-  cards.addEventListener('touchstart',e=>{
-    if(e.touches.length!==1||document.body.classList.contains('menu-open')||blocked(e.target))return;
-    const card=e.target.closest('.card');if(!card||pageCount(card)<2)return;
-    const t=e.touches[0];touchGate={id:t.identifier,startX:t.clientX,startY:t.clientY,mode:'pending'};
-  },{capture:true,passive:true});
-  cards.addEventListener('touchmove',e=>{
-    if(!touchGate)return;
-    const t=touchById(e.touches,touchGate.id);if(!t)return;
-    const dx=t.clientX-touchGate.startX,dy=t.clientY-touchGate.startY;
-    if(touchGate.mode==='pending'){
-      if(Math.abs(dx)<LOCK&&Math.abs(dy)<LOCK)return;
-      if(Math.abs(dx)>Math.abs(dy)*1.15)touchGate.mode='horizontal';
-      else{touchGate=null;return}
-    }
-    if(touchGate?.mode==='horizontal'){e.preventDefault();e.stopImmediatePropagation()}
-  },{capture:true,passive:false});
-  for(const type of ['touchend','touchcancel'])cards.addEventListener(type,e=>{
-    if(!touchGate)return;
-    const t=touchById(e.changedTouches,touchGate.id);if(!t&&type==='touchend')return;
-    const horizontal=touchGate.mode==='horizontal';touchGate=null;if(horizontal)e.stopImmediatePropagation();
-  },{capture:true,passive:true});
+  cards.addEventListener('touchstart',e=>{if(e.touches.length!==1||document.body.classList.contains('menu-open')||blocked(e.target))return;const card=e.target.closest('.card');if(!card||pageCount(card)<2)return;const t=e.touches[0];touchGate={id:t.identifier,startX:t.clientX,startY:t.clientY,mode:'pending'}},{capture:true,passive:true});
+  cards.addEventListener('touchmove',e=>{if(!touchGate)return;const t=touchById(e.touches,touchGate.id);if(!t)return;const dx=t.clientX-touchGate.startX,dy=t.clientY-touchGate.startY;if(touchGate.mode==='pending'){if(Math.abs(dx)<LOCK&&Math.abs(dy)<LOCK)return;if(Math.abs(dx)>Math.abs(dy)*1.15)touchGate.mode='horizontal';else{touchGate=null;return}}if(touchGate?.mode==='horizontal'){e.preventDefault();e.stopImmediatePropagation()}},{capture:true,passive:false});
+  for(const type of ['touchend','touchcancel'])cards.addEventListener(type,e=>{if(!touchGate)return;const t=touchById(e.changedTouches,touchGate.id);if(!t&&type==='touchend')return;const horizontal=touchGate.mode==='horizontal';touchGate=null;if(horizontal)e.stopImmediatePropagation()},{capture:true,passive:true});
 
-  cards.addEventListener('pointerdown',e=>{
-    if(!primary(e)||document.body.classList.contains('menu-open')||blocked(e.target))return;
-    const card=e.target.closest('.card');if(!card||pageCount(card)<2)return;
-    const page=currentPage(card);
-    swipe={pointerId:e.pointerId,pointerType:e.pointerType,card,page,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastT:performance.now(),vx:0,mode:'pending',interactionStarted:false};
-    adapter()?.begin?.(card,page);
-  },{capture:true});
+  cards.addEventListener('pointerdown',e=>{if(!primary(e)||document.body.classList.contains('menu-open')||blocked(e.target))return;const card=e.target.closest('.card');if(!card||pageCount(card)<2)return;const page=currentPage(card);swipe={pointerId:e.pointerId,pointerType:e.pointerType,card,page,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastT:performance.now(),vx:0,mode:'pending',interactionStarted:false};adapter()?.begin?.(card,page)},{capture:true});
+  cards.addEventListener('pointermove',e=>{if(!swipe||e.pointerId!==swipe.pointerId)return;const dx=e.clientX-swipe.startX,dy=e.clientY-swipe.startY;if(swipe.mode==='pending'){if(Math.abs(dx)<LOCK&&Math.abs(dy)<LOCK)return;if(Math.abs(dx)<=Math.abs(dy)*1.15){adapter()?.cancel?.(swipe.card,swipe.page);swipe=null;queueRestore();return}swipe.mode='horizontal';swipe.interactionStarted=true;beginModuleInteraction(swipe.card);try{swipe.card.setPointerCapture(e.pointerId)}catch{}}if(swipe.mode!=='horizontal')return;e.preventDefault();e.stopPropagation();const now=performance.now(),dt=Math.max(1,now-swipe.lastT);swipe.vx=(e.clientX-swipe.lastX)/dt;swipe.lastX=e.clientX;swipe.lastT=now;const track=swipe.card.querySelector('.track');if(!track)return;const width=Math.max(1,swipe.card.querySelector('.viewport')?.clientWidth||swipe.card.clientWidth);let pct=(-swipe.page*100)+(dx/width*100),min=-(pageCount(swipe.card)-1)*100;if(pct>0)pct=Math.min(18,pct*.32);if(pct<min)pct=Math.max(min-18,min+(pct-min)*.32);track.style.transition='none';track.style.transform=`translate3d(${pct}%,0,0)`},{capture:true,passive:false});
 
-  cards.addEventListener('pointermove',e=>{
-    if(!swipe||e.pointerId!==swipe.pointerId)return;
-    const dx=e.clientX-swipe.startX,dy=e.clientY-swipe.startY;
-    if(swipe.mode==='pending'){
-      if(Math.abs(dx)<LOCK&&Math.abs(dy)<LOCK)return;
-      if(Math.abs(dx)<=Math.abs(dy)*1.15){adapter()?.cancel?.(swipe.card,swipe.page);swipe=null;return}
-      swipe.mode='horizontal';
-      swipe.interactionStarted=true;
-      beginModuleInteraction(swipe.card);
-      try{swipe.card.setPointerCapture(e.pointerId)}catch{}
-    }
-    if(swipe.mode!=='horizontal')return;
-    e.preventDefault();e.stopPropagation();
-    const now=performance.now(),dt=Math.max(1,now-swipe.lastT);swipe.vx=(e.clientX-swipe.lastX)/dt;swipe.lastX=e.clientX;swipe.lastT=now;
-    const track=swipe.card.querySelector('.track');if(!track)return;
-    const width=Math.max(1,swipe.card.querySelector('.viewport')?.clientWidth||swipe.card.clientWidth);
-    let pct=(-swipe.page*100)+(dx/width*100);
-    const min=-(pageCount(swipe.card)-1)*100;
-    if(pct>0)pct=Math.min(18,pct*.32);
-    if(pct<min)pct=Math.max(min-18,min+(pct-min)*.32);
-    track.style.transition='none';track.style.transform=`translateX(${pct}%)`;
-  },{capture:true,passive:false});
+  function finish(e,cancel=false){if(!swipe||e.pointerId!==swipe.pointerId)return;const g=swipe;swipe=null;const dx=e.clientX-g.startX,dy=e.clientY-g.startY;let target=g.page;if(!cancel&&g.mode==='horizontal'){const decisive=Math.abs(dx)>=THRESHOLD&&Math.abs(dx)>Math.abs(dy)*1.1,flick=Math.abs(g.vx)>.45&&Math.abs(dx)>18;if(decisive||flick)target=g.page+(dx<0?1:-1)}target=Math.max(0,Math.min(pageCount(g.card)-1,target));commit(g.card,target);adapter()?.end?.(g.card,target);if(g.interactionStarted)setTimeout(()=>{endModuleInteraction(g.card);queueRestore()},220)}
+  cards.addEventListener('pointerup',e=>finish(e,false),{capture:true});cards.addEventListener('pointercancel',e=>finish(e,true),{capture:true});
 
-  function finish(e,cancel=false){
-    if(!swipe||e.pointerId!==swipe.pointerId)return;
-    const g=swipe;swipe=null;
-    const dx=e.clientX-g.startX,dy=e.clientY-g.startY;
-    let target=g.page;
-    if(!cancel&&g.mode==='horizontal'){
-      const decisive=Math.abs(dx)>=THRESHOLD&&Math.abs(dx)>Math.abs(dy)*1.1;
-      const flick=Math.abs(g.vx)>.45&&Math.abs(dx)>18;
-      if(decisive||flick)target=g.page+(dx<0?1:-1);
-    }
-    target=Math.max(0,Math.min(pageCount(g.card)-1,target));
-    commit(g.card,target);
-    adapter()?.end?.(g.card,target);
-    if(g.interactionStarted)setTimeout(()=>endModuleInteraction(g.card),220);
-  }
-  cards.addEventListener('pointerup',e=>finish(e,false),{capture:true});
-  cards.addEventListener('pointercancel',e=>finish(e,true),{capture:true});
-
-  const observer=new MutationObserver(()=>requestAnimationFrame(restoreAll));
-  observer.observe(cards,{childList:true,subtree:false});
-  window.addEventListener('resize',restoreAll);
-  requestAnimationFrame(restoreAll);
-
+  // Sensor updates can replace a card many times per second. Restoring the page while
+  // the pointer is down resets its transform and produces the visible flash on a slow drag.
+  const observer=new MutationObserver(queueRestore);observer.observe(cards,{childList:true,subtree:false});window.addEventListener('resize',queueRestore);requestAnimationFrame(restoreAll);
   window.BoatStationPageInteractions={renderPage,currentPage,restoreAll,isInteracting:id=>activeModules.has(String(id||'')),requestRender:requestModuleRender};
 })();
