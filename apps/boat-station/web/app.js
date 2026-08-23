@@ -15,13 +15,30 @@ const modules={};
 let lockedScrollY=0,sheetDrag=null,moduleMenuId=null;
 let reorder=null,resize=null,tapCandidate=null,touchSwipe=null,lastTouchSwipeAt=0,refreshGesture=null;
 
-function requestRender(id){renderModule(id)}
+const pendingRenders=new Set();
+let renderTimer=0,lastRenderAt=0;
+const ACTIVE_RENDER_MS=120,HIDDEN_RENDER_MS=500;
+function flushRenders(){
+  renderTimer=0;lastRenderAt=performance.now();
+  const ids=[...pendingRenders];pendingRenders.clear();
+  for(const id of ids)renderModule(id,true);
+  if(pendingRenders.size)scheduleRenderFlush();
+}
+function scheduleRenderFlush(){
+  if(renderTimer)return;
+  const interval=document.hidden?HIDDEN_RENDER_MS:ACTIVE_RENDER_MS;
+  const wait=Math.max(0,interval-(performance.now()-lastRenderAt));
+  renderTimer=setTimeout(flushRenders,wait);
+}
+function requestRender(id){if(!modules[id])return;pendingRenders.add(id);scheduleRenderFlush()}
 function openBatteryManager(){renderBatteryManager();openSheet(batteryManager)}
 modules.gps=createGpsModule(requestRender);
 modules.batteries=createBatteriesModule(requestRender,openBatteryManager);
 modules.phone=createPhoneModule(requestRender);
 modules.seastate=createSeaStateModule(requestRender);
 modules.compass=createCompassModule(requestRender);
+
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&pendingRenders.size){if(renderTimer){clearTimeout(renderTimer);renderTimer=0}flushRenders()}});
 
 function pager(count,current){return `<div class="pager">${Array.from({length:count},(_,i)=>`<span class="${i===current?'on':''}">●</span>`).join('')}</div>`}
 function updatePager(card,current){card.querySelectorAll('.pager').forEach(p=>p.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===current)))}
@@ -33,9 +50,17 @@ function saveHeights(){localStorage.setItem('bs.ui.heights',JSON.stringify(ui.he
 function pageHeight(id,page){const stored=ui.heights[id];if(stored&&typeof stored==='object'&&Number.isFinite(Number(stored[page])))return Number(stored[page]);if(Number.isFinite(Number(stored))&&page===0)return Number(stored);return null}
 function setPageHeight(id,page,height){const current=ui.heights[id]&&typeof ui.heights[id]==='object'?ui.heights[id]:{};ui.heights[id]={...current,[page]:Math.round(height)}}
 function measure(card){if(!card||card.classList.contains('collapsed'))return;const id=card.dataset.id,body=card.querySelector('.card-body');if(!body)return;const p=Math.min(ui.page[id]||0,modules[id].pages-1),fixed=pageHeight(id,p);if(fixed!==null){body.style.height=`${fixed}px`;return}const page=card.querySelector(`.page[data-page="${p}"]`);if(page)body.style.height=page.scrollHeight+'px'}
-function hydrate(card){const id=card.dataset.id;modules[id].afterRender?.(card);updatePager(card,ui.page[id]||0);requestAnimationFrame(()=>measure(card))}
-function renderAll(){cards.innerHTML=ui.order.map(moduleHtml).join('');cards.querySelectorAll('.card').forEach(hydrate)}
-function renderModule(id){const old=cards.querySelector(`.card[data-id="${id}"]`);if(!old)return;const holder=document.createElement('div');holder.innerHTML=moduleHtml(id);old.replaceWith(holder.firstElementChild);hydrate(cards.querySelector(`.card[data-id="${id}"]`))}
+function hydrate(card,measureLayout=true){const id=card.dataset.id;modules[id].afterRender?.(card);updatePager(card,ui.page[id]||0);if(measureLayout)requestAnimationFrame(()=>measure(card))}
+function renderAll(){cards.innerHTML=ui.order.map(moduleHtml).join('');cards.querySelectorAll('.card').forEach(card=>hydrate(card,true))}
+function renderModule(id,preserveLayout=false){
+  const old=cards.querySelector(`.card[data-id="${id}"]`);if(!old)return;
+  const oldBody=old.querySelector('.card-body');
+  const oldHeight=preserveLayout&&oldBody&&!old.classList.contains('collapsed')?oldBody.getBoundingClientRect().height:0;
+  const holder=document.createElement('div');holder.innerHTML=moduleHtml(id);
+  const next=holder.firstElementChild;
+  if(oldHeight>0){const body=next.querySelector('.card-body');if(body)body.style.height=`${oldHeight}px`}
+  old.replaceWith(next);hydrate(next,!preserveLayout);
+}
 function setModulePage(card,next){if(!card)return;const id=card.dataset.id,m=modules[id];if(!m||m.pages<2)return;const page=Math.max(0,Math.min(m.pages-1,next));if(page===(ui.page[id]||0))return;ui.page[id]=page;card.querySelector('.track').style.transform=`translateX(-${page*100}%)`;updatePager(card,page);setTimeout(()=>{measure(card);m.afterRender?.(card)},190)}
 
 function anySheetOpen(){return [...document.querySelectorAll('.sheet')].some(s=>s.classList.contains('open'))}
