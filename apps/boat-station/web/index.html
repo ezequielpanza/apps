@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Boat Station</title>
+<title>Boat Station Remote</title>
 <meta name="theme-color" content="#061522">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.png">
@@ -32,6 +32,7 @@
 (async function(){
   const params=new URLSearchParams(location.search);
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
+  if(isLocal) document.title='Boat Station';
   const menu=document.getElementById('menuSheet');
 
   try{
