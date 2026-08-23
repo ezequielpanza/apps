@@ -22,7 +22,10 @@ public class BoatStationActivity extends MainActivityCore {
         super.onCreate(savedInstanceState);
         startCoreService();
         WebView webView = findWebView(getWindow().getDecorView());
-        if (webView != null) webView.addJavascriptInterface(new CoreRuntimeBridge(), "CoreRuntimeBridge");
+        if (webView != null) {
+            webView.addJavascriptInterface(new CoreRuntimeBridge(), "CoreRuntimeBridge");
+            webView.addJavascriptInterface(new BatteryScannerBridge(this, webView), "BatteryScannerBridge");
+        }
     }
 
     private void startCoreService() {
