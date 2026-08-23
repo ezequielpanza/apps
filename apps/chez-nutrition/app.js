@@ -44,7 +44,7 @@ function renderCharts(evolution,intakes,goals){
     ...names.map(n=>({label:`Objetivo ${n} · ${goals[n].weight} kg`,data:labels.map(()=>goals[n].weight),borderDash:[7,6],borderWidth:2,pointRadius:0,tension:0}))
   ];
   if(weightChart)weightChart.destroy();
-  weightChart=new Chart($('weightChart'),{type:'line',data:{labels:labels.map(fmtDate),datasets:weightDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},zoom:{pan:{enabled:true,mode:'xy'},zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'xy'}}},scales:{y:{beginAtZero:false}}}});
+  weightChart=new Chart($('weightChart'),{type:'line',data:{labels:labels.map(fmtDate),datasets:weightDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},zoom:{pan:{enabled:true,mode:'x'},zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x'}}},scales:{y:{beginAtZero:false}}}});
   const dailyCalories=(name,date)=>{
     const entries=byPersonIntakes[name].filter(x=>x.Fecha===date);
     if(entries.length)return entries.reduce((sum,x)=>sum+num(x.kcal),0);
