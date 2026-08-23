@@ -15,7 +15,7 @@
   const installBar=document.createElement('div');
   installBar.id='remoteInstallBar';
   installBar.className='remote-install-bar';
-  installBar.innerHTML='<span>Instalá Boat Station Remote</span><div class="remote-install-actions"><button type="button" id="remoteInstallDismiss">Omitir</button><button type="button" id="remoteInstallBtn">Instalar</button></div>';
+  installBar.innerHTML='<span>Instalá Boat Station Remote</span><div class="remote-install-actions"><button type="button" id="remoteInstallBtn">Instalar</button><button type="button" id="remoteInstallDismiss">Omitir</button></div>';
   const installBtn=installBar.querySelector('#remoteInstallBtn');
   const dismissBtn=installBar.querySelector('#remoteInstallDismiss');
   const hideInstall=()=>installBar.classList.remove('show');
