@@ -10,10 +10,30 @@
   const active=()=>{const a=stations(),id=localStorage.getItem('bs.remote.activeStation');return a.find(x=>x.stationId===id)||a[0]||null};
   const apkVersion=async()=>{try{const r=await fetch('/APK_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(!r.ok)return'';return (await r.text()).trim()}catch{return''}};
 
+  let installPrompt=null;
+  const standalone=()=>window.matchMedia?.('(display-mode: standalone)')?.matches||window.navigator.standalone===true;
+  const installBar=document.createElement('div');
+  installBar.id='remoteInstallBar';
+  installBar.className='remote-install-bar';
+  installBar.innerHTML='<span>Instalá Boat Station Remote</span><button type="button">Instalar</button>';
+  const installBtn=installBar.querySelector('button');
+  const hideInstall=()=>installBar.classList.remove('show');
+  const showInstall=()=>{if(!standalone()&&installPrompt)installBar.classList.add('show')};
+  document.body.appendChild(installBar);
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;showInstall()});
+  window.addEventListener('appinstalled',()=>{installPrompt=null;hideInstall()});
+  installBtn.onclick=async()=>{
+    if(!installPrompt)return;
+    hideInstall();
+    try{await installPrompt.prompt();await installPrompt.userChoice}catch(_){}
+    installPrompt=null;
+  };
+  if(standalone())hideInstall();
+
   if(active())return;
 
   const gate=document.createElement('div');gate.id='remoteLanding';
-  gate.innerHTML='<div class="rl-card"><img class="rl-logo" src="./icon.png" alt="Boat Station"><h1>Boat Station</h1><p class="rl-intro">Accedé a Boat Station desde la web o instalá la app Android para convertir un teléfono en la estación del barco.</p><button class="rl-apk" id="rlApk" type="button">Descargar Boat Station APK</button><div class="rl-separator"><span>Ya tenés la app</span></div><p class="rl-pair-copy">Ingresá el código de vinculación que muestra Boat Station en el teléfono.</p><input id="rlCode" maxlength="19" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="one-time-code"><button id="rlConnect" type="button">Vincular estación</button><div class="rl-status" id="rlStatus"></div></div>';
+  gate.innerHTML='<div class="rl-card"><img class="rl-logo" src="./icon.png" alt="Boat Station"><h1>Boat Station Remote</h1><p class="rl-intro">Accedé a Boat Station desde la web o instalá la app Android para convertir un teléfono en la estación del barco.</p><button class="rl-apk" id="rlApk" type="button">Descargar Boat Station APK</button><div class="rl-separator"><span>Ya tenés la app</span></div><p class="rl-pair-copy">Ingresá el código de vinculación que muestra Boat Station en el teléfono.</p><input id="rlCode" maxlength="19" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="one-time-code"><button id="rlConnect" type="button">Vincular estación</button><div class="rl-status" id="rlStatus"></div></div>';
   document.body.appendChild(gate);
   const input=gate.querySelector('#rlCode'),status=gate.querySelector('#rlStatus'),apkBtn=gate.querySelector('#rlApk');
   let apkHref='/BoatStation.apk';
