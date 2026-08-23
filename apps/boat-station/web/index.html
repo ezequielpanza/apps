@@ -48,6 +48,12 @@
   }
 
   try{
+    await import('./pwa-version.js');
+  }catch(err){
+    console.warn('Boat Station PWA version bridge unavailable',err);
+  }
+
+  try{
     await import('./stations.js');
   }catch(err){
     console.error('Boat Station station management unavailable',err);
