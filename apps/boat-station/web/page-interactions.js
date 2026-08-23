@@ -7,6 +7,8 @@
   const FALLBACK_KEY='bs.ui.pageInteractions.pages';
   let swipe=null;
   let touchGate=null;
+  const activeModules=new Set();
+  const pendingRenders=new Map();
 
   function readFallback(){try{const v=JSON.parse(localStorage.getItem(FALLBACK_KEY)||'{}');return v&&typeof v==='object'?v:{}}catch{return {}}}
   function writeFallback(state){try{localStorage.setItem(FALLBACK_KEY,JSON.stringify(state))}catch{}}
@@ -46,15 +48,15 @@
   function blocked(target){return !!target.closest('.card-head,.drag-handle,.resize-handle,button,input,textarea,select,a,.sheet,.station-manager')}
   function primary(e){return e.isPrimary!==false&&(e.pointerType!=='mouse'||e.button===0)}
   function touchById(list,id){for(const t of list)if(t.identifier===id)return t;return null}
+  function moduleId(card){return card?.dataset?.id||''}
+  function beginModuleInteraction(card){const id=moduleId(card);if(!id)return;activeModules.add(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-start',{detail:{id}}))}
+  function endModuleInteraction(card){const id=moduleId(card);if(!id)return;activeModules.delete(id);const pending=pendingRenders.get(id);pendingRenders.delete(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-end',{detail:{id}}));if(pending)requestAnimationFrame(()=>{try{pending()}catch(e){console.warn('Boat Station deferred render',e)}})}
+  function requestModuleRender(id,render){id=String(id||'');if(!id||typeof render!=='function')return false;if(activeModules.has(id)){pendingRenders.set(id,render);return false}render();return true}
 
-  // The shared engine is the single owner of horizontal paging on touch devices.
-  // Capture-phase touch arbitration prevents the legacy card touch recognizer from
-  // competing with PointerEvent dragging while still allowing normal vertical scroll.
   cards.addEventListener('touchstart',e=>{
     if(e.touches.length!==1||document.body.classList.contains('menu-open')||blocked(e.target))return;
     const card=e.target.closest('.card');if(!card||pageCount(card)<2)return;
-    const t=e.touches[0];
-    touchGate={id:t.identifier,startX:t.clientX,startY:t.clientY,mode:'pending'};
+    const t=e.touches[0];touchGate={id:t.identifier,startX:t.clientX,startY:t.clientY,mode:'pending'};
   },{capture:true,passive:true});
   cards.addEventListener('touchmove',e=>{
     if(!touchGate)return;
@@ -65,24 +67,19 @@
       if(Math.abs(dx)>Math.abs(dy)*1.15)touchGate.mode='horizontal';
       else{touchGate=null;return}
     }
-    if(touchGate?.mode==='horizontal'){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    }
+    if(touchGate?.mode==='horizontal'){e.preventDefault();e.stopImmediatePropagation()}
   },{capture:true,passive:false});
   for(const type of ['touchend','touchcancel'])cards.addEventListener(type,e=>{
     if(!touchGate)return;
     const t=touchById(e.changedTouches,touchGate.id);if(!t&&type==='touchend')return;
-    const horizontal=touchGate.mode==='horizontal';
-    touchGate=null;
-    if(horizontal)e.stopImmediatePropagation();
+    const horizontal=touchGate.mode==='horizontal';touchGate=null;if(horizontal)e.stopImmediatePropagation();
   },{capture:true,passive:true});
 
   cards.addEventListener('pointerdown',e=>{
     if(!primary(e)||document.body.classList.contains('menu-open')||blocked(e.target))return;
     const card=e.target.closest('.card');if(!card||pageCount(card)<2)return;
     const page=currentPage(card);
-    swipe={pointerId:e.pointerId,pointerType:e.pointerType,card,page,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastT:performance.now(),vx:0,mode:'pending'};
+    swipe={pointerId:e.pointerId,pointerType:e.pointerType,card,page,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastT:performance.now(),vx:0,mode:'pending',interactionStarted:false};
     adapter()?.begin?.(card,page);
   },{capture:true});
 
@@ -93,6 +90,8 @@
       if(Math.abs(dx)<LOCK&&Math.abs(dy)<LOCK)return;
       if(Math.abs(dx)<=Math.abs(dy)*1.15){adapter()?.cancel?.(swipe.card,swipe.page);swipe=null;return}
       swipe.mode='horizontal';
+      swipe.interactionStarted=true;
+      beginModuleInteraction(swipe.card);
       try{swipe.card.setPointerCapture(e.pointerId)}catch{}
     }
     if(swipe.mode!=='horizontal')return;
@@ -120,6 +119,7 @@
     target=Math.max(0,Math.min(pageCount(g.card)-1,target));
     commit(g.card,target);
     adapter()?.end?.(g.card,target);
+    if(g.interactionStarted)setTimeout(()=>endModuleInteraction(g.card),220);
   }
   cards.addEventListener('pointerup',e=>finish(e,false),{capture:true});
   cards.addEventListener('pointercancel',e=>finish(e,true),{capture:true});
@@ -129,5 +129,5 @@
   window.addEventListener('resize',restoreAll);
   requestAnimationFrame(restoreAll);
 
-  window.BoatStationPageInteractions={renderPage,currentPage,restoreAll};
+  window.BoatStationPageInteractions={renderPage,currentPage,restoreAll,isInteracting:id=>activeModules.has(String(id||'')),requestRender:requestModuleRender};
 })();
