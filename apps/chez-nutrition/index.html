@@ -13,6 +13,8 @@
   <title>Chez Nutrition</title>
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
 </head>
 <body>
   <main class="app-shell">
@@ -42,7 +44,7 @@
     <section class="charts-grid">
       <article class="panel chart-card">
         <div class="section-head">
-          <div><div class="eyebrow">Evolución</div><h2>Peso</h2></div>
+          <div><div class="eyebrow">Evolución</div><h2>Peso</h2></div><button id="resetWeightZoomBtn" class="btn secondary chart-reset" type="button">Restablecer zoom</button>
         </div>
         <canvas id="weightChart"></canvas>
       </article>
