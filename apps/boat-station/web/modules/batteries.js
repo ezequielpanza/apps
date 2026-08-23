@@ -70,7 +70,17 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function historyPoints(){const cutoff=Date.now()-Number(state.historyHours)*3600000;return state.history.filter(p=>Number(p.time)>=cutoff)}
   function updateHistoryLabel(root){const el=root?.querySelector('[data-history-range]');if(el)el.textContent=historyRangeLabel()}
-  function aggregateForChart(points,start,end,count){if(!points.length)return[];const span=Math.max(1,end-start),step=span/count,buckets=Array.from({length:count},()=>({sum:0,n:0,time:0}));for(const p of points){const i=Math.max(0,Math.min(count-1,Math.floor((Number(p.time)-start)/step))),b=buckets[i];b.sum+=Number(p.soc)||0;b.n++;b.time=Number(p.time)}return buckets.map((b,i)=>b.n?{time:b.time||start+(i+.5)*step,soc:b.sum/b.n}:null)}
+  function aggregateForChart(points,start,end,count){
+    if(!points.length)return[];
+    const span=Math.max(1,end-start),step=span/count,buckets=Array.from({length:count},()=>({socSum:0,socN:0,currentSum:0,currentN:0,time:0}));
+    for(const p of points){
+      const i=Math.max(0,Math.min(count-1,Math.floor((Number(p.time)-start)/step))),b=buckets[i],soc=num(p.soc),current=num(p.current);
+      if(soc!==null){b.socSum+=soc;b.socN++}
+      if(current!==null){b.currentSum+=current;b.currentN++}
+      b.time=Number(p.time);
+    }
+    return buckets.map((b,i)=>b.socN?{time:b.time||start+(i+.5)*step,soc:b.socSum/b.socN,current:b.currentN?b.currentSum/b.currentN:null}:null);
+  }
   function markGranularity(hours){if(hours<=1)return 5*60000;if(hours<=3)return 15*60000;if(hours<=6)return 30*60000;if(hours<=24)return 60*60000;if(hours<=72)return 2*3600000;if(hours<=336)return 6*3600000;if(hours<=720)return 12*3600000;return 24*3600000}
   function roundedMark(time,hours){const step=markGranularity(hours);return Math.round(time/step)*step}
   function axisLabel(time,hours){const d=new Date(time),hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'),month=String(d.getMonth()+1).padStart(2,'0');if(hours<=12)return `${hh}:${mm}`;if(hours<=72)return `${day}/${month} ${hh}:${mm}`;if(hours<=336)return `${day}/${month} ${hh}h`;return `${day}/${month}`}
@@ -80,7 +90,15 @@ export function createBatteriesModule(requestRender,openManager){
     const hours=Number(state.historyHours),axisH=r.width<520?42:30,plotH=Math.max(20,r.height-axisH),end=Date.now(),start=end-hours*3600000,slot=r.width/12;
     c.strokeStyle='#17394f';c.lineWidth=1;for(let i=1;i<5;i++){const y=i*plotH/5;c.beginPath();c.moveTo(0,y);c.lineTo(r.width,y);c.stroke()}
     const pts=aggregateForChart(historyPoints(),start,end,12);
-    if(pts.some(Boolean)){const bar=Math.max(1,slot*.7);pts.forEach((p,i)=>{if(!p)return;const h=Math.max(1,(Math.max(0,Math.min(100,Number(p.soc)||0))/100)*plotH),x=i*slot+(slot-bar)/2;c.fillStyle='#1ed7e5';c.fillRect(x,plotH-h,bar,h)})}
+    if(pts.some(Boolean)){
+      const bar=Math.max(1,slot*.7);
+      pts.forEach((p,i)=>{
+        if(!p)return;
+        const h=Math.max(1,(Math.max(0,Math.min(100,Number(p.soc)||0))/100)*plotH),x=i*slot+(slot-bar)/2,current=num(p.current);
+        c.fillStyle=current===null||Math.abs(current)<=.15?'#1ed7e5':current>.15?'#8bd332':'#ff6e6e';
+        c.fillRect(x,plotH-h,bar,h);
+      });
+    }
     c.font=(r.width<520?'8px':'9px')+' system-ui, sans-serif';c.fillStyle='#7890a1';c.textBaseline='middle';c.textAlign='center';for(let i=0;i<12;i++){const center=start+(i+.5)*(end-start)/12,time=roundedMark(center,hours),text=axisLabel(time,hours),x=(i+.5)*slot,y=plotH+(axisH/2);c.save();c.translate(x,y);if(r.width<520)c.rotate(-Math.PI/4);c.fillText(text,0,0);c.restore()}
   }
   function changeHistoryZoom(direction,root){const i=HISTORY_HOUR_LEVELS.indexOf(Number(state.historyHours)),next=direction==='out'?Math.min(HISTORY_HOUR_LEVELS.length-1,i+1):Math.max(0,i-1);if(next===i)return;state.historyHours=HISTORY_HOUR_LEVELS[next];save();updateHistoryLabel(root);drawChart(root)}
