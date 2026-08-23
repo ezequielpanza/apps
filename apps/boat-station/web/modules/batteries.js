@@ -8,7 +8,7 @@ export function createBatteriesModule(requestRender,openManager){
   const HISTORY_HOUR_LEVELS=[1,3,6,12,24,48,72,168,336,720,1440,2160];
   if(!Number.isFinite(Number(state.historyHours))&&Number.isFinite(Number(state.historyDays)))state.historyHours=Number(state.historyDays)*24;
   delete state.historyDays;if(!HISTORY_HOUR_LEVELS.includes(Number(state.historyHours)))state.historyHours=168;
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
   const num=v=>Number.isFinite(Number(v))?Number(v):null;
   const clone=v=>{try{return JSON.parse(JSON.stringify(v))}catch{return v}};
   let saveTimer=0;
@@ -71,28 +71,31 @@ export function createBatteriesModule(requestRender,openManager){
     if(index===2)return statisticsPage();
     return batteryListPage();
   }
-  function historyPoints(){const cutoff=Date.now()-Number(state.historyHours)*3600000;return state.history.filter(p=>Number(p.time)>=cutoff)}
   function updateHistoryLabel(root){const el=root?.querySelector('[data-history-range]');if(el)el.textContent=historyRangeLabel()}
-  function aggregateForChart(points,start,end,count){
-    if(!points.length)return[];
-    const span=Math.max(1,end-start),step=span/count,buckets=Array.from({length:count},()=>({socSum:0,socN:0,currentSum:0,currentN:0,time:0}));
+  function chartWindow(hours,count=12){
+    const step=Math.max(1,(Number(hours)*3600000)/count);
+    const currentStart=Math.floor(Date.now()/step)*step;
+    return{step,start:currentStart-step*(count-1),end:currentStart+step,currentStart};
+  }
+  function aggregateForChart(points,start,step,count){
+    const buckets=Array.from({length:count},()=>({socSum:0,socN:0,currentSum:0,currentN:0,time:0}));
+    const end=start+step*count;
     for(const p of points){
-      const i=Math.max(0,Math.min(count-1,Math.floor((Number(p.time)-start)/step))),b=buckets[i],soc=num(p.soc),current=num(p.current);
+      const time=Number(p.time);if(!Number.isFinite(time)||time<start||time>=end)continue;
+      const i=Math.floor((time-start)/step),b=buckets[i],soc=num(p.soc),current=num(p.current);
       if(soc!==null){b.socSum+=soc;b.socN++}
       if(current!==null){b.currentSum+=current;b.currentN++}
-      b.time=Number(p.time);
+      b.time=time;
     }
     return buckets.map((b,i)=>b.socN?{time:b.time||start+(i+.5)*step,soc:b.socSum/b.socN,current:b.currentN?b.currentSum/b.currentN:null}:null);
   }
-  function markGranularity(hours){if(hours<=1)return 5*60000;if(hours<=3)return 15*60000;if(hours<=6)return 30*60000;if(hours<=24)return 60*60000;if(hours<=72)return 2*3600000;if(hours<=336)return 6*3600000;if(hours<=720)return 12*3600000;return 24*3600000}
-  function roundedMark(time,hours){const step=markGranularity(hours);return Math.round(time/step)*step}
   function axisLabel(time,hours){const d=new Date(time),hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'),month=String(d.getMonth()+1).padStart(2,'0');if(hours<=12)return `${hh}:${mm}`;if(hours<=72)return `${day}/${month} ${hh}:${mm}`;if(hours<=336)return `${day}/${month} ${hh}h`;return `${day}/${month}`}
   function drawChart(root){
     const canvas=root.querySelector('[data-battery-chart]');if(!canvas)return;const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;
     const dpr=window.devicePixelRatio||1;canvas.width=Math.round(r.width*dpr);canvas.height=Math.round(r.height*dpr);const c=canvas.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,r.width,r.height);
-    const hours=Number(state.historyHours),axisH=r.width<520?42:30,plotH=Math.max(20,r.height-axisH),end=Date.now(),start=end-hours*3600000,slot=r.width/12;
+    const hours=Number(state.historyHours),axisH=r.width<520?42:30,plotH=Math.max(20,r.height-axisH),windowSpec=chartWindow(hours,12),start=windowSpec.start,step=windowSpec.step,slot=r.width/12;
     c.strokeStyle='#17394f';c.lineWidth=1;for(let i=1;i<5;i++){const y=i*plotH/5;c.beginPath();c.moveTo(0,y);c.lineTo(r.width,y);c.stroke()}
-    const pts=aggregateForChart(historyPoints(),start,end,12);
+    const pts=aggregateForChart(state.history,start,step,12);
     if(pts.some(Boolean)){
       const bar=Math.max(1,slot*.7);
       pts.forEach((p,i)=>{
@@ -102,7 +105,7 @@ export function createBatteriesModule(requestRender,openManager){
         c.fillRect(x,plotH-h,bar,h);
       });
     }
-    c.font=(r.width<520?'8px':'9px')+' system-ui, sans-serif';c.fillStyle='#7890a1';c.textBaseline='middle';c.textAlign='center';for(let i=0;i<12;i++){const center=start+(i+.5)*(end-start)/12,time=roundedMark(center,hours),text=axisLabel(time,hours),x=(i+.5)*slot,y=plotH+(axisH/2);c.save();c.translate(x,y);if(r.width<520)c.rotate(-Math.PI/4);c.fillText(text,0,0);c.restore()}
+    c.font=(r.width<520?'8px':'9px')+' system-ui, sans-serif';c.fillStyle='#7890a1';c.textBaseline='middle';c.textAlign='center';for(let i=0;i<12;i++){const center=start+(i+.5)*step,text=axisLabel(center,hours),x=(i+.5)*slot,y=plotH+(axisH/2);c.save();c.translate(x,y);if(r.width<520)c.rotate(-Math.PI/4);c.fillText(text,0,0);c.restore()}
   }
   function changeHistoryZoom(direction,root){const i=HISTORY_HOUR_LEVELS.indexOf(Number(state.historyHours)),next=direction==='out'?Math.min(HISTORY_HOUR_LEVELS.length-1,i+1):Math.max(0,i-1);if(next===i)return;state.historyHours=HISTORY_HOUR_LEVELS[next];save();updateHistoryLabel(root);drawChart(root)}
   function afterRender(root){state.root=root;drawChart(root);root.querySelectorAll('[data-battery-manage]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openManager?.()}));root.querySelectorAll('[data-history-zoom]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();changeHistoryZoom(b.dataset.historyZoom,root)}))}
