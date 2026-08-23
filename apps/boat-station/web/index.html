@@ -72,7 +72,7 @@
       row.innerHTML='<span>Boat Station APK<br><small class="sub">Última versión disponible</small></span><a class="btn" href="/BoatStation.apk" download>Descargar</a>';
       inner.appendChild(row);
       try{
-        const versionResponse=await fetch('/APK_VERSION',{cache:'no-store'});
+        const versionResponse=await fetch('/APK_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
         if(versionResponse.ok){
           const version=(await versionResponse.text()).trim();
           if(version){
