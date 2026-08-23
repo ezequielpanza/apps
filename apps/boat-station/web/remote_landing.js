@@ -15,13 +15,15 @@
   const installBar=document.createElement('div');
   installBar.id='remoteInstallBar';
   installBar.className='remote-install-bar';
-  installBar.innerHTML='<span>Instalá Boat Station Remote</span><button type="button">Instalar</button>';
-  const installBtn=installBar.querySelector('button');
+  installBar.innerHTML='<span>Instalá Boat Station Remote</span><div class="remote-install-actions"><button type="button" id="remoteInstallDismiss">Omitir</button><button type="button" id="remoteInstallBtn">Instalar</button></div>';
+  const installBtn=installBar.querySelector('#remoteInstallBtn');
+  const dismissBtn=installBar.querySelector('#remoteInstallDismiss');
   const hideInstall=()=>installBar.classList.remove('show');
   const showInstall=()=>{if(!standalone()&&installPrompt)installBar.classList.add('show')};
   document.body.appendChild(installBar);
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;showInstall()});
   window.addEventListener('appinstalled',()=>{installPrompt=null;hideInstall()});
+  dismissBtn.onclick=()=>hideInstall();
   installBtn.onclick=async()=>{
     if(!installPrompt)return;
     hideInstall();
