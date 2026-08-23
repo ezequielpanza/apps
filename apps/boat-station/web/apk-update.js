@@ -20,6 +20,12 @@
   function download(version){
     const path=`/BoatStation-${encodeURIComponent(version)}.apk`;
     const url=new URL(path,location.origin).href;
+    try{
+      if(window.CoreRuntimeBridge&&typeof CoreRuntimeBridge.downloadApk==='function'){
+        const started=CoreRuntimeBridge.downloadApk(url,version);
+        if(started!==false)return;
+      }
+    }catch(_){}
     try{if(window.CoreBridge&&typeof CoreBridge.downloadApk==='function'){CoreBridge.downloadApk(url);return}}catch(_){}
     try{location.href=url}catch(_){window.open(url,'_self')}
   }
