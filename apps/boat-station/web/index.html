@@ -81,6 +81,12 @@
   }
 
   try{
+    await import('./apk-update.js');
+  }catch(err){
+    console.warn('Boat Station APK update checker unavailable',err);
+  }
+
+  try{
     await import('./pwa-version.js');
   }catch(err){
     console.warn('Boat Station PWA version bridge unavailable',err);
