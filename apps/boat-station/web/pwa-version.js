@@ -8,6 +8,7 @@
   function setRefreshUi(on,label){
     clearInterval(refreshStatusTimer);refreshStatusTimer=0;
     const host=document.getElementById('remoteFreshness');if(host)host.classList.toggle('refreshing',!!on);
+    const button=host?.querySelector('.remote-refresh-button');if(button){button.disabled=!!on;button.textContent=on?'Actualizando…':'Actualizar'}
     if(on){enforceRefreshText(label);refreshStatusTimer=setInterval(()=>enforceRefreshText(label),200)}
     else window.BoatStationRemoteUI?.markUpdated?.(Date.now());
   }
@@ -50,6 +51,12 @@
     const mismatch=localVersion!=='—'&&corePwaVersion!=='—'&&localVersion!==corePwaVersion;
     el.textContent=` · Remote ${localVersion} · Core ${coreApkVersion}${mismatch?' · actualización pendiente':''}`;
     el.classList.toggle('mismatch',mismatch);
+    if(!isLocal&&!host.querySelector('.remote-refresh-button')){
+      const button=document.createElement('button');
+      button.type='button';button.className='remote-refresh-button';button.textContent='Actualizar';
+      button.addEventListener('click',()=>runSystemRefresh({source:'desktop',sendCore:false}));
+      host.appendChild(button);
+    }
   }
   async function refreshServiceWorker(){if(!('serviceWorker'in navigator))return;try{const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.update()}catch(_){}}
   async function runSystemRefresh(options={}){
