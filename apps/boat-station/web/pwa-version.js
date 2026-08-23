@@ -3,15 +3,9 @@
   const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
   let localVersion='—',coreVersion='—',wrappedSync=false,wrappedRemote=false,wrappedCommand=false,refreshing=false,pull=null,refreshStatusTimer=0;
 
-  function ensureIndicator(){
-    let el=document.getElementById('systemRefreshIndicator');if(el)return el;
-    const style=document.createElement('style');style.textContent='@keyframes bsRefreshSpin{to{transform:rotate(360deg)}}#systemRefreshIndicator{position:fixed;z-index:5000;left:50%;top:58px;transform:translate(-50%,-70px);transition:transform .2s ease;display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:18px;background:#0b2637;color:#d7eef7;font:600 12px system-ui,sans-serif;box-shadow:0 5px 18px #0007;pointer-events:none}#systemRefreshIndicator.show{transform:translate(-50%,0)}#systemRefreshIndicator .spin{display:inline-block;font-size:15px;animation:bsRefreshSpin .8s linear infinite}';document.head.appendChild(style);
-    el=document.createElement('div');el.id='systemRefreshIndicator';el.innerHTML='<span class="spin">↻</span><span class="label">Actualizando</span>';document.body.appendChild(el);return el;
-  }
   function refreshLabel(source){return isLocal&&source==='remote-command'?'Actualización remota':'Actualizando'}
   function enforceRefreshText(label){const host=document.getElementById('remoteFreshness'),text=host?.querySelector('.remote-connection-text');if(text)text.textContent=label}
   function setRefreshUi(on,label){
-    const indicator=ensureIndicator();indicator.querySelector('.label').textContent=label;indicator.classList.toggle('show',!!on);
     clearInterval(refreshStatusTimer);refreshStatusTimer=0;
     const host=document.getElementById('remoteFreshness');if(host)host.classList.toggle('refreshing',!!on);
     if(on){enforceRefreshText(label);refreshStatusTimer=setInterval(()=>enforceRefreshText(label),200)}
