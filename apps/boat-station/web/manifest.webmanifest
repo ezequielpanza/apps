@@ -1,6 +1,6 @@
 {
-  "name": "Boat Station",
-  "short_name": "Boat Station",
+  "name": "Boat Station Remote",
+  "short_name": "BS Remote",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#061522",
