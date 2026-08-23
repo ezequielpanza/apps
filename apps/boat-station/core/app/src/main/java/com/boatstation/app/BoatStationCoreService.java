@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
@@ -22,9 +23,15 @@ import android.os.SystemClock;
 public class BoatStationCoreService extends Service {
     public static final String ACTION_START = "com.boatstation.app.action.START_CORE";
     public static final String ACTION_STOP = "com.boatstation.app.action.STOP_CORE";
+    public static final String ACTION_CONFIGURE_REMOTE = "com.boatstation.app.action.CONFIGURE_REMOTE";
+    public static final String EXTRA_STATION_ID = "stationId";
+    public static final String EXTRA_TOKEN = "token";
+    public static final String EXTRA_BACKEND = "backend";
+    public static final String EXTRA_STATION_NAME = "stationName";
 
     private static final String CHANNEL_ID = "boat_station_core";
     private static final int NOTIFICATION_ID = 4101;
+    private static final String PREFS = "boat_station_core";
 
     private final LocalBinder binder = new LocalBinder();
     private long startedAtElapsedRealtime;
@@ -50,6 +57,10 @@ public class BoatStationCoreService extends Service {
             return START_NOT_STICKY;
         }
 
+        if (intent != null && ACTION_CONFIGURE_REMOTE.equals(intent.getAction())) {
+            persistRemoteConfig(intent);
+        }
+
         startForeground(NOTIFICATION_ID, buildNotification());
         return START_STICKY;
     }
@@ -61,6 +72,24 @@ public class BoatStationCoreService extends Service {
 
     public long getUptimeMs() {
         return Math.max(0L, SystemClock.elapsedRealtime() - startedAtElapsedRealtime);
+    }
+
+    public SharedPreferences getCorePreferences() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE);
+    }
+
+    private void persistRemoteConfig(Intent intent) {
+        String stationId = intent.getStringExtra(EXTRA_STATION_ID);
+        String token = intent.getStringExtra(EXTRA_TOKEN);
+        String backend = intent.getStringExtra(EXTRA_BACKEND);
+        String stationName = intent.getStringExtra(EXTRA_STATION_NAME);
+        if (stationId == null || stationId.trim().isEmpty() || token == null || token.trim().isEmpty()) return;
+        SharedPreferences.Editor editor = getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString(EXTRA_STATION_ID, stationId.trim())
+                .putString(EXTRA_TOKEN, token.trim());
+        if (backend != null && !backend.trim().isEmpty()) editor.putString(EXTRA_BACKEND, backend.trim());
+        if (stationName != null && !stationName.trim().isEmpty()) editor.putString(EXTRA_STATION_NAME, stationName.trim());
+        editor.apply();
     }
 
     private void createNotificationChannel() {
