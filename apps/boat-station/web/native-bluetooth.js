@@ -1,5 +1,6 @@
 // Thin PWA <-> Android Core bridge for battery BLE. Native remains responsible for BLE logic.
 const native=()=>window.NativeBridge;
+const scannerNative=()=>window.BatteryScannerBridge||window.NativeBridge;
 const seen=new Map();
 let scanList=[];
 let scanEpoch=0;
@@ -28,7 +29,7 @@ function publishScan(){
 
 function nativeStart(){
   try{
-    const n=native();
+    const n=scannerNative();
     if(n&&typeof n.startBatteryScan==='function'){n.startBatteryScan();return true}
   }catch(_){}
   return false;
@@ -36,24 +37,19 @@ function nativeStart(){
 function stopNativeScan(){
   scanEpoch++;
   clearTimeout(scanRetryTimer);scanRetryTimer=0;
-  try{native()?.stopBatteryScan?.()}catch(_){ }
+  try{scannerNative()?.stopBatteryScan?.()}catch(_){ }
 }
 function startNativeScan(){
   const epoch=++scanEpoch;
   clearTimeout(scanRetryTimer);scanRetryTimer=0;
   seen.clear();scanList=[];publishScan();
-  // Android BLE scanners can remain in a transient state immediately after a
-  // previous device was selected. Explicitly stop the prior session and start
-  // a fresh one on the next turn instead of reusing the old scan lifecycle.
-  try{native()?.stopBatteryScan?.()}catch(_){ }
+  try{scannerNative()?.stopBatteryScan?.()}catch(_){ }
   setTimeout(()=>{if(epoch!==scanEpoch)return;nativeStart()},120);
-  // If Android silently rejected the immediate restart, retry once. This also
-  // recovers from an old native scan timeout that happened to fire meanwhile.
   scanRetryTimer=setTimeout(()=>{
     if(epoch!==scanEpoch||scanList.length)return;
-    try{native()?.stopBatteryScan?.()}catch(_){ }
-    setTimeout(()=>{if(epoch===scanEpoch)nativeStart()},180);
-  },1800);
+    try{scannerNative()?.stopBatteryScan?.()}catch(_){ }
+    setTimeout(()=>{if(epoch===scanEpoch)nativeStart()},220);
+  },2500);
   return true;
 }
 
@@ -68,9 +64,6 @@ exposeCoreAdapter();
 function normalizeBatteryData(data){
   if(!data||typeof data!=='object')return data;
   const out={...data,connected:true};
-  // Native Humsienk frames expose the BMS nominal/full capacity as totalAh.
-  // The PWA battery model uses capacityAh. Keep the transport field too, but
-  // normalize it here so all UI/bank calculations use one canonical name.
   const capacity=Number(data.capacityAh);
   const total=Number(data.totalAh);
   if((!Number.isFinite(capacity)||capacity<=0)&&Number.isFinite(total)&&total>0)out.capacityAh=total;
@@ -86,9 +79,12 @@ function attachCallbacks(){
     seen.set(key,device);
     publishScan();
   };
+  window.BoatStation.onBleScanStatus=status=>{
+    const message=String(status?.message||'').trim();
+    const el=document.querySelector('.scanner-status');
+    if(el&&message)el.textContent=message;
+  };
   window.BoatStation.onBatteryData=data=>{
-    // A GATT callback can arrive after the user deleted a battery. Never allow
-    // that stale callback to recreate a removed battery in the PWA model.
     if(!isConfiguredBattery(data))return;
     window.BoatStation?.updateBattery?.(normalizeBatteryData(data));
   };
@@ -99,7 +95,6 @@ function attachCallbacks(){
 }
 attachCallbacks();
 
-// The scanner is PWA UI; scanning itself is exclusively performed by the Core.
 document.addEventListener('click',e=>{
   if(e.target.closest('[data-open-scanner]')){
     exposeCoreAdapter();
