@@ -1,119 +1,106 @@
-/* Adaptive page sizing: the resize handle changes the useful space of the current page,
-   while typography remains stable and the pager defines the bottom of the page. */
+/* Adaptive page sizing: resize changes useful space per page. */
+.card-body{container-type:size;container-name:modulebody}
 .card-body>.viewport,
 .card-body>.viewport>.track,
 .card-body>.viewport>.track>.page{height:100%;min-height:0}
-
-.card-body>.viewport>.track>.page{
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-  padding:10px 12px 9px;
-}
-
-.card-body>.viewport>.track>.page>.pager{
-  flex:0 0 auto;
-  margin-top:auto;
-  padding-top:10px;
-  padding-bottom:1px;
-}
-
-/* The corner still belongs to the page, not to a generic outer blank area. */
+.card-body>.viewport>.track>.page{display:flex;flex-direction:column;overflow:hidden;padding:10px 12px 9px}
+.card-body>.viewport>.track>.page>.pager{flex:0 0 auto;margin-top:auto;padding-top:8px;padding-bottom:1px}
 .resize-handle{bottom:1px;right:1px}
 
-/* GPS · data page: keep typography fixed and let spacing consume extra room. */
-.card[data-id="gps"] .page[data-page="0"]>.gps-coords{flex:0 0 auto}
-.card[data-id="gps"] .page[data-page="0"]>.metric-grid{flex:1 1 auto;align-items:stretch;align-content:center}
-.card[data-id="gps"] .page[data-page="0"]>.metric-grid .metric{display:flex;flex-direction:column;justify-content:center}
+/* Shared field behavior: values and labels remain centered while geometry compresses. */
+.card .metric,.card .gps-coord{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:0}
+.card .metric .value,.card .metric .label,.card .gps-coord .value,.card .gps-coord .label{text-align:center;width:100%}
 
-/* GPS · map page: map is the elastic component between header/content controls and pager. */
-.card[data-id="gps"] .page[data-page="1"]>.gps-map{
-  flex:1 1 150px;
-  min-height:120px;
-  height:auto;
-  aspect-ratio:auto;
-}
-.card[data-id="gps"] .page[data-page="1"]>.gps-actions,
-.card[data-id="gps"] .page[data-page="1"]>.gps-status{flex:0 0 auto}
+/* GPS · summary */
+.card[data-id="gps"] .page[data-page="0"]>.gps-coords{flex:1 1 0;align-items:stretch;margin-bottom:clamp(4px,2cqh,8px)}
+.card[data-id="gps"] .page[data-page="0"]>.metric-grid{flex:1 1 0;align-items:stretch;align-content:stretch}
+.card[data-id="gps"] .page[data-page="0"] .gps-coord,
+.card[data-id="gps"] .page[data-page="0"] .metric{padding-block:clamp(4px,3cqh,10px);padding-inline:clamp(5px,2cqw,10px)}
+.card[data-id="gps"] .page[data-page="0"] .gps-coords,
+.card[data-id="gps"] .page[data-page="0"] .metric-grid{gap:clamp(4px,1.5cqh,8px)}
 
-/* Battery overview: panels stretch with the page, without scaling their text. */
-.card[data-id="batteries"] .page[data-page="0"]>.battery-overview{
-  flex:1 1 auto;
-  min-height:0;
-}
-.card[data-id="batteries"] .page[data-page="0"] .battery-bank-panel{
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-}
-.card[data-id="batteries"] .page[data-page="0"] .battery-mini-column{height:100%}
+/* GPS · map */
+.card[data-id="gps"] .page[data-page="1"]>.gps-map{flex:1 1 150px;min-height:92px;height:auto;aspect-ratio:auto}
+.card[data-id="gps"] .page[data-page="1"]>.gps-actions,.card[data-id="gps"] .page[data-page="1"]>.gps-status{flex:0 0 auto}
+.card[data-id="gps"] .gps-actions{gap:clamp(4px,1.4cqh,8px);margin-top:clamp(4px,1.5cqh,9px)}
+.card[data-id="gps"] .gps-action{justify-content:center;text-align:center;padding-block:clamp(4px,2.2cqh,9px);padding-inline:clamp(5px,2cqw,11px);min-height:clamp(32px,9cqh,44px)}
+.card[data-id="gps"] .gps-status{text-align:center;margin-top:clamp(3px,1.2cqh,7px)}
 
-/* Battery history and Sea State history share the same elastic chart shell. */
+/* Battery overview */
+.card[data-id="batteries"] .page[data-page="0"]>.battery-overview{flex:1 1 auto;min-height:0}
+.card[data-id="batteries"] .page[data-page="0"] .battery-bank-panel{display:flex;flex-direction:column;justify-content:center;min-height:0;padding-block:clamp(5px,2.5cqh,10px)}
+.card[data-id="batteries"] .page[data-page="0"] .battery-hero{padding-bottom:clamp(3px,2cqh,8px)}
+.card[data-id="batteries"] .page[data-page="0"] .battery-bank-panel .battery-ring{width:clamp(68px,43cqh,142px);height:clamp(68px,43cqh,142px);margin-bottom:clamp(3px,1.8cqh,9px)}
+.card[data-id="batteries"] .page[data-page="0"] .compact-bank-metrics{gap:clamp(3px,1.2cqh,6px)}
+.card[data-id="batteries"] .page[data-page="0"] .compact-bank-metrics .metric{padding-block:clamp(3px,2cqh,8px);padding-inline:3px}
+.card[data-id="batteries"] .page[data-page="0"] .battery-connected{margin-top:clamp(2px,1.5cqh,7px)}
+.card[data-id="batteries"] .page[data-page="0"] .battery-mini-column{height:100%;gap:clamp(2px,1.2cqh,5px)}
+.card[data-id="batteries"] .page[data-page="0"] .battery-mini{padding-block:clamp(2px,1.5cqh,6px);padding-inline:clamp(4px,1cqw,6px)}
+.card[data-id="batteries"] .page[data-page="0"] .battery-mini-head{margin-bottom:clamp(1px,1cqh,4px)}
+.card[data-id="batteries"] .page[data-page="0"] .battery-mini-right{gap:clamp(1px,1cqh,4px)}
+.card[data-id="batteries"] .page[data-page="0"] .battery-mini-charge{padding-top:clamp(1px,1cqh,4px)}
+
+/* Battery history + Sea State history */
 .card[data-id="batteries"] .page[data-page="1"]>.battery-history-wrap,
-.card[data-id="seastate"] .page[data-page="1"]>.battery-history-wrap{
-  flex:1 1 170px;
-  min-height:145px;
-}
+.card[data-id="seastate"] .page[data-page="1"]>.battery-history-wrap{flex:1 1 170px;min-height:130px}
 .card[data-id="batteries"] .page[data-page="1"] .battery-history,
-.card[data-id="seastate"] .page[data-page="1"] .battery-history{
-  height:auto;
-  min-height:0;
-  display:flex;
-  flex-direction:column;
-}
+.card[data-id="seastate"] .page[data-page="1"] .battery-history{height:auto;min-height:0;display:flex;flex-direction:column}
 .card[data-id="batteries"] .page[data-page="1"] .battery-history canvas,
-.card[data-id="seastate"] .page[data-page="1"] .battery-history canvas{
-  flex:1 1 auto;
-  min-height:100px;
-  height:auto;
-}
+.card[data-id="seastate"] .page[data-page="1"] .battery-history canvas{flex:1 1 auto;min-height:86px;height:auto}
 .card[data-id="batteries"] .page[data-page="1"] .battery-history-note,
 .card[data-id="seastate"] .page[data-page="1"] .battery-history-note{flex:0 0 auto}
 
-/* Battery statistics/list pages: use available vertical space for rhythm, not font scaling. */
-.card[data-id="batteries"] .page[data-page="2"]>.battery-list,
-.card[data-id="batteries"] .page[data-page="3"]>.battery-list{
-  flex:1 1 auto;
-  min-height:0;
+/* Battery statistics: maximum height can expose every selected field. */
+.card[data-id="batteries"] .page[data-page="2"]>.battery-list{flex:1 1 auto;min-height:0;gap:clamp(4px,1.2cqh,8px)}
+.card[data-id="batteries"] .page[data-page="2"] .battery-item{padding-block:clamp(6px,1.7cqh,11px)}
+.card[data-id="batteries"] .page[data-page="2"] .battery-item-top{min-height:24px;align-items:center}
+
+/* Connected batteries */
+.card[data-id="batteries"] .page[data-page="3"]>.battery-list{flex:1 1 auto;min-height:0;gap:clamp(3px,1.4cqh,8px)}
+.card[data-id="batteries"] .page[data-page="3"] .battery-item{padding-block:clamp(4px,2cqh,11px)}
+.card[data-id="batteries"] .page[data-page="3"] .battery-item-top{align-items:center}
+.card[data-id="batteries"] .page[data-page="3"] .battery-soc{align-self:center}
+
+/* Phone */
+.card[data-id="phone"] .page>.metric-grid{flex:1 1 auto;align-items:stretch;gap:clamp(4px,1.8cqh,8px)}
+.card[data-id="phone"] .page>.metric-grid .metric{padding-block:clamp(4px,3cqh,10px);padding-inline:clamp(4px,2cqw,10px)}
+.card[data-id="phone"] .page>.metric-grid+ .metric-grid{margin-top:clamp(4px,1.8cqh,8px)!important}
+
+/* Sea State current */
+.card[data-id="seastate"] .page[data-page="0"]>.battery-hero{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;padding-block:clamp(2px,2cqh,12px)}
+.card[data-id="seastate"] .page[data-page="0"]>.battery-hero .battery-bank-name{font-size:clamp(24px,18cqh,48px)!important;line-height:1}
+.card[data-id="seastate"] .page[data-page="0"]>.metric-grid{flex:1 1 auto;align-items:stretch;gap:clamp(4px,1.8cqh,8px)}
+.card[data-id="seastate"] .page[data-page="0"]>.metric-grid .metric{padding-block:clamp(4px,3cqh,10px)}
+
+/* Compass */
+.card[data-id="compass"] .page>.battery-hero{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0}
+.card[data-id="compass"] .page .battery-ring{width:clamp(72px,60cqh,180px);height:clamp(72px,60cqh,180px)}
+
+/* Compact states selected only by available module height. */
+@container modulebody (max-height:240px){
+  .card[data-id="batteries"] .page[data-page="0"] .compact-bank-metrics .metric .label{display:none}
+  .card[data-id="batteries"] .page[data-page="0"] .compact-bank-metrics .metric{padding-block:3px}
+  .card[data-id="batteries"] .page[data-page="0"] .battery-mini-top small,
+  .card[data-id="batteries"] .page[data-page="0"] .battery-mini-charge small{display:none}
+}
+@container modulebody (max-height:210px){
+  .card[data-id="gps"] .page[data-page="0"] .gps-coord,
+  .card[data-id="gps"] .page[data-page="0"] .metric,
+  .card[data-id="phone"] .page .metric,
+  .card[data-id="seastate"] .page[data-page="0"] .metric{padding-block:3px}
+  .card[data-id="gps"] .page[data-page="1"] .gps-action{min-height:30px;padding-block:3px}
+}
+@container modulebody (max-height:260px){
+  .card[data-id="batteries"] .page[data-page="3"] .battery-item{display:grid;grid-template-columns:minmax(80px,1fr) auto auto auto auto auto;column-gap:8px;align-items:center;padding:5px 7px}
+  .card[data-id="batteries"] .page[data-page="3"] .battery-item-top,
+  .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub{display:contents}
+  .card[data-id="batteries"] .page[data-page="3"] .battery-name{grid-column:1;grid-row:1;align-self:center}
+  .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub span:nth-child(1){grid-column:2;grid-row:1}
+  .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub span:nth-child(2){grid-column:3;grid-row:1}
+  .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub span:nth-child(3){grid-column:4;grid-row:1}
+  .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub span:nth-child(4){grid-column:5;grid-row:1}
+  .card[data-id="batteries"] .page[data-page="3"] .battery-soc{grid-column:6;grid-row:1;align-self:center}
+  .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub{margin-top:0}
 }
 
-/* Phone pages: cards expand vertically and keep values/labels at their normal font sizes. */
-.card[data-id="phone"] .page>.metric-grid{
-  flex:1 1 auto;
-  align-items:stretch;
-}
-.card[data-id="phone"] .page>.metric-grid .metric{
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-}
-
-/* Sea State current page: distribute extra height around the instrument and metrics. */
-.card[data-id="seastate"] .page[data-page="0"]>.battery-hero{
-  flex:1 1 auto;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-}
-.card[data-id="seastate"] .page[data-page="0"]>.metric-grid{
-  flex:0 0 auto;
-}
-
-/* Compass: center the instrument in any page height; its labels remain unchanged. */
-.card[data-id="compass"] .page>.battery-hero{
-  flex:1 1 auto;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-}
-
-/* Give controls slightly more/less breathing room through available geometry, never font-size. */
-.card[data-id="gps"] .gps-actions{row-gap:clamp(6px,1.5vh,12px)}
-.card[data-id="gps"] .gps-action{padding-block:clamp(8px,1.3vh,13px)}
-
-/* Preserve a few pixels between pager and the physical module edge. */
-.card[data-id="batteries"] .page,
-.card[data-id="gps"] .page,
-.card[data-id="phone"] .page,
-.card[data-id="seastate"] .page,
-.card[data-id="compass"] .page{padding-bottom:9px}
+.card[data-id="batteries"] .page,.card[data-id="gps"] .page,.card[data-id="phone"] .page,.card[data-id="seastate"] .page,.card[data-id="compass"] .page{padding-bottom:9px}
