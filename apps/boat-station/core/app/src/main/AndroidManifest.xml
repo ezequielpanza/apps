@@ -37,6 +37,10 @@
         android:label="Boat Station"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <service
+            android:name=".BoatStationCoreService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <activity android:name=".BoatStationActivity" android:exported="true" android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
