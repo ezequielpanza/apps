@@ -2,10 +2,13 @@ plugins {
     id 'com.android.application'
 }
 
-// Rebuild marker: Boat Station 1.2.3 callback-driven BLE fix.
 android {
     namespace 'com.boatstation.app'
     compileSdk 35
+
+    buildFeatures {
+        buildConfig true
+    }
 
     defaultConfig {
         applicationId 'com.boatstation.app'
