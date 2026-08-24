@@ -20,7 +20,7 @@ freshness.id='remoteFreshness';freshness.className='remote-freshness waiting';
 freshness.innerHTML='<span class="remote-connection-dot" aria-hidden="true"></span><span class="remote-connection-text">Sin conexión</span><span class="remote-connection-detail">· esperando al Core</span>';
 if(cards?.parentNode)cards.parentNode.insertBefore(freshness,cards);
 let lastSnapshotAt=0,interactionDepth=0,pendingData=null,pendingApply=null,interactionReleaseTimer=0;
-const CONNECTED_MAX_AGE_MS=7000;
+const CONNECTED_MAX_AGE_MS=30000;
 function elapsedLabel(ms){const seconds=Math.max(0,Math.floor(ms/1000));if(seconds<60)return `hace ${seconds} s`;const minutes=Math.floor(seconds/60);if(minutes<60)return `hace ${minutes} min`;const hours=Math.floor(minutes/60);if(hours<24)return `hace ${hours} h`;return `hace ${Math.floor(hours/24)} d`}
 function markUpdated(time){const remoteTime=Number(time);lastSnapshotAt=Number.isFinite(remoteTime)&&remoteTime>0?Math.min(Date.now(),remoteTime):Date.now();renderFreshness()}
 function renderFreshness(){const text=freshness.querySelector('.remote-connection-text'),detail=freshness.querySelector('.remote-connection-detail');if(!lastSnapshotAt){freshness.classList.remove('connected','disconnected');freshness.classList.add('waiting');if(text)text.textContent='Sin conexión';if(detail)detail.textContent='· esperando al Core';return}const age=Math.max(0,Date.now()-lastSnapshotAt),connected=age<=CONNECTED_MAX_AGE_MS;freshness.classList.toggle('connected',connected);freshness.classList.toggle('disconnected',!connected);freshness.classList.remove('waiting');if(text)text.textContent=connected?`Conectado a ${activeStationName()}`:'Sin conexión';if(detail)detail.textContent=connected?'':`· última conexión ${elapsedLabel(age)}`}
