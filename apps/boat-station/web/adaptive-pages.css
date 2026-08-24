@@ -14,6 +14,8 @@
 .page-content>.metric-grid+.metric-grid{margin-top:clamp(4px,1.8cqh,8px)!important}
 .metric,.gps-coord{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-width:0;min-height:32px}
 .metric .value,.metric .label,.gps-coord .value,.gps-coord .label{text-align:center;width:100%}
+/* Primary values always keep one complete line. Compression must consume padding/gaps before clipping the data itself. */
+.page-content .value{flex:0 0 auto;min-height:1.08em;line-height:1.08;display:flex;align-items:center;justify-content:center}
 .metric{padding-block:clamp(4px,3cqh,10px);padding-inline:clamp(4px,2cqw,10px)}
 
 /* GPS content uses the same flexible container; map owns remaining vertical space. */
