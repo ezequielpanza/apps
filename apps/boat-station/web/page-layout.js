@@ -50,6 +50,7 @@ export function createPageLayoutEngine(cards){
     const style=getComputedStyle(el);
     if(style.display==='none'||style.visibility==='hidden'||style.position==='fixed')return false;
     if(el.tagName==='CANVAS'||el.tagName==='SVG')return false;
+    if(el.childElementCount===0)return false;
     const overflowY=style.overflowY;
     if(!['hidden','clip','auto','scroll'].includes(overflowY))return false;
     return el.scrollHeight>el.clientHeight+FIT_EPSILON;
