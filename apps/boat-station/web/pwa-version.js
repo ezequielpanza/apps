@@ -50,7 +50,7 @@
     let el=host.querySelector('.remote-pwa-versions');
     if(!el){el=document.createElement('span');el.className='remote-pwa-versions';host.appendChild(el)}
     const mismatch=localVersion!=='—'&&corePwaVersion!=='—'&&localVersion!==corePwaVersion;
-    el.textContent=` · Remote ${localVersion} · Core ${coreApkVersion}${mismatch?' · actualización pendiente':''}`;
+    el.textContent=` · Remote ${localVersion} · Server ${corePwaVersion} · Core ${coreApkVersion}${mismatch?' · actualización pendiente':''}`;
     el.classList.toggle('mismatch',mismatch);
     if(!isLocal&&!host.querySelector('.remote-refresh-button')){
       const button=document.createElement('button');
