@@ -1,20 +1,32 @@
 const DEFAULT_MIN_CONTENT_HEIGHT=72;
 const PAGER_HEIGHT=28;
 const FIT_EPSILON=1;
+const LAYOUT_SCHEMA=2;
 
 function readJson(key,fallback){try{const value=JSON.parse(localStorage.getItem(key)||'null');return value??fallback}catch{return fallback}}
 function writeJson(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
 function isLocalRuntime(){const params=new URLSearchParams(location.search);return params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge}
-function storageKey(){if(isLocalRuntime())return 'bs.pageLayout.local.v1';const station=localStorage.getItem('bs.remote.activeStation')||'default';return `bs.pageLayout.remote.${station}.v1`}
+function storageBase(){if(isLocalRuntime())return 'bs.pageLayout.local';const station=localStorage.getItem('bs.remote.activeStation')||'default';return `bs.pageLayout.remote.${station}`}
+function storageKey(){return `${storageBase()}.v${LAYOUT_SCHEMA}`}
+function legacyStorageKey(){return `${storageBase()}.v1`}
+function initialState(){
+  const current=readJson(storageKey(),null);
+  if(current&&typeof current==='object')return{pages:current.pages||{},contentHeights:current.contentHeights||{}};
+  const legacy=readJson(legacyStorageKey(),null);
+  return{pages:legacy?.pages&&typeof legacy.pages==='object'?legacy.pages:{},contentHeights:{}};
+}
 
 export function createPageLayoutEngine(cards){
   let key=storageKey();
-  let state=readJson(key,{pages:{},contentHeights:{}});
+  let state=initialState();
   let resize=null;
   let validationQueued=false;
   const validationCards=new Set();
 
-  function ensureScope(){const next=storageKey();if(next===key)return;key=next;state=readJson(key,{pages:{},contentHeights:{}})}
+  function ensureScope(){
+    const next=storageKey();if(next===key)return;
+    key=next;state=initialState();
+  }
   function persist(){ensureScope();writeJson(key,state)}
   function pageCount(card){return card?.querySelectorAll('.page').length||0}
   function getPage(id,count){ensureScope();const raw=Number(state.pages?.[id])||0;return Math.max(0,Math.min(Math.max(0,count-1),raw))}
@@ -64,11 +76,15 @@ export function createPageLayoutEngine(cards){
     const previousHeight=content.style.height,previousOverflow=content.style.overflow;
     content.style.overflow='hidden';
     let low=DEFAULT_MIN_CONTENT_HEIGHT;
-    let high=Math.max(low,naturalContentHeight(content),content.getBoundingClientRect().height||0,160);
-    const ceiling=Math.max(900,window.innerHeight*1.5);
-    while(high<ceiling&&!contentFits(content,high))high=Math.min(ceiling,Math.ceil(high*1.35+24));
+    const natural=naturalContentHeight(content);
+    let high=Math.max(low,natural,160);
+    const ceiling=Math.max(1200,window.innerHeight*1.75);
+    while(high<ceiling&&!contentFits(content,high))high=Math.min(ceiling,Math.ceil(high*1.3+20));
     if(contentFits(content,high)){
-      while(high-low>1){const mid=(low+high)/2;if(contentFits(content,mid))high=mid;else low=mid}
+      while(high-low>1){
+        const mid=(low+high)/2;
+        if(contentFits(content,mid))high=mid;else low=mid;
+      }
     }
     const minimum=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.ceil(high));
     content.style.height=previousHeight;
@@ -76,12 +92,20 @@ export function createPageLayoutEngine(cards){
     return minimum;
   }
 
+  function defaultContentHeight(content){
+    if(!content)return DEFAULT_MIN_CONTENT_HEIGHT;
+    const minimum=minimumContentHeight(content);
+    const natural=naturalContentHeight(content);
+    const comfortableMax=Math.max(220,Math.round(window.innerHeight*.55));
+    return Math.max(minimum,Math.min(natural,comfortableMax));
+  }
+
   function applyContentHeight(card,page=currentPage(card),height=null){
     const content=contentElement(card,page);if(!content)return null;
     const id=card.dataset.id;
     let target=height;
     if(!Number.isFinite(target))target=savedContentHeight(id,page);
-    if(!Number.isFinite(target))target=naturalContentHeight(content);
+    if(!Number.isFinite(target))target=defaultContentHeight(content);
     const minimum=minimumContentHeight(content);
     target=Math.max(minimum,Math.round(target));
     card.style.setProperty('--page-content-height',`${target}px`);
@@ -134,7 +158,7 @@ export function createPageLayoutEngine(cards){
     applyContentHeight(card,page,savedContentHeight(card.dataset.id,page));
   }
 
-  function maxContentHeight(){return Math.max(900,window.innerHeight*1.5)}
+  function maxContentHeight(){return Math.max(1200,window.innerHeight*1.75)}
   function finishResize(event){
     if(!resize||event.pointerId!==resize.pointerId)return false;
     const current=resize;resize=null;current.card.classList.remove('resizing');
@@ -166,7 +190,10 @@ export function createPageLayoutEngine(cards){
   cards?.addEventListener('pointercancel',event=>{if(finishResize(event))event.stopImmediatePropagation()},{capture:true});
 
   const mutationObserver=new MutationObserver(records=>{
-    for(const record of records){const card=(record.target instanceof Element?record.target:record.target.parentElement)?.closest?.('.card');if(card)validationCards.add(card)}
+    for(const record of records){
+      const card=(record.target instanceof Element?record.target:record.target.parentElement)?.closest?.('.card');
+      if(card)validationCards.add(card);
+    }
     if(validationCards.size)queueValidation();
   });
   if(cards)mutationObserver.observe(cards,{subtree:true,childList:true});
@@ -174,7 +201,7 @@ export function createPageLayoutEngine(cards){
   window.addEventListener('resize',()=>queueValidation());
   document.fonts?.ready?.then(()=>queueValidation()).catch?.(()=>{});
 
-  const api={mountCard,mountAll,currentPage,getPage,setPage,refreshPage,contentElement,savedContentHeight,saveContentHeight,validateCard,validateAll:()=>queueValidation(),isResizing:()=>!!resize,pagerHeight:PAGER_HEIGHT};
+  const api={mountCard,mountAll,currentPage,getPage,setPage,refreshPage,contentElement,savedContentHeight,saveContentHeight,defaultContentHeight,validateCard,validateAll:()=>queueValidation(),isResizing:()=>!!resize,pagerHeight:PAGER_HEIGHT};
   window.BoatStationPageLayout=api;
   return api;
 }
