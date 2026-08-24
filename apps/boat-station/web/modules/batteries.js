@@ -73,7 +73,8 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function updateHistoryLabel(root){const el=root?.querySelector('[data-history-range]');if(el)el.textContent=historyRangeLabel()}
   function chartWindow(hours,count=12){
-    const step=Math.max(1,(Number(hours)*3600000)/count);
+    const stepMinutes=Math.max(1,Math.round(Number(hours)*60/count));
+    const step=stepMinutes*60000;
     const currentStart=Math.floor(Date.now()/step)*step;
     return{step,start:currentStart-step*(count-1),end:currentStart+step,currentStart};
   }
@@ -105,7 +106,7 @@ export function createBatteriesModule(requestRender,openManager){
         c.fillRect(x,plotH-h,bar,h);
       });
     }
-    c.font=(r.width<520?'8px':'9px')+' system-ui, sans-serif';c.fillStyle='#7890a1';c.textBaseline='middle';c.textAlign='center';for(let i=0;i<12;i++){const center=start+(i+.5)*step,text=axisLabel(center,hours),x=(i+.5)*slot,y=plotH+(axisH/2);c.save();c.translate(x,y);if(r.width<520)c.rotate(-Math.PI/4);c.fillText(text,0,0);c.restore()}
+    c.font=(r.width<520?'8px':'9px')+' system-ui, sans-serif';c.fillStyle='#7890a1';c.textBaseline='middle';c.textAlign='center';for(let i=0;i<12;i++){const periodEnd=start+(i+1)*step,text=axisLabel(periodEnd,hours),x=(i+.5)*slot,y=plotH+(axisH/2);c.save();c.translate(x,y);if(r.width<520)c.rotate(-Math.PI/4);c.fillText(text,0,0);c.restore()}
   }
   function changeHistoryZoom(direction,root){const i=HISTORY_HOUR_LEVELS.indexOf(Number(state.historyHours)),next=direction==='out'?Math.min(HISTORY_HOUR_LEVELS.length-1,i+1):Math.max(0,i-1);if(next===i)return;state.historyHours=HISTORY_HOUR_LEVELS[next];save();updateHistoryLabel(root);drawChart(root)}
   function afterRender(root){state.root=root;drawChart(root);root.querySelectorAll('[data-battery-manage]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openManager?.()}));root.querySelectorAll('[data-history-zoom]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();changeHistoryZoom(b.dataset.historyZoom,root)}))}
