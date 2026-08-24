@@ -15,6 +15,7 @@
 .card[data-id="gps"] .page[data-page="0"] .gps-coord,.card[data-id="gps"] .page[data-page="0"] .metric{padding-block:clamp(4px,3cqh,10px);padding-inline:clamp(5px,2cqw,10px)}
 .card[data-id="gps"] .page[data-page="0"] .gps-coords,.card[data-id="gps"] .page[data-page="0"] .metric-grid{gap:clamp(4px,1.5cqh,8px)}
 
+.card[data-id="gps"] .page[data-page="1"]{--bs-min-body-height:252px}
 .card[data-id="gps"] .page[data-page="1"]>.gps-map{flex:1 1 150px;min-height:92px;height:auto;aspect-ratio:auto}
 .card[data-id="gps"] .page[data-page="1"]>.gps-actions,.card[data-id="gps"] .page[data-page="1"]>.gps-status{flex:0 0 auto}
 .card[data-id="gps"] .gps-actions{gap:clamp(4px,1.4cqh,8px);margin-top:clamp(4px,1.5cqh,9px)}
