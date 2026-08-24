@@ -3,8 +3,8 @@
 .card-body>.viewport,
 .card-body>.viewport>.track,
 .card-body>.viewport>.track>.page{height:100%;min-height:0}
-.card-body>.viewport>.track>.page{display:flex;flex-direction:column;overflow:hidden;padding:10px 12px 9px}
-.card-body>.viewport>.track>.page>.pager{flex:0 0 auto;margin-top:auto;padding-top:8px;padding-bottom:1px}
+.card-body>.viewport>.track>.page{display:flex;flex-direction:column;overflow:hidden;padding:10px 12px 30px;position:relative}
+.card-body>.viewport>.track>.page>.pager{position:absolute;left:12px;right:12px;bottom:7px;height:14px;margin:0;padding:0;display:flex;justify-content:center;align-items:center;gap:7px}
 .resize-handle{bottom:1px;right:1px}
 
 .card .metric,.card .gps-coord{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:0}
@@ -82,5 +82,3 @@
   .card[data-id="batteries"] .page[data-page="3"] .battery-soc{grid-column:6;grid-row:1;align-self:center}
   .card[data-id="batteries"] .page[data-page="3"] .battery-item-sub{margin-top:0}
 }
-
-.card[data-id="batteries"] .page,.card[data-id="gps"] .page,.card[data-id="phone"] .page,.card[data-id="seastate"] .page,.card[data-id="compass"] .page{padding-bottom:9px}
