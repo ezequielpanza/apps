@@ -30,12 +30,36 @@ export function createPageLayoutEngine(cards){
     return height;
   }
 
+  function contentFits(content,height){
+    content.style.height=`${Math.round(height)}px`;
+    const root=content.getBoundingClientRect(),limit=root.bottom+.75;
+    if(content.scrollHeight>content.clientHeight+1)return false;
+    for(const el of content.querySelectorAll('*')){
+      const style=getComputedStyle(el);
+      if(style.display==='none'||style.visibility==='hidden'||style.position==='fixed')continue;
+      const rect=el.getBoundingClientRect();
+      if(rect.width<=0&&rect.height<=0)continue;
+      if(rect.bottom>limit)return false;
+    }
+    return true;
+  }
+
   function minimumContentHeight(content){
     if(!content)return DEFAULT_MIN_CONTENT_HEIGHT;
     const previousHeight=content.style.height,previousOverflow=content.style.overflow;
-    content.style.height='1px';
     content.style.overflow='hidden';
-    const minimum=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.ceil(content.scrollHeight));
+    let low=DEFAULT_MIN_CONTENT_HEIGHT;
+    let high=Math.max(low,naturalContentHeight(content),content.getBoundingClientRect().height||0,160);
+    const ceiling=Math.max(900,window.innerHeight*1.5);
+    while(high<ceiling&&!contentFits(content,high))high=Math.min(ceiling,Math.ceil(high*1.35+24));
+    if(!contentFits(content,high))low=high;
+    else{
+      while(high-low>1){
+        const mid=(low+high)/2;
+        if(contentFits(content,mid))high=mid;else low=mid;
+      }
+    }
+    const minimum=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.ceil(high));
     content.style.height=previousHeight;
     content.style.overflow=previousOverflow;
     return minimum;
