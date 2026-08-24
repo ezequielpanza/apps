@@ -8,7 +8,7 @@
   function setRefreshUi(on,label){
     clearInterval(refreshStatusTimer);refreshStatusTimer=0;
     const host=document.getElementById('remoteFreshness');if(host)host.classList.toggle('refreshing',!!on);
-    const button=host?.querySelector('.remote-refresh-button');if(button){button.disabled=!!on;button.textContent=on?'Actualizando…':'Actualizar'}
+    const button=host?.querySelector('.remote-refresh-button:not(.remote-server-refresh-button)');if(button){button.disabled=!!on;button.textContent=on?'Actualizando…':'Actualizar'}
     if(on){enforceRefreshText(label);refreshStatusTimer=setInterval(()=>enforceRefreshText(label),200)}
     else window.BoatStationRemoteUI?.markUpdated?.(Date.now());
   }
@@ -45,6 +45,7 @@
   }
   async function fetchVersion(){try{const r=await fetch('./PWA_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(r.ok)return(await r.text()).trim()}catch(_){}return''}
   async function loadLocalVersion(){const v=await fetchVersion();if(v)localVersion=v;render()}
+  function actionHost(host){let actions=host.querySelector('.remote-refresh-actions');if(!actions){actions=document.createElement('div');actions.className='remote-refresh-actions';host.appendChild(actions)}return actions}
   function render(){
     const host=document.getElementById('remoteFreshness');if(!host)return;
     let el=host.querySelector('.remote-pwa-versions');
@@ -52,17 +53,12 @@
     const mismatch=localVersion!=='—'&&corePwaVersion!=='—'&&localVersion!==corePwaVersion;
     el.textContent=` · Remote ${localVersion} · Server ${corePwaVersion} · Core ${coreApkVersion}${mismatch?' · actualización pendiente':''}`;
     el.classList.toggle('mismatch',mismatch);
-    if(!isLocal&&!host.querySelector('.remote-refresh-button')){
-      const button=document.createElement('button');
-      button.type='button';button.className='remote-refresh-button';button.textContent='Actualizar';
-      button.addEventListener('click',()=>runSystemRefresh({source:'desktop',sendCore:false}));
-      host.appendChild(button);
-    }
-    if(!isLocal&&!host.querySelector('.remote-server-refresh-button')){
-      const button=document.createElement('button');
-      button.type='button';button.className='remote-refresh-button remote-server-refresh-button';button.textContent='Actualizar servidor';
-      button.addEventListener('click',refreshServer);
-      host.appendChild(button);
+    if(!isLocal){
+      const actions=actionHost(host);
+      let refresh=actions.querySelector('.remote-refresh-button:not(.remote-server-refresh-button)');
+      if(!refresh){refresh=document.createElement('button');refresh.type='button';refresh.className='remote-refresh-button';refresh.textContent='Actualizar';refresh.addEventListener('click',()=>runSystemRefresh({source:'desktop',sendCore:false}));actions.appendChild(refresh)}
+      let server=actions.querySelector('.remote-server-refresh-button');
+      if(!server){server=document.createElement('button');server.type='button';server.className='remote-refresh-button remote-server-refresh-button';server.textContent='Actualizar servidor';server.addEventListener('click',refreshServer);actions.appendChild(server)}
     }
   }
   async function refreshServiceWorker(){if(!('serviceWorker'in navigator))return;try{const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.update()}catch(_){}}
