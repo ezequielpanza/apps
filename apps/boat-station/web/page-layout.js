@@ -1,5 +1,6 @@
 const DEFAULT_MIN_CONTENT_HEIGHT=72;
 const PAGER_HEIGHT=28;
+const FIT_EPSILON=1;
 
 function readJson(key,fallback){try{const value=JSON.parse(localStorage.getItem(key)||'null');return value??fallback}catch{return fallback}}
 function writeJson(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
@@ -10,6 +11,8 @@ export function createPageLayoutEngine(cards){
   let key=storageKey();
   let state=readJson(key,{pages:{},contentHeights:{}});
   let resize=null;
+  let validationQueued=false;
+  const validationCards=new Set();
 
   function ensureScope(){const next=storageKey();if(next===key)return;key=next;state=readJson(key,{pages:{},contentHeights:{}})}
   function persist(){ensureScope();writeJson(key,state)}
@@ -30,16 +33,28 @@ export function createPageLayoutEngine(cards){
     return height;
   }
 
+  function hasVerticalClip(el){
+    if(!(el instanceof HTMLElement)||el===document.body)return false;
+    const style=getComputedStyle(el);
+    if(style.display==='none'||style.visibility==='hidden'||style.position==='fixed')return false;
+    if(el.tagName==='CANVAS'||el.tagName==='SVG')return false;
+    const overflowY=style.overflowY;
+    if(!['hidden','clip','auto','scroll'].includes(overflowY))return false;
+    return el.scrollHeight>el.clientHeight+FIT_EPSILON;
+  }
+
   function contentFits(content,height){
     content.style.height=`${Math.round(height)}px`;
-    const root=content.getBoundingClientRect(),limit=root.bottom+.75;
-    if(content.scrollHeight>content.clientHeight+1)return false;
+    const root=content.getBoundingClientRect();
+    const topLimit=root.top-FIT_EPSILON,bottomLimit=root.bottom+FIT_EPSILON;
+    if(content.scrollHeight>content.clientHeight+FIT_EPSILON)return false;
     for(const el of content.querySelectorAll('*')){
       const style=getComputedStyle(el);
       if(style.display==='none'||style.visibility==='hidden'||style.position==='fixed')continue;
       const rect=el.getBoundingClientRect();
       if(rect.width<=0&&rect.height<=0)continue;
-      if(rect.bottom>limit)return false;
+      if(rect.top<topLimit||rect.bottom>bottomLimit)return false;
+      if(hasVerticalClip(el))return false;
     }
     return true;
   }
@@ -52,12 +67,8 @@ export function createPageLayoutEngine(cards){
     let high=Math.max(low,naturalContentHeight(content),content.getBoundingClientRect().height||0,160);
     const ceiling=Math.max(900,window.innerHeight*1.5);
     while(high<ceiling&&!contentFits(content,high))high=Math.min(ceiling,Math.ceil(high*1.35+24));
-    if(!contentFits(content,high))low=high;
-    else{
-      while(high-low>1){
-        const mid=(low+high)/2;
-        if(contentFits(content,mid))high=mid;else low=mid;
-      }
+    if(contentFits(content,high)){
+      while(high-low>1){const mid=(low+high)/2;if(contentFits(content,mid))high=mid;else low=mid}
     }
     const minimum=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.ceil(high));
     content.style.height=previousHeight;
@@ -70,17 +81,29 @@ export function createPageLayoutEngine(cards){
     const id=card.dataset.id;
     let target=height;
     if(!Number.isFinite(target))target=savedContentHeight(id,page);
-    if(!Number.isFinite(target)){
-      target=naturalContentHeight(content);
-      saveContentHeight(id,page,target);
-    }
-    target=Math.max(minimumContentHeight(content),Math.round(target));
+    if(!Number.isFinite(target))target=naturalContentHeight(content);
+    const minimum=minimumContentHeight(content);
+    target=Math.max(minimum,Math.round(target));
     card.style.setProperty('--page-content-height',`${target}px`);
+    if(savedContentHeight(id,page)!==target)saveContentHeight(id,page,target);
     return target;
   }
 
   function updatePager(card,page=currentPage(card)){
     card?.querySelectorAll('.pager').forEach(pager=>pager.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===page)));
+  }
+
+  function validateCard(card){
+    if(!card||!card.isConnected||card.classList.contains('collapsed')||(resize&&resize.card===card))return;
+    const page=currentPage(card),content=contentElement(card,page);if(!content)return;
+    const current=parseFloat(card.style.getPropertyValue('--page-content-height'));
+    const wanted=Number.isFinite(current)?current:savedContentHeight(card.dataset.id,page);
+    applyContentHeight(card,page,wanted);
+  }
+  function queueValidation(card=null){
+    if(card)validationCards.add(card);else cards?.querySelectorAll('.card').forEach(c=>validationCards.add(c));
+    if(validationQueued)return;validationQueued=true;
+    requestAnimationFrame(()=>{validationQueued=false;const list=[...validationCards];validationCards.clear();list.forEach(validateCard)});
   }
 
   function mountCard(card){
@@ -117,6 +140,7 @@ export function createPageLayoutEngine(cards){
     const current=resize;resize=null;current.card.classList.remove('resizing');
     const height=parseFloat(current.card.style.getPropertyValue('--page-content-height'));
     if(Number.isFinite(height))saveContentHeight(current.id,current.page,height);
+    queueValidation(current.card);
     window.dispatchEvent(new CustomEvent('boatstation-page-resize-end',{detail:{id:current.id,page:current.page,height}}));
     return true;
   }
@@ -141,9 +165,16 @@ export function createPageLayoutEngine(cards){
   cards?.addEventListener('pointerup',event=>{if(finishResize(event)){event.preventDefault();event.stopImmediatePropagation()}},{capture:true});
   cards?.addEventListener('pointercancel',event=>{if(finishResize(event))event.stopImmediatePropagation()},{capture:true});
 
-  window.addEventListener('resize',()=>requestAnimationFrame(mountAll));
+  const mutationObserver=new MutationObserver(records=>{
+    for(const record of records){const card=(record.target instanceof Element?record.target:record.target.parentElement)?.closest?.('.card');if(card)validationCards.add(card)}
+    if(validationCards.size)queueValidation();
+  });
+  if(cards)mutationObserver.observe(cards,{subtree:true,childList:true});
 
-  const api={mountCard,mountAll,currentPage,getPage,setPage,refreshPage,contentElement,savedContentHeight,saveContentHeight,isResizing:()=>!!resize,pagerHeight:PAGER_HEIGHT};
+  window.addEventListener('resize',()=>queueValidation());
+  document.fonts?.ready?.then(()=>queueValidation()).catch?.(()=>{});
+
+  const api={mountCard,mountAll,currentPage,getPage,setPage,refreshPage,contentElement,savedContentHeight,saveContentHeight,validateCard,validateAll:()=>queueValidation(),isResizing:()=>!!resize,pagerHeight:PAGER_HEIGHT};
   window.BoatStationPageLayout=api;
   return api;
 }
