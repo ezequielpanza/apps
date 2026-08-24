@@ -5,6 +5,9 @@
 .card-body>.viewport>.track>.page{height:100%;min-height:0}
 .card-body>.viewport>.track>.page{display:flex;flex-direction:column;overflow:hidden;padding:10px 12px 30px;position:relative}
 .card-body>.viewport>.track>.page>.pager{position:absolute;left:12px;right:12px;bottom:7px;height:14px;margin:0;padding:0;display:flex;justify-content:center;align-items:center;gap:7px}
+/* Every intermediate page component must be allowed to shrink inside the content area.
+   Header and pager live outside this flexible sizing model. */
+.card-body>.viewport>.track>.page>:not(.pager){min-height:0;min-width:0}
 .resize-handle{bottom:1px;right:1px}
 
 .card .metric,.card .gps-coord{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:0}
@@ -53,9 +56,9 @@
 .card[data-id="batteries"] .page[data-page="3"] .battery-item-top{align-items:center}
 .card[data-id="batteries"] .page[data-page="3"] .battery-soc{align-self:center}
 
-.card[data-id="phone"] .page>.metric-grid{flex:1 1 auto;align-items:stretch;gap:clamp(4px,1.8cqh,8px)}
-.card[data-id="phone"] .page>.metric-grid .metric{padding-block:clamp(4px,3cqh,10px);padding-inline:clamp(4px,2cqw,10px)}
-.card[data-id="phone"] .page>.metric-grid+ .metric-grid{margin-top:clamp(4px,1.8cqh,8px)!important}
+.card[data-id="phone"] .page>.metric-grid{flex:1 1 0;min-height:0;align-items:stretch;align-content:stretch;grid-auto-rows:minmax(0,1fr);gap:clamp(4px,1.8cqh,8px)}
+.card[data-id="phone"] .page>.metric-grid .metric{height:100%;min-height:0;padding-block:clamp(3px,2.4cqh,10px);padding-inline:clamp(4px,2cqw,10px)}
+.card[data-id="phone"] .page>.metric-grid+ .metric-grid{margin-top:clamp(3px,1.4cqh,8px)!important}
 
 .card[data-id="seastate"] .page[data-page="0"]>.battery-hero{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;padding-block:clamp(2px,2cqh,12px)}
 .card[data-id="seastate"] .page[data-page="0"]>.battery-hero .battery-bank-name{font-size:clamp(24px,18cqh,48px)!important;line-height:1}
