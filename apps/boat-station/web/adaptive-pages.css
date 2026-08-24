@@ -40,10 +40,13 @@
 .card[data-id="batteries"] .page[data-page="1"] .battery-history canvas,.card[data-id="seastate"] .page[data-page="1"] .battery-history canvas{flex:1 1 auto;min-height:86px;height:auto}
 .card[data-id="batteries"] .page[data-page="1"] .battery-history-note,.card[data-id="seastate"] .page[data-page="1"] .battery-history-note{flex:0 0 auto}
 
-.card[data-id="batteries"] .page[data-page="2"]>.battery-list{flex:1 1 auto;min-height:0;gap:clamp(4px,1.2cqh,8px)}
-.card[data-id="batteries"] .page[data-page="2"] .battery-item{padding-block:clamp(6px,1.7cqh,11px)}
-.card[data-id="batteries"] .page[data-page="2"] .battery-item-top{min-height:24px;align-items:center}
-.card[data-id="batteries"] .page[data-page="2"] .battery-item-sub{display:none}
+.card[data-id="batteries"] .page[data-page="2"]>.battery-stats-list{flex:1 1 auto;min-height:0;display:grid;grid-auto-flow:row;grid-auto-rows:minmax(0,1fr);gap:clamp(2px,1.2cqh,8px);align-content:stretch}
+.card[data-id="batteries"] .page[data-page="2"] .battery-stats-list>.battery-item{min-height:0;height:100%;display:flex;align-items:center;padding-block:clamp(2px,1.5cqh,10px);padding-inline:clamp(6px,2cqw,11px)}
+.card[data-id="batteries"] .page[data-page="2"] .battery-stats-list>.battery-item .battery-item-top{width:100%;min-height:0;align-items:center}
+.card[data-id="batteries"] .page[data-page="2"] .battery-stats-list>.battery-item .battery-name,.card[data-id="batteries"] .page[data-page="2"] .battery-stats-list>.battery-item .battery-soc{display:flex;align-items:center;min-height:0}
+.card[data-id="batteries"] .page[data-page="2"] .battery-stats-list>.battery-item .battery-soc{justify-content:flex-end;text-align:right}
+.card[data-id="batteries"] .page[data-page="2"] .battery-stats-list>.battery-item .battery-item-sub{display:none}
+.card[data-id="batteries"] .page[data-page="2"] .battery-stats-list>.battery-history-note{align-self:center;margin:0;min-height:0}
 
 .card[data-id="batteries"] .page[data-page="3"]>.battery-list{flex:1 1 auto;min-height:0;gap:clamp(3px,1.4cqh,8px)}
 .card[data-id="batteries"] .page[data-page="3"] .battery-item{padding-block:clamp(4px,2cqh,11px)}
