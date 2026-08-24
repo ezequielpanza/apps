@@ -77,6 +77,7 @@ export function createPageLayoutEngine(cards){
     if(track){track.style.transition=animate?'':'none';track.style.transform=`translate3d(-${page*100}%,0,0)`;if(!animate){track.getBoundingClientRect();track.style.transition=''}}
     updatePager(card,page);
     applyContentHeight(card,page);
+    window.dispatchEvent(new CustomEvent('boatstation-page-change',{detail:{id,page,card}}));
     return page;
   }
 
