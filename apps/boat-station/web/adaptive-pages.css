@@ -47,6 +47,10 @@
 .battery-history{height:100%;min-height:96px;display:flex;flex-direction:column}
 .battery-history canvas{flex:1 1 auto;min-height:72px;height:auto}
 .battery-history-note{flex:0 0 auto}
+.battery-soc-reference-grid{position:absolute;left:0;top:0;pointer-events:none;z-index:2;overflow:visible}
+.battery-soc-reference{position:absolute;left:0;right:0;height:0;border-top:1px solid rgba(150,188,208,.38)}
+.battery-soc-reference:first-child{border-top-color:rgba(180,214,230,.62)}
+.battery-soc-reference span{position:absolute;left:4px;top:-8px;padding:1px 4px;border-radius:5px;background:rgba(6,21,34,.78);color:#a8bfcd;font:700 9px/1 system-ui,sans-serif;letter-spacing:.01em}
 .battery-history-controls{width:94px;display:flex;flex-direction:column;gap:8px;align-self:stretch}
 .battery-history-control{flex:1 1 0;min-height:0;border:1px solid #24516a;border-radius:11px;background:#0d2b40;padding:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
 .battery-history-control>span{font-size:9px;color:#94a7b6;text-align:center;line-height:1.1}
