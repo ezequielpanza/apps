@@ -12,8 +12,10 @@
   function primary(event){return event.isPrimary!==false&&(event.pointerType!=='mouse'||event.button===0)}
   function moduleId(card){return card?.dataset?.id||''}
 
-  function beginModuleInteraction(card){const id=moduleId(card);if(!id)return;activeModules.add(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-start',{detail:{id}}))}
-  function endModuleInteraction(card){const id=moduleId(card);if(!id)return;activeModules.delete(id);const pending=pendingRenders.get(id);pendingRenders.delete(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-end',{detail:{id}}));if(pending)requestAnimationFrame(()=>{try{pending()}catch(error){console.warn('Boat Station deferred render',error)}})}
+  function holdModule(id){id=String(id||'');if(!id)return;activeModules.add(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-start',{detail:{id}}))}
+  function releaseModule(id){id=String(id||'');if(!id)return;activeModules.delete(id);const pending=pendingRenders.get(id);pendingRenders.delete(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-end',{detail:{id}}));if(pending)requestAnimationFrame(()=>{try{pending()}catch(error){console.warn('Boat Station deferred render',error)}})}
+  function beginModuleInteraction(card){holdModule(moduleId(card))}
+  function endModuleInteraction(card){releaseModule(moduleId(card))}
   function requestModuleRender(id,render){id=String(id||'');if(!id||typeof render!=='function')return false;if(activeModules.has(id)){pendingRenders.set(id,render);return true}render();return true}
 
   cards.addEventListener('pointerdown',event=>{
@@ -57,6 +59,9 @@
   }
   cards.addEventListener('pointerup',event=>finish(event,false),{capture:true});
   cards.addEventListener('pointercancel',event=>finish(event,true),{capture:true});
+
+  window.addEventListener('boatstation-page-resize-start',event=>holdModule(event.detail?.id));
+  window.addEventListener('boatstation-page-resize-end',event=>releaseModule(event.detail?.id));
 
   window.BoatStationPageInteractions={currentPage,isInteracting:id=>activeModules.has(String(id||'')),requestRender:requestModuleRender};
 })();
