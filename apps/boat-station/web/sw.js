@@ -1,4 +1,4 @@
-const CACHE='boat-station-v33';
+const CACHE='boat-station-v34';
 const APP_SHELL=['./','./index.html','./styles.css','./battery-overview.css','./stations.css','./remote-client-ui.css','./page-interactions.css','./adaptive-pages.css','./app.js','./stability-runtime.js','./page-layout.js','./page-interactions.js','./module-layout-settings.js','./battery-manager-status.js','./battery-stat-settings.js','./data-sync.js','./apk-update.js','./pwa-version.js','./manifest.webmanifest','./icon.png','./remote_landing.js','./remote-client-ui-v2.js','./stations.js','./native-tools-adapter.js','./native-bluetooth.js','./modules/gps.js','./modules/gps-stable.js','./modules/batteries-clean.js','./modules/phone.js','./modules/seastate.js','./modules/compass.js'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});
