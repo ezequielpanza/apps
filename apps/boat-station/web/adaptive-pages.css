@@ -43,10 +43,17 @@
 .battery-mini-right{gap:clamp(1px,1cqh,4px)}
 .battery-mini-charge{padding-top:clamp(1px,1cqh,4px)}
 
-.page-content>.battery-history-wrap{flex:1 1 auto;min-height:118px}
+.page-content>.battery-history-wrap{flex:1 1 auto;min-height:118px;grid-template-columns:minmax(0,1fr) auto}
 .battery-history{height:100%;min-height:96px;display:flex;flex-direction:column}
 .battery-history canvas{flex:1 1 auto;min-height:72px;height:auto}
 .battery-history-note{flex:0 0 auto}
+.battery-history-controls{width:94px;display:flex;flex-direction:column;gap:8px;align-self:stretch}
+.battery-history-control{flex:1 1 0;min-height:0;border:1px solid #24516a;border-radius:11px;background:#0d2b40;padding:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+.battery-history-control>span{font-size:9px;color:#94a7b6;text-align:center;line-height:1.1}
+.battery-history-control-row{width:100%;display:grid;grid-template-columns:28px minmax(0,1fr) 28px;align-items:center;gap:3px}
+.battery-history-control-row button{width:28px;height:30px;min-height:30px;padding:0;border:1px solid #24516a;border-radius:8px;background:#102f45;color:#dceaf2;font-size:18px;font-weight:800;line-height:1;touch-action:manipulation}
+.battery-history-control-row button:disabled{opacity:.35}
+.battery-history-control-row b{font-size:10px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 .page-content>.battery-list{flex:1 1 auto;gap:clamp(3px,1.4cqh,8px)}
 .battery-list>.battery-item{min-height:34px;padding-block:clamp(4px,1.7cqh,11px)}
@@ -75,4 +82,10 @@
 }
 @container pagecontent (max-height:260px){
   .card[data-id="batteries"] .page-content>.battery-list .battery-item-sub{font-size:10px;gap:8px}
+}
+@container pagecontent (max-width:390px){
+  .battery-history-controls{width:84px}
+  .battery-history-control-row{grid-template-columns:25px minmax(0,1fr) 25px}
+  .battery-history-control-row button{width:25px;height:28px;min-height:28px}
+  .battery-history-control-row b{font-size:9px}
 }
