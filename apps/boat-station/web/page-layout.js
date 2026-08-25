@@ -31,24 +31,24 @@ export function createPageLayoutEngine(cards){
   function isLeafTextElement(el){if(!(el instanceof HTMLElement))return false;if(el.children.length)return false;return !!String(el.textContent||'').trim()}
   function isOutOfFlow(style){return style.position==='absolute'||style.position==='fixed'}
   function hasVerticalClip(el){if(!(el instanceof HTMLElement)||el===document.body)return false;const style=getComputedStyle(el);if(style.display==='none'||style.visibility==='hidden'||isOutOfFlow(style))return false;if(el.tagName==='CANVAS'||el.tagName==='SVG'||isLeafTextElement(el))return false;const overflowY=style.overflowY;if(!['hidden','clip','auto','scroll'].includes(overflowY))return false;return el.scrollHeight>el.clientHeight+FIT_EPSILON}
-  function contentFits(content,height){content.style.height=`${Math.round(height)}px`;const root=content.getBoundingClientRect(),topLimit=root.top-FIT_EPSILON,bottomLimit=root.bottom+FIT_EPSILON;if(content.scrollHeight>content.clientHeight+FIT_EPSILON)return false;for(const el of content.querySelectorAll('*')){const style=getComputedStyle(el);if(style.display==='none'||style.visibility==='hidden'||isOutOfFlow(style))continue;const rect=el.getBoundingClientRect();if(rect.width<=0&&rect.height<=0)continue;if(rect.top<topLimit||rect.bottom>bottomLimit)return false;if(hasVerticalClip(el))return false}return true}
+  function contentFitsCurrent(content){const root=content.getBoundingClientRect(),topLimit=root.top-FIT_EPSILON,bottomLimit=root.bottom+FIT_EPSILON;if(content.scrollHeight>content.clientHeight+FIT_EPSILON)return false;for(const el of content.querySelectorAll('*')){const style=getComputedStyle(el);if(style.display==='none'||style.visibility==='hidden'||isOutOfFlow(style))continue;const rect=el.getBoundingClientRect();if(rect.width<=0&&rect.height<=0)continue;if(rect.top<topLimit||rect.bottom>bottomLimit)return false;if(hasVerticalClip(el))return false}return true}
   function minimumContentHeight(content){
     if(!content)return DEFAULT_MIN_CONTENT_HEIGHT;
-    const previousHeight=content.style.height,previousOverflow=content.style.overflow;
-    content.style.overflow='hidden';
+    const pageEl=content.closest('.page');
+    if(!pageEl)return DEFAULT_MIN_CONTENT_HEIGHT;
+    const previousVar=pageEl.style.getPropertyValue('--page-content-height');
+    const previousContentHeight=content.style.height,previousOverflow=content.style.overflow;
+    content.style.removeProperty('height');content.style.overflow='hidden';
     const ceiling=Math.max(1200,window.innerHeight*1.75);
     let firstFit=null,lastFail=DEFAULT_MIN_CONTENT_HEIGHT-1;
-    for(let h=DEFAULT_MIN_CONTENT_HEIGHT;h<=ceiling;h+=MIN_SCAN_STEP){
-      if(contentFits(content,h)){firstFit=h;break}
-      lastFail=h;
-    }
+    const test=h=>{pageEl.style.setProperty('--page-content-height',`${Math.round(h)}px`);pageEl.getBoundingClientRect();return contentFitsCurrent(content)};
+    for(let h=DEFAULT_MIN_CONTENT_HEIGHT;h<=ceiling;h+=MIN_SCAN_STEP){if(test(h)){firstFit=h;break}lastFail=h}
     if(firstFit===null)firstFit=ceiling;
-    const refineStart=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,lastFail+1);
     let minimum=firstFit;
-    for(let h=refineStart;h<firstFit;h++){
-      if(contentFits(content,h)){minimum=h;break}
-    }
-    content.style.height=previousHeight;content.style.overflow=previousOverflow;
+    for(let h=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,lastFail+1);h<firstFit;h++){if(test(h)){minimum=h;break}}
+    if(previousVar)pageEl.style.setProperty('--page-content-height',previousVar);else pageEl.style.removeProperty('--page-content-height');
+    content.style.height=previousContentHeight;content.style.overflow=previousOverflow;
+    pageEl.getBoundingClientRect();
     return Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.ceil(minimum));
   }
   function defaultContentHeight(content){return Math.ceil(minimumContentHeight(content)*DEFAULT_HEIGHT_FACTOR)}
@@ -79,7 +79,7 @@ export function createPageLayoutEngine(cards){
   function maxContentHeight(){return Math.max(1200,window.innerHeight*1.75)}
   function finishResize(event){if(!resize||event.pointerId!==resize.pointerId)return false;const current=resize;resize=null;current.card.classList.remove('resizing');const height=pageHeightValue(current.card,current.page);if(Number.isFinite(height))saveContentHeight(current.id,current.page,height);queueValidation(current.card);window.dispatchEvent(new CustomEvent('boatstation-page-resize-end',{detail:{id:current.id,page:current.page,height,card:current.card}}));return true}
 
-  cards?.addEventListener('pointerdown',event=>{const handle=event.target.closest('.resize-handle');if(!handle||event.isPrimary===false||(event.pointerType==='mouse'&&event.button!==0))return;const card=handle.closest('.card');if(!card||card.classList.contains('collapsed'))return;const page=currentPage(card),content=contentElement(card,page);if(!content)return;event.preventDefault();event.stopImmediatePropagation();const startH=applyContentHeight(card,page,null,{syncViewport:true});resize={pointerId:event.pointerId,card,id:card.dataset.id,page,startY:event.clientY,startH,minH:minimumContentHeight(content)};card.classList.add('resizing');window.dispatchEvent(new CustomEvent('boatstation-page-resize-start',{detail:{id:resize.id,page,card}}));try{handle.setPointerCapture(event.pointerId)}catch{}},{capture:true});
+  cards?.addEventListener('pointerdown',event=>{const handle=event.target.closest('.resize-handle');if(!handle||event.isPrimary===false||(event.pointerType==='mouse'&&event.button!==0))return;const card=handle.closest('.card');if(!card||card.classList.contains('collapsed'))return;const page=currentPage(card),content=contentElement(card,page);if(!content)return;event.preventDefault();event.stopImmediatePropagation();card.classList.add('resizing');const startH=applyContentHeight(card,page,null,{syncViewport:true});resize={pointerId:event.pointerId,card,id:card.dataset.id,page,startY:event.clientY,startH,minH:minimumContentHeight(content)};window.dispatchEvent(new CustomEvent('boatstation-page-resize-start',{detail:{id:resize.id,page,card}}));try{handle.setPointerCapture(event.pointerId)}catch{}},{capture:true});
   cards?.addEventListener('pointermove',event=>{if(!resize||event.pointerId!==resize.pointerId)return;event.preventDefault();event.stopImmediatePropagation();const next=Math.max(resize.minH,Math.min(maxContentHeight(),resize.startH+(event.clientY-resize.startY))),pageEl=pageElement(resize.card,resize.page);if(pageEl){pageEl.style.setProperty('--page-content-height',`${Math.round(next)}px`);syncViewportHeight(resize.card,resize.page,false)}},{capture:true,passive:false});
   cards?.addEventListener('pointerup',event=>{if(finishResize(event)){event.preventDefault();event.stopImmediatePropagation()}},{capture:true});
   cards?.addEventListener('pointercancel',event=>{if(finishResize(event))event.stopImmediatePropagation()},{capture:true});
