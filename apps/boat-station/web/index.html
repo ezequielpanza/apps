@@ -13,7 +13,6 @@
 <link rel="stylesheet" href="./remote-client-ui.css">
 <link rel="stylesheet" href="./page-interactions.css">
 <link rel="stylesheet" href="./adaptive-pages.css">
-<link rel="stylesheet" href="./responsive-components.css">
 <script>
 (function(){
   if(window.__bsNativeQueue)return;
@@ -38,14 +37,11 @@
   if(isLocal) document.title='Boat Station';
   const menu=document.getElementById('menuSheet');
 
-  try{await import('./stable-resize-observer.js')}catch(err){console.warn('Boat Station stable resize observer unavailable',err)}
   try{await import('./app.js')}catch(err){console.error('Boat Station UI failed to start',err);return}
   try{await import('./page-interactions.js')}catch(err){console.warn('Boat Station page interactions unavailable',err)}
   try{await import('./module-layout-settings.js')}catch(err){console.warn('Boat Station module layout settings unavailable',err)}
   try{await import('./battery-flow-status.js')}catch(err){console.warn('Boat Station battery flow status unavailable',err)}
   try{await import('./battery-manager-status.js')}catch(err){console.warn('Boat Station battery manager status unavailable',err)}
-  try{await import('./battery-chart-labels.js')}catch(err){console.warn('Boat Station battery chart labels unavailable',err)}
-  try{await import('./battery-chart-grid.js')}catch(err){console.warn('Boat Station battery chart reference grid unavailable',err)}
   try{await import('./battery-stat-settings.js')}catch(err){console.warn('Boat Station battery statistic settings unavailable',err)}
   try{await import('./data-sync.js')}catch(err){console.warn('Boat Station data sync unavailable',err)}
   try{await import('./apk-update.js')}catch(err){console.warn('Boat Station APK update checker unavailable',err)}
