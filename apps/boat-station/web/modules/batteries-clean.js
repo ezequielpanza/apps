@@ -37,8 +37,8 @@ export function createBatteriesModule(requestRender,openManager){
   function addBattery(device){const id=String(device.id||device.address||device.deviceId||device.mac||device.name||Date.now());if(state.batteries.some(b=>String(b.id)===id))return;state.batteries.push({id,name:device.name||device.deviceName||'Batería',deviceName:device.name||device.deviceName||'',address:device.address||device.mac||'',capacityAh:num(device.capacityAh)||0,connected:false});saveCurrent(true);requestRender('batteries')}
   function removeBattery(id){state.batteries=state.batteries.filter(b=>String(b.id)!==String(id));saveCurrent(true);requestRender('batteries')}
   function renameBank(name){const n=String(name||'').trim();if(!n)return;state.bankName=n;saveCurrent(true);requestRender('batteries')}
-  // History stays local to the Core; it must never be copied into the 2 s Remote snapshot.
-  function exportRemoteState(){return{bankName:state.bankName,batteries:clone(state.batteries),statsSummary:clone(stats())}}
+  // Remote needs the compacted Core history to render the same battery chart.
+  function exportRemoteState(){return{bankName:state.bankName,batteries:clone(state.batteries),history:clone(state.history),statsSummary:clone(stats())}}
   function applyRemoteState(remote){if(!remote||typeof remote!=='object')return;state.remoteAuthoritative=true;if(typeof remote.bankName==='string')state.bankName=remote.bankName;if(Array.isArray(remote.batteries))state.batteries=clone(remote.batteries);if(Array.isArray(remote.history))state.history=clone(remote.history);requestRender('batteries')}
   function setScanDevices(list){state.scanDevices=Array.isArray(list)?clone(list):[]}
   function executeRemoteCommand(command,payload){if(command==='battery.add')addBattery(payload?.device||payload);else if(command==='battery.remove')removeBattery(payload?.id);else if(command==='battery.renameBank')renameBank(payload?.name);else if(command==='battery.scan')try{window.BoatStationCore?.openBluetoothScanner?.()||window.NativeBridge?.startBatteryScan?.()}catch{}}
