@@ -4,6 +4,7 @@ const FIT_EPSILON=1;
 const LAYOUT_SCHEMA=2;
 const DEFAULT_HEIGHT_FACTOR=1.2;
 const PAGE_TRANSITION_MS=220;
+const MIN_SCAN_STEP=4;
 
 function readJson(key,fallback){try{const value=JSON.parse(localStorage.getItem(key)||'null');return value??fallback}catch{return fallback}}
 function writeJson(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
@@ -27,12 +28,29 @@ export function createPageLayoutEngine(cards){
   function savedContentHeight(id,page){ensureScope();const value=state.contentHeights?.[id]?.[page];return Number.isFinite(Number(value))?Number(value):null}
   function saveContentHeight(id,page,height){if(!id||!Number.isFinite(height))return;ensureScope();state.contentHeights[id]||(state.contentHeights[id]={});state.contentHeights[id][page]=Math.round(height);persist()}
 
-  function naturalContentHeight(content){if(!content)return DEFAULT_MIN_CONTENT_HEIGHT;const previous=content.style.height;content.style.height='auto';const height=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.ceil(content.scrollHeight));content.style.height=previous;return height}
   function isLeafTextElement(el){if(!(el instanceof HTMLElement))return false;if(el.children.length)return false;return !!String(el.textContent||'').trim()}
   function isOutOfFlow(style){return style.position==='absolute'||style.position==='fixed'}
   function hasVerticalClip(el){if(!(el instanceof HTMLElement)||el===document.body)return false;const style=getComputedStyle(el);if(style.display==='none'||style.visibility==='hidden'||isOutOfFlow(style))return false;if(el.tagName==='CANVAS'||el.tagName==='SVG'||isLeafTextElement(el))return false;const overflowY=style.overflowY;if(!['hidden','clip','auto','scroll'].includes(overflowY))return false;return el.scrollHeight>el.clientHeight+FIT_EPSILON}
   function contentFits(content,height){content.style.height=`${Math.round(height)}px`;const root=content.getBoundingClientRect(),topLimit=root.top-FIT_EPSILON,bottomLimit=root.bottom+FIT_EPSILON;if(content.scrollHeight>content.clientHeight+FIT_EPSILON)return false;for(const el of content.querySelectorAll('*')){const style=getComputedStyle(el);if(style.display==='none'||style.visibility==='hidden'||isOutOfFlow(style))continue;const rect=el.getBoundingClientRect();if(rect.width<=0&&rect.height<=0)continue;if(rect.top<topLimit||rect.bottom>bottomLimit)return false;if(hasVerticalClip(el))return false}return true}
-  function minimumContentHeight(content){if(!content)return DEFAULT_MIN_CONTENT_HEIGHT;const previousHeight=content.style.height,previousOverflow=content.style.overflow;content.style.overflow='hidden';let low=DEFAULT_MIN_CONTENT_HEIGHT,high=Math.max(low,naturalContentHeight(content),160);const ceiling=Math.max(1200,window.innerHeight*1.75);while(high<ceiling&&!contentFits(content,high))high=Math.min(ceiling,Math.ceil(high*1.3+20));if(contentFits(content,high)){while(high-low>1){const mid=(low+high)/2;if(contentFits(content,mid))high=mid;else low=mid}}const minimum=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.ceil(high));content.style.height=previousHeight;content.style.overflow=previousOverflow;return minimum}
+  function minimumContentHeight(content){
+    if(!content)return DEFAULT_MIN_CONTENT_HEIGHT;
+    const previousHeight=content.style.height,previousOverflow=content.style.overflow;
+    content.style.overflow='hidden';
+    const ceiling=Math.max(1200,window.innerHeight*1.75);
+    let firstFit=null,lastFail=DEFAULT_MIN_CONTENT_HEIGHT-1;
+    for(let h=DEFAULT_MIN_CONTENT_HEIGHT;h<=ceiling;h+=MIN_SCAN_STEP){
+      if(contentFits(content,h)){firstFit=h;break}
+      lastFail=h;
+    }
+    if(firstFit===null)firstFit=ceiling;
+    const refineStart=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,lastFail+1);
+    let minimum=firstFit;
+    for(let h=refineStart;h<firstFit;h++){
+      if(contentFits(content,h)){minimum=h;break}
+    }
+    content.style.height=previousHeight;content.style.overflow=previousOverflow;
+    return Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.ceil(minimum));
+  }
   function defaultContentHeight(content){return Math.ceil(minimumContentHeight(content)*DEFAULT_HEIGHT_FACTOR)}
 
   function pageHeightValue(card,page){const pageEl=pageElement(card,page);if(!pageEl)return null;const value=parseFloat(pageEl.style.getPropertyValue('--page-content-height'));return Number.isFinite(value)?value:null}
@@ -49,7 +67,7 @@ export function createPageLayoutEngine(cards){
 
   function initializePageHeights(card){if(!card)return;card.style.removeProperty('--page-content-height');for(const pageEl of card.querySelectorAll('.page[data-page]')){const page=Number(pageEl.dataset.page);if(Number.isFinite(page))applyContentHeight(card,page)}}
 
-  function resetModule(card){if(!card?.dataset?.id)return false;const id=card.dataset.id,pages=[...card.querySelectorAll('.page[data-page]')];ensureScope();state.contentHeights[id]={};for(const pageEl of pages){const page=Number(pageEl.dataset.page),content=pageEl.querySelector(':scope > .page-content');if(!Number.isFinite(page)||!content)continue;const height=defaultContentHeight(content);state.contentHeights[id][page]=height;pageEl.style.setProperty('--page-content-height',`${height}px`)}persist();syncViewportHeight(card,currentPage(card),false);window.dispatchEvent(new CustomEvent('boatstation-module-size-reset',{detail:{id,card}}));return true}
+  function resetModule(card){if(!card?.dataset?.id)return false;const id=card.dataset.id,pages=[...card.querySelectorAll('.page[data-page]')];ensureScope();state.contentHeights[id]={};for(const pageEl of pages){const page=Number(pageEl.dataset.page),content=pageEl.querySelector(':scope > .page-content');if(!Number.isFinite(page)||!content)continue;pageEl.style.removeProperty('--page-content-height');const height=defaultContentHeight(content);state.contentHeights[id][page]=height;pageEl.style.setProperty('--page-content-height',`${height}px`)}persist();syncViewportHeight(card,currentPage(card),false);window.dispatchEvent(new CustomEvent('boatstation-module-size-reset',{detail:{id,card}}));return true}
 
   function updatePager(card,page=currentPage(card)){card?.querySelectorAll('.pager').forEach(pager=>pager.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===page)))}
   function validateCard(card){if(!card||!card.isConnected||card.classList.contains('collapsed')||(resize&&resize.card===card))return;const page=currentPage(card),content=contentElement(card,page);if(!content)return;const wanted=pageHeightValue(card,page)??savedContentHeight(card.dataset.id,page);applyContentHeight(card,page,wanted,{syncViewport:true})}
