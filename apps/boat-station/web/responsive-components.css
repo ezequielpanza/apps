@@ -1,0 +1,23 @@
+/* Responsive component primitives. Components compress internally before they impose a larger page minimum. */
+.page-content>.battery-history-wrap{min-height:72px}
+
+@container pagecontent (max-height:180px){
+  .battery-history-controls{gap:4px}
+  .battery-history-control{padding:3px;gap:2px;border-radius:8px}
+  .battery-history-control>span{display:none}
+  .battery-history-control-row{grid-template-columns:24px minmax(0,1fr) 24px;gap:2px}
+  .battery-history-control-row button{width:24px;height:24px;min-height:24px;border-radius:6px;font-size:15px}
+  .battery-history-control-row b{font-size:9px}
+  .battery-history-note{margin-top:2px;font-size:9px;line-height:1.05}
+  .battery-history-note [data-history-last-sample]{margin-top:1px!important;font-size:9px!important;line-height:1.05}
+}
+
+@container pagecontent (max-height:125px){
+  .battery-history-controls{width:78px;gap:2px}
+  .battery-history-control{padding:1px 2px}
+  .battery-history-control-row{grid-template-columns:21px minmax(0,1fr) 21px;gap:1px}
+  .battery-history-control-row button{width:21px;height:21px;min-height:21px;font-size:14px}
+  .battery-history-control-row b{font-size:8px}
+  .battery-history-note{font-size:8px}
+  .battery-history-note [data-history-last-sample]{font-size:8px!important}
+}
