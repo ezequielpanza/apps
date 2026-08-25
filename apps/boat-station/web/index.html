@@ -27,6 +27,7 @@
 (async function(){
   const params=new URLSearchParams(location.search),isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;if(isLocal)document.title='Boat Station';const menu=document.getElementById('menuSheet');
   try{await import('./app.js')}catch(err){console.error('Boat Station UI failed to start',err);return}
+  try{await import('./stability-runtime.js')}catch(err){console.warn('Boat Station stability runtime unavailable',err)}
   try{await import('./page-interactions.js')}catch(err){console.warn('Boat Station page interactions unavailable',err)}
   try{await import('./module-layout-settings.js')}catch(err){console.warn('Boat Station module layout settings unavailable',err)}
   try{await import('./battery-manager-status.js')}catch(err){console.warn('Boat Station battery manager status unavailable',err)}
