@@ -1,5 +1,5 @@
 import {createGpsModule} from './modules/gps.js';
-import {createBatteriesModule} from './modules/batteries.js';
+import {createBatteriesModule} from './modules/batteries-clean.js';
 import {createPhoneModule} from './modules/phone.js';
 import {createSeaStateModule} from './modules/seastate.js';
 import {createCompassModule} from './modules/compass.js';
