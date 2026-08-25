@@ -37,110 +37,35 @@
   if(isLocal) document.title='Boat Station';
   const menu=document.getElementById('menuSheet');
 
-  try{
-    await import('./app.js');
-  }catch(err){
-    console.error('Boat Station UI failed to start',err);
-    return;
-  }
-
-  try{
-    await import('./page-interactions.js');
-  }catch(err){
-    console.warn('Boat Station page interactions unavailable',err);
-  }
-
-  try{
-    await import('./battery-flow-status.js');
-  }catch(err){
-    console.warn('Boat Station battery flow status unavailable',err);
-  }
-
-  try{
-    await import('./battery-manager-status.js');
-  }catch(err){
-    console.warn('Boat Station battery manager status unavailable',err);
-  }
-
-  try{
-    await import('./battery-chart-labels.js');
-  }catch(err){
-    console.warn('Boat Station battery chart labels unavailable',err);
-  }
-
-  try{
-    await import('./battery-stat-settings.js');
-  }catch(err){
-    console.warn('Boat Station battery statistic settings unavailable',err);
-  }
-
-  try{
-    await import('./data-sync.js');
-  }catch(err){
-    console.warn('Boat Station data sync unavailable',err);
-  }
-
-  try{
-    await import('./apk-update.js');
-  }catch(err){
-    console.warn('Boat Station APK update checker unavailable',err);
-  }
-
-  try{
-    await import('./pwa-version.js');
-  }catch(err){
-    console.warn('Boat Station PWA version bridge unavailable',err);
-  }
-
-  try{
-    await import('./stations.js');
-  }catch(err){
-    console.error('Boat Station station management unavailable',err);
-  }
+  try{await import('./app.js')}catch(err){console.error('Boat Station UI failed to start',err);return}
+  try{await import('./page-interactions.js')}catch(err){console.warn('Boat Station page interactions unavailable',err)}
+  try{await import('./module-layout-settings.js')}catch(err){console.warn('Boat Station module layout settings unavailable',err)}
+  try{await import('./battery-flow-status.js')}catch(err){console.warn('Boat Station battery flow status unavailable',err)}
+  try{await import('./battery-manager-status.js')}catch(err){console.warn('Boat Station battery manager status unavailable',err)}
+  try{await import('./battery-chart-labels.js')}catch(err){console.warn('Boat Station battery chart labels unavailable',err)}
+  try{await import('./battery-stat-settings.js')}catch(err){console.warn('Boat Station battery statistic settings unavailable',err)}
+  try{await import('./data-sync.js')}catch(err){console.warn('Boat Station data sync unavailable',err)}
+  try{await import('./apk-update.js')}catch(err){console.warn('Boat Station APK update checker unavailable',err)}
+  try{await import('./pwa-version.js')}catch(err){console.warn('Boat Station PWA version bridge unavailable',err)}
+  try{await import('./stations.js')}catch(err){console.error('Boat Station station management unavailable',err)}
 
   if(isLocal){
-    try{
-      await import('./native-bluetooth.js');
-    }catch(err){
-      console.warn('Boat Station Bluetooth adapter unavailable',err);
-    }
-    const queued=window.__bsNativeQueue||[];
-    window.__bsNativeQueue=[];
+    try{await import('./native-bluetooth.js')}catch(err){console.warn('Boat Station Bluetooth adapter unavailable',err)}
+    const queued=window.__bsNativeQueue||[];window.__bsNativeQueue=[];
     queued.forEach(([name,value])=>{try{window.BoatStation?.[name]?.(value)}catch(err){console.error('Boat Station native event error',name,err)}});
   }else{
     document.documentElement.classList.add('bs-remote-client');
     document.getElementById('addBtn').style.display='none';
     const inner=menu.querySelector('.sheet-inner');
     if(inner){
-      const row=document.createElement('div');
-      row.className='option remote-apk-row';
-      row.innerHTML='<span>Boat Station APK<br><small class="sub">Última versión disponible</small></span><a class="btn" href="/BoatStation.apk" download>Descargar</a>';
-      inner.appendChild(row);
-      try{
-        const versionResponse=await fetch('/APK_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
-        if(versionResponse.ok){
-          const version=(await versionResponse.text()).trim();
-          if(version){
-            const download=row.querySelector('.btn');
-            download.textContent='Descargar '+version;
-            download.href='/BoatStation-'+version+'.apk';
-            download.setAttribute('download','BoatStation-'+version+'.apk');
-          }
-        }
-      }catch(err){
-        console.warn('Boat Station APK version unavailable',err);
-      }
+      const row=document.createElement('div');row.className='option remote-apk-row';
+      row.innerHTML='<span>Boat Station APK<br><small class="sub">Última versión disponible</small></span><a class="btn" href="/BoatStation.apk" download>Descargar</a>';inner.appendChild(row);
+      try{const versionResponse=await fetch('/APK_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(versionResponse.ok){const version=(await versionResponse.text()).trim();if(version){const download=row.querySelector('.btn');download.textContent='Descargar '+version;download.href='/BoatStation-'+version+'.apk';download.setAttribute('download','BoatStation-'+version+'.apk')}}}catch(err){console.warn('Boat Station APK version unavailable',err)}
     }
-    try{
-      await import('./remote-client-ui-v2.js');
-    }catch(err){
-      console.warn('Boat Station Remote UI extras unavailable',err);
-    }
+    try{await import('./remote-client-ui-v2.js')}catch(err){console.warn('Boat Station Remote UI extras unavailable',err)}
   }
 
-  if('serviceWorker' in navigator&&location.protocol==='https:'){
-    navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Boat Station SW',err));
-  }
+  if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Boat Station SW',err));
 })().catch(err=>console.error('Boat Station bootstrap error',err));
 </script>
 </body>
