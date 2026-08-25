@@ -2,7 +2,7 @@ const CURRENT_KEY='bs.batteries.current.v1',HISTORY_KEY='bs.batteries.history.v1
 const SAMPLE_MS=30000,SAVE_MS=2000,MAX_AGE=840*86400000,BARS=30;
 const ZOOMS=[['5 min',5*60000],['15 min',15*60000],['1 h',3600000],['3 h',3*3600000],['6 h',6*3600000],['12 h',12*3600000],['1 día',86400000],['7 días',7*86400000],['28 días',28*86400000]];
 const num=v=>Number.isFinite(Number(v))?Number(v):null;
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const read=(k,f)=>{try{const v=JSON.parse(localStorage.getItem(k)||'null');return v??f}catch{return f}};
 const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
 const clone=v=>{try{return JSON.parse(JSON.stringify(v))}catch{return v}};
