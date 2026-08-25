@@ -45,7 +45,7 @@ public class MainActivityCore extends MainActivityV100 {
     private static final String WEB_URL = "https://boat-station.pages.dev/?mode=station";
     private static final int REQ_EXPORT_GPX = 3101;
     private static final int REQ_IMPORT_GPX = 3102;
-    private static final long SENSOR_PUSH_MS = 200;
+    private static final long SENSOR_PUSH_MS = 250;
 
     private WebView coreWebView;
     private TextToSpeech tts;
@@ -87,7 +87,7 @@ public class MainActivityCore extends MainActivityV100 {
         coreWebView.loadUrl(WEB_URL);
     }
 
-    @Override protected void onResume(){super.onResume();if(coreSensorManager!=null){coreSensorManager.unregisterListener(this);if(coreRotationSensor!=null)coreSensorManager.registerListener(this,coreRotationSensor,SensorManager.SENSOR_DELAY_GAME);if(coreAccelSensor!=null)coreSensorManager.registerListener(this,coreAccelSensor,SensorManager.SENSOR_DELAY_GAME);}lastSensorPush=0;}
+    @Override protected void onResume(){super.onResume();if(coreSensorManager!=null){coreSensorManager.unregisterListener(this);if(coreRotationSensor!=null)coreSensorManager.registerListener(this,coreRotationSensor,SensorManager.SENSOR_DELAY_UI);if(coreAccelSensor!=null)coreSensorManager.registerListener(this,coreAccelSensor,SensorManager.SENSOR_DELAY_UI);}lastSensorPush=0;}
     @Override protected void onPause(){if(coreSensorManager!=null)coreSensorManager.unregisterListener(this);super.onPause();}
     @Override public void onSensorChanged(SensorEvent event){if(event==null||event.sensor==null)return;int type=event.sensor.getType();if(type==Sensor.TYPE_ROTATION_VECTOR){float[] r=new float[9],o=new float[3];try{SensorManager.getRotationMatrixFromVector(r,event.values);SensorManager.getOrientation(r,o);float h=(float)Math.toDegrees(o[0]);if(h<0)h+=360f;latestHeading=h;haveHeading=true;}catch(Exception ignored){}}else if(type==Sensor.TYPE_ACCELEROMETER){double m=Math.sqrt(event.values[0]*event.values[0]+event.values[1]*event.values[1]+event.values[2]*event.values[2]);latestMotion=Math.abs(m-SensorManager.GRAVITY_EARTH);haveMotion=true;}pushSensorFrame(false);}
     private void pushSensorFrame(boolean force){if(coreWebView==null)return;long now=SystemClock.elapsedRealtime();if(!force&&now-lastSensorPush<SENSOR_PUSH_MS)return;if(!haveHeading&&!haveMotion)return;lastSensorPush=now;String heading=haveHeading?String.format(Locale.US,"%.1f",latestHeading):"null",motion=haveMotion?String.format(Locale.US,"%.3f",latestMotion):"null";String js="(function(){var b=window.BoatStation;if(!b)return;if("+heading+"!==null&&b.updateCompass)b.updateCompass("+heading+");if("+motion+"!==null&&b.updateMotion)b.updateMotion("+motion+");window.__bsLastNativeSensor=Date.now();})();";WebView target=coreWebView;if(target!=null)target.post(()->{try{if(coreWebView==target)target.evaluateJavascript(js,null);}catch(Exception ignored){}});}
@@ -110,7 +110,7 @@ public class MainActivityCore extends MainActivityV100 {
         @JavascriptInterface public void downloadApk(final String url){if(url==null||url.trim().isEmpty())return;runOnUiThread(()->{try{Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse(url));i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(i);}catch(Exception ignored){}});}
         @JavascriptInterface public String getCapabilities(){try{JSONObject o=new JSONObject();o.put("location",true);o.put("bluetooth",true);o.put("sensors",true);o.put("storage",true);o.put("camera",true);o.put("microphone",true);o.put("notifications",true);o.put("wifi",true);o.put("usb",true);o.put("nfc",true);o.put("tts",true);o.put("wakeLock",true);o.put("background",true);o.put("qr",true);o.put("gpx",true);return o.toString();}catch(Exception e){return"{}";}}
         @JavascriptInterface public boolean isTtsReady(){return ttsReady;}
-        @JavascriptInterface public void restartSensors(){runOnUiThread(()->{if(coreSensorManager==null)return;coreSensorManager.unregisterListener(MainActivityCore.this);if(coreRotationSensor!=null)coreSensorManager.registerListener(MainActivityCore.this,coreRotationSensor,SensorManager.SENSOR_DELAY_GAME);if(coreAccelSensor!=null)coreSensorManager.registerListener(MainActivityCore.this,coreAccelSensor,SensorManager.SENSOR_DELAY_GAME);lastSensorPush=0;pushSensorFrame(true);});}
+        @JavascriptInterface public void restartSensors(){runOnUiThread(()->{if(coreSensorManager==null)return;coreSensorManager.unregisterListener(MainActivityCore.this);if(coreRotationSensor!=null)coreSensorManager.registerListener(MainActivityCore.this,coreRotationSensor,SensorManager.SENSOR_DELAY_UI);if(coreAccelSensor!=null)coreSensorManager.registerListener(MainActivityCore.this,coreAccelSensor,SensorManager.SENSOR_DELAY_UI);lastSensorPush=0;pushSensorFrame(true);});}
         @JavascriptInterface public void speak(final String text){runOnUiThread(()->{if(tts!=null&&ttsReady&&text!=null&&!text.trim().isEmpty())tts.speak(text,TextToSpeech.QUEUE_FLUSH,null,"boat-station-tts");});}
         @JavascriptInterface public void alarm(final String text){runOnUiThread(()->{if(tts!=null&&ttsReady&&text!=null&&!text.trim().isEmpty())tts.speak(text,TextToSpeech.QUEUE_FLUSH,null,"boat-station-alarm");else toneFallback();});}
         @JavascriptInterface public void stopSpeaking(){runOnUiThread(()->{if(tts!=null)tts.stop();});}
