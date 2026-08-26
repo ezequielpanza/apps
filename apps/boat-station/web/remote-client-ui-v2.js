@@ -37,6 +37,23 @@ window.addEventListener('boatstation-page-interaction-end',endInteraction);
 window.addEventListener('boatstation-page-resize-start',beginInteraction);
 window.addEventListener('boatstation-page-resize-end',endInteraction);
 
+document.addEventListener('click',async event=>{
+  const btn=event.target.closest('[data-remove-battery]');
+  if(!btn)return;
+  const send=window.BoatStationRemoteCommand?.send;
+  if(typeof send!=='function')return;
+  const id=String(btn.dataset.removeBattery||'');
+  if(!id)return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+  const original=btn.textContent;
+  btn.disabled=true;
+  btn.textContent='Eliminando…';
+  const ok=await send('battery.remove',{id});
+  if(!ok){btn.disabled=false;btn.textContent=original}
+},{capture:true});
+
 const addObserver=new MutationObserver(()=>requestAnimationFrame(filterAddSheet));if(addSheet)addObserver.observe(addSheet,{childList:true,subtree:true});
 window.addEventListener('boatstation-module-catalog-updated',filterAddSheet);
 window.BoatStationRemoteUI={isBusy,scheduleData,markUpdated,filterAddSheet};
