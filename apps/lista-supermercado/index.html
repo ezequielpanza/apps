@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f6f1">
+  <meta name="description" content="Una lista de compras simple y rápida para llevar al supermercado.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <title>La lista · Chez Team</title>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar"><div class="brand"><span class="brand-mark">C</span><span>CHEZ TEAM <small>· LA LISTA</small></span></div><span class="local-pill" title="Los datos se guardan en este dispositivo"><span class="dot"></span> En este dispositivo</span></header>
+    <section class="intro"><div class="eyebrow">PARA LA PRÓXIMA COMPRA <span class="sparkle">✳</span></div><h1>La lista del <em>súper.</em></h1><p>Agregá lo que falta. Tachá lo que ya está en el changuito.</p></section>
+    <form id="add-form" class="add-form" autocomplete="off"><label class="sr-only" for="product">Producto</label><span class="plus">+</span><input id="product" name="product" placeholder="¿Qué hay que comprar?" maxlength="80" required><label class="sr-only" for="quantity">Cantidad opcional</label><input id="quantity" name="quantity" placeholder="Cant." maxlength="20"><button type="submit">Agregar <span aria-hidden="true">↗</span></button></form>
+    <div id="suggestions" class="suggestions" hidden></div>
+    <div class="toolbar"><div><span class="section-kicker">MI LISTA</span><h2>Para comprar <span id="remaining-count" class="count">0</span></h2></div><button id="clear-done" class="text-button" type="button" hidden>Limpiar comprados</button></div>
+    <div id="list" class="list" aria-live="polite"></div>
+    <section id="done-section" class="done-section" hidden><h2>En el changuito <span id="done-count" class="count">0</span></h2><div id="done-list" class="list"></div></section>
+    <footer>HECHA PARA COMPRAR SIN OLVIDARSE DE NADA <span>✳</span></footer>
+  </main>
+  <script src="app.js" defer></script>
+</body>
+</html>
