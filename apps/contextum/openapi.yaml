@@ -1,0 +1,45 @@
+openapi: 3.1.0
+info:
+  title: Contextum Action API
+  description: Read the latest Contextum snapshot associated with a temporary pairing code.
+  version: 0.4.0
+servers:
+  - url: https://contextum.pages.dev
+paths:
+  /api/pair/{code}:
+    get:
+      operationId: getCurrentContext
+      summary: Obtener el contexto actual de Contextum
+      description: Devuelve el último snapshot de Contextum asociado a un código temporal de ocho caracteres. Usa esta acción cuando el usuario quiera saber su ubicación, precisión GPS, movimiento, nota activa o estado de ejecución.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Código temporal de ocho caracteres mostrado por Contextum.
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 8
+            pattern: '^[A-HJ-NP-Z2-9]{8}$'
+      responses:
+        '200':
+          description: Snapshot actual de Contextum
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source:
+                    type: string
+                  access:
+                    type: string
+                  code:
+                    type: string
+                  snapshot:
+                    type: object
+                    additionalProperties: true
+                additionalProperties: true
+        '400':
+          description: Código inválido
+        '404':
+          description: Código vencido o desconocido
