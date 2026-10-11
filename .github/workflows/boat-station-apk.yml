@@ -6,6 +6,9 @@ on:
     paths:
       - 'apps/boat-station/core/**'
       - 'apps/boat-station/web/**'
+      - '!apps/boat-station/web/*.apk'
+      - '!apps/boat-station/web/APK_VERSION'
+      - '!apps/boat-station/web/_redirects'
       - '.github/workflows/boat-station-apk.yml'
   workflow_dispatch:
 
