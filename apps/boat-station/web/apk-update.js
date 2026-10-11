@@ -21,7 +21,7 @@
   function setDownloadState(state){downloadState=state;render()}
   function download(version){
     if(!window.confirm(`Descargar Boat Station ${version}?`))return;
-    const path=`/BoatStation-${encodeURIComponent(version)}.apk`;
+    const path='/BoatStation.apk';
     const url=new URL(path,location.origin).href;
     setDownloadState('starting');
     try{
