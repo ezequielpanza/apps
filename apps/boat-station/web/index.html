@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Boat Station Remote</title>
+<title>BoatStation Dashboard</title>
+<script>
+(function(){const p=new URLSearchParams(location.search);if(p.get('mode')!=='station'&&p.get('view')!=='sensors'&&!window.CoreBridge&&!window.BoatStationCore&&!window.NativeBridge)location.replace('./dashboard.html')})();
+</script>
 <meta name="theme-color" content="#061522">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.png">

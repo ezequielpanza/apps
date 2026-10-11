@@ -1,11 +1,16 @@
 {
-  "name": "Boat Station Remote",
-  "short_name": "BS Remote",
+  "name": "BoatStation Dashboard",
+  "short_name": "BoatStation",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#061522",
-  "theme_color": "#061522",
+  "background_color": "#071b27",
+  "theme_color": "#071b27",
   "icons": [
-    {"src":"icon.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
