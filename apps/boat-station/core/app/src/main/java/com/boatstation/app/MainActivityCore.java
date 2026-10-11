@@ -2,6 +2,7 @@ package com.boatstation.app;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.ActivityNotFoundException;
 import android.graphics.Bitmap;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -79,7 +80,12 @@ public class MainActivityCore extends MainActivityV100 {
         assetLoader = new WebViewAssetLoader.Builder().addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
         coreWebView.setWebViewClient(new WebViewClient(){
             @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request){return assetLoader.shouldInterceptRequest(request.getUrl());}
-            @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){return false;}
+            @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
+                Uri uri=request.getUrl();
+                if("https".equals(uri.getScheme()) && "appassets.androidplatform.net".equals(uri.getHost())) return false;
+                try { startActivity(new Intent(Intent.ACTION_VIEW,uri)); } catch (ActivityNotFoundException ignored) {}
+                return true;
+            }
             @Override public void onPageFinished(WebView view,String url){super.onPageFinished(view,url);announceCore(view);pushSensorFrame(true);}
             @Override public void onReceivedError(WebView view,WebResourceRequest request,WebResourceError error){super.onReceivedError(view,request,error);if(request!=null&&request.isForMainFrame())showOfflineShell(view);}
             @Override public boolean onRenderProcessGone(WebView view,RenderProcessGoneDetail detail){
