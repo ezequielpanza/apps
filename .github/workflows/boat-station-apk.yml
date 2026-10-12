@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - 'apps/boat-station/core/**'
+      - 'apps/boat-station/web/**'
+      - '!apps/boat-station/web/*.apk'
+      - '!apps/boat-station/web/APK_VERSION'
+      - '!apps/boat-station/web/_redirects'
       - '.github/workflows/boat-station-apk.yml'
   workflow_dispatch:
 
@@ -72,6 +76,32 @@ jobs:
           path: apps/boat-station/core/releases/BoatStation-${{ steps.version.outputs.version }}.apk
           if-no-files-found: error
 
+      - name: Prepare source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=zip --output=/tmp/BoatStation-Sources.zip HEAD apps/boat-station/
+          cp "apps/boat-station/core/releases/BoatStation-${{ steps.version.outputs.version }}.apk" /tmp/BoatStation.apk
+
+      - name: Back up APK and sources to Google Drive
+        shell: bash
+        env:
+          BOAT_STATION_GDRIVE_RCLONE_CONF_BASE64: ${{ secrets.BOAT_STATION_GDRIVE_RCLONE_CONF_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$BOAT_STATION_GDRIVE_RCLONE_CONF_BASE64" ]]; then
+            echo "::error::Missing BOAT_STATION_GDRIVE_RCLONE_CONF_BASE64 GitHub Actions secret"
+            exit 1
+          fi
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+          mkdir -p "$HOME/.config/rclone"
+          printf '%s' "$BOAT_STATION_GDRIVE_RCLONE_CONF_BASE64" | base64 --decode > "$HOME/.config/rclone/rclone.conf"
+          chmod 600 "$HOME/.config/rclone/rclone.conf"
+          rclone copyto /tmp/BoatStation.apk boatstation:BoatStation.apk --drive-chunk-size 32M
+          rclone copyto /tmp/BoatStation-Sources.zip boatstation:BoatStation-Sources.zip --drive-chunk-size 32M
+          rclone lsjson boatstation:BoatStation.apk
+          rclone lsjson boatstation:BoatStation-Sources.zip
+
       - name: Publish APK in repository and Pages web root
         if: github.event_name == 'push'
         shell: bash
@@ -85,11 +115,9 @@ jobs:
           git reset --hard origin/main
           mkdir -p apps/boat-station/core/releases apps/boat-station/web
           cp "/tmp/$APK" "apps/boat-station/core/releases/$APK"
-          cp "/tmp/$APK" "apps/boat-station/web/$APK"
           cp "/tmp/$APK" "apps/boat-station/web/BoatStation.apk"
           printf '%s\n' "${{ steps.version.outputs.version }}" > apps/boat-station/web/APK_VERSION
-          printf '%s\n' "/BoatStation.apk /$APK 302" > apps/boat-station/web/_redirects
-          git add "apps/boat-station/core/releases/$APK" "apps/boat-station/web/$APK" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION apps/boat-station/web/_redirects
+          git add "apps/boat-station/core/releases/$APK" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION
           if ! git diff --cached --quiet; then
             git commit -m "Build Boat Station ${{ steps.version.outputs.version }} APK"
             git push origin HEAD:main
