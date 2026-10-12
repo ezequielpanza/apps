@@ -1,6 +1,6 @@
 (function(){
   const api=window.BoatStation;if(!api||window.BoatStationDataSync)return;
-  const params=new URLSearchParams(location.search),isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
+  const params=new URLSearchParams(location.search),isLocal=window.BoatStationRuntime?.isServer()??(params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge);
   const state={gps:null,phone:null,compass:null,motion:null,batteries:{},bluetoothDevices:[]};
   const copy=value=>{try{return JSON.parse(JSON.stringify(value))}catch{return value}};
   const wrap=(name,store)=>{const original=api[name];if(typeof original!=='function')return;api[name]=function(value){store(value);return original.call(api,value)}};

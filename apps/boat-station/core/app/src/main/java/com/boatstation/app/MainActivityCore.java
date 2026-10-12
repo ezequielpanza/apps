@@ -27,6 +27,9 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import com.journeyapps.barcodescanner.IntentIntegrator;
+import com.journeyapps.barcodescanner.IntentResult;
+
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.common.BitMatrix;
@@ -101,7 +104,20 @@ public class MainActivityCore extends MainActivityV100 {
     private void chooseGpxImport(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,REQ_IMPORT_GPX);}
     private boolean write(Uri uri,String text){try(OutputStream o=getContentResolver().openOutputStream(uri,"wt")){if(o==null)return false;o.write((text==null?"":text).getBytes(StandardCharsets.UTF_8));o.flush();return true;}catch(Exception e){return false;}}
     private String read(Uri uri){try(InputStream in=getContentResolver().openInputStream(uri)){return in==null?"":new String(readBytes(in),StandardCharsets.UTF_8);}catch(Exception e){return"";}}
-    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){super.onActivityResult(requestCode,resultCode,data);if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();if(requestCode==REQ_EXPORT_GPX){boolean ok=write(uri,pendingGpx);pendingGpx="";if(coreWebView!=null)coreWebView.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-gpx-exported',{detail:{ok:"+ok+"}}));",null);}else if(requestCode==REQ_IMPORT_GPX){String raw=read(uri);if(coreWebView!=null)coreWebView.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-gpx-imported',{detail:{gpx:"+JSONObject.quote(raw)+"}}));",null);}}
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        super.onActivityResult(requestCode,resultCode,data);
+        IntentResult qr=IntentIntegrator.parseActivityResult(requestCode,resultCode,data);
+        if(qr!=null){
+            String value=qr.getContents()==null?"":qr.getContents();
+            WebView target=coreWebView;
+            if(target!=null)target.post(()->target.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-qr-scanned',{detail:{value:"+JSONObject.quote(value)+"}}));",null));
+            return;
+        }
+        if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;
+        Uri uri=data.getData();
+        if(requestCode==REQ_EXPORT_GPX){boolean ok=write(uri,pendingGpx);pendingGpx="";if(coreWebView!=null)coreWebView.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-gpx-exported',{detail:{ok:"+ok+"}}));",null);}
+        else if(requestCode==REQ_IMPORT_GPX){String raw=read(uri);if(coreWebView!=null)coreWebView.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-gpx-imported',{detail:{gpx:"+JSONObject.quote(raw)+"}}));",null);}
+    }
 
     public class CoreBridge {
         @JavascriptInterface public String getCoreVersion(){return CORE_VERSION;}
@@ -118,6 +134,7 @@ public class MainActivityCore extends MainActivityV100 {
     }
     public class NativeToolsBridge {
         @JavascriptInterface public String qrDataUrl(String payload){try{BitMatrix m=new MultiFormatWriter().encode(payload,BarcodeFormat.QR_CODE,640,640);Bitmap bmp=Bitmap.createBitmap(640,640,Bitmap.Config.ARGB_8888);for(int y=0;y<640;y++)for(int x=0;x<640;x++)bmp.setPixel(x,y,m.get(x,y)?0xFF000000:0xFFFFFFFF);ByteArrayOutputStream out=new ByteArrayOutputStream();bmp.compress(Bitmap.CompressFormat.PNG,100,out);return"data:image/png;base64,"+Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);}catch(Exception e){return"";}}
+        @JavascriptInterface public void scanQr(){runOnUiThread(()->{try{IntentIntegrator scanner=new IntentIntegrator(MainActivityCore.this);scanner.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);scanner.setPrompt("Escaneá el QR de Boat Station");scanner.setBeepEnabled(false);scanner.setOrientationLocked(false);scanner.initiateScan();}catch(Exception ignored){}});}
         @JavascriptInterface public void exportGpx(String gpx){pendingGpx=gpx==null?"":gpx;runOnUiThread(MainActivityCore.this::chooseGpxExport);}
         @JavascriptInterface public void importGpx(){runOnUiThread(MainActivityCore.this::chooseGpxImport);}
     }

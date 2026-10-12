@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>BoatStation Dashboard</title>
+<script src="./runtime-mode.js"></script>
 <script>
-(function(){const p=new URLSearchParams(location.search);if(p.get('mode')!=='station'&&p.get('view')!=='sensors'&&!window.CoreBridge&&!window.BoatStationCore&&!window.NativeBridge)location.replace('./dashboard.html')})();
+(function(){const runtime=window.BoatStationRuntime,p=new URLSearchParams(location.search);if(!runtime?.isServer()&&p.get('view')!=='sensors'&&!runtime?.isNative())location.replace('./dashboard.html')})();
 </script>
 <meta name="theme-color" content="#061522">
 <link rel="manifest" href="./manifest.webmanifest">
@@ -28,7 +29,7 @@
 <script src="./native-tools-adapter.js"></script>
 <script>
 (async function(){
-  const params=new URLSearchParams(location.search),isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;if(isLocal)document.title='Boat Station';const menu=document.getElementById('menuSheet');
+  const params=new URLSearchParams(location.search),isLocal=window.BoatStationRuntime?.isServer()??(params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge);if(isLocal||window.BoatStationRuntime?.isNative())document.title='Boat Station';const menu=document.getElementById('menuSheet');
   try{await import('./app.js')}catch(err){console.error('Boat Station UI failed to start',err);return}
   try{await import('./stability-runtime.js')}catch(err){console.warn('Boat Station stability runtime unavailable',err)}
   try{await import('./page-interactions.js')}catch(err){console.warn('Boat Station page interactions unavailable',err)}

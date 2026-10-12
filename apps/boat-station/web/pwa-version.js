@@ -1,6 +1,6 @@
 (function(){
   const params=new URLSearchParams(location.search);
-  const isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;
+  const isLocal=window.BoatStationRuntime?.isServer()??(params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge);
   let localVersion='—',coreApkVersion='—',corePwaVersion='—',wrappedSync=false,wrappedRemote=false,wrappedCommand=false,refreshing=false,serverRefreshing=false,pull=null,refreshStatusTimer=0;
   function refreshLabel(source){return isLocal&&source==='remote-command'?'Actualización remota':'Actualizando'}
   function enforceRefreshText(label){const host=document.getElementById('remoteFreshness'),text=host?.querySelector('.remote-connection-text');if(text)text.textContent=label}
