@@ -7,7 +7,7 @@ const storedZones=read('bs.dashboard.zones.v1',{}),zones=storedZones&&typeof sto
 const records=new Map();let selected=localStorage.getItem('bs.remote.activeStation')||stations()[0]?.stationId||'',timer=0,running=false,pending=false,map=null,layer=null,fitPending=true;
 const format=(value,digits=1,suffix='')=>{const n=number(value);return n===null?'—':n.toFixed(digits)+suffix};
 let clientId=localStorage.getItem('bs.remote.clientId');if(!clientId){clientId='web-'+crypto.randomUUID();localStorage.setItem('bs.remote.clientId',clientId)}
-if(window.L){map=L.map('map').setView([20,-69],5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);layer=L.layerGroup().addTo(map)}else{$('map').textContent='No se pudo cargar el mapa. Los sensores siguen disponibles.'}
+if(window.L){map=L.map('map').setView([20,-69],5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);layer=L.layerGroup().addTo(map);const resizeMap=()=>requestAnimationFrame(()=>map?.invalidateSize({pan:false}));if(window.ResizeObserver){const mapResizeObserver=new ResizeObserver(resizeMap);mapResizeObserver.observe(document.querySelector('.map-panel'))}window.addEventListener('resize',resizeMap);window.addEventListener('orientationchange',resizeMap);resizeMap()}else{$('map').textContent='No se pudo cargar el mapa. Los sensores siguen disponibles.'}
 function choose(id){selected=id;localStorage.setItem('bs.remote.activeStation',id);fillZone();fillVessel();render()}
 function fillZone(){const current=zone(zones[selected]);$('anchorLat').value=current?.lat??'';$('anchorLon').value=current?.lon??'';$('anchorRadius').value=current?.radius??40;$('anchorStatus').textContent=current?'Zona manual guardada. No sincronizada con la APK.':''}
 function metric(label,value){const box=document.createElement('div');box.className='metric';const b=document.createElement('b'),s=document.createElement('span');b.textContent=value;s.textContent=label;box.append(b,s);return box}
@@ -26,9 +26,40 @@ function render(){
 }
 function getVesselConfig(id){const all=read('bs.dashboard.vessels.v1',{}),saved=all&&typeof all==='object'&&!Array.isArray(all)?all[id]:null;if(saved)return saved;const row=stations().find(s=>s.stationId===id);return /\bchez\b/i.test(row?.name||'')?{type:'mono',length:12.5,beam:4.2,phoneForward:0,phoneStarboard:0,magneticCorrection:0}:{type:'mono'} }
 function hullSvg(config,color){const cat=config.type==='cat',ratio=number(config.length)>0&&number(config.beam)>0?number(config.beam)/number(config.length):.36,beam=Math.max(14,Math.min(30,ratio*52)),left=(52-beam)/2,right=52-left;const shape=cat?'<path d="'+(26-beam*.42)+' 10 L'+(26-beam*.42)+' 44 L'+(26-beam*.42-5)+' 40 Z"/><path d="'+(26+beam*.42)+' 10 L'+(26+beam*.42)+' 44 L'+(26+beam*.42+5)+' 40 Z"/><path d="M'+(26-beam*.42-3)+' 17 H'+(26+beam*.42+3)+' M'+(26-beam*.42-3)+' 30 H'+(26+beam*.42+3)+'" fill="none" stroke="white" stroke-width="2"/>':'<path d="M26 3 Q'+right+' 10 '+right+' 18 L'+right+' 35 Q26 51 '+left+' 35 L'+left+' 18 Q'+left+' 10 26 3 Z"/>';return '<svg viewBox="0 0 52 54" aria-hidden="true"><g fill="'+color+'" stroke="white" stroke-width="1.8" stroke-linejoin="round">'+shape+'</g><path d="M26 9v15m-3-3 3 3 3-3" fill="none" stroke="#052335" stroke-width="1.5"/></svg>'}
-function renderMap(rows){if(!map)return;layer.clearLayers();const points=[];for(const row of rows){const record=records.get(row.stationId),t=record?.telemetry,config=getVesselConfig(row.stationId),gpsPosition=position(t?.gps),online=fresh(record),currentZone=zone(zones[row.stationId]);if(gpsPosition){const vessel=vesselPosition(t.gps,t.compass,config),color=row.stationId===selected?'#35d6ba':'#62a4c5',outline=boatFootprint(vessel||gpsPosition,vessel?.heading,config);for(const [index,hull] of outline.entries()){const shape=L.polygon(hull,{color,weight:1.5,opacity:online?.95:.55,fillColor:color,fillOpacity:online?.26:.12,lineJoin:'round'});shape.on('click',()=>choose(row.stationId)).addTo(layer)}if(!outline.length){L.circleMarker([vessel?.lat??gpsPosition.lat,vessel?.lon??gpsPosition.lon],{radius:4,color,fillOpacity:.8}).on('click',()=>choose(row.stationId)).addTo(layer)}points.push([gpsPosition.lat,gpsPosition.lon]);if($('routes').checked){const route=Array.isArray(t?.gpsState?.route)?t.gpsState.route.map(position).filter(Boolean).map(p=>[p.lat,p.lon]):[];if(route.length>1)L.polyline(route,{color:row.stationId===selected?'#339f9c':'#657e99',weight:3,opacity:.8}).addTo(layer)}}if(currentZone&&$('zones').checked){const label=document.createElement('span');label.textContent=(row.name||'Barco')+' · zona manual · '+currentZone.radius+' m';L.circle([currentZone.lat,currentZone.lon],{radius:currentZone.radius,color:'#bd873f',dashArray:'6 6',fillOpacity:.12}).bindTooltip(label).addTo(layer);L.circleMarker([currentZone.lat,currentZone.lon],{radius:3,color:'#bd873f'}).addTo(layer);points.push([currentZone.lat,currentZone.lon])}}
-  $('mapNotice').hidden=points.length>0;$('mapNotice').textContent=rows.length?'Sin posiciones GPS recibidas. El mapa inicial no indica la ubicación de Chez.':'Vinculá un barco para ver su posición. El mapa inicial no indica la ubicación de Chez.';if(fitPending&&points.length){map.fitBounds(L.latLngBounds(points),{padding:[70,80],maxZoom:16});fitPending=false}}
-
+function renderMap(rows){
+  if(!map)return;
+  layer.clearLayers();
+  const points=[];
+  let boatCount=0;
+  for(const row of rows){
+    const record=records.get(row.stationId),t=record?.telemetry,config=getVesselConfig(row.stationId),gpsPosition=position(t?.gps),online=fresh(record),currentZone=zone(zones[row.stationId]);
+    if(gpsPosition){
+      boatCount++;
+      const vessel=vesselPosition(t.gps,t.compass,config),center=vessel||gpsPosition,color=row.stationId===selected?'#35d6ba':'#62a4c5',outline=boatFootprint(center,vessel?.heading,config);
+      for(const hull of outline){
+        const shape=L.polygon(hull,{color,weight:1.5,opacity:online?.95:.55,fillColor:color,fillOpacity:online?.26:.12,lineJoin:'round'});
+        shape.on('click',()=>choose(row.stationId)).addTo(layer)
+      }
+      if(!outline.length)L.circleMarker([center.lat,center.lon],{radius:4,color,fillOpacity:.8}).on('click',()=>choose(row.stationId)).addTo(layer);
+      else L.circleMarker([center.lat,center.lon],{radius:3,color:'#f2fffc',weight:1,fillColor:color,fillOpacity:1}).on('click',()=>choose(row.stationId)).addTo(layer);
+      points.push([center.lat,center.lon]);
+      if($('routes').checked){
+        const route=Array.isArray(t?.gpsState?.route)?t.gpsState.route.map(position).filter(Boolean).map(p=>[p.lat,p.lon]):[];
+        if(route.length>1)L.polyline(route,{color:row.stationId===selected?'#339f9c':'#657e99',weight:3,opacity:.8}).addTo(layer)
+      }
+    }
+    if(currentZone&&$('zones').checked){
+      const label=document.createElement('span');
+      label.textContent=(row.name||'Barco')+' · zona manual · '+currentZone.radius+' m';
+      L.circle([currentZone.lat,currentZone.lon],{radius:currentZone.radius,color:'#bd873f',dashArray:'6 6',fillOpacity:.12}).bindTooltip(label).addTo(layer);
+      L.circleMarker([currentZone.lat,currentZone.lon],{radius:3,color:'#bd873f'}).addTo(layer);
+      points.push([currentZone.lat,currentZone.lon])
+    }
+  }
+  $('mapNotice').hidden=points.length>0;
+  $('mapNotice').textContent=rows.length?'Sin posiciones GPS recibidas. El mapa inicial no indica la ubicación de Chez.':'Vinculá un barco para ver su posición. El mapa inicial no indica la ubicación de Chez.';
+  if(fitPending&&points.length){map.fitBounds(L.latLngBounds(points),{padding:[70,80],maxZoom:boatCount===1&&points.length===1?19:16});fitPending=false}
+}
 function renderAlerts(rows){const entries=rows.map(row=>({...row,zone:zone(zones[row.stationId])})).filter(row=>row.zone),pairs=overlaps(entries);$('alerts').replaceChildren();for(const [a,b] of pairs){const div=document.createElement('div');div.className='alert';div.textContent='Zonas manuales superpuestas: '+a.name+' y '+b.name+'. Revisá el espacio de borneo. No confirma riesgo de colisión.';$('alerts').append(div)}if(!pairs.length)$('alerts').textContent=entries.length>1?'Sin solapamiento entre las zonas manuales.':entries.length===1?'Agregá otra zona para comparar el borneo.':'Sin zonas manuales para comparar.';const stale=rows.filter(row=>records.get(row.stationId)?.telemetry&&!fresh(records.get(row.stationId)));if(stale.length){const p=document.createElement('p');p.textContent='Lecturas antiguas: '+stale.map(row=>row.name).join(', ')+'.';$('alerts').append(p)}}
 async function fetchState(row){const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);try{const query=new URLSearchParams({clientId,clientName:'BoatStation Dashboard'}),response=await fetch(backend+'/api/station/'+encodeURIComponent(row.stationId)+'/state?'+query,{headers:{Authorization:'Bearer '+row.token},cache:'no-store',signal:controller.signal});if(!response.ok)throw new Error(response.status===401?'Código no autorizado':'Error del servidor ('+response.status+')');const data=await response.json(),telemetry=data.snapshot?.telemetry;if(!telemetry||typeof telemetry!=='object')throw new Error('La estación aún no publicó datos');return {updatedAt:data.updatedAt,telemetry,error:null}}finally{clearTimeout(timeout)}}
 async function cycle(){if(document.hidden)return;if(running){pending=true;return}clearTimeout(timer);running=true;$('refresh').disabled=true;try{const rows=stations();for(let i=0;i<rows.length;i+=4){await Promise.all(rows.slice(i,i+4).map(async row=>{try{const record=await fetchState(row);if(stations().some(s=>s.stationId===row.stationId&&s.token===row.token))records.set(row.stationId,record)}catch(error){records.set(row.stationId,{...records.get(row.stationId),error:error.name==='AbortError'?'Sin respuesta':error.message})}}));render()}}finally{running=false;$('refresh').disabled=false;render();if(!document.hidden)timer=setTimeout(cycle,pending?0:5000);pending=false}}
