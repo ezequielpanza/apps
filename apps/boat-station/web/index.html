@@ -38,7 +38,7 @@
   try{await import('./battery-stat-settings.js')}catch(err){console.warn('Boat Station battery statistic settings unavailable',err)}
   try{await import('./data-sync.js')}catch(err){console.warn('Boat Station data sync unavailable',err)}
   if(!window.BoatStationRuntime?.isNative())try{await import('./apk-update.js')}catch(err){console.warn('Boat Station APK update checker unavailable',err)}
-  try{await import('./pwa-version.js')}catch(err){console.warn('Boat Station PWA version bridge unavailable',err)}
+  if(!window.BoatStationRuntime?.isNative())try{await import('./pwa-version.js')}catch(err){console.warn('Boat Station PWA version bridge unavailable',err)}
   try{await import('./stations.js')}catch(err){console.error('Boat Station station management unavailable',err)}
   const menuInner=menu.querySelector('.sheet-inner');
   if(menuInner&&isLocal){
