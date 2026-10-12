@@ -42,3 +42,10 @@ jobs:
           node --check apps/boat-station/web/pwa-version.js
       - name: Build debug APK
         run: gradle -p apps/boat-station/core :app:assembleDebug --stacktrace
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoatStation-1.2.12-test
+          path: apps/boat-station/core/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
