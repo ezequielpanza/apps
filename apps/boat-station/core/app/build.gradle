@@ -11,7 +11,7 @@ android {
     }
 
     sourceSets {
-        main.assets.srcDirs += ['../../web']
+        main.assets.srcDirs = ['../../web']
     }
 
     defaultConfig {
