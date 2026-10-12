@@ -135,7 +135,7 @@ public class MainActivityCore extends MainActivityV100 {
     }
     public class NativeToolsBridge {
         @JavascriptInterface public String qrDataUrl(String payload){try{BitMatrix m=new MultiFormatWriter().encode(payload,BarcodeFormat.QR_CODE,640,640);Bitmap bmp=Bitmap.createBitmap(640,640,Bitmap.Config.ARGB_8888);for(int y=0;y<640;y++)for(int x=0;x<640;x++)bmp.setPixel(x,y,m.get(x,y)?0xFF000000:0xFFFFFFFF);ByteArrayOutputStream out=new ByteArrayOutputStream();bmp.compress(Bitmap.CompressFormat.PNG,100,out);return"data:image/png;base64,"+Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);}catch(Exception e){return"";}}
-        @JavascriptInterface public void scanQr(){runOnUiThread(()->{try{IntentIntegrator scanner=new IntentIntegrator(MainActivityCore.this);scanner.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);scanner.setPrompt("Escaneá el QR de Boat Station");scanner.setBeepEnabled(false);scanner.setOrientationLocked(false);scanner.initiateScan();}catch(Exception ignored){}});}
+        @JavascriptInterface public String appVersion(){return BuildConfig.VERSION_NAME;}\n        @JavascriptInterface public void scanQr(){runOnUiThread(()->{try{IntentIntegrator scanner=new IntentIntegrator(MainActivityCore.this);scanner.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);scanner.setPrompt("Escaneá el QR de Boat Station");scanner.setBeepEnabled(false);scanner.setOrientationLocked(false);scanner.initiateScan();}catch(Exception ignored){}});}
         @JavascriptInterface public void exportGpx(String gpx){pendingGpx=gpx==null?"":gpx;runOnUiThread(MainActivityCore.this::chooseGpxExport);}
         @JavascriptInterface public void importGpx(){runOnUiThread(MainActivityCore.this::chooseGpxImport);}
     }
