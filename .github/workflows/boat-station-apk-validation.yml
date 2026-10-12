@@ -40,12 +40,20 @@ jobs:
           node --check apps/boat-station/web/data-sync.js
           node --check apps/boat-station/web/page-layout.js
           node --check apps/boat-station/web/pwa-version.js
-      - name: Build debug APK
-        run: gradle -p apps/boat-station/core :app:assembleDebug --stacktrace
-      - name: Upload test APK
+      - name: Build signed release APK
+        env:
+          BOAT_STATION_KEYSTORE_BASE64: ${{ secrets.BOAT_STATION_KEYSTORE_BASE64 }}
+          BOAT_STATION_KEYSTORE_PASSWORD: ${{ secrets.BOAT_STATION_KEYSTORE_PASSWORD }}
+          BOAT_STATION_KEY_ALIAS: ${{ secrets.BOAT_STATION_KEY_ALIAS }}
+          BOAT_STATION_KEY_PASSWORD: ${{ secrets.BOAT_STATION_KEY_PASSWORD }}
+        run: |
+          test -n "$BOAT_STATION_KEYSTORE_BASE64"
+          printf '%s' "$BOAT_STATION_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/boatstation.jks"
+          BOAT_STATION_KEYSTORE_PATH="$RUNNER_TEMP/boatstation.jks" gradle -p apps/boat-station/core :app:assembleRelease --stacktrace
+      - name: Upload final APK
         uses: actions/upload-artifact@v4
         with:
-          name: BoatStation-1.2.12-test
-          path: apps/boat-station/core/app/build/outputs/apk/debug/app-debug.apk
+          name: BoatStation-1.2.12
+          path: apps/boat-station/core/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
