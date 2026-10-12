@@ -1,0 +1,32 @@
+name: Deploy Chez Dashboard
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/chez-dashboard/**'
+      - '.github/workflows/deploy-chez-dashboard.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source
+        run: test -s apps/chez-dashboard/index.html
+      - name: Ensure Pages project exists
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@latest pages project list > /tmp/pages-list.txt
+          if ! grep -Eq '(^|[[:space:]|])chez-dashboard([[:space:]|]|$)' /tmp/pages-list.txt; then
+            npx --yes wrangler@latest pages project create chez-dashboard --production-branch=main
+          fi
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@latest pages deploy apps/chez-dashboard --project-name=chez-dashboard --branch=main
