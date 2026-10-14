@@ -73,7 +73,7 @@
 /* Sea State and compass are ordinary flexible content. */
 .page-content>.battery-hero{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center}
 .card[data-id="seastate"] .page-content>.battery-hero .battery-bank-name{font-size:clamp(24px,18cqh,48px)!important;line-height:1}
-.card[data-id="compass"] .page-content .battery-ring{width:clamp(72px,60cqh,180px);height:clamp(72px,60cqh,180px)}
+.card[data-id="compass"] .page-content .battery-ring{width:clamp(72px,60cqh,180px);height:clamp(72px,60cqh,180px);aspect-ratio:1;flex:0 0 auto;box-sizing:border-box}
 
 @container pagecontent (max-height:240px){
   .compact-bank-metrics .metric .label{display:none}
