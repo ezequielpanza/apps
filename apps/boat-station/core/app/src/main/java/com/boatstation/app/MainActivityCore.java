@@ -2,6 +2,8 @@ package com.boatstation.app;
 
 import android.content.Context;
 import android.content.Intent;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -27,6 +29,8 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebChromeClient;
+import android.webkit.PermissionRequest;
 
 import androidx.webkit.WebViewAssetLoader;
 
@@ -79,6 +83,9 @@ public class MainActivityCore extends MainActivityV100 {
         initTts();
         coreWebView.addJavascriptInterface(new CoreBridge(), "CoreBridge");
         coreWebView.addJavascriptInterface(new NativeToolsBridge(), "NativeToolsBridge");
+        coreWebView.setWebChromeClient(new WebChromeClient(){
+            @Override public void onPermissionRequest(final PermissionRequest request){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.M&&checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)request.grant(request.getResources());else{if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.M)requestPermissions(new String[]{Manifest.permission.CAMERA},4101);request.deny();}});}
+        });
         WebSettings settings=coreWebView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(true);settings.setAllowContentAccess(true);settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O)coreWebView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT,false);

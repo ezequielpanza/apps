@@ -62,7 +62,7 @@
     else if(downloadState==='browser')sub='Abriendo descarga…';
     else if(downloadState==='error')sub='No se pudo iniciar la descarga';
     const disabled=downloadState==='starting'||downloadState==='started';
-    const label=downloadState==='started'?'Descargando…':'Descargar';
+    const label=downloadState==='started'?'Actualizando…':'Actualizar';
     row.innerHTML=`<span style="min-width:0;flex:1">Nueva versión ${latest}<br><small class="sub">${sub}</small></span><button type="button" class="btn" data-core-apk-download ${disabled?'disabled':''}>${label}</button>`;
     row.querySelector('[data-core-apk-download]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();download(latest)});
     const title=inner.querySelector('h3');
