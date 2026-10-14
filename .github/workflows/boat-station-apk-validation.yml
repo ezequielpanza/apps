@@ -53,7 +53,7 @@ jobs:
       - name: Upload final APK
         uses: actions/upload-artifact@v4
         with:
-          name: BoatStation-1.2.15
+          name: BoatStation-1.2.16
           path: apps/boat-station/core/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
