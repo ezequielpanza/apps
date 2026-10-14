@@ -8,7 +8,7 @@ const MIN_SCAN_STEP=8;
 
 function readJson(key,fallback){try{const value=JSON.parse(localStorage.getItem(key)||'null');return value??fallback}catch{return fallback}}
 function writeJson(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
-function isLocalRuntime(){const params=new URLSearchParams(location.search);return params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge}
+function isLocalRuntime(){const params=new URLSearchParams(location.search);return window.BoatStationRuntime?.isServer()??(params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge)}
 function storageBase(){if(isLocalRuntime())return'bs.pageLayout.local';const station=localStorage.getItem('bs.remote.activeStation')||'default';return`bs.pageLayout.remote.${station}`}
 function storageKey(){return`${storageBase()}.v${LAYOUT_SCHEMA}`}
 function legacyStorageKey(){return`${storageBase()}.v1`}

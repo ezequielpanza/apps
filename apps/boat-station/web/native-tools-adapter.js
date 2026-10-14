@@ -3,6 +3,7 @@
     if(!window.NativeToolsBridge)return;
     window.BoatStationTools={
       qrDataUrl:payload=>NativeToolsBridge.qrDataUrl(payload),
+      appVersion:()=>NativeToolsBridge.appVersion?.()||'',
       exportGpx:gpx=>NativeToolsBridge.exportGpx(gpx),
       importGpx:()=>NativeToolsBridge.importGpx()
     };

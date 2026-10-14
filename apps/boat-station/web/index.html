@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>BoatStation Dashboard</title>
+<script src="./runtime-mode.js"></script>
 <script>
-(function(){const p=new URLSearchParams(location.search);if(p.get('mode')!=='station'&&p.get('view')!=='sensors'&&!window.CoreBridge&&!window.BoatStationCore&&!window.NativeBridge)location.replace('./dashboard.html')})();
+(function(){const runtime=window.BoatStationRuntime,p=new URLSearchParams(location.search);if(!runtime?.isServer()&&p.get('view')!=='sensors'&&!runtime?.isNative())location.replace('./dashboard.html')})();
 </script>
 <meta name="theme-color" content="#061522">
 <link rel="manifest" href="./manifest.webmanifest">
@@ -17,7 +18,7 @@
 <link rel="stylesheet" href="./page-interactions.css">
 <link rel="stylesheet" href="./adaptive-pages.css">
 <script>
-(function(){if(window.__bsNativeQueue)return;window.__bsNativeQueue=[];const methods=['updateGPS','updatePhone','updateCompass','updateMotion','onBleScanResult','onBatteryConnection','onBatteryData'];const stub={};methods.forEach(name=>stub[name]=value=>window.__bsNativeQueue.push([name,value]));window.BoatStation=stub})();
+(function(){if(window.__bsNativeQueue)return;window.__bsNativeQueue=[];const methods=['updateGPS','updatePhone','updateCompass','updateAttitude','updateMotion','onBleScanResult','onBatteryConnection','onBatteryData'];const stub={};methods.forEach(name=>stub[name]=value=>window.__bsNativeQueue.push([name,value]));window.BoatStation=stub})();
 </script>
 </head>
 <body>
@@ -28,7 +29,7 @@
 <script src="./native-tools-adapter.js"></script>
 <script>
 (async function(){
-  const params=new URLSearchParams(location.search),isLocal=params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge;if(isLocal)document.title='Boat Station';const menu=document.getElementById('menuSheet');
+  const params=new URLSearchParams(location.search),isLocal=window.BoatStationRuntime?.isServer()??(params.get('mode')==='station'||!!window.CoreBridge||!!window.BoatStationCore||!!window.NativeBridge);if(isLocal||window.BoatStationRuntime?.isNative())document.title='Boat Station';const menu=document.getElementById('menuSheet');
   try{await import('./app.js')}catch(err){console.error('Boat Station UI failed to start',err);return}
   try{await import('./stability-runtime.js')}catch(err){console.warn('Boat Station stability runtime unavailable',err)}
   try{await import('./page-interactions.js')}catch(err){console.warn('Boat Station page interactions unavailable',err)}
@@ -37,8 +38,18 @@
   try{await import('./battery-stat-settings.js')}catch(err){console.warn('Boat Station battery statistic settings unavailable',err)}
   try{await import('./data-sync.js')}catch(err){console.warn('Boat Station data sync unavailable',err)}
   try{await import('./apk-update.js')}catch(err){console.warn('Boat Station APK update checker unavailable',err)}
-  try{await import('./pwa-version.js')}catch(err){console.warn('Boat Station PWA version bridge unavailable',err)}
+  if(!window.BoatStationRuntime?.isNative())try{await import('./pwa-version.js')}catch(err){console.warn('Boat Station PWA version bridge unavailable',err)}
   try{await import('./stations.js')}catch(err){console.error('Boat Station station management unavailable',err)}
+  const menuInner=menu.querySelector('.sheet-inner');
+  if(menuInner&&isLocal){
+    const version=String(window.BoatStationTools?.appVersion?.()||'').trim();
+    if(version){
+      const row=document.createElement('div');
+      row.className='option bs-app-version';
+      row.innerHTML='<span>Versión de la app</span><strong>'+version+'</strong>';
+      menuInner.appendChild(row);
+    }
+  }
   if(isLocal){try{await import('./native-bluetooth.js')}catch(err){console.warn('Boat Station Bluetooth adapter unavailable',err)}const queued=window.__bsNativeQueue||[];window.__bsNativeQueue=[];queued.forEach(([name,value])=>{try{window.BoatStation?.[name]?.(value)}catch(err){console.error('Boat Station native event error',name,err)}})}else{document.documentElement.classList.add('bs-remote-client');document.getElementById('addBtn').style.display='none';const inner=menu.querySelector('.sheet-inner');if(inner){const row=document.createElement('div');row.className='option remote-apk-row';row.innerHTML='<span>Boat Station APK<br><small class="sub">Última versión disponible</small></span><a class="btn" href="/BoatStation.apk" download>Descargar</a>';inner.appendChild(row);try{const versionResponse=await fetch('/APK_VERSION?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(versionResponse.ok){const version=(await versionResponse.text()).trim();if(version){const download=row.querySelector('.btn');download.textContent='Descargar '+version;download.href='/BoatStation-'+version+'.apk';download.setAttribute('download','BoatStation-'+version+'.apk')}}}catch(err){console.warn('Boat Station APK version unavailable',err)}}try{await import('./remote-client-ui-v2.js')}catch(err){console.warn('Boat Station Remote UI extras unavailable',err)}}
   if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Boat Station SW',err));
 })().catch(err=>console.error('Boat Station bootstrap error',err));
