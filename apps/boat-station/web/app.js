@@ -122,6 +122,7 @@ window.BoatStation={
   updateGPS:data=>modules.gps.update(data),
   updatePhone:data=>modules.phone.update(data),
   updateCompass:value=>modules.compass.update(value),
+  updateAttitude:value=>modules.seastate.updateAttitude(value),
   updateMotion:value=>modules.seastate.update(value),
   updateBattery:data=>modules.batteries.updateBattery(data),
   bluetoothDevices:list=>{scanDevices=Array.isArray(list)?list:[];if(bluetoothScanner.classList.contains('open'))renderBluetoothScanner(scanDevices.length?`${scanDevices.length} dispositivo${scanDevices.length===1?'':'s'} encontrado${scanDevices.length===1?'':'s'}`:'Escaneando dispositivos Bluetooth…')}
