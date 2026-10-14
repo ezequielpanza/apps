@@ -62,6 +62,7 @@ public class MainActivityCore extends MainActivityV100 {
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
     private String pendingGpx = "";
+    private PermissionRequest pendingCameraRequest;
     private SensorManager coreSensorManager;
     private Sensor coreRotationSensor;
     private Sensor coreAccelSensor;
@@ -84,7 +85,7 @@ public class MainActivityCore extends MainActivityV100 {
         coreWebView.addJavascriptInterface(new CoreBridge(), "CoreBridge");
         coreWebView.addJavascriptInterface(new NativeToolsBridge(), "NativeToolsBridge");
         coreWebView.setWebChromeClient(new WebChromeClient(){
-            @Override public void onPermissionRequest(final PermissionRequest request){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.M&&checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)request.grant(request.getResources());else{if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.M)requestPermissions(new String[]{Manifest.permission.CAMERA},4101);request.deny();}});}
+            @Override public void onPermissionRequest(final PermissionRequest request){runOnUiThread(()->grantWebCameraPermission(request));}
         });
         WebSettings settings=coreWebView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(true);settings.setAllowContentAccess(true);settings.setCacheMode(WebSettings.LOAD_DEFAULT);
@@ -106,6 +107,14 @@ public class MainActivityCore extends MainActivityV100 {
         coreWebView.loadUrl(WEB_URL);
     }
 
+    private void grantWebCameraPermission(PermissionRequest request){
+        boolean asksCamera=false;for(String resource:request.getResources())if(PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource))asksCamera=true;
+        if(!asksCamera){request.deny();return;}
+        if(Build.VERSION.SDK_INT<Build.VERSION_CODES.M||checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED){request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});return;}
+        pendingCameraRequest=request;
+        requestPermissions(new String[]{Manifest.permission.CAMERA},4101);
+    }
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){super.onRequestPermissionsResult(requestCode,permissions,grantResults);if(requestCode==4101){PermissionRequest request=pendingCameraRequest;pendingCameraRequest=null;if(request==null)return;if(grantResults.length>0&&grantResults[0]==PackageManager.PERMISSION_GRANTED)request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});else request.deny();}}
     @Override protected void onResume(){super.onResume();if(coreSensorManager!=null){coreSensorManager.unregisterListener(this);if(coreRotationSensor!=null)coreSensorManager.registerListener(this,coreRotationSensor,SensorManager.SENSOR_DELAY_UI);if(coreAccelSensor!=null)coreSensorManager.registerListener(this,coreAccelSensor,SensorManager.SENSOR_DELAY_UI);}lastSensorPush=0;}
     @Override protected void onPause(){if(coreSensorManager!=null)coreSensorManager.unregisterListener(this);super.onPause();}
     @Override public void onSensorChanged(SensorEvent event){if(event==null||event.sensor==null)return;int type=event.sensor.getType();if(type==Sensor.TYPE_ROTATION_VECTOR){float[] r=new float[9],o=new float[3];try{SensorManager.getRotationMatrixFromVector(r,event.values);SensorManager.getOrientation(r,o);float h=(float)Math.toDegrees(o[0]);if(h<0)h+=360f;latestHeading=h;latestPitch=(float)Math.toDegrees(o[1]);latestRoll=(float)Math.toDegrees(o[2]);haveHeading=true;haveAttitude=true;}catch(Exception ignored){}}else if(type==Sensor.TYPE_ACCELEROMETER){double m=Math.sqrt(event.values[0]*event.values[0]+event.values[1]*event.values[1]+event.values[2]*event.values[2]);latestMotion=Math.abs(m-SensorManager.GRAVITY_EARTH);haveMotion=true;}pushSensorFrame(false);}
