@@ -26,10 +26,10 @@ jobs:
           VERSION="$(tr -d '\r\n ' < apps/boat-station/core/VERSION)"
           APK="apps/boat-station/core/releases/BoatStation-${VERSION}.apk"
           if [ -f "$APK" ]; then
-            cp "$APK" "apps/boat-station/web/BoatStation-${VERSION}.apk"
             echo "$VERSION" > apps/boat-station/web/APK_VERSION
-            printf '%s\n' "/BoatStation.apk /BoatStation-${VERSION}.apk 302" > apps/boat-station/web/_redirects
+            printf '%s\n' "/BoatStation-${VERSION}.apk https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web/BoatStation-${VERSION}.apk 302" "/BoatStation.apk /BoatStation-${VERSION}.apk 302" > apps/boat-station/web/_redirects
           fi
+          find apps/boat-station/web -maxdepth 1 -type f -name '*.apk' -delete
 
       - name: Validate canonical Boat Station web
         shell: bash
