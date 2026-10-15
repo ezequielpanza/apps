@@ -5,6 +5,8 @@
   if(!isCore)return;
 
   const RELEASE_BASE='https://boat-station.pages.dev';
+  const VERSION_URL='https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web/APK_VERSION';
+  const APK_BASE='https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web';
   let installed='';
   let latest='';
   let checking=false;
@@ -23,7 +25,7 @@
   function download(version){
     if(!window.confirm(`Descargar Boat Station ${version}?`))return;
     const path=`/BoatStation-${encodeURIComponent(version)}.apk`;
-    const url=new URL(path,RELEASE_BASE).href;
+    const url=new URL(path,APK_BASE).href;
     setDownloadState('starting');
     try{
       if(window.CoreRuntimeBridge&&typeof CoreRuntimeBridge.downloadApk==='function'){
@@ -73,7 +75,7 @@
     const now=Date.now();if(!force&&now-lastCheck<5*60*1000)return;
     checking=true;lastCheck=now;
     try{
-      const r=await fetch(RELEASE_BASE+'/APK_VERSION?v='+now,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+      const r=await fetch(VERSION_URL+'?v='+now,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
       if(r.ok){latest=(await r.text()).trim();render()}
     }catch(_){}finally{checking=false}
   }
