@@ -102,6 +102,9 @@ jobs:
             echo "APK already published"
           fi
 
+      - name: Remove APK binaries from Cloudflare payload
+        run: find apps/boat-station/web -maxdepth 1 -type f -name '*.apk' -delete
+
       - name: Deploy updated Boat Station web to Cloudflare Pages
         if: github.event_name == 'push'
         env:
