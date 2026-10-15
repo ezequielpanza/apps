@@ -54,6 +54,9 @@ jobs:
           test -n "$BOAT_STATION_KEYSTORE_BASE64"
           printf '%s' "$BOAT_STATION_KEYSTORE_BASE64" | base64 --decode > apps/boat-station/core/boatstation-release.jks
 
+      - name: Exclude APK files from embedded web assets
+        run: find apps/boat-station/web -maxdepth 1 -type f -name '*.apk' -delete
+
       - name: Build signed Boat Station APK
         env:
           BOAT_STATION_KEYSTORE_PATH: ${{ github.workspace }}/apps/boat-station/core/boatstation-release.jks
