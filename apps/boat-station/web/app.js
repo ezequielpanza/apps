@@ -2,13 +2,12 @@ import {createGpsModule} from './modules/gps.js';
 import {createBatteriesModule} from './modules/batteries-clean.js';
 import {createPhoneModule} from './modules/phone.js';
 import {createSeaStateModule} from './modules/seastate.js';
-import {createCompassModule} from './modules/compass.js';
 import {createPageLayoutEngine} from './page-layout.js';
 
 const cards=document.getElementById('cards');
 const menu=document.getElementById('menuSheet');
 const add=document.getElementById('addSheet');
-const ALL_MODULE_IDS=['gps','batteries','phone','seastate','compass'];
+const ALL_MODULE_IDS=['gps','batteries','phone','seastate'];
 const readJson=(key,fallback)=>{try{const value=JSON.parse(localStorage.getItem(key)||'null');return value??fallback}catch{return fallback}};
 const savedOrder=readJson('bs.ui.order',readJson('bs.clean.order',null));
 const ui={order:Array.isArray(savedOrder)?savedOrder.filter(id=>ALL_MODULE_IDS.includes(id)):[...ALL_MODULE_IDS],collapsed:{}};
@@ -35,7 +34,6 @@ modules.gps=createGpsModule(requestRender);
 modules.batteries=createBatteriesModule(requestRender,openBatteryManager);
 modules.phone=createPhoneModule(requestRender);
 modules.seastate=createSeaStateModule(requestRender);
-modules.compass=createCompassModule(requestRender);
 
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&pendingRenders.size){if(renderTimer){clearTimeout(renderTimer);renderTimer=0}flushRenders()}});
 
@@ -121,7 +119,7 @@ document.addEventListener('touchcancel',()=>{refreshGesture=null;hideRefresh()},
 window.BoatStation={
   updateGPS:data=>modules.gps.update(data),
   updatePhone:data=>modules.phone.update(data),
-  updateCompass:value=>{modules.seastate.updateCompass(value);modules.compass.update(modules.seastate.boatHeading())},
+  updateCompass:value=>modules.seastate.updateCompass(value),
   updateAttitude:value=>modules.seastate.updateAttitude(value),
   updateMotion:value=>modules.seastate.update(value),
   updateBattery:data=>modules.batteries.updateBattery(data),
