@@ -122,6 +122,8 @@ window.BoatStation={
   updateCompass:value=>modules.seastate.updateCompass(value),
   updateAttitude:value=>modules.seastate.updateAttitude(value),
   updateMotion:value=>modules.seastate.update(value),
+  getBoatStatusState:()=>modules.seastate.exportRemoteState(),
+  applyBoatStatusState:value=>modules.seastate.applyRemoteState(value),
   updateBattery:data=>modules.batteries.updateBattery(data),
   bluetoothDevices:list=>{scanDevices=Array.isArray(list)?list:[];if(bluetoothScanner.classList.contains('open'))renderBluetoothScanner(scanDevices.length?`${scanDevices.length} dispositivo${scanDevices.length===1?'':'s'} encontrado${scanDevices.length===1?'':'s'}`:'Escaneando dispositivos Bluetooth…')}
 };
