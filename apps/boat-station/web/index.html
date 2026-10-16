@@ -41,12 +41,12 @@
   if(!window.BoatStationRuntime?.isNative())try{await import('./pwa-version.js')}catch(err){console.warn('Boat Station PWA version bridge unavailable',err)}
   try{await import('./stations.js')}catch(err){console.error('Boat Station station management unavailable',err)}
   const menuInner=menu.querySelector('.sheet-inner');
-  if(menuInner&&isLocal){
+  if(menuInner&&(isLocal||window.BoatStationRuntime?.isNative())){
     const version=String(window.BoatStationTools?.appVersion?.()||'').trim();
     if(version){
       const row=document.createElement('div');
       row.className='option bs-app-version';
-      row.innerHTML='<span>Versión de la app</span><strong>'+version+'</strong>';
+      row.innerHTML='<span>'+(isLocal?'Versión de la app':'Versión del cliente')+'</span><strong>'+version+'</strong>';
       menuInner.appendChild(row);
     }
   }
