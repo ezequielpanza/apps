@@ -36,5 +36,10 @@
 </main>
 <div class="export-modal" id="exportModal"><div class="modal-card"><button class="modal-close" id="closeExport">×</button><span class="eyebrow">LISTO PARA CONTAR TU HISTORIA</span><h2>Exportar animación</h2><p>Generá un video para llevar a Premiere o compartirlo en redes.</p><div class="export-options"><label>Formato<select id="format"><option value="16:9">16:9 · YouTube</option><option value="9:16">9:16 · Reels / Shorts</option><option value="1:1">1:1 · Cuadrado</option></select></label><label>Cuadros por segundo<select id="fps"><option>24</option><option>25</option><option selected>30</option><option>60</option></select></label></div><div class="export-resolution"><span>Resolución de salida</span><strong>Full HD · 1080p</strong><small id="resolution">1920 × 1080 · MP4 H.264</small></div><button id="exportMp4" class="share-button full">Exportar MP4 <span>↗</span></button><button id="exportPng" class="quiet-button full">Descargar fotograma PNG</button><div class="export-progress" id="exportProgress"><span></span><b>Preparando video…</b></div><small class="export-note">Los mapas mantienen su atribución de origen. El video puede importarse en Adobe Premiere Pro.</small></div></div>
 <div id="toast"></div><canvas id="renderCanvas" hidden></canvas>
+<script>
+window.addEventListener('error',e=>{const n=document.getElementById('runtimeError');if(n){n.hidden=false;n.textContent='Error de la app: '+(e.message||'no se pudo cargar un archivo')+' · '+(e.filename||'')}});
+window.addEventListener('unhandledrejection',e=>{const n=document.getElementById('runtimeError');if(n){n.hidden=false;n.textContent='Error de módulo: '+(e.reason?.message||String(e.reason))}});
+</script>
+<div id="runtimeError" hidden style="position:fixed;z-index:3000;left:12px;bottom:12px;max-width:90vw;padding:10px 12px;border-radius:8px;background:#fff3cd;color:#5c4300;font:12px sans-serif;box-shadow:0 2px 12px #0002"></div>
 <script src="leaflet.js"></script><script type="module" src="app.js"></script>
 </body></html>
