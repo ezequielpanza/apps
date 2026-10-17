@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101619"><title>Chez Travel Animator</title>
-<link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="leaflet.css"><link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css"><link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="topbar">
@@ -12,9 +12,9 @@
 </header>
 <main class="workspace">
  <section class="map-wrap"><div id="map"></div>
-   <div class="map-toolbar"><div class="map-style-control"><span>MAPA</span><select id="mapStyle"><option value="satellite" selected>Satélite</option><option value="streets">Calles · OSM</option><option value="topo">Relieve</option><option value="night">Noche</option></select></div><button id="fitRoute" title="Encuadrar ruta">⛶</button><button id="toggleFollow" title="Seguir al vehículo">◎</button><div class="tilt-control" aria-label="Ajustar inclinación del mapa"><button id="tiltDown" title="Reducir inclinación 15 grados" aria-label="Reducir inclinación 15 grados">−</button><span id="tiltValue">0°</span><button id="tiltUp" title="Aumentar inclinación 15 grados" aria-label="Aumentar inclinación 15 grados">+</button></div></div>
+   <div class="map-toolbar"><div class="map-style-control"><span>MAPA</span><select id="mapStyle"><option value="satellite" selected>Satélite</option><option value="streets">Calles · OSM</option><option value="topo">Relieve</option><option value="night">Noche</option></select></div><button id="fitRoute" title="Encuadrar ruta">⛶</button><button id="toggleFollow" title="Seguir al vehículo">◎</button><div class="tilt-control" aria-label="Ajustar inclinación del mapa"><button id="tiltDown" title="Reducir pitch 15 grados" aria-label="Reducir inclinación 15 grados">−</button><span id="tiltValue">0°</span><button id="tiltUp" title="Aumentar pitch 15 grados" aria-label="Aumentar inclinación 15 grados">+</button></div></div>
    <div class="map-instruction" id="mapInstruction"><span>＋</span> Tocá el mapa para agregar una escala <button id="dismissInstruction">×</button></div>
-   <div class="map-credit">© OpenStreetMap · Esri · OpenTopoMap</div>
+   <div class="map-credit" id="mapCredit">Tiles © Esri</div>
    <div class="map-empty" id="mapEmpty"><div class="empty-mark">⌁</div><strong>Tu viaje empieza en el mapa</strong><span>Hacé clic para agregar el primer punto</span></div>
    <div class="map-controls"><button id="zoomIn">＋</button><button id="zoomOut">−</button></div>
  </section>
@@ -36,5 +36,5 @@
 </main>
 <div class="export-modal" id="exportModal"><div class="modal-card"><button class="modal-close" id="closeExport">×</button><span class="eyebrow">LISTO PARA CONTAR TU HISTORIA</span><h2>Exportar animación</h2><p>Generá un video para llevar a Premiere o compartirlo en redes.</p><div class="export-options"><label>Formato<select id="format"><option value="16:9">16:9 · YouTube</option><option value="9:16">9:16 · Reels / Shorts</option><option value="1:1">1:1 · Cuadrado</option></select></label><label>Cuadros por segundo<select id="fps"><option>24</option><option>25</option><option selected>30</option><option>60</option></select></label></div><div class="export-resolution"><span>Resolución de salida</span><strong>Full HD · 1080p</strong><small id="resolution">1920 × 1080 · MP4 H.264</small></div><button id="exportMp4" class="share-button full">Exportar MP4 <span>↗</span></button><button id="exportPng" class="quiet-button full">Descargar fotograma PNG</button><div class="export-progress" id="exportProgress"><span></span><b>Preparando video…</b></div><small class="export-note">Los mapas mantienen su atribución de origen. El video puede importarse en Adobe Premiere Pro.</small></div></div>
 <div id="toast"></div><canvas id="renderCanvas" hidden></canvas>
-<script src="leaflet.js"></script><script src="https://unpkg.com/@tomickigrzegorz/leaflet-rotate@0.2.4/dist/leaflet-rotate.umd.min.js"></script><script type="module" src="app.js"></script>
+<script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script><script type="module" src="app.js"></script>
 </body></html>
