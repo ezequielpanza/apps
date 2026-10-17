@@ -1,4 +1,4 @@
-const CACHE='travelmap-v7';
+const CACHE='travelmap-v8';
 const CORE=['./','./index.html','./app.js','./style.css','./manifest.webmanifest','./icon.svg','./mp4-muxer.mjs','./leaflet.js','./leaflet.css'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('travelmap-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
