@@ -8,3 +8,4 @@
 | Chez YouTube Tool | apps/chez-youtube-tool | chez-youtube-tool | https://chez-youtube-tool.ezequielpanza.workers.dev | Cloudflare Worker + D1 + PWA |
 | La lista · Chez Team | apps/lista-supermercado | lista-supermercado | https://lista-supermercado.pages.dev | PWA HTML/CSS/JS |
 | Chez Dashboard | apps/chez-dashboard | chez-dashboard | https://chez-dashboard.pages.dev (pendiente de verificación) | HTML/CSS/JS |
+| TravelMap Animator | apps/travelmap-animator | travelmap-animator | https://travelmap-animator.pages.dev | PWA HTML/CSS/JS + Leaflet |
