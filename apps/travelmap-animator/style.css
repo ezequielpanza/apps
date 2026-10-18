@@ -4,3 +4,5 @@
 .route-stop.selected{background:#fff8d9;border-radius:9px}.route-stop.selected .stop-bullet{box-shadow:0 0 0 3px #ffd43b99;color:#fff}
 
 .route-stop{grid-template-columns:23px minmax(0,1fr) 20px;cursor:grab;user-select:none}.route-stop input{cursor:text;user-select:text}.route-stop:active{cursor:grabbing}.stop-bullet{cursor:grab}.route-stop.dragging{opacity:.42}.route-stop.drop-before{box-shadow:inset 0 2px #35b9a5}.route-stop.drop-after{box-shadow:inset 0 -2px #35b9a5}
+
+.route-stop{transition:transform .16s ease}
