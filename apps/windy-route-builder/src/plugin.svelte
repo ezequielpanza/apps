@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
     import { map } from '@windy/map';
-    import { singleclick } from '@windy/singleclick';
     import { setUrl } from '@windy/location';
     import config from './pluginConfig.js';
 
@@ -176,12 +175,12 @@
 
     onMount(() => {
         waypointLayer = L.layerGroup().addTo(map);
-        singleclick.on(name, onMapClick);
+        map.on('click', onMapClick);
         if (points.length > 0) recalculate();
     });
 
     onDestroy(() => {
-        singleclick.off(name, onMapClick);
+        map.off('click', onMapClick);
         waypointLayer?.removeFrom(map);
         routeLine?.removeFrom(map);
     });
