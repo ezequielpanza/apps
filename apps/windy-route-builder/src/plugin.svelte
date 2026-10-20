@@ -127,6 +127,15 @@
         redrawMap();
     }
 
+    function setStartPoint(): void {
+        const center = map.getCenter();
+        const start: Waypoint = { id: points[0]?.id ?? nextPointId++, lat: center.lat, lon: center.lng };
+        points = points.length ? [start, ...points.slice(1)] : [start];
+        setUrl(name, { lat: start.lat, lon: start.lon });
+        message = 'Punto 1 fijado como Inicio en el centro actual del mapa.';
+        recalculate();
+    }
+
     export const onopen = (location?: { lat: number; lon: number }) => {
         const center = map.getCenter();
         const start = location && Number.isFinite(location.lat) && Number.isFinite(location.lon)
@@ -160,6 +169,10 @@
     <div class="plugin__title plugin__title--chevron-back">{title}</div>
     <div class="panel-kicker"><span class="status-dot"></span><span>PLANIFICADOR DE RUTA</span><span class="beta">BETA</span></div>
     <p class="intro">Haz clic en el mapa para agregar puntos. El último será el destino; al tocar un tramo, insertas un punto intermedio.</p>
+
+    <button class="set-start" on:click={setStartPoint}>
+        <span class="start-symbol">●</span><span>Inicio</span><small>Fijar punto 1 en el centro del mapa</small>
+    </button>
 
     <div class="map-instruction" aria-live="polite">
         <span class="instruction-icon">⌖</span><span>{message}</span>
@@ -206,6 +219,10 @@
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00c9a7; box-shadow: 0 0 8px #00c9a766; }
     .beta { margin-left: auto; padding: 2px 6px; border: 1px solid #50595d; border-radius: 3px; color: #aab4b8; font-size: 9px; letter-spacing: .06em; }
     .intro { color: #b4bdc0; font-size: 12px; line-height: 1.45; margin: 0 0 14px; }
+    .set-start { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; margin: 0 0 10px; padding: 8px 11px; border: 1px solid #32785f; border-radius: 5px; background: #263f38; color: #f1f7f4; cursor: pointer; font: inherit; text-align: left; }
+    .set-start:hover { border-color: #62cfaa; background: #2d5044; }
+    .set-start .start-symbol { display: grid; place-items: center; flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #27aa78; color: #fff; font-size: 10px; }
+    .set-start small { margin-left: auto; color: #b9cbc3; font-size: 10px; }
     .actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
     .action { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 62px; padding: 8px 3px; border: 1px solid #51595c; border-radius: 5px; background: #414648; color: #e6ebed; cursor: pointer; font: inherit; transition: background .15s, border-color .15s, transform .15s; }
     .action:hover { border-color: #8b989c; background: #4b5254; }
