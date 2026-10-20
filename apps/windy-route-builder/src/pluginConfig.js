@@ -1,6 +1,6 @@
 const config = {
     name: 'windy-plugin-route-builder',
-    version: '0.1.11',
+    version: '0.1.12',
     title: 'Route Builder',
     icon: '🧭',
     description: 'Añade puntos con clics en el mapa e inserta intermedios al pulsar sobre un tramo.',
@@ -10,7 +10,7 @@ const config = {
     mobileUI: 'fullscreen',
     routerPath: '/route-builder/:lat?/:lon?',
     addToContextmenu: true,
-    listenToSingleclick: true,
+    listenToSingleclick: false,
 };
 
 export default config;
