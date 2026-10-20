@@ -127,6 +127,13 @@
         recalculate();
     }
 
+    function onMapDomClick(event: MouseEvent): void {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest('.route-builder-marker-wrap, .leaflet-control')) return;
+        const position = map.mouseEventToLatLng(event);
+        onMapClick({ lat: position.lat, lon: position.lng });
+    }
+
     function removePoint(key: string): void {
         points = points.filter(point => String(point.id) !== key);
         recalculate();
@@ -175,12 +182,12 @@
 
     onMount(() => {
         waypointLayer = L.layerGroup().addTo(map);
-        map.on('click', onMapClick);
+        map.getContainer().addEventListener('click', onMapDomClick, true);
         if (points.length > 0) recalculate();
     });
 
     onDestroy(() => {
-        map.off('click', onMapClick);
+        map.getContainer().removeEventListener('click', onMapDomClick, true);
         waypointLayer?.removeFrom(map);
         routeLine?.removeFrom(map);
     });
