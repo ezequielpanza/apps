@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
     import { map } from '@windy/map';
-    import { setUrl } from '@windy/location';
     import config from './pluginConfig.js';
 
     type Waypoint = { id: number; lat: number; lon: number };
@@ -73,7 +72,6 @@
                     ? { ...current, lat: position.lat, lon: position.lng }
                     : current);
                 message = `Punto ${index + 1} reubicado.`;
-                setUrl(name, { lat: position.lat, lon: position.lng });
                 distanceNm = points.slice(1).reduce((sum, currentPoint, currentIndex) => {
                     return sum + haversineNm(points[currentIndex], currentPoint);
                 }, 0);
@@ -123,7 +121,6 @@
             message = points.length === 1 ? 'Inicio fijado. Haz clic en el mapa para continuar la ruta.'
                 : `Punto ${points.length} agregado. El último punto es el destino.`;
         }
-        setUrl(name, { lat: point.lat, lon: point.lon });
         recalculate();
     }
 
@@ -159,7 +156,6 @@
         const center = map.getCenter();
         const start: Waypoint = { id: points[0]?.id ?? nextPointId++, lat: center.lat, lon: center.lng };
         points = points.length ? [start, ...points.slice(1)] : [start];
-        setUrl(name, { lat: start.lat, lon: start.lon });
         message = 'Punto 1 fijado como Inicio en el centro actual del mapa.';
         recalculate();
     }
