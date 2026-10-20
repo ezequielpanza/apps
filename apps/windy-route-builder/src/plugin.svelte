@@ -32,33 +32,53 @@
     }
 
     function recalculate(): void {
-        distanceNm = ordered.slice(1).reduce((sum, point, index) => {
-            return sum + haversineNm(ordered[index], point);
+        distanceNm = points.slice(1).reduce((sum, point, index) => {
+            return sum + haversineNm(points[index], point);
         }, 0);
         redrawMap();
+    }
+
+    function redrawRouteLine(): void {
+        routeLine?.removeFrom(map);
+        routeLine = null;
+        if (points.length > 1) {
+            routeLine = L.polyline(points.map(point => [point.lat, point.lon]), {
+                color: '#00a6d6', weight: 4, opacity: 0.95, interactive: false,
+            }).addTo(map);
+        }
     }
 
     function redrawMap(): void {
         if (!waypointLayer) return;
         waypointLayer.clearLayers();
-        routeLine?.removeFrom(map);
-        routeLine = null;
+        redrawRouteLine();
 
-        if (ordered.length > 1) {
-            routeLine = L.polyline(ordered.map(point => [point.lat, point.lon]), {
-                color: '#00a6d6', weight: 4, opacity: 0.95, interactive: false,
-            }).addTo(map);
-        }
-
-        ordered.forEach((point, index) => {
-            const role = index === 0 ? 'start' : index === ordered.length - 1 ? 'end' : 'via';
+        points.forEach((point, index) => {
+            const role = index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'via';
             const marker = L.marker([point.lat, point.lon], {
                 icon: L.divIcon({
                     className: 'route-builder-marker-wrap',
                     html: `<span class="route-builder-marker route-builder-marker--${role}">${index + 1}</span>`,
                     iconSize: [30, 30], iconAnchor: [15, 15],
                 }),
-                interactive: false,
+                draggable: true,
+                bubblingMouseEvents: false,
+            });
+            marker.on('click', (event: any) => {
+                const originalEvent = event?.originalEvent;
+                if (originalEvent) L.DomEvent.stopPropagation(originalEvent);
+            });
+            marker.on('dragend', (event: any) => {
+                const position = event.target.getLatLng();
+                points = points.map(current => current.id === point.id
+                    ? { ...current, lat: position.lat, lon: position.lng }
+                    : current);
+                message = `Punto ${index + 1} reubicado.`;
+                setUrl(name, { lat: position.lat, lon: position.lng });
+                distanceNm = points.slice(1).reduce((sum, currentPoint, currentIndex) => {
+                    return sum + haversineNm(points[currentIndex], currentPoint);
+                }, 0);
+                redrawRouteLine();
             });
             marker.bindTooltip(`${index + 1}. ${role === 'start' ? 'Inicio' : role === 'end' ? 'Destino' : `Intermedio ${index}`}`);
             waypointLayer?.addLayer(marker);
@@ -138,8 +158,10 @@
 
     export const onopen = (location?: { lat: number; lon: number }) => {
         const center = map.getCenter();
-        const start = location && Number.isFinite(location.lat) && Number.isFinite(location.lon)
-            ? location
+        const lat = Number(location?.lat);
+        const lon = Number(location?.lon);
+        const start = Number.isFinite(lat) && Number.isFinite(lon)
+            ? { lat, lon }
             : { lat: center.lat, lon: center.lng };
         points = [{ id: nextPointId++, lat: start.lat, lon: start.lon }];
         message = 'Inicio fijado en la última posición. Haz clic en el mapa para continuar la ruta.';
@@ -153,8 +175,7 @@
     onMount(() => {
         waypointLayer = L.layerGroup().addTo(map);
         singleclick.on(name, onMapClick);
-        if (points.length === 0) onopen();
-        else recalculate();
+        if (points.length > 0) recalculate();
     });
 
     onDestroy(() => {
@@ -273,3 +294,4 @@
     :global(.route-builder-marker--start) { background: #21a366; }
     :global(.route-builder-marker--end) { background: #cf5947; }
 </style>
+
