@@ -1,0 +1,4 @@
+/plugin.min.js
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, HEAD, OPTIONS
+  Cache-Control: no-cache
