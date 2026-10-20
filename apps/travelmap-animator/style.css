@@ -8,3 +8,5 @@
 .route-stop{transition:transform .16s ease}
 
 .route-stop.selected .stop-bullet{color:#53615d}.route-stop.selected:first-child .stop-bullet,.route-stop.selected:last-child .stop-bullet{color:#fff}
+
+.route-stop,.route-stop:active{cursor:default}.stop-bullet{cursor:grab}.stop-bullet:active{cursor:grabbing}
