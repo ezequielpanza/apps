@@ -1,6 +1,6 @@
 const config = {
     name: 'windy-plugin-route-builder',
-    version: '0.1.0',
+    version: '0.1.1',
     title: 'Route Builder',
     icon: '🧭',
     description: 'Dibuja una ruta con inicio, destino y puntos intermedios sobre el mapa.',

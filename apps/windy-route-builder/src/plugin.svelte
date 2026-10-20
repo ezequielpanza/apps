@@ -147,32 +147,41 @@
 <div class="plugin__mobile-header">{title}</div>
 <section class="plugin__content route-builder">
     <div class="plugin__title plugin__title--chevron-back">{title}</div>
-    <p class="intro">Marca los puntos directamente en el mapa. Puedes cambiar el orden de los puntos intermedios.</p>
+    <div class="panel-kicker"><span class="status-dot"></span><span>PLANIFICADOR DE RUTA</span><span class="beta">BETA</span></div>
+    <p class="intro">Traza tu recorrido sobre el mapa y organiza los puntos de paso.</p>
 
-    <div class="actions">
-        <button class:active={mode === 'start'} on:click={() => selectMode('start')}>＋ Fijar inicio</button>
-        <button class:active={mode === 'via'} on:click={() => selectMode('via')}>＋ Añadir intermedio</button>
-        <button class:active={mode === 'end'} on:click={() => selectMode('end')}>⚑ Fijar destino</button>
+    <div class="actions" aria-label="Acciones de ruta">
+        <button class="action" class:start-active={mode === 'start'} aria-pressed={mode === 'start'} on:click={() => selectMode('start')}>
+            <span class="action-symbol start-symbol">●</span><span class="action-label">Inicio</span>
+        </button>
+        <button class="action" class:via-active={mode === 'via'} aria-pressed={mode === 'via'} on:click={() => selectMode('via')}>
+            <span class="action-symbol">＋</span><span class="action-label">Intermedio</span>
+        </button>
+        <button class="action" class:end-active={mode === 'end'} aria-pressed={mode === 'end'} on:click={() => selectMode('end')}>
+            <span class="action-symbol end-symbol">⚑</span><span class="action-label">Destino</span>
+        </button>
     </div>
 
-    <div class="map-instruction" aria-live="polite">{message}</div>
+    <div class="map-instruction" class:awaiting={mode !== 'idle'} aria-live="polite">
+        <span class="instruction-icon">{mode === 'idle' ? 'i' : '⌖'}</span><span>{message}</span>
+    </div>
 
     <div class="route-summary">
-        <span>Distancia estimada</span>
+        <div class="summary-copy"><span class="summary-label">DISTANCIA ESTIMADA</span><span class="summary-points">{ordered.length} {ordered.length === 1 ? 'punto' : 'puntos'} en ruta</span></div>
         <strong>{distanceNm.toFixed(1)} <small>Nm</small></strong>
     </div>
 
     <div class="waypoint-heading">
-        <h3>Puntos de la ruta</h3>
-        <button class="clear" on:click={clearRoute} disabled={ordered.length === 0}>Borrar ruta</button>
+        <div class="heading-title"><h3>Recorrido</h3><span class="point-count">{ordered.length}</span></div>
+        <button class="clear" on:click={clearRoute} disabled={ordered.length === 0}>Limpiar</button>
     </div>
 
     {#if ordered.length === 0}
-        <div class="empty">Todavía no hay puntos. Fija el inicio y luego agrega el destino y los puntos intermedios.</div>
+        <div class="empty"><span class="empty-mark">⌖</span><strong>Tu ruta empieza aquí</strong><span>Selecciona <b>Inicio</b> y marca un punto en el mapa.</span></div>
     {:else}
         <ol class="waypoints">
             {#each ordered as point, index (point.key)}
-                <li>
+                <li class:destination={point.key === 'end'} class:origin={point.key === 'start'}>
                     <span class="number" class:first={index === 0} class:last={point.key === 'end'}>{index + 1}</span>
                     <span class="point-info">
                         <strong>{point.role}</strong>
@@ -180,46 +189,69 @@
                     </span>
                     <span class="point-actions">
                         {#if point.key.startsWith('via-')}
-                            <button aria-label="Mover arriba" title="Mover arriba" on:click={() => moveVia(index - (start ? 1 : 0), -1)} disabled={index <= (start ? 1 : 0)}>↑</button>
-                            <button aria-label="Mover abajo" title="Mover abajo" on:click={() => moveVia(index - (start ? 1 : 0), 1)} disabled={index >= vias.length + (start ? 0 : -1)}>↓</button>
+                            <button class="icon-button" aria-label="Mover arriba" title="Mover arriba" on:click={() => moveVia(index - (start ? 1 : 0), -1)} disabled={index <= (start ? 1 : 0)}>↑</button>
+                            <button class="icon-button" aria-label="Mover abajo" title="Mover abajo" on:click={() => moveVia(index - (start ? 1 : 0), 1)} disabled={index >= vias.length + (start ? 0 : -1)}>↓</button>
                         {/if}
-                        <button aria-label="Eliminar punto" title="Eliminar punto" on:click={() => removePoint(point.key)}>×</button>
+                        <button class="icon-button remove-button" aria-label="Eliminar punto" title="Eliminar punto" on:click={() => removePoint(point.key)}>×</button>
                     </span>
                 </li>
             {/each}
         </ol>
     {/if}
-    <div class="footnote">La línea conecta los puntos en el orden de la lista; es una ruta directa entre coordenadas, no navegación que evite tierra.</div>
+    <div class="footnote"><span>ⓘ</span> La línea une los puntos en orden; no calcula navegación costera ni evita tierra.</div>
 </section>
 
 <style>
-    .route-builder { color: #3b4145; padding-bottom: 22px; }
-    .intro { color: #737b80; font-size: 13px; margin: 12px 0 16px; }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-    .actions button { border: 1px solid #c8d0d4; border-radius: 4px; background: #f5f7f8; color: #47535a; padding: 9px 8px; cursor: pointer; font-size: 12px; }
-    .actions button:first-child { grid-column: span 2; }
-    .actions button:hover, .actions button.active { border-color: #008fbd; background: #e4f6fb; color: #087da0; }
-    .map-instruction { min-height: 38px; margin: 12px 0; padding: 10px; border-left: 3px solid #00a6d6; background: #f0f8fa; color: #55636a; font-size: 12px; }
-    .route-summary { display: flex; align-items: center; justify-content: space-between; border-radius: 4px; padding: 12px; background: #596367; color: white; }
-    .route-summary strong { font-size: 21px; font-weight: 600; }
-    .route-summary small { font-size: 12px; font-weight: 400; }
-    .waypoint-heading { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; border-bottom: 1px solid #e1e4e6; }
-    .waypoint-heading h3 { font-size: 14px; margin: 0; padding: 8px 0; }
-    .clear { border: 0; background: transparent; color: #a04436; cursor: pointer; font-size: 12px; }
-    .clear:disabled { color: #aab0b4; cursor: default; }
-    .empty { padding: 18px 8px; color: #889198; font-size: 12px; text-align: center; }
+    .route-builder { color: #f2f5f6; padding: 0 12px 18px; font-family: inherit; }
+    .panel-kicker { display: flex; align-items: center; gap: 7px; margin: 2px 0 9px; color: #9ca6aa; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00c9a7; box-shadow: 0 0 8px #00c9a766; }
+    .beta { margin-left: auto; padding: 2px 6px; border: 1px solid #50595d; border-radius: 3px; color: #aab4b8; font-size: 9px; letter-spacing: .06em; }
+    .intro { color: #b4bdc0; font-size: 12px; line-height: 1.45; margin: 0 0 14px; }
+    .actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+    .action { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 62px; padding: 8px 3px; border: 1px solid #51595c; border-radius: 5px; background: #414648; color: #e6ebed; cursor: pointer; font: inherit; transition: background .15s, border-color .15s, transform .15s; }
+    .action:hover { border-color: #8b989c; background: #4b5254; }
+    .action:active { transform: translateY(1px); }
+    .action.start-active, .action.via-active, .action.end-active { border-color: #00b7df; background: #075a70; color: #fff; box-shadow: inset 0 0 0 1px #00b7df44; }
+    .action-symbol { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #00a6d6; color: white; font-size: 15px; font-weight: 700; line-height: 1; }
+    .start-symbol { background: #27aa78; font-size: 10px; }
+    .end-symbol { background: #e36e5b; font-size: 13px; }
+    .action-label { overflow: hidden; max-width: 100%; color: #f4f7f8; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+    .map-instruction { display: flex; align-items: center; gap: 9px; min-height: 38px; margin: 10px 0; padding: 8px 10px; border: 1px solid #444c4f; border-radius: 4px; background: #303638; color: #c3cbce; font-size: 11px; line-height: 1.4; }
+    .map-instruction.awaiting { border-color: #087f9e; background: #113e49; color: #e1f8fd; }
+    .instruction-icon { display: grid; place-items: center; flex: 0 0 19px; width: 19px; height: 19px; border-radius: 50%; background: #596367; color: white; font-size: 11px; font-weight: 700; }
+    .awaiting .instruction-icon { background: #00a6d6; }
+    .route-summary { display: flex; align-items: center; justify-content: space-between; min-height: 66px; padding: 11px 13px; border: 1px solid #087e9d; border-left: 3px solid #00bce5; border-radius: 5px; background: linear-gradient(120deg, #124653, #2e3c40 72%); color: #fff; }
+    .summary-copy { display: flex; flex-direction: column; gap: 5px; }
+    .summary-label { color: #a9dbe5; font-size: 9px; font-weight: 700; letter-spacing: .11em; }
+    .summary-points { color: #c5cfd2; font-size: 11px; }
+    .route-summary strong { color: #fff; font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+    .route-summary small { color: #b9d9df; font-size: 11px; font-weight: 500; letter-spacing: 0; }
+    .waypoint-heading { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-bottom: 8px; border-bottom: 1px solid #4b5255; }
+    .heading-title { display: flex; align-items: center; gap: 8px; }
+    .waypoint-heading h3 { color: #f1f4f5; font-size: 13px; font-weight: 650; margin: 0; }
+    .point-count { display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; background: #454d50; color: #d3dbde; font-size: 10px; font-weight: 700; }
+    .clear { border: 0; background: transparent; color: #f08b7b; cursor: pointer; font: inherit; font-size: 11px; }
+    .clear:hover:not(:disabled) { color: #ffb1a5; }
+    .clear:disabled { color: #727b7e; cursor: default; }
+    .empty { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 23px 12px; color: #9ba5a9; font-size: 11px; line-height: 1.45; text-align: center; }
+    .empty strong { color: #e0e6e8; font-size: 12px; }
+    .empty b { color: #cdebf0; font-weight: 600; }
+    .empty-mark { display: grid; place-items: center; width: 32px; height: 32px; margin-bottom: 2px; border: 1px solid #596367; border-radius: 50%; color: #8ad4e4; font-size: 18px; }
     .waypoints { margin: 0; padding: 0; list-style: none; }
-    .waypoints li { display: flex; align-items: center; gap: 10px; min-height: 57px; border-bottom: 1px solid #edf0f1; }
-    .number { display: grid; place-items: center; width: 25px; height: 25px; flex: 0 0 25px; border-radius: 50%; background: #00a6d6; color: white; font-size: 12px; font-weight: bold; }
-    .number.first { background: #21a366; }
-    .number.last { background: #cf5947; }
+    .waypoints li { display: flex; align-items: center; gap: 9px; min-height: 48px; border-bottom: 1px solid #42494c; }
+    .number { display: grid; place-items: center; width: 23px; height: 23px; flex: 0 0 23px; border: 1px solid #83d5e7; border-radius: 50%; background: #12657a; color: white; font-size: 10px; font-weight: 700; }
+    .number.first { border-color: #62cfaa; background: #176c54; }
+    .number.last { border-color: #f1a095; background: #a94e43; }
     .point-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-    .point-info strong { font-size: 12px; }
-    .point-info small { color: #849097; font-size: 11px; font-variant-numeric: tabular-nums; }
-    .point-actions { display: flex; gap: 3px; }
-    .point-actions button { width: 25px; height: 25px; border: 1px solid #d8dddf; border-radius: 3px; background: white; color: #606c72; cursor: pointer; }
-    .point-actions button:disabled { color: #cbd0d3; cursor: default; }
-    .footnote { margin-top: 16px; color: #929a9f; font-size: 11px; line-height: 1.45; }
+    .point-info strong { overflow: hidden; color: #edf1f2; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+    .point-info small { color: #a1abae; font-size: 10px; font-variant-numeric: tabular-nums; }
+    .point-actions { display: flex; gap: 4px; }
+    .icon-button { display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid #555e61; border-radius: 4px; background: #3d4446; color: #e3e8e9; cursor: pointer; font: inherit; font-size: 13px; }
+    .icon-button:hover:not(:disabled) { border-color: #00a6d6; background: #125267; color: #fff; }
+    .icon-button:disabled { color: #747d80; cursor: default; }
+    .remove-button { color: #f09a8d; font-size: 17px; }
+    .footnote { display: flex; gap: 6px; margin-top: 12px; color: #a1aaad; font-size: 10px; line-height: 1.45; }
+    .footnote span { flex: 0 0 auto; color: #67b9cb; }
     :global(.route-builder-marker-wrap) { background: transparent; border: 0; }
     :global(.route-builder-marker) { display: grid; place-items: center; width: 27px; height: 27px; border: 2px solid white; border-radius: 50%; background: #00a6d6; color: white; font: bold 12px Arial,sans-serif; box-shadow: 0 1px 5px #0008; }
     :global(.route-builder-marker--start) { background: #21a366; }
