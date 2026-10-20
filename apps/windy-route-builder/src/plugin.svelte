@@ -2,26 +2,24 @@
     import { onDestroy, onMount } from 'svelte';
     import { map } from '@windy/map';
     import { singleclick } from '@windy/singleclick';
+    import { setUrl } from '@windy/location';
     import config from './pluginConfig.js';
 
-    type Waypoint = { lat: number; lon: number };
-    type SelectionMode = 'idle' | 'start' | 'via' | 'end';
+    type Waypoint = { id: number; lat: number; lon: number };
 
     const { name, title } = config;
-    let start: Waypoint | null = null;
-    let vias: Waypoint[] = [];
-    let end: Waypoint | null = null;
-    let mode: SelectionMode = 'idle';
-    let message = 'Elige una acción y haz clic sobre el mapa.';
+    let points: Waypoint[] = [];
+    let message = 'El primer clic fija el inicio. Sigue haciendo clic para trazar la ruta.';
     let distanceNm = 0;
+    let nextPointId = 1;
     let waypointLayer: L.LayerGroup | null = null;
     let routeLine: L.Polyline | null = null;
 
-    $: ordered = [
-        ...(start ? [{ ...start, role: 'Inicio', key: 'start' }] : []),
-        ...vias.map((point, index) => ({ ...point, role: `Intermedio ${index + 1}`, key: `via-${index}` })),
-        ...(end ? [{ ...end, role: 'Destino', key: 'end' }] : []),
-    ];
+    $: ordered = points.map((point, index) => ({
+        ...point,
+        role: index === 0 ? 'Inicio' : index === points.length - 1 ? 'Destino' : `Intermedio ${index}`,
+        key: String(point.id),
+    }));
 
     function haversineNm(a: Waypoint, b: Waypoint): number {
         const rad = (degrees: number) => degrees * Math.PI / 180;
@@ -48,85 +46,96 @@
 
         if (ordered.length > 1) {
             routeLine = L.polyline(ordered.map(point => [point.lat, point.lon]), {
-                color: '#00a6d6', weight: 4, opacity: 0.95,
+                color: '#00a6d6', weight: 4, opacity: 0.95, interactive: false,
             }).addTo(map);
         }
 
         ordered.forEach((point, index) => {
-            const role = index === 0 ? 'start' : index === ordered.length - 1 && end ? 'end' : 'via';
+            const role = index === 0 ? 'start' : index === ordered.length - 1 ? 'end' : 'via';
             const marker = L.marker([point.lat, point.lon], {
                 icon: L.divIcon({
                     className: 'route-builder-marker-wrap',
                     html: `<span class="route-builder-marker route-builder-marker--${role}">${index + 1}</span>`,
                     iconSize: [30, 30], iconAnchor: [15, 15],
                 }),
+                interactive: false,
             });
             marker.bindTooltip(`${index + 1}. ${role === 'start' ? 'Inicio' : role === 'end' ? 'Destino' : `Intermedio ${index}`}`);
             waypointLayer?.addLayer(marker);
         });
     }
 
-    function selectMode(next: SelectionMode): void {
-        if ((next === 'via' || next === 'end') && !start) {
-            message = 'Primero fija el punto de inicio.';
-            mode = 'idle';
-            return;
-        }
-        mode = next;
-        message = next === 'start' ? 'Haz clic en el mapa para fijar el inicio.'
-            : next === 'end' ? 'Haz clic en el mapa para fijar el destino.'
-            : next === 'via' ? 'Haz clic en el mapa para añadir un punto intermedio.'
-            : 'Elige una acción y haz clic sobre el mapa.';
+    function distanceToSegment(point: L.Point, start: L.Point, end: L.Point): number {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const lengthSquared = dx * dx + dy * dy;
+        if (!lengthSquared) return point.distanceTo(start);
+        const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
+        return point.distanceTo(L.point(start.x + t * dx, start.y + t * dy));
     }
 
     function onMapClick(event: any): void {
-        if (mode === 'idle') return;
-        const selectedMode = mode;
         const lat = Number(event?.lat ?? event?.latlng?.lat);
         const lon = Number(event?.lon ?? event?.lng ?? event?.latlng?.lng);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
             message = 'Windy no devolvió coordenadas para ese clic. Vuelve a intentarlo.';
             return;
         }
-        const point = { lat, lon };
-        if (selectedMode === 'start') start = point;
-        else if (selectedMode === 'end') end = point;
-        else vias = [...vias, point];
-        mode = 'idle';
-        const pointLabel = selectedMode === 'start' ? 'Inicio' : selectedMode === 'end' ? 'Destino' : 'Punto intermedio';
-        message = `${pointLabel} agregado: ${lat.toFixed(4)}, ${lon.toFixed(4)}.`;
+        const point: Waypoint = { id: nextPointId++, lat, lon };
+        const clickedAt = map.latLngToContainerPoint([lat, lon]);
+        let insertAt = -1;
+        let closestDistance = 14;
+        for (let index = 0; index < points.length - 1; index++) {
+            const segmentStart = map.latLngToContainerPoint([points[index].lat, points[index].lon]);
+            const segmentEnd = map.latLngToContainerPoint([points[index + 1].lat, points[index + 1].lon]);
+            const distance = distanceToSegment(clickedAt, segmentStart, segmentEnd);
+            if (distance <= closestDistance) {
+                closestDistance = distance;
+                insertAt = index + 1;
+            }
+        }
+        if (insertAt >= 0) {
+            points = [...points.slice(0, insertAt), point, ...points.slice(insertAt)];
+            message = `Punto intermedio insertado en el tramo ${insertAt}.`;
+        } else {
+            points = [...points, point];
+            message = points.length === 1 ? 'Inicio fijado. Haz clic en el mapa para continuar la ruta.'
+                : `Punto ${points.length} agregado. El último punto es el destino.`;
+        }
+        setUrl(name, { lat: point.lat, lon: point.lon });
         recalculate();
     }
 
     function removePoint(key: string): void {
-        if (key === 'start') {
-            start = null;
-            vias = [];
-            end = null;
-        }
-        else if (key === 'end') end = null;
-        else vias = vias.filter((_, index) => key !== `via-${index}`);
+        points = points.filter(point => String(point.id) !== key);
         recalculate();
     }
 
     function moveVia(index: number, direction: -1 | 1): void {
         const target = index + direction;
-        if (target < 0 || target >= vias.length) return;
-        const next = [...vias];
+        if (target < 1 || target >= points.length - 1) return;
+        const next = [...points];
         [next[index], next[target]] = [next[target], next[index]];
-        vias = next;
+        points = next;
         recalculate();
     }
 
     function clearRoute(): void {
-        start = null;
-        vias = [];
-        end = null;
+        points = [];
         distanceNm = 0;
-        mode = 'idle';
-        message = 'Ruta borrada. Elige una acción y haz clic sobre el mapa.';
+        message = 'El primer clic fija el inicio. Sigue haciendo clic para trazar la ruta.';
         redrawMap();
     }
+
+    export const onopen = (location?: { lat: number; lon: number }) => {
+        const center = map.getCenter();
+        const start = location && Number.isFinite(location.lat) && Number.isFinite(location.lon)
+            ? location
+            : { lat: center.lat, lon: center.lng };
+        points = [{ id: nextPointId++, lat: start.lat, lon: start.lon }];
+        message = 'Inicio fijado en la última posición. Haz clic en el mapa para continuar la ruta.';
+        recalculate();
+    };
 
     function coordinate(point: Waypoint): string {
         return `${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}`;
@@ -135,6 +144,8 @@
     onMount(() => {
         waypointLayer = L.layerGroup().addTo(map);
         singleclick.on(name, onMapClick);
+        if (points.length === 0) onopen();
+        else recalculate();
     });
 
     onDestroy(() => {
@@ -148,22 +159,10 @@
 <section class="plugin__content route-builder">
     <div class="plugin__title plugin__title--chevron-back">{title}</div>
     <div class="panel-kicker"><span class="status-dot"></span><span>PLANIFICADOR DE RUTA</span><span class="beta">BETA</span></div>
-    <p class="intro">Traza tu recorrido sobre el mapa y organiza los puntos de paso.</p>
+    <p class="intro">Haz clic en el mapa para agregar puntos. El último será el destino; al tocar un tramo, insertas un punto intermedio.</p>
 
-    <div class="actions" aria-label="Acciones de ruta">
-        <button class="action" class:start-active={mode === 'start'} aria-pressed={mode === 'start'} on:click={() => selectMode('start')}>
-            <span class="action-symbol start-symbol">●</span><span class="action-label">Inicio</span>
-        </button>
-        <button class="action" class:via-active={mode === 'via'} aria-pressed={mode === 'via'} on:click={() => selectMode('via')}>
-            <span class="action-symbol">＋</span><span class="action-label">Intermedio</span>
-        </button>
-        <button class="action" class:end-active={mode === 'end'} aria-pressed={mode === 'end'} on:click={() => selectMode('end')}>
-            <span class="action-symbol end-symbol">⚑</span><span class="action-label">Destino</span>
-        </button>
-    </div>
-
-    <div class="map-instruction" class:awaiting={mode !== 'idle'} aria-live="polite">
-        <span class="instruction-icon">{mode === 'idle' ? 'i' : '⌖'}</span><span>{message}</span>
+    <div class="map-instruction" aria-live="polite">
+        <span class="instruction-icon">⌖</span><span>{message}</span>
     </div>
 
     <div class="route-summary">
@@ -181,16 +180,16 @@
     {:else}
         <ol class="waypoints">
             {#each ordered as point, index (point.key)}
-                <li class:destination={point.key === 'end'} class:origin={point.key === 'start'}>
-                    <span class="number" class:first={index === 0} class:last={point.key === 'end'}>{index + 1}</span>
+                <li class:destination={index === points.length - 1 && index > 0} class:origin={index === 0}>
+                    <span class="number" class:first={index === 0} class:last={index === points.length - 1 && index > 0}>{index + 1}</span>
                     <span class="point-info">
                         <strong>{point.role}</strong>
                         <small>{coordinate(point)}</small>
                     </span>
                     <span class="point-actions">
-                        {#if point.key.startsWith('via-')}
-                            <button class="icon-button" aria-label="Mover arriba" title="Mover arriba" on:click={() => moveVia(index - (start ? 1 : 0), -1)} disabled={index <= (start ? 1 : 0)}>↑</button>
-                            <button class="icon-button" aria-label="Mover abajo" title="Mover abajo" on:click={() => moveVia(index - (start ? 1 : 0), 1)} disabled={index >= vias.length + (start ? 0 : -1)}>↓</button>
+                        {#if index > 0 && index < points.length - 1}
+                            <button class="icon-button" aria-label="Mover arriba" title="Mover arriba" on:click={() => moveVia(index, -1)} disabled={index <= 1}>↑</button>
+                            <button class="icon-button" aria-label="Mover abajo" title="Mover abajo" on:click={() => moveVia(index, 1)} disabled={index >= points.length - 2}>↓</button>
                         {/if}
                         <button class="icon-button remove-button" aria-label="Eliminar punto" title="Eliminar punto" on:click={() => removePoint(point.key)}>×</button>
                     </span>
