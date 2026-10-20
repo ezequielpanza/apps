@@ -104,7 +104,9 @@
         const point: Waypoint = { id: nextPointId++, lat, lon };
         const clickedAt = map.latLngToContainerPoint([lat, lon]);
         let insertAt = -1;
-        let closestDistance = 14;
+        // Only treat a click as an intermediate insertion when it lands very close
+        // to the visible route line. Otherwise, keep extending the route at the end.
+        let closestDistance = 7;
         for (let index = 0; index < points.length - 1; index++) {
             const segmentStart = map.latLngToContainerPoint([points[index].lat, points[index].lon]);
             const segmentEnd = map.latLngToContainerPoint([points[index + 1].lat, points[index + 1].lon]);
