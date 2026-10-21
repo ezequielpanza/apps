@@ -77,7 +77,6 @@
                 }, 0);
                 redrawRouteLine();
             });
-            marker.bindTooltip(`${index + 1}. ${role === 'start' ? 'Inicio' : role === 'end' ? 'Destino' : `Intermedio ${index}`}`);
             waypointLayer?.addLayer(marker);
         });
     }
