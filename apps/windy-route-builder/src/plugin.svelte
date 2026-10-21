@@ -294,9 +294,9 @@
     .footnote { display: flex; gap: 6px; margin-top: 12px; color: #a1aaad; font-size: 10px; line-height: 1.45; }
     .footnote span { flex: 0 0 auto; color: #67b9cb; }
     :global(.route-builder-marker-wrap) { background: transparent; border: 0; }
-    :global(.route-builder-marker) { position: relative; isolation: isolate; display: grid; place-items: center; width: 27px; height: 27px; border: 0; border-radius: 50%; background: transparent; color: white; font: bold 8px Arial,sans-serif; }
-    :global(.route-builder-marker::before) { content: ''; position: absolute; inset: 6.5px; border: 1px solid white; border-radius: 50%; background: #00a6d6; box-shadow: 0 1px 3px #0008; z-index: -1; }
-    :global(.route-builder-marker--start::before) { background: #21a366; }
-    :global(.route-builder-marker--end::before) { background: #cf5947; }
+    :global(.route-builder-marker) { position: relative; isolation: isolate; display: grid; place-items: center; width: 27px; height: 27px; border: 0; border-radius: 50%; background: transparent; color: white; font: bold 8.8px Arial,sans-serif; }
+    :global(.route-builder-marker::before) { content: ''; position: absolute; inset: 6.5px; border: 1px solid #00a6d6; border-radius: 50%; background: #00a6d6; box-shadow: 0 1px 3px #0008; z-index: -1; }
+    :global(.route-builder-marker--start::before) { border-color: #21a366; background: #21a366; }
+    :global(.route-builder-marker--end::before) { border-color: #cf5947; background: #cf5947; }
 </style>
 
