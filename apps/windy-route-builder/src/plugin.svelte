@@ -150,6 +150,10 @@
     function onMapDomClick(event: MouseEvent): void {
         const target = event.target as HTMLElement | null;
         if (target?.closest('.route-builder-marker-wrap, .leaflet-control')) return;
+        // Let this click add a route point without activating Windy's location selector.
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
         const position = map.mouseEventToLatLng(event);
         onMapClick({ lat: position.lat, lon: position.lng });
     }
