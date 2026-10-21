@@ -85,7 +85,9 @@
                 const previous = points[index];
                 const from = map.latLngToContainerPoint([previous.lat, previous.lon]);
                 const to = map.latLngToContainerPoint([point.lat, point.lon]);
-                const angle = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
+                let angle = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
+                if (angle > 90) angle -= 180;
+                else if (angle < -90) angle += 180;
                 const midpoint: [number, number] = [(previous.lat + point.lat) / 2, (previous.lon + point.lon) / 2];
                 const segmentKm = haversineNm(previous, point) * 1.852;
                 waypointLayer?.addLayer(L.marker(midpoint, {
@@ -327,6 +329,6 @@
     :global(.route-builder-marker--start::before) { border-color: #21a366; background: #21a366; }
     :global(.route-builder-marker--end::before) { border-color: #cf5947; background: #cf5947; }
     :global(.route-builder-distance-wrap) { background: transparent; border: 0; }
-    :global(.route-builder-distance-label) { display: block; width: 82px; color: #fff; font-family: Roboto, Arial, sans-serif; font-size: 18px; font-weight: 700; font-style: normal; line-height: 22px; text-align: center; white-space: nowrap; text-shadow: 0 1px 3px #526575, 0 0 5px #526575; transform-origin: center; }
+    :global(.route-builder-distance-label) { display: block; width: 82px; color: #fff; font-family: Roboto, Arial, sans-serif !important; font-size: 14px !important; font-weight: 700; font-style: normal !important; line-height: 22px; text-align: center; white-space: nowrap; text-shadow: 0 1px 3px #526575, 0 0 5px #526575; transform-origin: center; }
 </style>
 
