@@ -1,6 +1,6 @@
 const config = {
     name: 'windy-plugin-route-builder',
-    version: '0.1.20',
+    version: '0.1.21',
     title: 'Route Builder',
     icon: '🧭',
     description: 'Añade puntos con clics en el mapa e inserta intermedios al pulsar sobre un tramo.',
