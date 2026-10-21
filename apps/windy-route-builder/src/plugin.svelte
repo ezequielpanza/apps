@@ -41,7 +41,7 @@
         routeLine = null;
         if (points.length > 1) {
             routeLine = L.polyline(points.map(point => [point.lat, point.lon]), {
-                color: '#00a6d6', weight: 4, opacity: 0.95, interactive: false,
+                color: '#ffffff', weight: 6, opacity: 0.95, interactive: false,
             }).addTo(map);
         }
     }
@@ -50,6 +50,26 @@
         if (!waypointLayer) return;
         waypointLayer.clearLayers();
         redrawRouteLine();
+
+        points.slice(1).forEach((point, index) => {
+            const previous = points[index];
+            const from = map.latLngToContainerPoint([previous.lat, previous.lon]);
+            const to = map.latLngToContainerPoint([point.lat, point.lon]);
+            const angle = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
+            const midpoint = map.containerPointToLatLng(L.point((from.x + to.x) / 2, (from.y + to.y) / 2));
+            const segmentKm = haversineNm(previous, point) * 1.852;
+            const label = L.marker(midpoint, {
+                icon: L.divIcon({
+                    className: 'route-builder-distance-wrap',
+                    html: `<span class="route-builder-distance-label" style="transform:rotate(${angle}deg)">${segmentKm.toFixed(1)} km</span>`,
+                    iconSize: [82, 22], iconAnchor: [41, 11],
+                }),
+                interactive: false,
+                keyboard: false,
+                bubblingMouseEvents: false,
+            });
+            waypointLayer?.addLayer(label);
+        });
 
         points.forEach((point, index) => {
             const role = index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'via';
@@ -75,7 +95,7 @@
                 distanceNm = points.slice(1).reduce((sum, currentPoint, currentIndex) => {
                     return sum + haversineNm(points[currentIndex], currentPoint);
                 }, 0);
-                redrawRouteLine();
+                redrawMap();
             });
             waypointLayer?.addLayer(marker);
         });
@@ -297,5 +317,7 @@
     :global(.route-builder-marker::before) { content: ''; position: absolute; inset: 6.5px; border: 1px solid #00a6d6; border-radius: 50%; background: #00a6d6; box-shadow: 0 1px 3px #0008; z-index: -1; }
     :global(.route-builder-marker--start::before) { border-color: #21a366; background: #21a366; }
     :global(.route-builder-marker--end::before) { border-color: #cf5947; background: #cf5947; }
+    :global(.route-builder-distance-wrap) { background: transparent; border: 0; }
+    :global(.route-builder-distance-label) { display: block; width: 82px; color: #fff; font-size: 15px; font-weight: 700; font-style: italic; line-height: 22px; text-align: center; white-space: nowrap; text-shadow: 0 1px 3px #526575, 0 0 5px #526575; transform-origin: center; }
 </style>
 
