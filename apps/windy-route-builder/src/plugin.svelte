@@ -92,7 +92,7 @@
                     pane: 'shadowPane',
                     icon: L.divIcon({
                         className: 'route-builder-distance-wrap',
-                        html: `<span class="route-builder-distance-label" style="transform:rotate(${angle}deg)">${segmentKm.toFixed(1)} km</span>`,
+                        html: `<span class="route-builder-distance-label" style="transform:rotate(${angle}deg) translateY(10px)">${segmentKm.toFixed(1)} km</span>`,
                         iconSize: [82, 22], iconAnchor: [41, 11],
                     }),
                     interactive: false,
@@ -149,11 +149,12 @@
 
     function onMapDomClick(event: MouseEvent): void {
         const target = event.target as HTMLElement | null;
-        if (target?.closest('.route-builder-marker-wrap, .leaflet-control')) return;
+        if (target?.closest('.leaflet-control')) return;
         // Let this click add a route point without activating Windy's location selector.
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
+        if (target?.closest('.route-builder-marker-wrap')) return;
         const position = map.mouseEventToLatLng(event);
         onMapClick({ lat: position.lat, lon: position.lng });
     }
@@ -326,6 +327,6 @@
     :global(.route-builder-marker--start::before) { border-color: #21a366; background: #21a366; }
     :global(.route-builder-marker--end::before) { border-color: #cf5947; background: #cf5947; }
     :global(.route-builder-distance-wrap) { background: transparent; border: 0; }
-    :global(.route-builder-distance-label) { display: block; width: 82px; color: #fff; font-size: 15px; font-weight: 700; font-style: italic; line-height: 22px; text-align: center; white-space: nowrap; text-shadow: 0 1px 3px #526575, 0 0 5px #526575; transform-origin: center; }
+    :global(.route-builder-distance-label) { display: block; width: 82px; color: #fff; font-size: 12px; font-weight: 600; font-style: normal; line-height: 22px; text-align: center; white-space: nowrap; text-shadow: 0 1px 3px #526575, 0 0 5px #526575; transform-origin: center; }
 </style>
 
