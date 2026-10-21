@@ -41,7 +41,7 @@
         routeLine = null;
         if (points.length > 1) {
             routeLine = L.polyline(points.map(point => [point.lat, point.lon]), {
-                color: '#ffffff', weight: 6, opacity: 0.95, interactive: false,
+                color: '#ffffff', weight: 3, opacity: 0.95, interactive: false,
             }).addTo(map);
         }
     }
@@ -49,27 +49,6 @@
     function redrawMap(): void {
         if (!waypointLayer) return;
         waypointLayer.clearLayers();
-        redrawRouteLine();
-
-        points.slice(1).forEach((point, index) => {
-            const previous = points[index];
-            const from = map.latLngToContainerPoint([previous.lat, previous.lon]);
-            const to = map.latLngToContainerPoint([point.lat, point.lon]);
-            const angle = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
-            const midpoint = map.containerPointToLatLng(L.point((from.x + to.x) / 2, (from.y + to.y) / 2));
-            const segmentKm = haversineNm(previous, point) * 1.852;
-            const label = L.marker(midpoint, {
-                icon: L.divIcon({
-                    className: 'route-builder-distance-wrap',
-                    html: `<span class="route-builder-distance-label" style="transform:rotate(${angle}deg)">${segmentKm.toFixed(1)} km</span>`,
-                    iconSize: [82, 22], iconAnchor: [41, 11],
-                }),
-                interactive: false,
-                keyboard: false,
-                bubblingMouseEvents: false,
-            });
-            waypointLayer?.addLayer(label);
-        });
 
         points.forEach((point, index) => {
             const role = index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'via';
@@ -98,6 +77,31 @@
                 redrawMap();
             });
             waypointLayer?.addLayer(marker);
+        });
+
+        redrawRouteLine();
+        points.slice(1).forEach((point, index) => {
+            try {
+                const previous = points[index];
+                const from = map.latLngToContainerPoint([previous.lat, previous.lon]);
+                const to = map.latLngToContainerPoint([point.lat, point.lon]);
+                const angle = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
+                const midpoint: [number, number] = [(previous.lat + point.lat) / 2, (previous.lon + point.lon) / 2];
+                const segmentKm = haversineNm(previous, point) * 1.852;
+                waypointLayer?.addLayer(L.marker(midpoint, {
+                    pane: 'shadowPane',
+                    icon: L.divIcon({
+                        className: 'route-builder-distance-wrap',
+                        html: `<span class="route-builder-distance-label" style="transform:rotate(${angle}deg)">${segmentKm.toFixed(1)} km</span>`,
+                        iconSize: [82, 22], iconAnchor: [41, 11],
+                    }),
+                    interactive: false,
+                    keyboard: false,
+                    bubblingMouseEvents: false,
+                }));
+            } catch (error) {
+                console.warn('No se pudo mostrar la distancia de este tramo.', error);
+            }
         });
     }
 
