@@ -84,6 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           APK="BoatStation-${{ steps.version.outputs.version }}.apk"
+          LATEST="BoatStation-LastVersion.apk"
           cp "apps/boat-station/core/releases/$APK" "/tmp/$APK"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -92,10 +93,11 @@ jobs:
           mkdir -p apps/boat-station/core/releases apps/boat-station/web
           cp "/tmp/$APK" "apps/boat-station/core/releases/$APK"
           cp "/tmp/$APK" "apps/boat-station/web/$APK"
+          cp "/tmp/$APK" "apps/boat-station/web/$LATEST"
           cp "/tmp/$APK" "apps/boat-station/web/BoatStation.apk"
           printf '%s\n' "${{ steps.version.outputs.version }}" > apps/boat-station/web/APK_VERSION
-          printf '%s\n' "/$APK https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web/$APK 302" "/BoatStation.apk /$APK 302" > apps/boat-station/web/_redirects
-          git add "apps/boat-station/core/releases/$APK" "apps/boat-station/web/$APK" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION apps/boat-station/web/_redirects
+          printf '%s\n' "/$APK https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web/$APK 302" "/BoatStation.apk /$LATEST 302" "/BoatStation-LastVersion.apk https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web/$APK 302" > apps/boat-station/web/_redirects
+          git add "apps/boat-station/core/releases/$APK" "apps/boat-station/web/$APK" "apps/boat-station/web/$LATEST" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION apps/boat-station/web/_redirects
           if ! git diff --cached --quiet; then
             git commit -m "Build Boat Station ${{ steps.version.outputs.version }} APK"
             git push origin HEAD:main
