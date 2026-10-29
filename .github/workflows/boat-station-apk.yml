@@ -1,12 +1,6 @@
 name: Boat Station APK
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/boat-station/core/**'
-      - 'apps/boat-station/web/**'
-      - '.github/workflows/boat-station-apk.yml'
   workflow_dispatch:
 
 permissions:
