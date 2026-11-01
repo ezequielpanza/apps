@@ -33,6 +33,7 @@ function render(){
 }
 function getVesselConfig(id){const all=read('bs.dashboard.vessels.v1',{}),saved=all&&typeof all==='object'&&!Array.isArray(all)?all[id]:null;if(saved)return saved;const row=stations().find(s=>s.stationId===id),name=records.get(id)?.telemetry?.stationName||row?.name||'';return /\bchez\b/i.test(name)?{type:'mono',length:12.5,beam:4.2,phoneForward:0,phoneStarboard:0,magneticCorrection:0}:{type:'mono'} }
 function hullSvg(config,color){const cat=config.type==='cat',ratio=number(config.length)>0&&number(config.beam)>0?number(config.beam)/number(config.length):.36,beam=Math.max(14,Math.min(30,ratio*52)),left=(52-beam)/2,right=52-left;const shape=cat?'<path d="'+(26-beam*.42)+' 10 L'+(26-beam*.42)+' 44 L'+(26-beam*.42-5)+' 40 Z"/><path d="'+(26+beam*.42)+' 10 L'+(26+beam*.42)+' 44 L'+(26+beam*.42+5)+' 40 Z"/><path d="M'+(26-beam*.42-3)+' 17 H'+(26+beam*.42+3)+' M'+(26-beam*.42-3)+' 30 H'+(26+beam*.42+3)+'" fill="none" stroke="white" stroke-width="2"/>':'<path d="M26 3 Q'+right+' 10 '+right+' 18 L'+right+' 35 Q26 51 '+left+' 35 L'+left+' 18 Q'+left+' 10 26 3 Z"/>';return '<svg viewBox="0 0 52 54" aria-hidden="true"><g fill="'+color+'" stroke="white" stroke-width="1.8" stroke-linejoin="round">'+shape+'</g><path d="M26 9v15m-3-3 3 3 3-3" fill="none" stroke="#052335" stroke-width="1.5"/></svg>'}
+function boatMagneticHeading(telemetry){const raw=number(telemetry?.boatStatus?.sensors?.heading);if(raw===null)return number(telemetry?.compass);const offset=number(telemetry?.boatStatus?.base?.headingOffset)||0,fine=number(telemetry?.boatStatus?.fine?.heading)||0;return ((raw+offset+fine)%360+360)%360}
 function renderMap(rows){
   if(!map)return;
   layer.clearLayers();
@@ -42,7 +43,7 @@ function renderMap(rows){
     const record=records.get(row.stationId),t=record?.telemetry,config=getVesselConfig(row.stationId),gpsPosition=position(t?.gps),online=fresh(record);
     if(gpsPosition){
       boatCount++;
-      const vessel=vesselPosition(t.gps,t.compass,config),center=vessel||gpsPosition,color=row.stationId===selected?'#35d6ba':'#62a4c5',outline=boatFootprint(center,vessel?.heading,config);
+      const vessel=vesselPosition(t.gps,boatMagneticHeading(t),config),center=vessel||gpsPosition,color=row.stationId===selected?'#35d6ba':'#62a4c5',outline=boatFootprint(center,vessel?.heading,config);
       for(const hull of outline){
         const shape=L.polygon(hull,{color,weight:1.5,opacity:online?.95:.55,fillColor:color,fillOpacity:online?.26:.12,lineJoin:'round'});
         shape.on('click',()=>choose(row.stationId)).addTo(layer)
