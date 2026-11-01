@@ -5,10 +5,16 @@ const stations=()=>{const rows=read('bs.remote.stations',[]);return Array.isArra
 const save=(key,value)=>localStorage.setItem(key,JSON.stringify(value));
 const records=new Map();let selected=localStorage.getItem('bs.remote.activeStation')||stations()[0]?.stationId||'',timer=0,running=false,pending=false,map=null,layer=null,fitPending=true;
 const sensorFrame=$('sensorFrame');
-const widthSlider=$('sensorWidth'),widthOutput=$('sensorWidthValue');
-function applySensorWidth(value){const width=Math.max(260,Math.min(640,Number(value)||360));document.documentElement.style.setProperty('--sensor-width',width+'px');widthSlider.value=String(width);widthOutput.value=width+' px';widthOutput.textContent=width+' px';localStorage.setItem('bs.dashboard.sensorWidth',String(width))}
-widthSlider.addEventListener('input',()=>applySensorWidth(widthSlider.value));
-applySensorWidth(localStorage.getItem('bs.dashboard.sensorWidth')||widthSlider.value);
+const sensorResize=$('sensorResize');
+function applySensorWidth(value){const available=Math.max(260,window.innerWidth-250-280-8),width=Math.max(260,Math.min(640,available,Number(value)||360));document.documentElement.style.setProperty('--sensor-width',width+'px');localStorage.setItem('bs.dashboard.sensorWidth',String(width));sensorResize.setAttribute('aria-valuenow',String(width));requestAnimationFrame(()=>map?.invalidateSize({pan:false}))}
+applySensorWidth(localStorage.getItem('bs.dashboard.sensorWidth')||360);
+let resizePointer=null;
+sensorResize.addEventListener('pointerdown',event=>{if(window.innerWidth<=1100)return;resizePointer=event.pointerId;sensorResize.setPointerCapture(event.pointerId);sensorResize.classList.add('dragging');event.preventDefault()});
+sensorResize.addEventListener('pointermove',event=>{if(resizePointer===event.pointerId)applySensorWidth(window.innerWidth-event.clientX)});
+function stopResize(event){if(resizePointer===event.pointerId){resizePointer=null;sensorResize.classList.remove('dragging')}}
+sensorResize.addEventListener('pointerup',stopResize);sensorResize.addEventListener('pointercancel',stopResize);
+sensorResize.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();const current=Number(localStorage.getItem('bs.dashboard.sensorWidth'))||360;applySensorWidth(current+(event.key==='ArrowLeft'?20:-20))}});
+window.addEventListener('resize',()=>{if(window.innerWidth>1100)applySensorWidth(localStorage.getItem('bs.dashboard.sensorWidth')||360)});
 function syncSensorFrame(id=selected){if(id)localStorage.setItem('bs.remote.activeStation',id);else localStorage.removeItem('bs.remote.activeStation');sensorFrame.src='./index.html?view=sensors&dashboard='+Date.now()+'&station='+encodeURIComponent(id||'')}
 let clientId=localStorage.getItem('bs.remote.clientId');if(!clientId){clientId='web-'+crypto.randomUUID();localStorage.setItem('bs.remote.clientId',clientId)}
 if(window.L){map=L.map('map').setView([20,-69],5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);layer=L.layerGroup().addTo(map);const resizeMap=()=>requestAnimationFrame(()=>map?.invalidateSize({pan:false}));if(window.ResizeObserver){const mapResizeObserver=new ResizeObserver(resizeMap);mapResizeObserver.observe(document.querySelector('.map-panel'))}window.addEventListener('resize',resizeMap);window.addEventListener('orientationchange',resizeMap);resizeMap()}else{$('map').textContent='No se pudo cargar el mapa. Los sensores siguen disponibles.'}
