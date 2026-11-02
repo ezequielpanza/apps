@@ -35,6 +35,7 @@ public class MainActivityV100 extends MainActivity {
     private static final int REQ_FOLDER = 1100;
     private static final int REQ_EXPORT_ZIP = 1101;
     private static final int REQ_IMPORT_ZIP = 1102;
+    private static final int REQ_EXPORT_BATTERY_DIAGNOSTICS = 1103;
     private static final String PREFS = "boat_station";
     private static final String DATA_FOLDER = "data_folder_uri";
     private static final String LAST_BACKUP = "last_backup_time";
@@ -89,6 +90,13 @@ public class MainActivityV100 extends MainActivity {
         i.addCategory(Intent.CATEGORY_OPENABLE);
         startActivityForResult(i,REQ_IMPORT_ZIP);
     }
+    private void chooseBatteryDiagnosticsExport() {
+        Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.setType("text/csv");
+        i.putExtra(Intent.EXTRA_TITLE,"BoatStation-diagnostico-baterias.csv");
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(i,REQ_EXPORT_BATTERY_DIAGNOSTICS);
+    }
 
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data) {
         super.onActivityResult(requestCode,resultCode,data);
@@ -105,6 +113,16 @@ public class MainActivityV100 extends MainActivity {
             boolean ok=exportZipTo(uri,pendingExportJson);
             pendingExportJson="";
             eval("window.BoatStation&&BoatStation.onZipExported&&BoatStation.onZipExported("+ok+")");
+        } else if(requestCode==REQ_EXPORT_BATTERY_DIAGNOSTICS){
+            Thread worker=new Thread(()->{
+                boolean ok=false;
+                try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){
+                    if(output!=null){BatteryDiagnosticsStore.get(MainActivityV100.this).exportCsv(output);ok=true;}
+                }catch(Exception ignored){}
+                final boolean success=ok;
+                runOnUiThread(()->eval("window.BoatStationDiagnostics&&BoatStationDiagnostics.onExported&&BoatStationDiagnostics.onExported("+success+")"));
+            },"BoatStation-BatteryCsv");
+            worker.start();
         } else if(requestCode==REQ_IMPORT_ZIP){
             String config=importZipFrom(uri);
             eval("window.BoatStation&&BoatStation.onZipImported&&BoatStation.onZipImported("+JSONObject.quote(config)+")");
@@ -138,6 +156,7 @@ public class MainActivityV100 extends MainActivity {
         @JavascriptInterface public boolean saveBackup(String json){Uri tree=folderUri();if(tree==null)return false;Uri file=ensureFile(treeDoc(tree),"application/json",BACKUP_NAME);boolean ok=file!=null&&writeText(file,json,false);if(ok)getSharedPreferences(PREFS,MODE_PRIVATE).edit().putLong(LAST_BACKUP,System.currentTimeMillis()).apply();return ok;}
         @JavascriptInterface public String loadBackup(){Uri tree=folderUri();if(tree==null)return "";Uri file=findFile(treeDoc(tree),BACKUP_NAME);return file==null?"":readText(file);}
         @JavascriptInterface public void exportZip(String json){pendingExportJson=json==null?"":json;runOnUiThread(MainActivityV100.this::chooseExportZip);}
+        @JavascriptInterface public void exportBatteryDiagnosticsCsv(){runOnUiThread(MainActivityV100.this::chooseBatteryDiagnosticsExport);}
         @JavascriptInterface public void importZip(){runOnUiThread(MainActivityV100.this::chooseImportZip);}
         @JavascriptInterface public void restoreNativeConfig(String banks,String batteries){try{new JSONArray(banks);new JSONArray(batteries);getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("battery_banks_v1",banks).putString("battery_configs_v2",batteries).apply();}catch(Exception ignored){}}
         @JavascriptInterface public void restartApp(){runOnUiThread(()->{Intent i=getIntent();finish();startActivity(i);});}
