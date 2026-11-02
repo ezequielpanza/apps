@@ -6,6 +6,7 @@ export function createGpsModule(requestRender){
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const unitDefs={nautical:{label:'Náuticas',speed:'kn',accuracy:'m'},metric:{label:'Métricas',speed:'km/h',accuracy:'m'},imperial:{label:'Imperiales',speed:'mph',accuracy:'ft'}};
   const coordDefs={dd:{label:'Grados decimales'},dm:{label:'Grados y minutos'},dms:{label:'Grados, minutos y segundos'}};
+  let gpsMap=null,gpsMapElement=null,gpsRouteLayer=null,gpsPositionLayer=null;
   function unitDef(){return unitDefs[state.units]||unitDefs.nautical}
   function speedValue(f){const kts=Number(f?.speedKts);if(!Number.isFinite(kts))return'—';if(state.units==='metric')return(kts*1.852).toFixed(1);if(state.units==='imperial')return(kts*1.150779).toFixed(1);return kts.toFixed(1)}
   function accuracyValue(f){const m=Number(f?.accuracy);if(!Number.isFinite(m))return'—';return state.units==='imperial'?Math.round(m*3.28084):Math.round(m)}
@@ -13,7 +14,7 @@ export function createGpsModule(requestRender){
   function summary(){if(!state.fix)return'Sin señal';return`${coordValue(state.fix.lat,true)}, ${coordValue(state.fix.lon,false)}`}
   function primaryAction(){if(state.recording)return{action:'stop',icon:'■',label:'Detener ruta'};if(state.route.length)return{action:'resume',icon:'▶',label:'Reanudar ruta'};return{action:'new',icon:'●',label:'Iniciar nueva ruta'}}
   function statusText(){if(state.recording)return`● Grabando ruta · ${state.route.length} puntos${state.importName?` · ${esc(state.importName)}`:''}`;if(state.route.length)return`Ruta detenida · ${state.route.length} puntos${state.importName?` · ${esc(state.importName)}`:''}`;return'Sin ruta activa'}
-  function page(index){if(index===0){const f=state.fix||{},u=unitDef();return`<div class="gps-coords"><div class="gps-coord"><div class="value" data-gps-lat>${coordValue(f.lat,true)}</div><div class="label">Latitud</div></div><div class="gps-coord"><div class="value" data-gps-lon>${coordValue(f.lon,false)}</div><div class="label">Longitud</div></div></div><div class="metric-grid three"><div class="metric"><div class="value" data-gps-speed>${speedValue(f)} ${u.speed}</div><div class="label">Velocidad</div></div><div class="metric"><div class="value" data-gps-bearing>${Number.isFinite(Number(f.bearing))?Math.round(Number(f.bearing)):'—'}°</div><div class="label">Rumbo</div></div><div class="metric"><div class="value" data-gps-accuracy>${accuracyValue(f)} ${u.accuracy}</div><div class="label">Precisión</div></div></div>`}const p=primaryAction(),newButton=state.route.length&&!state.recording?'<button class="gps-map-button gps-route-new" data-gps-action="new" aria-label="Nueva ruta" title="Nueva ruta">＋</button>':'';return`<div class="gps-map-shell"><canvas class="gps-map" data-gps-map></canvas><div class="gps-map-zoom"><button class="gps-map-button" data-gps-action="zoom-in" aria-label="Acercar" title="Acercar">＋</button><button class="gps-map-button" data-gps-action="zoom-out" aria-label="Alejar" title="Alejar">−</button></div><div class="gps-map-route-controls"><button class="gps-map-button gps-map-record ${state.recording?'recording':''}" data-gps-action="${p.action}" aria-label="${p.label}" title="${p.label}">${p.icon}</button>${newButton}<button class="gps-map-button gps-map-clear" data-gps-action="clear" aria-label="Limpiar ruta" title="Limpiar ruta" ${state.route.length?'':'disabled'}>×</button></div><div class="gps-map-attribution">Imágenes © Esri · Marcas náuticas © OpenSeaMap / OpenStreetMap</div></div><div class="gps-status ${state.recording?'gps-rec':''}" data-gps-status>${statusText()}</div>`}
+  function page(index){if(index===0){const f=state.fix||{},u=unitDef();return`<div class="gps-coords"><div class="gps-coord"><div class="value" data-gps-lat>${coordValue(f.lat,true)}</div><div class="label">Latitud</div></div><div class="gps-coord"><div class="value" data-gps-lon>${coordValue(f.lon,false)}</div><div class="label">Longitud</div></div></div><div class="metric-grid three"><div class="metric"><div class="value" data-gps-speed>${speedValue(f)} ${u.speed}</div><div class="label">Velocidad</div></div><div class="metric"><div class="value" data-gps-bearing>${Number.isFinite(Number(f.bearing))?Math.round(Number(f.bearing)):'—'}°</div><div class="label">Rumbo</div></div><div class="metric"><div class="value" data-gps-accuracy>${accuracyValue(f)} ${u.accuracy}</div><div class="label">Precisión</div></div></div>`}const p=primaryAction(),newButton=state.route.length&&!state.recording?'<button class="gps-map-button gps-route-new" data-gps-action="new" aria-label="Nueva ruta" title="Nueva ruta">＋</button>':'';return`<div class="gps-map-shell"><div class="gps-map" data-gps-map></div><div class="gps-map-zoom"><button class="gps-map-button" data-gps-action="zoom-in" aria-label="Acercar" title="Acercar">＋</button><button class="gps-map-button" data-gps-action="zoom-out" aria-label="Alejar" title="Alejar">−</button></div><div class="gps-map-route-controls"><button class="gps-map-button gps-map-record ${state.recording?'recording':''}" data-gps-action="${p.action}" aria-label="${p.label}" title="${p.label}">${p.icon}</button>${newButton}<button class="gps-map-button gps-map-clear" data-gps-action="clear" aria-label="Limpiar ruta" title="Limpiar ruta" ${state.route.length?'':'disabled'}>×</button></div><div class="gps-map-attribution">Imágenes © Esri · Marcas náuticas © OpenSeaMap / OpenStreetMap</div></div><div class="gps-status ${state.recording?'gps-rec':''}" data-gps-status>${statusText()}</div>`}
   function setText(selector,value){const el=state.root?.querySelector(selector);if(el&&el.textContent!==value)el.textContent=value}
   function mapVisible(){const root=state.root;if(!root)return false;const layout=window.BoatStationPageLayout;return layout?.currentPage?layout.currentPage(root)===1:!!root.querySelector('.page[data-page="1"] [data-gps-map]')}
   function refreshLive(){const root=state.root;if(!root)return;const f=state.fix||{},u=unitDef(),summaryEl=root.querySelector('.summary');if(summaryEl)summaryEl.textContent=summary();setText('[data-gps-lat]',coordValue(f.lat,true));setText('[data-gps-lon]',coordValue(f.lon,false));setText('[data-gps-speed]',`${speedValue(f)} ${u.speed}`);setText('[data-gps-bearing]',`${Number.isFinite(Number(f.bearing))?Math.round(Number(f.bearing)):'—'}°`);setText('[data-gps-accuracy]',`${accuracyValue(f)} ${u.accuracy}`);const status=root.querySelector('[data-gps-status]');if(status){status.textContent=statusText();status.classList.toggle('gps-rec',state.recording)}if(mapVisible())draw(root)}
@@ -32,58 +33,34 @@ export function createGpsModule(requestRender){
   function stopRoute(){state.recording=false;state.routeStoppedAt=Date.now();requestRender('gps')}
   function clearRoute(){state.recording=false;state.route=[];state.routeId='';state.routeStartedAt=0;state.routeStoppedAt=0;state.importName='';requestRender('gps')}
   function localAction(action,root){if(action==='new')startNewRoute();else if(action==='resume')resumeRoute();else if(action==='stop')stopRoute();else if(action==='export')exportGpx();else if(action==='import')root.querySelector('[data-gps-file]')?.click();else if(action==='clear')clearRoute()}
-  function handleAction(action,root){if(action==='zoom-in'||action==='zoom-out'){mapZoomOffset=Math.max(-16,Math.min(16,mapZoomOffset+(action==='zoom-in'?1:-1)));draw(root);return}if(state.remoteAuthoritative&&['new','resume','stop','clear'].includes(action)){window.BoatStationRemoteCommand?.send?.(`gps.${action}`);return}localAction(action,root)}
-  const tileCache=new Map();
-  const TILE_SIZE=256;
-  function tileImage(url){
-    let entry=tileCache.get(url);
-    if(entry){entry.used=Date.now();return entry}
-    const image=new Image();entry={image,loaded:false,failed:false,used:Date.now()};tileCache.set(url,entry);
-    image.onload=()=>{entry.loaded=true;if(state.root&&mapVisible())draw(state.root)};
-    image.onerror=()=>{entry.failed=true};
-    image.src=url;
-    if(tileCache.size>500){for(const [key,value] of tileCache){if(tileCache.size<=400)break;if(value.loaded||value.failed)tileCache.delete(key)}}
-    return entry
+  function handleAction(action,root){if(action==='zoom-in'||action==='zoom-out'){if(gpsMap){action==='zoom-in'?gpsMap.zoomIn():gpsMap.zoomOut()}else draw(root);return}if(state.remoteAuthoritative&&['new','resume','stop','clear'].includes(action)){window.BoatStationRemoteCommand?.send?.(`gps.${action}`);return}localAction(action,root)}
+  function ensureMap(root){
+    const element=root?.querySelector('[data-gps-map]');if(!element||!element.isConnected)return null;
+    if(gpsMap&&gpsMapElement===element)return gpsMap;
+    if(gpsMap){try{gpsMap.remove()}catch{}gpsMap=null;gpsMapElement=null;gpsRouteLayer=null;gpsPositionLayer=null}
+    const L=window.L;
+    if(!L){element.textContent='No se pudo cargar el mapa';return null}
+    const center=state.fix||state.route[state.route.length-1]||{lat:20,lon:-69};
+    const map=L.map(element,{zoomControl:false,attributionControl:false,zoomSnap:.25,zoomDelta:1,preferCanvas:true}).setView([center.lat,center.lon],state.route.length>1?12:15);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,attribution:'Tiles © Esri'}).addTo(map);
+    L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap / OpenStreetMap contributors'}).addTo(map);
+    gpsRouteLayer=L.polyline([],{color:'#1ed7e5',weight:3,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(map);
+    gpsPositionLayer=L.circleMarker([center.lat,center.lon],{radius:7,color:'#efffd8',weight:2,fillColor:'#8bd332',fillOpacity:1}).addTo(map);
+    gpsMap=map;gpsMapElement=element;
+    map.on('load',()=>map.invalidateSize({pan:false}));
+    requestAnimationFrame(()=>map.invalidateSize({pan:false}));
+    return map;
   }
-  function mercator(lat,lon){const clamped=Math.max(-85.0511,Math.min(85.0511,lat)),sin=Math.sin(clamped*Math.PI/180);return{x:(lon+180)/360,y:.5-Math.log((1+sin)/(1-sin))/(4*Math.PI)}}
   function draw(root){
     if(!root?.isConnected)return;
-    const canvas=root.querySelector('[data-gps-map]');if(!canvas)return;
-    const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
-    const dpr=window.devicePixelRatio||1,w=rect.width,h=rect.height,pw=Math.max(1,Math.round(w*dpr)),ph=Math.max(1,Math.round(h*dpr));
-    if(canvas.width!==pw)canvas.width=pw;if(canvas.height!==ph)canvas.height=ph;
-    const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#0b2638';ctx.fillRect(0,0,w,h);
-    const route=state.route,center=state.fix?{lat:state.fix.lat,lon:state.fix.lon}:route.length?route[route.length-1]:null;
-    if(!center){ctx.fillStyle='#c1ced8';ctx.font='13px sans-serif';ctx.fillText('Sin posición GPS',12,22);return}
-    const origin=mercator(center.lat,center.lon);let spanX=0,spanY=0;
-    for(const p of route){const q=mercator(p.lat,p.lon);spanX=Math.max(spanX,Math.abs(q.x-origin.x));spanY=Math.max(spanY,Math.abs(q.y-origin.y))}
-    const minSpan=Math.max(0.00000015,Math.max(w,h)/(TILE_SIZE*Math.pow(2,18))*0.65);
-    const span=Math.max(spanX,spanY,minSpan),usable=Math.max(48,Math.min(w,h)-36);
-    const zoom=Math.max(2,Math.min(18,Math.floor(Math.log2(usable/(2*span*TILE_SIZE)))+mapZoomOffset));
-    const scale=TILE_SIZE*Math.pow(2,zoom),centerX=origin.x*scale,centerY=origin.y*scale,cx=w/2,cy=h/2;
-    const left=centerX-w/2,top=centerY-h/2,right=centerX+w/2,bottom=centerY+h/2;
-    const minTileX=Math.floor(left/TILE_SIZE),maxTileX=Math.floor(right/TILE_SIZE),minTileY=Math.floor(top/TILE_SIZE),maxTileY=Math.floor(bottom/TILE_SIZE),tiles=Math.pow(2,zoom);
-    for(let ty=minTileY;ty<=maxTileY;ty++){
-      if(ty<0||ty>=tiles)continue;
-      for(let tx=minTileX;tx<=maxTileX;tx++){
-        const wrappedX=((tx%tiles)+tiles)%tiles,x=tx*TILE_SIZE-left,y=ty*TILE_SIZE-top;
-        const satellite=tileImage(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${wrappedX}`);
-        if(satellite.loaded)ctx.drawImage(satellite.image,x,y,TILE_SIZE,TILE_SIZE);
-      }
-    }
-    for(let ty=minTileY;ty<=maxTileY;ty++){
-      if(ty<0||ty>=tiles)continue;
-      for(let tx=minTileX;tx<=maxTileX;tx++){
-        const wrappedX=((tx%tiles)+tiles)%tiles,x=tx*TILE_SIZE-left,y=ty*TILE_SIZE-top;
-        const nautical=tileImage(`https://tiles.openseamap.org/seamark/${zoom}/${wrappedX}/${ty}.png`);
-        if(nautical.loaded)ctx.drawImage(nautical.image,x,y,TILE_SIZE,TILE_SIZE);
-      }
-    }
-    const project=p=>{const q=mercator(p.lat,p.lon);let dx=(q.x-origin.x)*scale;if(dx>scale/2)dx-=scale;if(dx< -scale/2)dx+=scale;return{x:cx+dx,y:cy+(q.y-origin.y)*scale}};
-    if(route.length>1){ctx.save();ctx.beginPath();ctx.rect(0,0,w,h);ctx.clip();ctx.strokeStyle='#1ed7e5';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();route.forEach((p,i)=>{const q=project(p);i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)});ctx.stroke();ctx.restore()}
-    ctx.fillStyle='#8bd332';ctx.beginPath();ctx.arc(cx,cy,6,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#efffd8';ctx.lineWidth=1.5;ctx.stroke();
+    const map=ensureMap(root);if(!map)return;
+    const route=state.route.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon)));
+    if(gpsRouteLayer)gpsRouteLayer.setLatLngs(route.map(p=>[p.lat,p.lon]));
+    const center=state.fix||route[route.length-1];
+    if(center&&gpsPositionLayer){gpsPositionLayer.setLatLng([center.lat,center.lon]);if(!map._gpsUserMoved)map.panTo([center.lat,center.lon],{animate:false})}
+    requestAnimationFrame(()=>{if(gpsMap===map&&gpsMapElement?.isConnected)map.invalidateSize({pan:false})});
   }
-  function afterRender(root){state.root=root;if(mapVisible())draw(root);requestAnimationFrame(()=>{if(state.root===root&&root.isConnected)draw(root)});root.querySelectorAll('[data-gps-action]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();handleAction(btn.dataset.gpsAction,root)}));}
+  function afterRender(root){state.root=root;if(mapVisible())draw(root);requestAnimationFrame(()=>{if(state.root===root&&root.isConnected)draw(root)});root.querySelectorAll('[data-gps-action]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();handleAction(btn.dataset.gpsAction,root)}));const mapEl=root.querySelector('[data-gps-map]');mapEl?.addEventListener('pointerdown',()=>{if(gpsMap)gpsMap._gpsUserMoved=true},{passive:true});}
   window.addEventListener('boatstation-page-change',event=>{if(event.detail?.id!=='gps')return;const root=state.root;requestAnimationFrame(()=>{if(root?.isConnected)draw(root)})});
   function sampledRoute(){const route=state.route;if(route.length<=REMOTE_ROUTE_POINTS)return route.map(p=>({...p}));const step=(route.length-1)/(REMOTE_ROUTE_POINTS-1),out=[];for(let i=0;i<REMOTE_ROUTE_POINTS;i++)out.push({...route[Math.min(route.length-1,Math.round(i*step))]});return out}
   function exportRemoteState(){return{recording:!!state.recording,routeId:String(state.routeId||''),routeStartedAt:Number(state.routeStartedAt)||0,routeStoppedAt:Number(state.routeStoppedAt)||0,route:sampledRoute(),routePointCount:state.route.length,importName:String(state.importName||'')}}
