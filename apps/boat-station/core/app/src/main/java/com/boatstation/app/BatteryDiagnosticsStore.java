@@ -224,7 +224,7 @@ public final class BatteryDiagnosticsStore extends SQLiteOpenHelper {
                 Double voltage = num(c, "voltage_v"), current = num(c, "current_a"), soc = num(c, "soc_pct"), capacity = num(c, "capacity_ah");
                 Double intervalCharge = null, intervalDischarge = null, intervalNet = null, socDelta = null, expectedSocDelta = null, socError = null;
                 boolean valid = false;
-                if (s.prevElapsed >= 0 && elapsed > s.prevElapsed && elapsed - s.prevElapsed <= 20000L && s.prevCurrent != null && current != null) {
+                if (s.prevElapsed >= 0 && elapsed > s.prevElapsed && elapsed - s.prevElapsed <= 15000L && s.prevCurrent != null && current != null) {
                     double dt = (elapsed - s.prevElapsed) / 1000.0;
                     double chargeStart = Math.max(0, s.prevCurrent), chargeEnd = Math.max(0, current);
                     double dischargeStart = Math.max(0, -s.prevCurrent), dischargeEnd = Math.max(0, -current);
