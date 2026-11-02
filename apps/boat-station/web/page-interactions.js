@@ -8,7 +8,7 @@
   function layout(){return window.BoatStationPageLayout||null}
   function pageCount(card){return card?.querySelectorAll('.page').length||0}
   function currentPage(card){return layout()?.currentPage?.(card)||0}
-  function blocked(target){return !!target.closest('.card-head,.drag-handle,.resize-handle,button,input,textarea,select,a,.sheet,.station-manager')}
+  function blocked(target){return !!target.closest('.card-head,.drag-handle,.resize-handle,.gps-map-shell,.gps-map,button,input,textarea,select,a,.sheet,.station-manager')}
   function primary(event){return event.isPrimary!==false&&(event.pointerType!=='mouse'||event.button===0)}
   function moduleId(card){return card?.dataset?.id||''}
 
