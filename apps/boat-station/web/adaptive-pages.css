@@ -23,7 +23,7 @@
 .page-content>.gps-coords+.metric-grid{flex:1 1 0}
 .gps-coord{padding-block:clamp(4px,3cqh,10px);padding-inline:clamp(5px,2cqw,10px)}
 .gps-coords,.metric-grid{gap:clamp(4px,1.5cqh,8px)}
-.page-content>.gps-map{flex:1 1 auto;min-height:92px;height:auto;width:100%;aspect-ratio:auto}
+.page-content>.gps-map-shell{flex:1 1 0;min-height:92px;height:auto;width:100%;aspect-ratio:auto}
 .page-content>.gps-actions,.page-content>.gps-status{flex:0 0 auto}
 .gps-actions{gap:clamp(4px,1.4cqh,8px);margin-top:clamp(4px,1.5cqh,9px)}
 .gps-action{justify-content:center;text-align:center;padding-block:clamp(4px,2.2cqh,9px);padding-inline:clamp(5px,2cqw,11px);min-height:32px}
