@@ -31,6 +31,7 @@ public final class BatteryDiagnosticsStore extends SQLiteOpenHelper {
     private static final int DB_VERSION = 1;
     private static final long RETENTION_MS = 90L * 24L * 60L * 60L * 1000L;
     private static volatile BatteryDiagnosticsStore instance;
+    private final Context appContext;
 
     public static BatteryDiagnosticsStore get(Context context) {
         if (instance == null) synchronized (BatteryDiagnosticsStore.class) {
@@ -39,7 +40,7 @@ public final class BatteryDiagnosticsStore extends SQLiteOpenHelper {
         return instance;
     }
 
-    private BatteryDiagnosticsStore(Context context) { super(context, DB_NAME, null, DB_VERSION); }
+    private BatteryDiagnosticsStore(Context context) { super(context, DB_NAME, null, DB_VERSION); this.appContext = context; }
 
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE samples (_id INTEGER PRIMARY KEY AUTOINCREMENT, battery_id TEXT NOT NULL, battery_name TEXT, bms_type TEXT, time_ms INTEGER NOT NULL, elapsed_ms INTEGER NOT NULL, voltage_v REAL, current_a REAL, soc_pct REAL, cell1_v REAL, cell2_v REAL, cell3_v REAL, cell4_v REAL, temp_battery_c REAL, temp_sensors_json TEXT, charge_allowed INTEGER, discharge_allowed INTEGER, alarms_json TEXT, protections_json TEXT, remaining_ah REAL, capacity_ah REAL, connected INTEGER, raw_frame_hex TEXT)");
@@ -124,7 +125,7 @@ public final class BatteryDiagnosticsStore extends SQLiteOpenHelper {
     }
 
     private void pruneIfNeeded(SQLiteDatabase db, long now) {
-        Context c = getContextCompat();
+        Context c = appContext;
         if (c == null) return;
         long last = c.getSharedPreferences("battery_diagnostics", Context.MODE_PRIVATE).getLong("last_prune_ms", 0);
         if (now - last < 24L * 60L * 60L * 1000L) return;
@@ -132,14 +133,6 @@ public final class BatteryDiagnosticsStore extends SQLiteOpenHelper {
         db.delete("samples", "time_ms < ?", new String[]{String.valueOf(cutoff)});
         db.delete("events", "time_ms < ?", new String[]{String.valueOf(cutoff)});
         c.getSharedPreferences("battery_diagnostics", Context.MODE_PRIVATE).edit().putLong("last_prune_ms", now).apply();
-    }
-
-    private Context getContextCompat() {
-        try {
-            java.lang.reflect.Field field = SQLiteOpenHelper.class.getDeclaredField("mContext");
-            field.setAccessible(true);
-            return (Context) field.get(this);
-        } catch (Exception ignored) { return null; }
     }
 
     private static Double num(Cursor c, String column) {
