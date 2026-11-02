@@ -47,7 +47,7 @@ export function createGpsModule(requestRender){
   }
   function mercator(lat,lon){const clamped=Math.max(-85.0511,Math.min(85.0511,lat)),sin=Math.sin(clamped*Math.PI/180);return{x:(lon+180)/360,y:.5-Math.log((1+sin)/(1-sin))/(4*Math.PI)}}
   function draw(root){
-    if(!mapVisible())return;
+    if(!root?.isConnected)return;
     const canvas=root.querySelector('[data-gps-map]');if(!canvas)return;
     const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
     const dpr=window.devicePixelRatio||1,w=rect.width,h=rect.height,pw=Math.max(1,Math.round(w*dpr)),ph=Math.max(1,Math.round(h*dpr));
@@ -83,7 +83,8 @@ export function createGpsModule(requestRender){
     if(route.length>1){ctx.save();ctx.beginPath();ctx.rect(0,0,w,h);ctx.clip();ctx.strokeStyle='#1ed7e5';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();route.forEach((p,i)=>{const q=project(p);i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)});ctx.stroke();ctx.restore()}
     ctx.fillStyle='#8bd332';ctx.beginPath();ctx.arc(cx,cy,6,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#efffd8';ctx.lineWidth=1.5;ctx.stroke();
   }
-  function afterRender(root){state.root=root;if(mapVisible())draw(root);root.querySelectorAll('[data-gps-action]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();handleAction(btn.dataset.gpsAction,root)}));}
+  function afterRender(root){state.root=root;if(mapVisible())draw(root);requestAnimationFrame(()=>{if(state.root===root&&root.isConnected)draw(root)});root.querySelectorAll('[data-gps-action]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();handleAction(btn.dataset.gpsAction,root)}));}
+  window.addEventListener('boatstation-page-change',event=>{if(event.detail?.id!=='gps')return;const root=state.root;requestAnimationFrame(()=>{if(root?.isConnected)draw(root)})});
   function sampledRoute(){const route=state.route;if(route.length<=REMOTE_ROUTE_POINTS)return route.map(p=>({...p}));const step=(route.length-1)/(REMOTE_ROUTE_POINTS-1),out=[];for(let i=0;i<REMOTE_ROUTE_POINTS;i++)out.push({...route[Math.min(route.length-1,Math.round(i*step))]});return out}
   function exportRemoteState(){return{recording:!!state.recording,routeId:String(state.routeId||''),routeStartedAt:Number(state.routeStartedAt)||0,routeStoppedAt:Number(state.routeStoppedAt)||0,route:sampledRoute(),routePointCount:state.route.length,importName:String(state.importName||'')}}
   function applyRemoteState(remote){if(!remote||typeof remote!=='object')return;const before=JSON.stringify([state.recording,state.routeId,state.routeStartedAt,state.routeStoppedAt,state.route.length,state.importName]);state.remoteAuthoritative=true;state.recording=!!remote.recording;state.routeId=String(remote.routeId||'');state.routeStartedAt=Number(remote.routeStartedAt)||0;state.routeStoppedAt=Number(remote.routeStoppedAt)||0;state.importName=String(remote.importName||'');state.route=Array.isArray(remote.route)?remote.route.map(p=>({lat:Number(p.lat),lon:Number(p.lon),time:Number(p.time)||Date.now()})).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)):[];compactRoute();const after=JSON.stringify([state.recording,state.routeId,state.routeStartedAt,state.routeStoppedAt,state.route.length,state.importName]);if(before!==after)requestRender('gps');else refreshLive()}
