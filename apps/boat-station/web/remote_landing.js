@@ -33,7 +33,7 @@
   };
   if(standalone())hideInstall();
 
-  if(active())return;
+  if(active()){document.documentElement.classList.remove('bs-remote');return;}
 
   const gate=document.createElement('div');gate.id='remoteLanding';
   gate.innerHTML='<div class="rl-card"><img class="rl-logo" src="./icon.png" alt="Boat Station"><h1>Boat Station Remote</h1><p class="rl-intro">'+(isNative?'Este teléfono está en modo cliente. Vinculalo a una estación o usalo como servidor.':'Accedé a Boat Station desde la web o instalá la app Android para convertir un teléfono en la estación del barco.')+'</p>'+(isNative?'<button class="rl-mode" id="rlUseServer" type="button">Usar este teléfono como servidor</button>':'<button class="rl-apk" id="rlApk" type="button">Descargar Boat Station APK</button>')+'<div class="rl-separator"><span>'+ (isNative?'Vincular como cliente':'Ya tenés la app') +'</span></div><p class="rl-pair-copy">Ingresá el código de vinculación que muestra Boat Station en el teléfono.</p><input id="rlCode" maxlength="19" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="one-time-code"><button id="rlConnect" type="button">Vincular estación</button><button id="rlScan" type="button">Escanear QR de otra app</button><div class="rl-status" id="rlStatus"></div></div>';
