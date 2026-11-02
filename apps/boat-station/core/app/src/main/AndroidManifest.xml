@@ -41,6 +41,10 @@
             android:name=".BoatStationCoreService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".BatteryDiagnosticsService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
         <activity android:name=".BoatStationActivity" android:exported="true" android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
