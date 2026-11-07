@@ -1,4 +1,5 @@
 const DEFAULT_MIN_CONTENT_HEIGHT=72;
+const GPS_MIN_CONTENT_HEIGHT=128;
 const PAGER_HEIGHT=28;
 const FIT_EPSILON=1;
 const LAYOUT_SCHEMA=2;
@@ -31,7 +32,7 @@ export function createPageLayoutEngine(cards){
   function hasVerticalClip(el){if(!(el instanceof HTMLElement)||el===document.body)return false;const style=getComputedStyle(el);if(style.display==='none'||style.visibility==='hidden'||isOutOfFlow(style))return false;if(el.tagName==='CANVAS'||el.tagName==='SVG'||isLeafTextElement(el))return false;if(!['hidden','clip','auto','scroll'].includes(style.overflowY))return false;return el.scrollHeight>el.clientHeight+FIT_EPSILON}
   function contentFits(content){const root=content.getBoundingClientRect(),top=root.top-FIT_EPSILON,bottom=root.bottom+FIT_EPSILON;if(content.scrollHeight>content.clientHeight+FIT_EPSILON)return false;for(const el of content.querySelectorAll('*')){const style=getComputedStyle(el);if(style.display==='none'||style.visibility==='hidden'||isOutOfFlow(style))continue;const rect=el.getBoundingClientRect();if(rect.width<=0&&rect.height<=0)continue;if(rect.top<top||rect.bottom>bottom||hasVerticalClip(el))return false}return true}
   function minimumContentHeight(content,force=false){
-    if(!content)return DEFAULT_MIN_CONTENT_HEIGHT;const pageEl=content.closest('.page');if(!pageEl)return DEFAULT_MIN_CONTENT_HEIGHT;const width=Math.round(content.getBoundingClientRect().width),cached=minimumCache.get(content);if(!force&&cached&&Math.abs(cached.width-width)<=1)return cached.height;
+    if(!content)return DEFAULT_MIN_CONTENT_HEIGHT;const pageEl=content.closest('.page');if(!pageEl)return DEFAULT_MIN_CONTENT_HEIGHT;const width=Math.round(content.getBoundingClientRect().width),cached=minimumCache.get(content);if(content.closest('.card')?.dataset?.id==='gps'){minimumCache.set(content,{width,height:GPS_MIN_CONTENT_HEIGHT});return GPS_MIN_CONTENT_HEIGHT}if(!force&&cached&&Math.abs(cached.width-width)<=1)return cached.height;
     const previous=pageEl.style.getPropertyValue('--page-content-height'),previousOverflow=content.style.overflow;content.style.overflow='hidden';const ceiling=Math.max(900,window.innerHeight*1.4);let minimum=ceiling,lastFail=DEFAULT_MIN_CONTENT_HEIGHT-1;
     const test=h=>{pageEl.style.setProperty('--page-content-height',`${h}px`);pageEl.getBoundingClientRect();return contentFits(content)};
     for(let h=DEFAULT_MIN_CONTENT_HEIGHT;h<=ceiling;h+=MIN_SCAN_STEP){if(test(h)){minimum=h;break}lastFail=h}
