@@ -6,7 +6,7 @@ export function createGpsModule(requestRender){
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const unitDefs={nautical:{label:'Náuticas',speed:'kn',accuracy:'m'},metric:{label:'Métricas',speed:'km/h',accuracy:'m'},imperial:{label:'Imperiales',speed:'mph',accuracy:'ft'}};
   const coordDefs={dd:{label:'Grados decimales'},dm:{label:'Grados y minutos'},dms:{label:'Grados, minutos y segundos'}};
-  let gpsMap=null,gpsMapElement=null,gpsRouteLayer=null,gpsPositionLayer=null;
+  let gpsMap=null,gpsMapElement=null,gpsRouteLayer=null,gpsPositionLayer=null,gpsMapResizeObserver=null;
   function unitDef(){return unitDefs[state.units]||unitDefs.nautical}
   function speedValue(f){const kts=Number(f?.speedKts);if(!Number.isFinite(kts))return'—';if(state.units==='metric')return(kts*1.852).toFixed(1);if(state.units==='imperial')return(kts*1.150779).toFixed(1);return kts.toFixed(1)}
   function accuracyValue(f){const m=Number(f?.accuracy);if(!Number.isFinite(m))return'—';return state.units==='imperial'?Math.round(m*3.28084):Math.round(m)}
@@ -37,7 +37,7 @@ export function createGpsModule(requestRender){
   function ensureMap(root){
     const element=root?.querySelector('[data-gps-map]');if(!element||!element.isConnected)return null;
     if(gpsMap&&gpsMapElement===element)return gpsMap;
-    if(gpsMap){try{gpsMap.remove()}catch{}gpsMap=null;gpsMapElement=null;gpsRouteLayer=null;gpsPositionLayer=null}
+    if(gpsMapResizeObserver){try{gpsMapResizeObserver.disconnect()}catch{}gpsMapResizeObserver=null}if(gpsMap){try{gpsMap.remove()}catch{}gpsMap=null;gpsMapElement=null;gpsRouteLayer=null;gpsPositionLayer=null}
     const L=window.L;
     if(!L){element.textContent='No se pudo cargar el mapa';return null}
     const center=state.fix||state.route[state.route.length-1]||{lat:20,lon:-69};
@@ -48,6 +48,7 @@ export function createGpsModule(requestRender){
     gpsRouteLayer=L.polyline([],{color:'#1ed7e5',weight:3,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(map);
     gpsPositionLayer=L.circleMarker([center.lat,center.lon],{radius:7,color:'#efffd8',weight:2,fillColor:'#8bd332',fillOpacity:1}).addTo(map);
     gpsMap=map;gpsMapElement=element;
+    if(typeof ResizeObserver!=='undefined'){gpsMapResizeObserver=new ResizeObserver(()=>{if(gpsMap===map&&gpsMapElement===element)map.invalidateSize({pan:false,debounceMoveend:true})});gpsMapResizeObserver.observe(element)}
     map.on('load',()=>map.invalidateSize({pan:false}));
     requestAnimationFrame(()=>map.invalidateSize({pan:false}));
     return map;
