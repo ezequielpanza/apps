@@ -48,9 +48,12 @@
   }
   function render(){
     removeRow();
-    if(!installed||!latest)return;
+    const staticRow=document.querySelector('[data-server-apk-download]');
+    if(!installed||!latest){if(staticRow)staticRow.hidden=false;return}
     const updateAvailable=newer(latest,installed);
-    if(newer(installed,latest))return;
+    const installedIsNewer=newer(installed,latest);
+    if(staticRow)staticRow.hidden=updateAvailable||installedIsNewer;
+    if(installedIsNewer||!updateAvailable)return;
     const inner=menuInner();if(!inner)return;
     const row=document.createElement('div');
     row.className='option remote-apk-row';
