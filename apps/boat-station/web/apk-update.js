@@ -48,7 +48,9 @@
   }
   function render(){
     removeRow();
-    if(!installed||!latest||!newer(latest,installed))return;
+    if(!installed||!latest)return;
+    const updateAvailable=newer(latest,installed);
+    if(newer(installed,latest))return;
     const inner=menuInner();if(!inner)return;
     const row=document.createElement('div');
     row.className='option remote-apk-row';
@@ -57,14 +59,15 @@
     row.style.alignItems='center';
     row.style.justifyContent='space-between';
     row.style.gap='12px';
-    let sub=`APK instalada: ${installed}`;
+    let sub=updateAvailable?`APK instalada: ${installed}`:`Versión instalada: ${installed}`;
     if(downloadState==='starting')sub='Iniciando descarga…';
     else if(downloadState==='started')sub='Descarga iniciada · revisá las notificaciones';
     else if(downloadState==='browser')sub='Abriendo descarga…';
     else if(downloadState==='error')sub='No se pudo iniciar la descarga';
     const disabled=downloadState==='starting'||downloadState==='started';
-    const label=downloadState==='started'?'Actualizando…':'Actualizar';
-    row.innerHTML=`<span style="min-width:0;flex:1">Nueva versión ${latest}<br><small class="sub">${sub}</small></span><button type="button" class="btn" data-core-apk-download ${disabled?'disabled':''}>${label}</button>`;
+    const label=downloadState==='started'?(updateAvailable?'Actualizando…':'Descarga iniciada'):downloadState==='starting'?'Iniciando…':updateAvailable?'Actualizar':'Descargar Última Versión';
+    const heading=updateAvailable?`Nueva versión ${latest}`:'Última versión disponible';
+    row.innerHTML=`<span style="min-width:0;flex:1">${heading}<br><small class="sub">${sub}</small></span><button type="button" class="btn" data-core-apk-download ${disabled?'disabled':''}>${label}</button>`;
     row.querySelector('[data-core-apk-download]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();download(latest)});
     const title=inner.querySelector('h3');
     if(title&&title.nextSibling)inner.insertBefore(row,title.nextSibling);else inner.appendChild(row);
