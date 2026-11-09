@@ -316,22 +316,22 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let windModelRowsCollapsed = true;
     let windIndicatorField: WindowConditionKey | '' = '';
     let windIndicatorUserChoice = false;
-    let windIndicatorDistance = 50;
+    let windIndicatorDistance = 80;
     let windIndicatorSize = 20;
     let windIndicatorTextSize = 10;
     let windIndicatorDegreesEnabled = true;
     let waveIndicatorField: WindowConditionKey | '' = '';
     let waveIndicatorUserChoice = false;
-    let waveIndicatorDistance = 50;
+    let waveIndicatorDistance = 80;
     let waveIndicatorSize = 20;
     let waveIndicatorTextSize = 10;
     let waveIndicatorDegreesEnabled = true;
-    let windRoseEnabled = false;
+    let windRoseEnabled = true;
     let windRoseRadius = 50;
     let windRoseLineWidth = 10;
     let windRoseFontSize = 7;
-    let windRoseTransparency = 75;
-    let windRoseLabelMode: 'cardinal' | 'degrees' = 'cardinal';
+    let windRoseTransparency = 25;
+    let windRoseLabelMode: 'cardinal' | 'degrees' = 'degrees';
     let windRoseSignature = '';
     let headingDegreesEnabled = false;
     let headingDegreesFontSize = 14;
@@ -481,7 +481,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     const newModelFields: WindowConditionKey[] = ['gfsDew', 'ecmwfDew', 'mblueDew', 'iconDew', 'aromeDew', 'ecmwfTemperature', 'mblueTemperature', 'iconTemperature', 'aromeTemperature', 'ecmwfFeels', 'mblueFeels', 'iconFeels', 'aromeFeels', 'ecmwfRain', 'mblueRain', 'iconRain', 'aromeRain', 'ecmwfGust', 'mblueGust', 'iconGust', 'aromeGust', 'feels'];
     const skyModelFields: WindowConditionKey[] = ['ecmwfSky', 'mblueSky', 'iconSky', 'aromeSky'];
     function isSkyField(key: WindowConditionKey): boolean { return key === 'clouds' || key === 'skyAverage' || skyModelFields.includes(key); }
-    let hiddenRouteFields = new Set<WindowConditionKey>([...newModelFields, ...skyModelFields]);
+    const defaultRouteFields = new Set<WindowConditionKey>(['arrival', 'wind', 'direction', 'waves']);
+    let hiddenRouteFields = new Set<WindowConditionKey>(windowFieldKeys.filter(field => !defaultRouteFields.has(field)));
     let showRouteFieldPicker = false;
     let selectedRouteFields = new Set<WindowConditionKey>();
     let draggedRouteField: WindowConditionKey | null = null;
@@ -619,6 +620,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let passiveWatchId: number | null = null;
     let passivePositionMarker: L.Marker | null = null;
     let passiveFix: { lat: number; lon: number; speed: number | null; heading: number | null; timestamp: number; accuracy: number } | null = null;
+    let passivePositionRequestPending = false;
+    const gpsPositionDotHtml = '<span class="gps-position-halo"></span><span class="gps-position-dot"></span>';
     let hasInitiallyCentered = false;
     let localForecast: RouteForecastSample | null = null;
     let localForecastPending = false;
@@ -2603,34 +2606,59 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         finally { localForecastPending = false; }
     }
 
-    function startPassiveLocation(): void {
-        if (!navigator.geolocation || passiveWatchId !== null) return;
-        passiveWatchId = navigator.geolocation.watchPosition(position => {
-            const { latitude, longitude, accuracy, speed, heading } = position.coords;
-            if (!hasValidCoordinates(latitude, longitude) || !Number.isFinite(accuracy)) return;
-            const course = typeof heading === 'number' && Number.isFinite(heading) && typeof speed === 'number' && speed >= 0.5 ? heading : null;
-            passiveFix = { lat: latitude, lon: longitude, accuracy, speed: typeof speed === 'number' && Number.isFinite(speed) && speed >= 0 ? speed * 1.943844 : null, heading: course, timestamp: position.timestamp };
-            if (!passivePositionMarker) {
-                const icon = L.divIcon({ className: 'route-builder-gps-position-icon', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] });
-                passivePositionMarker = L.marker([latitude, longitude], { icon, interactive: false, zIndexOffset: 1500 }).addTo(map);
-            } else passivePositionMarker.setLatLng([latitude, longitude]);
-            passivePositionMarker.setOpacity(navigationActive ? 0 : 1);
-            if (!hasInitiallyCentered) {
-                hasInitiallyCentered = true;
-                map.setView([latitude, longitude], Math.max(map.getZoom(), 8), { animate: false });
-                const rect = map.getContainer().getBoundingClientRect(), view = window.visualViewport;
-                const viewport = { left: view?.offsetLeft ?? 0, top: view?.offsetTop ?? 0, right: (view?.offsetLeft ?? 0) + (view?.width ?? window.innerWidth), bottom: (view?.offsetTop ?? 0) + (view?.height ?? window.innerHeight) };
-                const drawer = forecastDrawer && !forecastDrawer.hidden && forecastDrawer.classList.contains('is-open') ? forecastDrawer.getBoundingClientRect() : null;
-                const target = visibleMapCenter(rect, viewport, null, drawer);
-                if (target) { const point = map.latLngToContainerPoint([latitude, longitude]); map.panBy(L.point(point.x - target.x, point.y - target.y), { animate: false }); }
-                updateForecastStatus(`Ubicación obtenida (precisión estimada: ${Math.round(accuracy)} m).`);
-            }
-            redrawMapOverlays();
-            if (followBoat) centerBoatInVisibleMap();
-            void refreshLocalForecast();
+    function applyPassivePosition(position: GeolocationPosition): void {
+        if (passiveTrackingDisposed) return;
+        const { latitude, longitude, accuracy, speed, heading } = position.coords;
+        if (!hasValidCoordinates(latitude, longitude) || !Number.isFinite(accuracy)) return;
+        if (passiveFix && position.timestamp < passiveFix.timestamp) return;
+        const course = typeof heading === 'number' && Number.isFinite(heading) && typeof speed === 'number' && speed >= 0.5 ? heading : null;
+        passiveFix = { lat: latitude, lon: longitude, accuracy, speed: typeof speed === 'number' && Number.isFinite(speed) && speed >= 0 ? speed * 1.943844 : null, heading: course, timestamp: position.timestamp };
+        const icon = L.divIcon({ className: 'route-builder-gps-position-icon', html: gpsPositionDotHtml, iconSize: [34, 34], iconAnchor: [17, 17] });
+        if (!passivePositionMarker) passivePositionMarker = L.marker([latitude, longitude], { icon, interactive: false, zIndexOffset: 10000 }).addTo(map);
+        else {
+            passivePositionMarker.setLatLng([latitude, longitude]);
+            passivePositionMarker.setIcon(icon);
+        }
+        passivePositionMarker.setZIndexOffset(10000);
+        passivePositionMarker.setOpacity(navigationActive ? 0 : 1);
+        if (!hasInitiallyCentered) {
+            hasInitiallyCentered = true;
+            map.setView([latitude, longitude], Math.max(map.getZoom(), 8), { animate: false });
+            const rect = map.getContainer().getBoundingClientRect(), view = window.visualViewport;
+            const viewport = { left: view?.offsetLeft ?? 0, top: view?.offsetTop ?? 0, right: (view?.offsetLeft ?? 0) + (view?.width ?? window.innerWidth), bottom: (view?.offsetTop ?? 0) + (view?.height ?? window.innerHeight) };
+            const drawer = forecastDrawer && !forecastDrawer.hidden && forecastDrawer.classList.contains('is-open') ? forecastDrawer.getBoundingClientRect() : null;
+            const target = visibleMapCenter(rect, viewport, null, drawer);
+            if (target) { const point = map.latLngToContainerPoint([latitude, longitude]); map.panBy(L.point(point.x - target.x, point.y - target.y), { animate: false }); }
+            updateForecastStatus(`Ubicación obtenida (precisión estimada: ${Math.round(accuracy)} m).`);
+        }
+        redrawMapOverlays();
+        if (followBoat) centerBoatInVisibleMap();
+        void refreshLocalForecast();
+    }
+
+    function reportPassiveLocationFailure(): void {
+        if (!passiveTrackingDisposed && !passiveFix) updateForecastStatus('No se pudo obtener la ubicación. Comprobá los permisos de ubicación.');
+    }
+
+    function requestPassiveLocation(): void {
+        if (!navigator.geolocation || passivePositionRequestPending) return;
+        passivePositionRequestPending = true;
+        navigator.geolocation.getCurrentPosition(position => {
+            passivePositionRequestPending = false;
+            applyPassivePosition(position);
         }, () => {
-            if (!passiveFix) updateForecastStatus('No se pudo obtener la ubicación. Comprobá los permisos de ubicación.');
-        }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 });
+            passivePositionRequestPending = false;
+            reportPassiveLocationFailure();
+        }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
+    }
+
+    function startPassiveLocation(): void {
+        if (!navigator.geolocation) {
+            updateForecastStatus('Este dispositivo no ofrece ubicación GPS en el navegador.');
+            return;
+        }
+        if (passiveWatchId === null) passiveWatchId = navigator.geolocation.watchPosition(applyPassivePosition, reportPassiveLocationFailure, { enableHighAccuracy: true, timeout: 30000, maximumAge: 30000 });
+        requestPassiveLocation();
     }
 
     function redrawMapOverlays(): void {
@@ -2642,92 +2670,84 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         redrawWindRose();
     }
 
-    function redrawWindIndicator(): void {
+    function redrawDirectionalIndicator(kind: 'wind' | 'wave'): void {
+        const isWave = kind === 'wave';
+        const field = isWave ? waveIndicatorField : windIndicatorField;
         const fix = visualFix();
         const now = Date.now();
-        if (!fix || now - fix.timestamp > 30000 || !windIndicatorField) {
-            if (windIndicatorOverlay) windIndicatorOverlay.hidden = true;
+        let overlay = isWave ? waveIndicatorOverlay : windIndicatorOverlay;
+        if (!fix || now - fix.timestamp > 30000 || !field) {
+            if (overlay) overlay.hidden = true;
             return;
         }
-        // Use only a route sample close to the boat and current time; never
-        // silently display a distant or future waypoint as current wind.
         const sample = nearbyForecast(fix, now);
-        const direction = sample ? (windIndicatorField === 'directionAverage'
+        const direction = sample ? (!isWave && field === 'directionAverage'
             ? groupValue('directionAverage', sample.values)
-            : fieldDirection(windIndicatorField, sample.values)) : null;
-        if (direction === null) { if (windIndicatorOverlay) windIndicatorOverlay.hidden = true; return; }
-        if (!windIndicatorOverlay) {
-            windIndicatorOverlay = document.createElement('div');
-            windIndicatorOverlay.className = 'route-wind-indicator';
-            windIndicatorOverlay.innerHTML = '<b class="route-wind-degrees"></b><svg viewBox="0 0 26 30" aria-hidden="true"><path d="M2 2 L24 2 L13 28 Z" fill="#087bd1" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg><span>T</span>';
-            map.getContainer().appendChild(windIndicatorOverlay);
+            : fieldDirection(field, sample.values)) : null;
+        if (direction === null || !Number.isFinite(direction)) {
+            if (overlay) overlay.hidden = true;
+            return;
         }
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = isWave ? 'route-wind-indicator route-wave-indicator' : 'route-wind-indicator';
+            const fill = isWave ? '#f4d03f' : '#087bd1';
+            const label = isWave ? 'W' : 'T';
+            overlay.innerHTML = `<b class="route-wind-degrees"></b><svg viewBox="0 0 26 30" aria-hidden="true"><path d="M2 2 L24 2 L13 28 Z" fill="${fill}" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg><span>${label}</span>`;
+            map.getContainer().appendChild(overlay);
+            if (isWave) waveIndicatorOverlay = overlay;
+            else windIndicatorOverlay = overlay;
+        }
+        // Both symbols share size, offset, text size, and bearing math.
+        // Their color and letter distinguish wind from waves.
+        const distance = windIndicatorDistance;
+        const size = windIndicatorSize;
+        const textSize = windIndicatorTextSize;
         const origin = map.latLngToContainerPoint([fix.lat, fix.lon]);
         const bearing = map.maplibreMap?.getBearing?.() ?? 0;
         const screenDirection = (direction - bearing) * Math.PI / 180;
-        windIndicatorOverlay.style.left = `${origin.x + windIndicatorDistance * Math.sin(screenDirection)}px`;
-        windIndicatorOverlay.style.top = `${origin.y - windIndicatorDistance * Math.cos(screenDirection)}px`;
-        windIndicatorOverlay.style.setProperty('--wind-indicator-size', `${windIndicatorSize}px`);
-        windIndicatorOverlay.style.setProperty('--wind-indicator-height', `${windIndicatorSize * 30 / 26}px`);
-        windIndicatorOverlay.style.setProperty('--wind-indicator-padding', `${windIndicatorSize * 5 / 26}px`);
-        windIndicatorOverlay.style.setProperty('--wind-indicator-text-size', `${windIndicatorTextSize}px`);
-        const triangle = windIndicatorOverlay.querySelector<SVGElement>('svg');
-        if (triangle) triangle.style.transform = `rotate(${direction - bearing}deg)`;
-        const label = windIndicatorOverlay.querySelector<HTMLElement>('span');
-        if (label) label.style.transform = `rotate(${direction - bearing}deg)`;
-        const degreesLabel = windIndicatorOverlay.querySelector<HTMLElement>('.route-wind-degrees');
+        const rotation = `rotate(${direction - bearing}deg)`;
+        overlay.style.left = `${origin.x + distance * Math.sin(screenDirection)}px`;
+        overlay.style.top = `${origin.y - distance * Math.cos(screenDirection)}px`;
+        overlay.style.setProperty('--wind-indicator-size', `${size}px`);
+        overlay.style.setProperty('--wind-indicator-height', `${size * 30 / 26}px`);
+        overlay.style.setProperty('--wind-indicator-padding', `${size * 5 / 26}px`);
+        overlay.style.setProperty('--wind-indicator-text-size', `${textSize}px`);
+        const triangle = overlay.querySelector<SVGElement>('svg');
+        if (triangle) triangle.style.transform = rotation;
+        const label = overlay.querySelector<HTMLElement>('span:not(.route-wind-degrees)');
+        if (label) label.style.transform = rotation;
+        const degreesLabel = overlay.querySelector<HTMLElement>('.route-wind-degrees');
         if (degreesLabel) {
             degreesLabel.textContent = String(Math.round(direction) % 360).padStart(3, '0');
             degreesLabel.hidden = !windIndicatorDegreesEnabled;
-            const labelOffset = windIndicatorSize * 0.5 + 10;
+            const labelOffset = size * 0.5 + 10;
             degreesLabel.style.left = `calc(50% + ${labelOffset * Math.sin(screenDirection)}px)`;
             degreesLabel.style.top = `calc(50% - ${labelOffset * Math.cos(screenDirection)}px)`;
-            degreesLabel.style.transform = `translate(-50%, -50%) rotate(${direction - bearing}deg)`;
+            degreesLabel.style.transform = `translate(-50%, -50%) ${rotation}`;
         }
-        windIndicatorOverlay.title = `Viento previsto desde ${Math.round(direction)}°`;
-        windIndicatorOverlay.hidden = false;
+        overlay.title = isWave ? `Olas desde ${Math.round(direction)}°` : `Viento previsto desde ${Math.round(direction)}°`;
+        overlay.hidden = false;
     }
 
-    function redrawWaveIndicator(): void {
-        const fix = visualFix();
-        const now = Date.now();
-        if (!fix || now - fix.timestamp > 30000 || !waveIndicatorField) {
-            if (waveIndicatorOverlay) waveIndicatorOverlay.hidden = true;
-            return;
-        }
-        const sample = nearbyForecast(fix, now);
-        const direction = sample ? fieldDirection(waveIndicatorField, sample.values) : null;
-        if (direction === null) { if (waveIndicatorOverlay) waveIndicatorOverlay.hidden = true; return; }
-        if (!waveIndicatorOverlay) {
-            waveIndicatorOverlay = document.createElement('div');
-            waveIndicatorOverlay.className = 'route-wind-indicator route-wave-indicator';
-            waveIndicatorOverlay.innerHTML = '<b class="route-wind-degrees"></b><svg viewBox="0 0 26 30" aria-hidden="true"><path d="M2 2 L24 2 L13 28 Z" fill="#f4d03f" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg><span>W</span>';
-            map.getContainer().appendChild(waveIndicatorOverlay);
-        }
-        const origin = map.latLngToContainerPoint([fix.lat, fix.lon]);
-        const bearing = map.maplibreMap?.getBearing?.() ?? 0;
-        const screenDirection = (direction - bearing) * Math.PI / 180;
-        waveIndicatorOverlay.style.left = `${origin.x + waveIndicatorDistance * Math.sin(screenDirection)}px`;
-        waveIndicatorOverlay.style.top = `${origin.y - waveIndicatorDistance * Math.cos(screenDirection)}px`;
-        waveIndicatorOverlay.style.setProperty('--wind-indicator-size', `${waveIndicatorSize}px`);
-        waveIndicatorOverlay.style.setProperty('--wind-indicator-height', `${waveIndicatorSize * 30 / 26}px`);
-        waveIndicatorOverlay.style.setProperty('--wind-indicator-padding', `${waveIndicatorSize * 5 / 26}px`);
-        waveIndicatorOverlay.style.setProperty('--wind-indicator-text-size', `${waveIndicatorTextSize}px`);
-        const triangle = waveIndicatorOverlay.querySelector<SVGElement>('svg');
-        if (triangle) triangle.style.transform = `rotate(${direction - bearing}deg)`;
-        const label = waveIndicatorOverlay.querySelector<HTMLElement>('span');
-        if (label) label.style.transform = `rotate(${direction - bearing}deg)`;
-        const degreesLabel = waveIndicatorOverlay.querySelector<HTMLElement>('.route-wind-degrees');
-        if (degreesLabel) {
-            degreesLabel.textContent = String(Math.round(direction) % 360).padStart(3, '0');
-            degreesLabel.hidden = !waveIndicatorDegreesEnabled;
-            const labelOffset = waveIndicatorSize * 0.5 + 10;
-            degreesLabel.style.left = `calc(50% + ${labelOffset * Math.sin(screenDirection)}px)`;
-            degreesLabel.style.top = `calc(50% - ${labelOffset * Math.cos(screenDirection)}px)`;
-            degreesLabel.style.transform = `translate(-50%, -50%) rotate(${direction - bearing}deg)`;
-        }
-        waveIndicatorOverlay.title = `Olas desde ${Math.round(direction)}`;
-        waveIndicatorOverlay.hidden = false;
+    function redrawWindIndicator(): void { redrawDirectionalIndicator('wind'); }
+    function redrawWaveIndicator(): void { redrawDirectionalIndicator('wave'); }
+
+    function syncIndicatorGeometryControls(setting: 'distance' | 'size' | 'text-size'): void {
+        const value = setting === 'distance' ? windIndicatorDistance : setting === 'size' ? windIndicatorSize : windIndicatorTextSize;
+        for (const input of document.querySelectorAll<HTMLInputElement>(`[data-wind-indicator-setting="${setting}"], [data-wave-indicator-setting="${setting}"]`)) input.value = String(value);
+        try {
+            localStorage.setItem(`route-builder-wind-indicator-${setting}`, String(value));
+            localStorage.setItem(`route-builder-wave-indicator-${setting}`, String(value));
+        } catch { /* Keep the shared setting for this session. */ }
+    }
+
+    function syncIndicatorDegreesControls(): void {
+        for (const input of document.querySelectorAll<HTMLInputElement>('[data-wind-indicator-degrees], [data-wave-indicator-degrees]')) input.checked = windIndicatorDegreesEnabled;
+        try {
+            localStorage.setItem('route-builder-wind-indicator-degrees', String(windIndicatorDegreesEnabled));
+            localStorage.setItem('route-builder-wave-indicator-degrees', String(windIndicatorDegreesEnabled));
+        } catch { /* Keep the shared setting for this session. */ }
     }
 
     function redrawWindRose(): void {
@@ -3101,7 +3121,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 }
             }
             windModelRowsCollapsed = localStorage.getItem('route-builder-wind-model-rows-collapsed') !== 'false';
-            const savedHiddenRouteFields = JSON.parse(localStorage.getItem('route-builder-forecast-hidden-fields') || '[]');
+            const savedHiddenRouteFieldsRaw = localStorage.getItem('route-builder-forecast-hidden-fields');
+            const savedHiddenRouteFields = savedHiddenRouteFieldsRaw === null ? null : JSON.parse(savedHiddenRouteFieldsRaw);
             if (Array.isArray(savedHiddenRouteFields)) {
                 hiddenRouteFields = new Set(savedHiddenRouteFields.filter((field: string) => field !== 'windAverage' && !additionalGroups[field as WindowConditionKey] && windowFieldKeys.includes(field as WindowConditionKey)));
                 for (const field of [...newModelFields, ...skyModelFields]) if (!savedRouteFieldOrder?.includes(field)) hiddenRouteFields.add(field);
@@ -3130,6 +3151,22 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             if (savedWaveTextSize >= 6 && savedWaveTextSize <= 40) waveIndicatorTextSize = savedWaveTextSize;
             const savedWaveDegrees = localStorage.getItem('route-builder-wave-indicator-degrees');
             if (savedWaveDegrees !== null) waveIndicatorDegreesEnabled = savedWaveDegrees !== 'false';
+            if (!(savedWindDistance >= 20 && savedWindDistance <= 200) && savedWaveDistance >= 20 && savedWaveDistance <= 200) windIndicatorDistance = savedWaveDistance;
+            if (!(savedWindSize >= 16 && savedWindSize <= 80) && savedWaveSize >= 16 && savedWaveSize <= 80) windIndicatorSize = savedWaveSize;
+            if (!(savedWindTextSize >= 6 && savedWindTextSize <= 40) && savedWaveTextSize >= 6 && savedWaveTextSize <= 40) windIndicatorTextSize = savedWaveTextSize;
+            if (savedWindDegrees === null && savedWaveDegrees !== null) windIndicatorDegreesEnabled = savedWaveDegrees !== 'false';
+            waveIndicatorDistance = windIndicatorDistance;
+            waveIndicatorSize = windIndicatorSize;
+            waveIndicatorTextSize = windIndicatorTextSize;
+            waveIndicatorDegreesEnabled = windIndicatorDegreesEnabled;
+            // One-time migration: place both arrows at the requested 80 px radius,
+            // then let future user adjustments persist normally.
+            if (localStorage.getItem('route-builder-shared-indicator-geometry-v1') !== 'true') {
+                windIndicatorDistance = waveIndicatorDistance = 80;
+                localStorage.setItem('route-builder-wind-indicator-distance', '80');
+                localStorage.setItem('route-builder-wave-indicator-distance', '80');
+                localStorage.setItem('route-builder-shared-indicator-geometry-v1', 'true');
+            }
             const savedWindRoseEnabled = localStorage.getItem('route-builder-wind-rose-enabled');
             if (savedWindRoseEnabled !== null) windRoseEnabled = savedWindRoseEnabled === 'true';
             const savedHeadingDegreesEnabled = localStorage.getItem('route-builder-heading-degrees-enabled');
@@ -3312,6 +3349,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             const fix = visualFix();
             if (!fix || Date.now() - fix.timestamp > 30000) {
                 updateForecastStatus('Esperando una posición GPS reciente para centrar y seguir.');
+                requestPassiveLocation();
                 return;
             }
             centerBoatInVisibleMap();
@@ -3408,9 +3446,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 gpsButton.title = 'Desactivar modo Navegación';
                 if (navigationPanel) navigationPanel.hidden = false;
                 updateNavigationPanel();
-                const icon = L.divIcon({ className: 'route-builder-gps-position-icon', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] });
-                if (!gpsPositionMarker) gpsPositionMarker = L.marker([lat, lon], { icon, interactive: false, zIndexOffset: 1500 }).addTo(map);
+                const icon = L.divIcon({ className: 'route-builder-gps-position-icon', html: gpsPositionDotHtml, iconSize: [34, 34], iconAnchor: [17, 17] });
+                if (!gpsPositionMarker) gpsPositionMarker = L.marker([lat, lon], { icon, interactive: false, zIndexOffset: 10000 }).addTo(map);
                 else gpsPositionMarker.setLatLng([lat, lon]);
+                gpsPositionMarker.setZIndexOffset(10000);
                 map.setView([lat, lon], Math.max(map.getZoom(), 8));
                 setFollowBoat(true);
                 centerBoatInVisibleMap();
@@ -3441,10 +3480,11 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                         if (liveRouteActive && navigationTargetId !== previousTargetId) refreshLiveRoute();
                         tryStartAutomaticLive();
                         const markerHtml = hasCourse
-                            ? `<svg viewBox="0 0 24 24" width="26" height="26" style="transform:rotate(${heading}deg)" aria-label="Rumbo GPS"><path d="M12 2 L21 21 L12 17 L3 21 Z" fill="#087bd1" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>`
-                            : '<span></span>';
+                            ? `<svg viewBox="0 0 24 24" width="30" height="30" style="transform:rotate(${heading}deg)" aria-label="Rumbo GPS"><path d="M12 2 L21 21 L12 17 L3 21 Z" fill="#087bd1" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>`
+                            : gpsPositionDotHtml;
                         gpsPositionMarker.setLatLng([latitude, longitude]);
-                        gpsPositionMarker.setIcon(L.divIcon({ className: 'route-builder-gps-position-icon', html: markerHtml, iconSize: [26, 26], iconAnchor: [13, 13] }));
+                        gpsPositionMarker.setIcon(L.divIcon({ className: 'route-builder-gps-position-icon', html: markerHtml, iconSize: [34, 34], iconAnchor: [17, 17] }));
+                        gpsPositionMarker.setZIndexOffset(10000);
                         if (followBoat) centerBoatInVisibleMap();
                     }, () => {
                         if (!navigationActive || requestGeneration !== gpsRequestGeneration) return;
@@ -4067,20 +4107,19 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 const value = Number(waveVisualInput.value);
                 if (!Number.isFinite(value)) return;
                 const setting = waveVisualInput.dataset.waveIndicatorSetting;
-                if (setting === 'distance') waveIndicatorDistance = Math.max(20, Math.min(200, value));
-                else if (setting === 'size') waveIndicatorSize = Math.max(16, Math.min(80, value));
-                else if (setting === 'text-size') waveIndicatorTextSize = Math.max(6, Math.min(40, value));
+                if (setting === 'distance') windIndicatorDistance = waveIndicatorDistance = Math.max(20, Math.min(200, value));
+                else if (setting === 'size') windIndicatorSize = waveIndicatorSize = Math.max(16, Math.min(80, value));
+                else if (setting === 'text-size') windIndicatorTextSize = waveIndicatorTextSize = Math.max(6, Math.min(40, value));
                 else return;
-                waveVisualInput.value = String(setting === 'distance' ? waveIndicatorDistance : setting === 'size' ? waveIndicatorSize : waveIndicatorTextSize);
-                try { localStorage.setItem(`route-builder-wave-indicator-${setting}`, waveVisualInput.value); } catch { /* Keep current setting in memory. */ }
+                syncIndicatorGeometryControls(setting);
                 redrawMapOverlays();
                 return;
             }
             const waveDegreesToggle = target.closest<HTMLInputElement>('[data-wave-indicator-degrees]');
             if (waveDegreesToggle) {
-                waveIndicatorDegreesEnabled = waveDegreesToggle.checked;
-                try { localStorage.setItem('route-builder-wave-indicator-degrees', String(waveIndicatorDegreesEnabled)); } catch { /* Keep the setting in memory. */ }
-                redrawWaveIndicator();
+                windIndicatorDegreesEnabled = waveIndicatorDegreesEnabled = waveDegreesToggle.checked;
+                syncIndicatorDegreesControls();
+                redrawMapOverlays();
                 return;
             }
             const windVisualInput = target.closest<HTMLInputElement>('[data-wind-indicator-setting]');
@@ -4088,20 +4127,19 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 const value = Number(windVisualInput.value);
                 if (!Number.isFinite(value)) return;
                 const setting = windVisualInput.dataset.windIndicatorSetting;
-                if (setting === 'distance') windIndicatorDistance = Math.max(20, Math.min(200, value));
-                else if (setting === 'size') windIndicatorSize = Math.max(16, Math.min(80, value));
-                else if (setting === 'text-size') windIndicatorTextSize = Math.max(6, Math.min(40, value));
+                if (setting === 'distance') windIndicatorDistance = waveIndicatorDistance = Math.max(20, Math.min(200, value));
+                else if (setting === 'size') windIndicatorSize = waveIndicatorSize = Math.max(16, Math.min(80, value));
+                else if (setting === 'text-size') windIndicatorTextSize = waveIndicatorTextSize = Math.max(6, Math.min(40, value));
                 else return;
-                windVisualInput.value = String(setting === 'distance' ? windIndicatorDistance : setting === 'size' ? windIndicatorSize : windIndicatorTextSize);
-                try { localStorage.setItem(`route-builder-wind-indicator-${setting}`, windVisualInput.value); } catch { /* Keep current setting in memory. */ }
+                syncIndicatorGeometryControls(setting);
                 redrawMapOverlays();
                 return;
             }
             const windDegreesToggle = target.closest<HTMLInputElement>('[data-wind-indicator-degrees]');
             if (windDegreesToggle) {
-                windIndicatorDegreesEnabled = windDegreesToggle.checked;
-                try { localStorage.setItem('route-builder-wind-indicator-degrees', String(windIndicatorDegreesEnabled)); } catch { /* Keep the setting in memory. */ }
-                redrawWindIndicator();
+                windIndicatorDegreesEnabled = waveIndicatorDegreesEnabled = windDegreesToggle.checked;
+                syncIndicatorDegreesControls();
+                redrawMapOverlays();
                 return;
             }
             const windRoseToggle = target.closest<HTMLInputElement>('[data-wind-rose-enabled]');
@@ -5742,7 +5780,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-builder-map-type-menu button[aria-pressed="true"]) { background: #d5ece9; color: #066d63; font-weight: 700; }
     :global(.route-builder-zoom-in) { top: -256px; }
     :global(.route-builder-zoom-out) { top: -204px; }
-    :global(.route-builder-gps-position-icon span) { display: block; box-sizing: border-box; width: 22px; height: 22px; border: 3px solid #fff; border-radius: 50%; background: #087bd1; box-shadow: 0 1px 8px #102b3b99; }
+    :global(.route-builder-gps-position-icon) { border: 0; background: transparent; }
+    :global(.route-builder-gps-position-icon .gps-position-halo) { position: absolute; inset: 0; display: block; border: 2px solid #fff; border-radius: 50%; background: #087bd133; box-shadow: 0 0 0 2px #087bd1, 0 1px 8px #102b3b99; }
+    :global(.route-builder-gps-position-icon .gps-position-dot) { position: absolute; inset: 9px; display: block; border: 2px solid #fff; border-radius: 50%; background: #087bd1; box-shadow: 0 1px 3px #102b3b99; }
+    :global(.route-builder-gps-position-icon svg) { display: block; filter: drop-shadow(0 1px 2px #102b3b99); }
     :global(.route-wind-indicator) { position: absolute; z-index: 650; width: var(--wind-indicator-size, 26px); height: var(--wind-indicator-height, 30px); transform: translate(-50%, -50%); pointer-events: none; }
     :global(.route-wind-rose) { position: absolute; z-index: 640; transform: translate(-50%, -50%); pointer-events: none; }
     :global(.route-wind-rose[hidden]) { display: none; }
@@ -5751,7 +5792,6 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-wind-indicator[hidden]) { display: none; }
     :global(.route-wind-indicator svg) { position: absolute; inset: 0; width: 100%; height: 100%; }
     :global(.route-wind-indicator span) { position: absolute; inset: 0; display: grid; place-items: center; padding-bottom: var(--wind-indicator-padding, 5px); box-sizing: border-box; color: #fff; font: bold var(--wind-indicator-text-size, 12px) Arial,sans-serif; text-shadow: 0 1px 2px #003a68; }
-    :global(.route-wave-indicator span) { color: #202426; text-shadow: 0 1px 1px #fff8; }
     :global(.route-wind-indicator .route-wind-degrees) { position: absolute; top: 50%; left: 50%; padding: 1px 3px; border-radius: 3px; background: #263238cc; color: #fff; font: 700 10px/1.2 Arial,sans-serif; white-space: nowrap; text-shadow: 0 1px 1px #000; }
     :global(.route-wind-indicator .route-wind-degrees[hidden]) { display: none; }
     :global(.route-navigation-dashboard) { position: fixed; z-index: 2147483000; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); box-sizing: border-box; display: grid; grid-template-columns: 24px minmax(0,1fr) minmax(0,1.08fr) minmax(0,1fr) 14px; width: min(520px, calc(100vw - 12px)); min-height: 92px; padding: 3px 2px; border: 1px solid #aab5b8; border-radius: 10px; background: #edf0f0f5; color: #343c3e; box-shadow: 0 2px 7px #14252c66; font-family: Arial,sans-serif; }
