@@ -2619,6 +2619,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 updateForecastStatus(`Ubicación obtenida (precisión estimada: ${Math.round(accuracy)} m).`);
             }
             redrawMapOverlays();
+            if (followBoat) centerBoatInVisibleMap();
             void refreshLocalForecast();
         }, () => {
             if (!passiveFix) updateForecastStatus('No se pudo obtener la ubicación. Comprobá los permisos de ubicación.');
@@ -2857,8 +2858,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
 
     function centerBoatInVisibleMap(): void {
         const requestVersion = ++centerRequestVersion;
-        const fix = navigationFix;
-        if (!navigationActive || !fix || Date.now() - fix.timestamp > 30000) {
+        const fix = visualFix();
+        if (!fix || Date.now() - fix.timestamp > 30000) {
             updateForecastStatus('No hay una posición GPS reciente para centrar el mapa.');
             return;
         }
@@ -2896,8 +2897,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         // so the boat lands in the unobscured portion of the map.
         map.setView([fix.lat, fix.lon], map.getZoom(), { animate: false });
         window.requestAnimationFrame(() => {
-            if (requestVersion !== centerRequestVersion || !followBoat || !navigationActive || !navigationFix) return;
-            const actual = map.latLngToContainerPoint([navigationFix.lat, navigationFix.lon]);
+            const latestFix = visualFix();
+            if (requestVersion !== centerRequestVersion || !followBoat || !latestFix || Date.now() - latestFix.timestamp > 30000) return;
+            const actual = map.latLngToContainerPoint([latestFix.lat, latestFix.lon]);
             map.panBy(L.point(actual.x - target.x, actual.y - target.y), { animate: false });
         });
     }
@@ -2906,7 +2908,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         followBoat = enabled;
         if (!enabled) centerRequestVersion++;
         centerButton?.setAttribute('aria-pressed', String(enabled));
-        if (centerButton) centerButton.title = enabled ? 'Desactivar centrado automático' : 'Centrar el barco en el mapa visible';
+        if (centerButton) {
+            centerButton.title = enabled ? 'Desactivar seguimiento GPS' : 'Centrar y seguir la ubicación GPS';
+            centerButton.setAttribute('aria-label', centerButton.title);
+        }
     }
 
     function stopFollowingOnMapDrag(): void {
@@ -3293,43 +3298,15 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         centerButton.setAttribute('aria-label', 'Centrar el barco en el mapa visible');
         centerButton.setAttribute('aria-pressed', 'false');
         centerButton.hidden = false;
-        centerButton.addEventListener('click', async event => {
+        centerButton.addEventListener('click', event => {
             event.stopPropagation();
-            if (!navigationActive) {
-                if (!centerButton || centerButton.disabled) return;
-                centerButton.disabled = true;
-                try {
-                    const position = await getGPSlocation({ enableHighAccuracy: true, timeout: 20000, maximumAge: 10000, getMeFallbackGps: false, doNotShowFailureMessage: true });
-                    if (navigationActive) return;
-                    const lat = Number(position?.lat), lon = Number(position?.lon);
-                    if (position?.source !== 'device' || !hasValidCoordinates(lat, lon)) throw new Error('Posición inválida');
-                    const rect = map.getContainer().getBoundingClientRect();
-                    const view = window.visualViewport;
-                    const viewport = { left: view?.offsetLeft ?? 0, top: view?.offsetTop ?? 0, right: (view?.offsetLeft ?? 0) + (view?.width ?? window.innerWidth), bottom: (view?.offsetTop ?? 0) + (view?.height ?? window.innerHeight) };
-                    let drawer = forecastDrawer && !forecastDrawer.hidden && forecastDrawer.classList.contains('is-open') ? forecastDrawer.getBoundingClientRect() : null;
-                    const callout = forecastDrawer?.querySelector('.departure-timebar-callout');
-                    if (drawer && callout && callout.getClientRects().length) {
-                        const label = callout.getBoundingClientRect();
-                        drawer = { left: drawer.left, right: drawer.right, top: Math.min(drawer.top, label.top), bottom: drawer.bottom };
-                    }
-                    const target = visibleMapCenter(rect, viewport, null, drawer);
-                    map.setView([lat, lon], map.getZoom(), { animate: false });
-                    if (target) {
-                        const actual = map.latLngToContainerPoint([lat, lon]);
-                        map.panBy(L.point(actual.x - target.x, actual.y - target.y), { animate: false });
-                    }
-                    updateForecastStatus('Mapa centrado en la posición GPS.');
-                } catch {
-                    updateForecastStatus('No se pudo obtener la posición GPS. Comprobá los permisos de ubicación.');
-                } finally {
-                    if (centerButton) centerButton.disabled = false;
-                }
+            if (followBoat) { setFollowBoat(false); return; }
+            setFollowBoat(true);
+            const fix = visualFix();
+            if (!fix || Date.now() - fix.timestamp > 30000) {
+                updateForecastStatus('Esperando una posición GPS reciente para centrar y seguir.');
                 return;
             }
-
-            if (followBoat) { setFollowBoat(false); return; }
-            if (!navigationFix || Date.now() - navigationFix.timestamp > 30000) { centerBoatInVisibleMap(); return; }
-            setFollowBoat(true);
             centerBoatInVisibleMap();
         });
         mapTypeControl = document.createElement('div');
@@ -3380,7 +3357,6 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 if (!leaveLiveRoute(restorePreviousRouteOnNavExit, true)) return;
                 navigationActive = false;
                 passivePositionMarker?.setOpacity(1);
-                setFollowBoat(false);
                 autoLivePending = false;
                 if (liveButton) liveButton.hidden = true;
                 if (centerButton) centerButton.hidden = false;
@@ -4305,6 +4281,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         window.addEventListener('resize', positionForecastDrawer);
         window.addEventListener('resize', scheduleCenterForLayoutChange);
         map.on('resize', positionForecastDrawer);
+        map.on('resize', scheduleCenterForLayoutChange);
         map.on('resize', redrawGpsCourseLine);
         map.on('move zoomend', redrawMapOverlays);
         map.on('dragstart', stopFollowingOnMapDrag);
@@ -5131,6 +5108,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         map.off('move zoomend', redrawMapOverlays);
         map.off('dragstart', stopFollowingOnMapDrag);
         map.off('resize', positionForecastDrawer);
+        map.off('resize', scheduleCenterForLayoutChange);
         map.off('resize', redrawGpsCourseLine);
         window.removeEventListener('resize', positionForecastDrawer);
         window.removeEventListener('resize', scheduleCenterForLayoutChange);
