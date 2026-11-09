@@ -7,3 +7,5 @@ Las consultas a Open-Meteo se realizan bajo las condiciones de su servicio gratu
 Compilar: npm install y npm run build. Pruebas: npm test. Servir el directorio raíz por HTTPS o localhost.
 
 La compilación y las pruebas automatizadas de conversiones y rutas se ejecutaron localmente. Se requiere verificar la interfaz, el GPS y las respuestas de pronóstico en el sitio publicado.
+
+Fuente de viento: GFS Global, ECMWF IFS e ICON Global. Fuente de olas: GFS Wave 0.25° y ECMWF WAM. El cálculo utiliza los datos disponibles para cada posición y hora.
