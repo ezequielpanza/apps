@@ -2955,11 +2955,11 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             let top = Math.max(mapRect.top, viewport.top);
             let bottom = Math.min(mapRect.bottom, viewport.bottom);
             const nav = navigationPanel && !navigationPanel.hidden ? navigationPanel.getBoundingClientRect() : null;
-            let drawer = forecastDrawer && !forecastDrawer.hidden && forecastDrawer.classList.contains('is-open')
+            let drawer: { left: number; right: number; top: number; bottom: number } | null = forecastDrawer && !forecastDrawer.hidden && forecastDrawer.classList.contains('is-open')
                 ? forecastDrawer.getBoundingClientRect() : null;
             const callout = forecastDrawer?.querySelector<HTMLElement>('.departure-timebar-callout');
             if (drawer && callout && callout.getClientRects().length) {
-                drawer = { ...drawer, top: Math.min(drawer.top, callout.getBoundingClientRect().top) };
+                drawer = { left: drawer.left, right: drawer.right, top: Math.min(drawer.top, callout.getBoundingClientRect().top), bottom: drawer.bottom };
             }
             if (nav && nav.right > left && nav.left < right && nav.bottom > top && nav.top < bottom) top = Math.min(bottom, nav.bottom);
             if (drawer && drawer.right > left && drawer.left < right && drawer.bottom > top && drawer.top < bottom) bottom = Math.max(top, drawer.top);
