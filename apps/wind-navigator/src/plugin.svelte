@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
-    import { map } from './adapters/map.js';
+    import { map, getBaseMap, setBaseMap } from './adapters/map.js';
     import windyStore from './adapters/store.js';
     import { getPointForecastData } from './adapters/fetch.js';
     import colors from './adapters/colors.js';
@@ -599,6 +599,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let gpsButton: HTMLButtonElement | null = null;
     let liveButton: HTMLButtonElement | null = null;
     let centerButton: HTMLButtonElement | null = null;
+    let mapTypeControl: HTMLDivElement | null = null;
     let zoomInButton: HTMLButtonElement | null = null;
     let zoomOutButton: HTMLButtonElement | null = null;
     let centerLayoutObserver: ResizeObserver | null = null;
@@ -615,6 +616,18 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let downwindLaylineLayers: L.Polyline[] = [];
     let gpsRequestGeneration = 0;
     let gpsWatchId: number | null = null;
+    let passiveWatchId: number | null = null;
+    let passivePositionMarker: L.Marker | null = null;
+    let passiveFix: { lat: number; lon: number; speed: number | null; heading: number | null; timestamp: number; accuracy: number } | null = null;
+    let hasInitiallyCentered = false;
+    let localForecast: RouteForecastSample | null = null;
+    let localForecastPending = false;
+    let localForecastLastAttempt = 0;
+    let passiveTrackingDisposed = false;
+    function visualFix() {
+        return navigationActive && navigationFix && Date.now() - navigationFix.timestamp <= 30000 ? navigationFix : passiveFix;
+    }
+
     let navigationActive = false;
     let followBoat = false;
     let liveRouteActive = false;
@@ -652,7 +665,6 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
 
     async function getForecastRequest(model: 'gfs' | 'ecmwf' | 'gfsWaves' | 'ecmwfWaves' | 'cmems' | 'mblue' | 'icon' | 'aromeAntilles', lat: number, lon: number): Promise<any> {
-        if (points.length < 2) throw new Error('Se necesitan al menos dos puntos de ruta.');
         if (!hasValidCoordinates(lat, lon)) {
             throw new Error(`Coordenadas inválidas para la consulta: lat ${lat}, lon ${lon}.`);
         }
@@ -1695,6 +1707,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         if (gpsButton) forecastDrawer.appendChild(gpsButton);
         if (liveButton) forecastDrawer.appendChild(liveButton);
         if (centerButton) forecastDrawer.appendChild(centerButton);
+        if (mapTypeControl) forecastDrawer.appendChild(mapTypeControl);
         if (zoomInButton) forecastDrawer.appendChild(zoomInButton);
         if (zoomOutButton) forecastDrawer.appendChild(zoomOutButton);
         updateBoatTrackMarker();
@@ -2553,6 +2566,65 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         event.stopImmediatePropagation();
     }
 
+    function nearbyForecast(fix: { lat: number; lon: number }, now: number): RouteForecastSample | null {
+        if (localForecast && localForecast.values && now - localForecast.eta.getTime() <= 30 * 60000 && now >= localForecast.eta.getTime() && haversineNm(fix as Waypoint, localForecast as Waypoint) <= 10) return localForecast;
+        return routeForecast.filter(item => item.values && Math.abs(item.eta.getTime() - now) <= 90 * 60000 && haversineNm(fix as Waypoint, item as Waypoint) <= 10)
+            .sort((a, b) => haversineNm(fix as Waypoint, a as Waypoint) - haversineNm(fix as Waypoint, b as Waypoint))[0] ?? null;
+    }
+
+    async function refreshLocalForecast(): Promise<void> {
+        const fix = visualFix();
+        const now = Date.now();
+        if (!fix || now - fix.timestamp > 30000 || localForecastPending || now - localForecastLastAttempt < 60000) return;
+        if (!windIndicatorField && !waveIndicatorField && laylineMode === 'none') return;
+        if (localForecast && now - localForecast.eta.getTime() < 300000 && haversineNm(fix as Waypoint, localForecast as Waypoint) < 2) return;
+        localForecastPending = true;
+        localForecastLastAttempt = now;
+        const lat = fix.lat, lon = fix.lon;
+        try {
+            const b = await getCachedForecastBundle(lat, lon);
+            if (passiveTrackingDisposed) return;
+            const t = Date.now();
+            const val = (d: any, key: string) => { const index = d ? coveredForecastIndex(d.ts, t) : -1; return index >= 0 ? forecastNumber(d, key, index) : null; };
+            localForecast = { lat, lon, distanceNm: 0, eta: new Date(t), values: {
+                direction: val(b.data, 'windDir'), ecmwfWindDirection: val(b.ecmwfData, 'windDir'), iconWindDirection: val(b.iconData, 'windDir'),
+                wavesDir: val(b.seaData, 'wavesDir'), ecmwfWavesDir: val(b.ecmwfSeaData, 'wavesDir'), swell1Dir: val(b.seaData, 'swell1Dir'),
+                ecmwfSwell1Dir: val(b.ecmwfSeaData, 'swell1Dir'), swell2Dir: val(b.seaData, 'swell2Dir'), windWavesDir: val(b.seaData, 'windWavesDir')
+            }};
+            redrawWindIndicator(); redrawWaveIndicator(); redrawLaylines();
+        } catch { localForecast = null; }
+        finally { localForecastPending = false; }
+    }
+
+    function startPassiveLocation(): void {
+        if (!navigator.geolocation || passiveWatchId !== null) return;
+        passiveWatchId = navigator.geolocation.watchPosition(position => {
+            const { latitude, longitude, accuracy, speed, heading } = position.coords;
+            if (!hasValidCoordinates(latitude, longitude) || !Number.isFinite(accuracy)) return;
+            const course = typeof heading === 'number' && Number.isFinite(heading) && typeof speed === 'number' && speed >= 0.5 ? heading : null;
+            passiveFix = { lat: latitude, lon: longitude, accuracy, speed: typeof speed === 'number' && Number.isFinite(speed) && speed >= 0 ? speed * 1.943844 : null, heading: course, timestamp: position.timestamp };
+            if (!passivePositionMarker) {
+                const icon = L.divIcon({ className: 'route-builder-gps-position-icon', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] });
+                passivePositionMarker = L.marker([latitude, longitude], { icon, interactive: false, zIndexOffset: 1500 }).addTo(map);
+            } else passivePositionMarker.setLatLng([latitude, longitude]);
+            passivePositionMarker.setOpacity(navigationActive ? 0 : 1);
+            if (!hasInitiallyCentered) {
+                hasInitiallyCentered = true;
+                map.setView([latitude, longitude], Math.max(map.getZoom(), 8), { animate: false });
+                const rect = map.getContainer().getBoundingClientRect(), view = window.visualViewport;
+                const viewport = { left: view?.offsetLeft ?? 0, top: view?.offsetTop ?? 0, right: (view?.offsetLeft ?? 0) + (view?.width ?? window.innerWidth), bottom: (view?.offsetTop ?? 0) + (view?.height ?? window.innerHeight) };
+                const drawer = forecastDrawer && !forecastDrawer.hidden && forecastDrawer.classList.contains('is-open') ? forecastDrawer.getBoundingClientRect() : null;
+                const target = visibleMapCenter(rect, viewport, null, drawer);
+                if (target) { const point = map.latLngToContainerPoint([latitude, longitude]); map.panBy(L.point(point.x - target.x, point.y - target.y), { animate: false }); }
+                updateForecastStatus(`Ubicación obtenida (precisión estimada: ${Math.round(accuracy)} m).`);
+            }
+            redrawMapOverlays();
+            void refreshLocalForecast();
+        }, () => {
+            if (!passiveFix) updateForecastStatus('No se pudo obtener la ubicación. Comprobá los permisos de ubicación.');
+        }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 });
+    }
+
     function redrawMapOverlays(): void {
         redrawDistanceLabels(liveDisplayPoints ?? points);
         redrawGpsCourseLine();
@@ -2563,16 +2635,15 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
 
     function redrawWindIndicator(): void {
-        const fix = navigationFix;
+        const fix = visualFix();
         const now = Date.now();
-        if (!navigationActive || !fix || now - fix.timestamp > 30000 || !windIndicatorField) {
+        if (!fix || now - fix.timestamp > 30000 || !windIndicatorField) {
             if (windIndicatorOverlay) windIndicatorOverlay.hidden = true;
             return;
         }
         // Use only a route sample close to the boat and current time; never
         // silently display a distant or future waypoint as current wind.
-        const sample = routeForecast.filter(item => item.values && Math.abs(item.eta.getTime() - now) <= 90 * 60000 && haversineNm(fix as Waypoint, item as Waypoint) <= 10)
-            .sort((a, b) => haversineNm(fix as Waypoint, a as Waypoint) - haversineNm(fix as Waypoint, b as Waypoint))[0];
+        const sample = nearbyForecast(fix, now);
         const direction = sample ? (windIndicatorField === 'directionAverage'
             ? groupValue('directionAverage', sample.values)
             : fieldDirection(windIndicatorField, sample.values)) : null;
@@ -2610,14 +2681,13 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
 
     function redrawWaveIndicator(): void {
-        const fix = navigationFix;
+        const fix = visualFix();
         const now = Date.now();
-        if (!navigationActive || !fix || now - fix.timestamp > 30000 || !waveIndicatorField) {
+        if (!fix || now - fix.timestamp > 30000 || !waveIndicatorField) {
             if (waveIndicatorOverlay) waveIndicatorOverlay.hidden = true;
             return;
         }
-        const sample = routeForecast.filter(item => item.values && Math.abs(item.eta.getTime() - now) <= 90 * 60000 && haversineNm(fix as Waypoint, item as Waypoint) <= 10)
-            .sort((a, b) => haversineNm(fix as Waypoint, a as Waypoint) - haversineNm(fix as Waypoint, b as Waypoint))[0];
+        const sample = nearbyForecast(fix, now);
         const direction = sample ? fieldDirection(waveIndicatorField, sample.values) : null;
         if (direction === null) { if (waveIndicatorOverlay) waveIndicatorOverlay.hidden = true; return; }
         if (!waveIndicatorOverlay) {
@@ -2653,8 +2723,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
 
     function redrawWindRose(): void {
-        const fix = navigationFix;
-        const hasCurrentFix = navigationActive && !!fix && Date.now() - fix.timestamp <= 30000;
+        const fix = visualFix();
+        const hasCurrentFix = !!fix && Date.now() - fix.timestamp <= 30000;
         if (!hasCurrentFix) {
             if (windRoseOverlay) windRoseOverlay.hidden = true;
             if (headingDegreesOverlay) headingDegreesOverlay.hidden = true;
@@ -2731,11 +2801,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         };
         removeLayers(upwindLaylineLayers);
         removeLayers(downwindLaylineLayers);
-        const fix = navigationFix;
+        const fix = visualFix();
         const now = Date.now();
-        if (laylineMode === 'none' || !navigationActive || !fix || now - fix.timestamp > 30000 || !windIndicatorField) return;
-        const sample = routeForecast.filter(item => item.values && Math.abs(item.eta.getTime() - now) <= 90 * 60000 && haversineNm(fix as Waypoint, item as Waypoint) <= 10)
-            .sort((a, b) => haversineNm(fix as Waypoint, a as Waypoint) - haversineNm(fix as Waypoint, b as Waypoint))[0];
+        if (laylineMode === 'none' || !fix || now - fix.timestamp > 30000 || !windIndicatorField) return;
+        const sample = nearbyForecast(fix, now);
         const windFrom = sample ? (windIndicatorField === 'directionAverage'
             ? groupValue('directionAverage', sample.values)
             : fieldDirection(windIndicatorField, sample.values)) : null;
@@ -2761,8 +2830,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
 
     function redrawGpsCourseLine(): void {
-        const fix = navigationFix;
-        if (!navigationActive || !fix || Date.now() - fix.timestamp > 30000 || fix.heading === null || !Number.isFinite(fix.heading)) {
+        const fix = visualFix();
+        if (!fix || Date.now() - fix.timestamp > 30000 || fix.heading === null || !Number.isFinite(fix.heading)) {
             if (gpsCourseOverlay) gpsCourseOverlay.hidden = true;
             return;
         }
@@ -3233,7 +3302,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                     const position = await getGPSlocation({ enableHighAccuracy: true, timeout: 20000, maximumAge: 10000, getMeFallbackGps: false, doNotShowFailureMessage: true });
                     if (navigationActive) return;
                     const lat = Number(position?.lat), lon = Number(position?.lon);
-                    if (position?.source !== 'gps' || !hasValidCoordinates(lat, lon)) throw new Error('Posición inválida');
+                    if (position?.source !== 'device' || !hasValidCoordinates(lat, lon)) throw new Error('Posición inválida');
                     const rect = map.getContainer().getBoundingClientRect();
                     const view = window.visualViewport;
                     const viewport = { left: view?.offsetLeft ?? 0, top: view?.offsetTop ?? 0, right: (view?.offsetLeft ?? 0) + (view?.width ?? window.innerWidth), bottom: (view?.offsetTop ?? 0) + (view?.height ?? window.innerHeight) };
@@ -3262,6 +3331,20 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             if (!navigationFix || Date.now() - navigationFix.timestamp > 30000) { centerBoatInVisibleMap(); return; }
             setFollowBoat(true);
             centerBoatInVisibleMap();
+        });
+        mapTypeControl = document.createElement('div');
+        mapTypeControl.className = 'route-builder-map-type';
+        mapTypeControl.innerHTML = `<button type="button" class="route-builder-gps-label-button route-builder-map-type-button" aria-label="Tipo de mapa" aria-expanded="false" title="Tipo de mapa"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5"/></svg></button><div class="route-builder-map-type-menu" role="group" aria-label="Tipo de mapa" hidden><button type="button" data-map-type="standard">Estándar</button><button type="button" data-map-type="satellite">Satélite</button><button type="button" data-map-type="topographic">Topográfico</button></div>`;
+        const mapTypeButton = mapTypeControl.querySelector<HTMLButtonElement>('.route-builder-map-type-button')!;
+        const mapTypeMenu = mapTypeControl.querySelector<HTMLDivElement>('.route-builder-map-type-menu')!;
+        const syncMapType = () => mapTypeMenu.querySelectorAll<HTMLButtonElement>('[data-map-type]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mapType === getBaseMap())));
+        syncMapType();
+        mapTypeButton.addEventListener('click', event => { event.stopPropagation(); mapTypeMenu.hidden = !mapTypeMenu.hidden; mapTypeButton.setAttribute('aria-expanded', String(!mapTypeMenu.hidden)); });
+        mapTypeMenu.addEventListener('click', event => {
+            event.stopPropagation();
+            const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-map-type]');
+            if (!button?.dataset.mapType) return;
+            setBaseMap(button.dataset.mapType); syncMapType(); mapTypeMenu.hidden = true; mapTypeButton.setAttribute('aria-expanded', 'false');
         });
         const makeZoomButton = (label: string, symbol: string, className: string, delta: number): HTMLButtonElement => {
             const button = document.createElement('button');
@@ -3296,6 +3379,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             if (navigationActive) {
                 if (!leaveLiveRoute(restorePreviousRouteOnNavExit, true)) return;
                 navigationActive = false;
+                passivePositionMarker?.setOpacity(1);
                 setFollowBoat(false);
                 autoLivePending = false;
                 if (liveButton) liveButton.hidden = true;
@@ -3326,13 +3410,14 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 const position = await getGPSlocation({ enableHighAccuracy: true, timeout: 20000, maximumAge: 10000, getMeFallbackGps: false, doNotShowFailureMessage: true });
                 if (requestGeneration !== gpsRequestGeneration) return;
                 const lat = Number(position?.lat), lon = Number(position?.lon);
-                if (position?.source !== 'gps' || !hasValidCoordinates(lat, lon)) {
+                if (position?.source !== 'device' || !hasValidCoordinates(lat, lon)) {
                     updateForecastStatus('No se pudo obtener una posición GPS. Comprueba la ubicación y sus permisos.');
                     return;
                 }
                 navigationFix = { lat, lon, speed: null, heading: null, timestamp: Date.now() };
                 navigationPlanBackupActive = saveTemporaryPlan(localStorage, { points, nextPointId, departureDateTime, speedKnots });
                 navigationActive = true;
+                passivePositionMarker?.setOpacity(0);
                 autoLivePending = true;
                 if (liveButton) liveButton.hidden = false;
                 if (centerButton) centerButton.hidden = false;
@@ -3392,6 +3477,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         forecastDrawer.appendChild(gpsButton);
         forecastDrawer.appendChild(liveButton);
         forecastDrawer.appendChild(centerButton);
+        forecastDrawer.appendChild(mapTypeControl);
         forecastDrawer.appendChild(zoomInButton);
         forecastDrawer.appendChild(zoomOutButton);
         forecastDrawer.addEventListener('toggle', event => {
@@ -4240,6 +4326,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             forecastMessage = 'Agrega al menos dos Waypoints para consultar el pronóstico.';
             renderForecastDrawer();
         }
+        startPassiveLocation();
     });
 
     function applyDistanceFont(): void {
@@ -4326,7 +4413,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const waveIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wave"${waveIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de olas</summary><div class="navigation-visual-group-body"><label>Fuente<select data-wave-indicator-field aria-label="Fuente del indicador de olas"><option value="">Ninguno</option>${waveOptions}</select></label><label>Mostrar grados de las olas<input type="checkbox" data-wave-indicator-degrees${waveIndicatorDegreesEnabled ? ' checked' : ''}></label><label>Distancia al barco (px)<input type="number" min="20" max="200" step="1" value="${waveIndicatorDistance}" data-wave-indicator-setting="distance"></label><label>Tamaño del indicador (px)<input type="number" min="16" max="80" step="1" value="${waveIndicatorSize}" data-wave-indicator-setting="size"></label><label>Tamaño de la letra (px)<input type="number" min="6" max="40" step="1" value="${waveIndicatorTextSize}" data-wave-indicator-setting="text-size"></label></div></details>`;
         const laylinesSettings = `<details class="navigation-visual-group" data-visual-group="laylines"${laylinesSettingsOpen ? ' open' : ''}><summary>Laylines</summary><div class="navigation-visual-group-body"><label>Modo<select data-layline-mode>${laylineModes.map(([value, label]) => `<option value="${value}"${value === laylineMode ? ' selected' : ''}>${label}</option>`).join('')}</select></label><label>Ángulo Upwind (0–90°)<input type="number" min="0" max="90" step="1" value="${upwindLaylineAngle}" data-layline-setting="upwind-angle"></label><label>Ángulo Downwind (90–180°)<input type="number" min="90" max="180" step="1" value="${downwindLaylineAngle}" data-layline-setting="downwind-angle"></label><label>Color babor del viento<input type="color" data-layline-color="port" value="${portWindLaylineColor}" aria-label="Color de las laylines por babor del viento"></label><label>Color estribor del viento<input type="color" data-layline-color="starboard" value="${starboardWindLaylineColor}" aria-label="Color de las laylines por estribor del viento"></label><small>Los ángulos se miden respecto a la dirección de donde viene el viento. Automático compara el viento seleccionado con el rumbo GPS del barco.</small></div></details>`;
         const windRoseSettings = `<details class="navigation-visual-group" data-visual-group="rose"${windRoseSettingsOpen ? ' open' : ''}><summary>Rosa de los vientos</summary><div class="navigation-visual-group-body"><label class="wind-rose-toggle">Mostrar rosa<input type="checkbox" data-wind-rose-enabled${windRoseEnabled ? ' checked' : ''}></label><label>Radio del círculo (px)<input type="number" min="20" max="200" step="1" value="${windRoseRadius}" data-wind-rose-setting="radius"></label><label>Ancho (px)<input type="number" min="1" max="20" step="1" value="${windRoseLineWidth}" data-wind-rose-setting="width" title="Grosor de las líneas de la rosa"></label><label>Tamaño de fuente (px)<input type="number" min="4" max="24" step="1" value="${windRoseFontSize}" data-wind-rose-setting="font-size"></label><label>Transparencia (%)<input type="number" min="0" max="100" step="1" value="${windRoseTransparency}" data-wind-rose-setting="transparency"></label><label>Etiquetas<select data-wind-rose-label-mode><option value="cardinal"${windRoseLabelMode === 'cardinal' ? ' selected' : ''}>Signos cardinales</option><option value="degrees"${windRoseLabelMode === 'degrees' ? ' selected' : ''}>Grados</option></select></label><hr><strong>Indicador de grados del heading</strong><label class="wind-rose-toggle">Mostrar grados<input type="checkbox" data-heading-degrees-enabled${headingDegreesEnabled ? ' checked' : ''}></label><label>Tamaño de letra (px)<input type="number" min="6" max="40" step="1" value="${headingDegreesFontSize}" data-heading-degrees-setting="font-size"></label><label>Ancho (px)<input type="number" min="30" max="200" step="1" value="${headingDegreesWidth}" data-heading-degrees-setting="width"></label><label>Alto (px)<input type="number" min="16" max="100" step="1" value="${headingDegreesHeight}" data-heading-degrees-setting="height"></label></div></details>`;
-        const navigationSettings = `<div class="route-forecast-settings"><strong>En vivo</strong><label>Promedio de velocidad<select data-live-setting="speed">${liveSpeedOptions.map(value => option(value, liveSpeedSeconds)).join('')}</select></label><label>Actualizar pronóstico<select data-live-setting="forecast">${liveForecastOptions.map(value => option(value, liveForecastSeconds)).join('')}</select></label><label>Refrescar waypoints<select data-live-setting="waypoints">${liveWaypointOptions.map(value => option(value, liveWaypointSeconds)).join('')}</select></label><label class="nav-restore-route-setting">Cargar ruta anterior al salir del modo NAV<input type="checkbox" data-nav-restore-previous-route${restorePreviousRouteOnNavExit ? ' checked' : ''}></label><small>Apagado: conserva la ruta que estabas navegando.</small><details class="navigation-visual-aids"${visualAidsOpen ? ' open' : ''}><summary>Ayudas visuales</summary><div class="navigation-visual-aids-list">${windIndicatorSettings}${waveIndicatorSettings}${laylinesSettings}${windRoseSettings}</div></details></div>`;
+        const navigationSettings = `<div class="route-forecast-settings"><strong>Ubicación</strong><label>Fuente de ubicación<select aria-label="Fuente de ubicación"><option selected>Automática (alta precisión)</option><option disabled>Solo GPS (solo en la App de celular)</option></select></label><small>La ubicación es proporcionada por el celular o el navegador.</small><strong>En vivo</strong><label>Promedio de velocidad<select data-live-setting="speed">${liveSpeedOptions.map(value => option(value, liveSpeedSeconds)).join('')}</select></label><label>Actualizar pronóstico<select data-live-setting="forecast">${liveForecastOptions.map(value => option(value, liveForecastSeconds)).join('')}</select></label><label>Refrescar waypoints<select data-live-setting="waypoints">${liveWaypointOptions.map(value => option(value, liveWaypointSeconds)).join('')}</select></label><label class="nav-restore-route-setting">Cargar ruta anterior al salir del modo NAV<input type="checkbox" data-nav-restore-previous-route${restorePreviousRouteOnNavExit ? ' checked' : ''}></label><small>Apagado: conserva la ruta que estabas navegando.</small><details class="navigation-visual-aids"${visualAidsOpen ? ' open' : ''}><summary>Ayudas visuales</summary><div class="navigation-visual-aids-list">${windIndicatorSettings}${waveIndicatorSettings}${laylinesSettings}${windRoseSettings}</div></details></div>`;
         const settingsContent = settingsTab === 'forecast'
             ? renderRouteForecastSettingsControls('route-forecast-settings')
             : settingsTab === 'navigation' ? navigationSettings : '<div class="forecast-settings-map-tab"></div>';
@@ -5012,6 +5099,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         hiddenWindyCrosshair?.classList.remove('route-builder-hide-crosshair');
         crosshairStyle?.remove();
         gpsRequestGeneration++;
+        passiveTrackingDisposed = true;
+        if (passiveWatchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(passiveWatchId);
+        passiveWatchId = null;
+        passivePositionMarker?.removeFrom(map);
         if (liveRefreshTimer !== null) window.clearInterval(liveRefreshTimer);
         if (liveWaypointTimer !== null) window.clearInterval(liveWaypointTimer);
         if (navigationRefreshTimer !== null) window.clearInterval(navigationRefreshTimer);
@@ -5051,6 +5142,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         gpsButton?.remove();
         liveButton?.remove();
         centerButton?.remove();
+        mapTypeControl?.remove();
         zoomInButton?.remove();
         zoomOutButton?.remove();
         windyControlsStyles.forEach(style => style.remove());
@@ -5624,8 +5716,14 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-builder-center-button) { top: -100px; width: 42px; min-width: 42px; padding: 0; display: grid; place-items: center; }
     :global(.route-builder-center-button[hidden]) { display: none; }
     :global(.route-builder-zoom-button) { font-size: 27px; font-weight: 400; }
-    :global(.route-builder-zoom-in) { top: -216px; }
-    :global(.route-builder-zoom-out) { top: -164px; }
+    :global(.route-builder-map-type) { position: absolute; z-index: 2147483646; top: -152px; right: 8px; width: 42px; height: 42px; }
+    :global(.route-builder-map-type-button) { position: static; display: grid; place-items: center; }
+    :global(.route-builder-map-type-menu) { position: absolute; right: 50px; top: 0; width: 138px; padding: 4px; border-radius: 8px; background: #f4f6f6; box-shadow: 0 2px 8px #14252c88; }
+    :global(.route-builder-map-type-menu[hidden]) { display: none; }
+    :global(.route-builder-map-type-menu button) { display: block; width: 100%; padding: 10px; border: 0; border-radius: 5px; background: transparent; color: #27383d; text-align: left; font: 14px Arial,sans-serif; }
+    :global(.route-builder-map-type-menu button[aria-pressed="true"]) { background: #d5ece9; color: #066d63; font-weight: 700; }
+    :global(.route-builder-zoom-in) { top: -256px; }
+    :global(.route-builder-zoom-out) { top: -204px; }
     :global(.route-builder-gps-position-icon span) { display: block; box-sizing: border-box; width: 22px; height: 22px; border: 3px solid #fff; border-radius: 50%; background: #087bd1; box-shadow: 0 1px 8px #102b3b99; }
     :global(.route-wind-indicator) { position: absolute; z-index: 650; width: var(--wind-indicator-size, 26px); height: var(--wind-indicator-height, 30px); transform: translate(-50%, -50%); pointer-events: none; }
     :global(.route-wind-rose) { position: absolute; z-index: 640; transform: translate(-50%, -50%); pointer-events: none; }
