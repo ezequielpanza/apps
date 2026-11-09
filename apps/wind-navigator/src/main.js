@@ -31,7 +31,7 @@ else {
     }
     const userAgent = navigator.userAgent;
     if (/android/i.test(userAgent)) {
-      installInstructions.textContent = 'Toca ⋮ (arriba a la derecha) y elige “Instalar app” o “Añadir a pantalla principal”.';
+      installInstructions.textContent = 'En Chrome, toca ⋮ (arriba a la derecha), elige “Instalar app” o “Añadir a pantalla principal” y confirma. El icono se crea al confirmar la instalación.';
     } else if (/iphone|ipad|ipod/i.test(userAgent)) {
       installInstructions.textContent = 'Toca Compartir y elige “Añadir a pantalla de inicio”.';
     } else {
@@ -43,7 +43,6 @@ else {
 
 window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
-  hideInstallButton();
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.error);
