@@ -606,6 +606,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let centerLayoutObserver: ResizeObserver | null = null;
     let centerLayoutFrame: number | null = null;
     let centerRequestVersion = 0;
+    let routeFitRequestVersion = 0;
     let gpsPositionMarker: L.Marker | null = null;
     let gpsCourseOverlay: HTMLDivElement | null = null;
     let gpsCourseLine: HTMLDivElement | null = null;
@@ -1010,6 +1011,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             recenterDepartureTimeline = true;
             try { localStorage.setItem('route-builder-speed-knots', String(speedKnots)); } catch { /* Keep the live speed for this session. */ }
             recalculate(true);
+            fitLoadedRoute(points);
             restartLiveTimers();
             return;
         }
@@ -1026,6 +1028,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             try { localStorage.setItem('route-builder-speed-knots', String(speedKnots)); } catch { /* Current session still uses the restored speed. */ }
         }
         recalculate(true);
+        fitLoadedRoute(points);
     }
 
     function leaveLiveRoute(restorePreviousRoute = false, clearNavigationBackup = true): boolean {
@@ -2928,6 +2931,72 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             if (requestVersion !== centerRequestVersion || !followBoat || !latestFix || Date.now() - latestFix.timestamp > 30000) return;
             const actual = map.latLngToContainerPoint([latestFix.lat, latestFix.lon]);
             map.panBy(L.point(actual.x - target.x, actual.y - target.y), { animate: false });
+        });
+    }
+
+    function fitLoadedRoute(routePoints: Waypoint[]): void {
+        if (!routePoints.length) return;
+        const requestVersion = ++routeFitRequestVersion;
+        const routeCoordinates = routePoints.map(point => [point.lat, point.lon] as [number, number]);
+        window.requestAnimationFrame(() => {
+            if (requestVersion !== routeFitRequestVersion) return;
+            map.invalidateSize?.({ pan: false });
+            const mapRect = map.getContainer().getBoundingClientRect();
+            const view = window.visualViewport;
+            const viewport = {
+                left: view?.offsetLeft ?? 0,
+                top: view?.offsetTop ?? 0,
+                right: (view?.offsetLeft ?? 0) + (view?.width ?? window.innerWidth),
+                bottom: (view?.offsetTop ?? 0) + (view?.height ?? window.innerHeight),
+            };
+            const size = map.getSize();
+            let left = Math.max(mapRect.left, viewport.left);
+            let right = Math.min(mapRect.right, viewport.right);
+            let top = Math.max(mapRect.top, viewport.top);
+            let bottom = Math.min(mapRect.bottom, viewport.bottom);
+            const nav = navigationPanel && !navigationPanel.hidden ? navigationPanel.getBoundingClientRect() : null;
+            let drawer = forecastDrawer && !forecastDrawer.hidden && forecastDrawer.classList.contains('is-open')
+                ? forecastDrawer.getBoundingClientRect() : null;
+            const callout = forecastDrawer?.querySelector<HTMLElement>('.departure-timebar-callout');
+            if (drawer && callout && callout.getClientRects().length) {
+                drawer = { ...drawer, top: Math.min(drawer.top, callout.getBoundingClientRect().top) };
+            }
+            if (nav && nav.right > left && nav.left < right && nav.bottom > top && nav.top < bottom) top = Math.min(bottom, nav.bottom);
+            if (drawer && drawer.right > left && drawer.left < right && drawer.bottom > top && drawer.top < bottom) bottom = Math.max(top, drawer.top);
+            const sidePanel = document.querySelector<HTMLElement>('.plugin-rhpane');
+            const sidePanelBounds = sidePanel?.getBoundingClientRect();
+            if (sidePanel && getComputedStyle(sidePanel).display !== 'none' && (sidePanelBounds?.width || 0) > 0 && sidePanelBounds!.left > left && sidePanelBounds!.left < right) {
+                right = sidePanelBounds!.left;
+            }
+            if (right <= left || bottom <= top) return;
+
+            const margin = 24;
+            const fitPadding = (before: number, after: number, extent: number): [number, number] => {
+                const first = Math.max(margin, before + margin);
+                const second = Math.max(margin, after + margin);
+                const maxTotal = Math.max(0, extent - 80);
+                if (first + second <= maxTotal) return [first, second];
+                const scale = maxTotal / (first + second || 1);
+                return [first * scale, second * scale];
+            };
+            const [padLeft, padRight] = fitPadding(left - mapRect.left, mapRect.right - right, size.x);
+            const [padTop, padBottom] = fitPadding(top - mapRect.top, mapRect.bottom - bottom, size.y);
+            const bounds = L.latLngBounds(routeCoordinates);
+            const southWest = bounds.getSouthWest();
+            const northEast = bounds.getNorthEast();
+            const isPointRoute = routeCoordinates.length === 1
+                || (Math.abs(northEast.lat - southWest.lat) < 0.0001 && Math.abs(northEast.lng - southWest.lng) < 0.0001);
+            if (isPointRoute) {
+                const center = routeCoordinates[0];
+                map.setView(center, Math.min(13, Math.max(9, map.getZoom())), { animate: false });
+                return;
+            }
+            map.fitBounds(bounds, {
+                paddingTopLeft: L.point(padLeft, padTop),
+                paddingBottomRight: L.point(padRight, padBottom),
+                maxZoom: 13,
+                animate: false,
+            });
         });
     }
 
@@ -5148,6 +5217,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
 
     onDestroy(() => {
+        routeFitRequestVersion++;
         hiddenWindyCrosshair?.classList.remove('route-builder-hide-crosshair');
         crosshairStyle?.remove();
         gpsRequestGeneration++;

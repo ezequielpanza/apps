@@ -1,6 +1,6 @@
 const config = {
     name: 'windy-plugin-navigator',
-    version: '0.0.10',
+    version: '0.0.11',
     title: 'Wind Navigator',
     icon: '🧭',
     description: 'Añade y gestiona waypoints en el mapa.',
