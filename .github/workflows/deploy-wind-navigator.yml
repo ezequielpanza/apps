@@ -1,0 +1,41 @@
+name: Deploy Wind Navigator
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/wind-navigator/**'
+      - '.github/workflows/deploy-wind-navigator.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy-wind-navigator
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create new Cloudflare Pages project
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@latest pages project list --json > /tmp/wind-navigator-projects.json
+          node -e 'const p=require("/tmp/wind-navigator-projects.json"); if (!Array.isArray(p)) throw Error("Formato de lista inesperado"); if (p.some(x=>x.name==="wind-navigator")) throw Error("El proyecto ya existe; revisar antes de publicar");'
+          npx --yes wrangler@latest pages project create wind-navigator --production-branch=main
+      - name: Prepare public assets
+        shell: bash
+        run: |
+          mkdir -p /tmp/wind-navigator-deploy/src /tmp/wind-navigator-deploy/dist
+          cp apps/wind-navigator/index.html apps/wind-navigator/manifest.webmanifest apps/wind-navigator/sw.js /tmp/wind-navigator-deploy/
+          cp apps/wind-navigator/src/style.css /tmp/wind-navigator-deploy/src/
+          cp apps/wind-navigator/dist/app.js /tmp/wind-navigator-deploy/dist/
+          cp -r apps/wind-navigator/icons /tmp/wind-navigator-deploy/
+      - name: Publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@latest pages deploy /tmp/wind-navigator-deploy --project-name=wind-navigator --branch=main
