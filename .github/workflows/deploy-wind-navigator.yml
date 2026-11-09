@@ -16,18 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create new Cloudflare Pages project
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes wrangler@latest pages project list --json > /tmp/wind-navigator-projects.json
-          wind_navigator_exists=$(node -e 'const p=require("/tmp/wind-navigator-projects.json"); if (!Array.isArray(p)) throw Error("Formato de lista inesperado"); process.stdout.write(p.some(x=>x.name==="wind-navigator") ? "yes" : "no");')
-          if [ "$wind_navigator_exists" = "no" ]; then
-            npx --yes wrangler@latest pages project create wind-navigator --production-branch=main
-          fi
       - name: Prepare public assets
         shell: bash
         run: |
