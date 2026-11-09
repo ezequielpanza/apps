@@ -40,7 +40,7 @@
         <service
             android:name=".BoatStationCoreService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="connectedDevice" />
         <service
             android:name=".BatteryDiagnosticsService"
             android:exported="false"
