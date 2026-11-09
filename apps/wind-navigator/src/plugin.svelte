@@ -5281,9 +5281,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.forecast-settings-tabs) { position: sticky; top: 50px; z-index: 4; display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #d3dcdd; background: #f4f6f6; }
     :global(.forecast-settings-tabs button) { flex: 1 1 0; min-width: 0; min-height: 38px; padding: 4px 3px; border: 1px solid #9aa7a9; border-radius: 4px; background: #e7eded; color: #465255; font: 600 10px Arial,sans-serif; }
     :global(.forecast-settings-tabs button[aria-pressed="true"]) { background: #087f95; border-color: #087f95; color: #fff; }
-    :global(.forecast-settings-dialog .route-forecast-settings) { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 12px; border: 0; background: transparent; }
-    :global(.forecast-settings-dialog .route-forecast-settings label) { display: grid; grid-template-columns: minmax(120px,1fr) minmax(110px,1fr); align-items: center; gap: 10px; color: #465255; font-size: 11px; }
-    :global(.forecast-settings-dialog .route-forecast-settings select) { min-height: 34px; padding: 5px 7px; font-size: 11px; }
+    :global(.forecast-settings-dialog .route-forecast-settings) { display: grid; grid-template-columns: minmax(0,1fr); width: 100%; min-width: 0; box-sizing: border-box; gap: 10px; padding: 12px; border: 0; background: transparent; }
+    :global(.forecast-settings-dialog .route-forecast-settings label) { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); width: 100%; min-width: 0; box-sizing: border-box; align-items: center; gap: 10px; color: #465255; font-size: 11px; }
+    :global(.forecast-settings-dialog .route-forecast-settings select) { width: 100%; min-width: 0; box-sizing: border-box; min-height: 34px; padding: 5px 7px; font-size: 11px; }
     :global(.forecast-settings-dialog .nav-restore-route-setting) { grid-template-columns: minmax(0,1fr) auto !important; }
     :global(.forecast-settings-dialog .nav-restore-route-setting input[type="checkbox"]) { width: 18px; height: 18px; margin: 0; accent-color: #087f95; }
     :global(.forecast-settings-dialog .route-forecast-settings > small) { color: #788587; font-size: 10px; }
