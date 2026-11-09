@@ -198,7 +198,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         iconSky: 'Cielo ICON · 13 km',
         aromeSky: 'Cielo AROME Antillas · 2.5 km',
         skyAverage: 'Cielo · estado predominante',
-        gfsDew: 'Punto de rocío GFS · 22 km',
+        gfsDew: 'Punto de rocío GFS · global',
         ecmwfDew: 'Punto de rocío ECMWF · 9 km',
         mblueDew: 'Punto de rocío mBlue AI · global',
         iconDew: 'Punto de rocío ICON · 13 km',
@@ -220,7 +220,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         mblueGust: 'Rachas mBlue AI · global',
         iconGust: 'Rachas ICON · 13 km',
         aromeGust: 'Rachas AROME Antillas · 2.5 km',
-        feels: 'Sens. térmica GFS · 22 km',
+        feels: 'Sens. térmica GFS · global',
         temperatureAverage: 'Temperatura promedio · modelos agregados',
         feelsAverage: 'Sens. térmica promedio · modelos agregados',
         rainAverage: 'Lluvia promedio · modelos agregados',
@@ -231,16 +231,22 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         swell1PeriodAverage: 'Período oleaje 1 promedio · modelos agregados',
         wavesPeriodAverage: 'Período promedio · modelos agregados',
         wavesPowerAverage: 'Potencia promedio · modelos agregados',
-        clouds: 'Cielo GFS 22 km', temperature: 'Temperatura GFS 22 km', rain: 'Lluvia GFS 22 km', windAverage: 'Viento promedio · modelos agregados', wind: 'Viento GFS 22 km',
+        clouds: 'Cielo GFS global', temperature: 'Temperatura GFS global', rain: 'Lluvia GFS global', windAverage: 'Viento promedio · modelos agregados', wind: 'Viento GFS global',
         ecmwfWind: 'Viento ECMWF 9 km', mblueWind: 'Viento mBlue AI global', iconWind: 'Viento ICON 13 km', aromeWind: 'Viento AROME Antillas 2.5 km',
         ecmwfWindDirection: 'Dirección viento ECMWF 9 km', mblueWindDirection: 'Dirección viento mBlue AI global', iconWindDirection: 'Dirección viento ICON 13 km', aromeWindDirection: 'Dirección viento AROME Antillas 2.5 km',
-        gust: 'Rachas GFS 22 km', direction: 'Dirección viento GFS 22 km', waves: 'Olas GFS Waves 22 km', swell1: 'Oleaje 1 GFS Waves 22 km',
-        swell2: 'Oleaje 2 GFS Waves 22 km', swell1Period: 'Período oleaje 1 GFS Waves 22 km', swell2Period: 'Período oleaje 2 GFS Waves 22 km', windWaves: 'Mar de viento GFS Waves 22 km', windWavesPeriod: 'Período mar de viento GFS Waves 22 km', current: 'Corriente CMEMS 8 km', currentTide: 'Corriente de marea CMEMS 8 km',
-        wavesPeriod: 'Periodo GFS Waves 22 km', wavesPower: 'Potencia GFS Waves 22 km',
-        ecmwfWaves: 'Olas ECMWF Waves 9 km', ecmwfSwell1: 'Oleaje 1 ECMWF Waves 9 km', ecmwfSwell1Period: 'Período oleaje 1 ECMWF Waves 9 km', ecmwfWavesPeriod: 'Período ECMWF Waves 9 km', ecmwfWavesPower: 'Potencia ECMWF Waves 9 km', arrival: 'Hora de paso',
+        gust: 'Rachas GFS global', direction: 'Dirección viento GFS global', waves: 'Olas GFS Waves 0.25°', swell1: 'Oleaje 1 GFS Waves 0.25°',
+        swell2: 'Oleaje 2 GFS Waves 0.25°', swell1Period: 'Período oleaje 1 GFS Waves 0.25°', swell2Period: 'Período oleaje 2 GFS Waves 0.25°', windWaves: 'Mar de viento GFS Waves 0.25°', windWavesPeriod: 'Período mar de viento GFS Waves 0.25°', current: 'Corriente CMEMS 8 km', currentTide: 'Corriente de marea CMEMS 8 km',
+        wavesPeriod: 'Periodo GFS Waves 0.25°', wavesPower: 'Potencia GFS Waves 0.25°',
+        ecmwfWaves: 'Olas ECMWF WAM', ecmwfSwell1: 'Oleaje 1 ECMWF WAM', ecmwfSwell1Period: 'Período oleaje 1 ECMWF WAM', ecmwfWavesPeriod: 'Período ECMWF WAM', ecmwfWavesPower: 'Potencia ECMWF WAM', arrival: 'Hora de paso',
     };
     const windowFieldKeys: WindowConditionKey[] = ['skyAverage', 'ecmwfSky', 'mblueSky', 'iconSky', 'aromeSky', 'gfsDew', 'ecmwfDew', 'mblueDew', 'iconDew', 'aromeDew', 'dewAverage', 'ecmwfTemperature', 'mblueTemperature', 'iconTemperature', 'aromeTemperature', 'ecmwfFeels', 'mblueFeels', 'iconFeels', 'aromeFeels', 'ecmwfRain', 'mblueRain', 'iconRain', 'aromeRain', 'ecmwfGust', 'mblueGust', 'iconGust', 'aromeGust', 'feels', 'temperatureAverage', 'feelsAverage', 'rainAverage', 'gustAverage', 'dewAverage', 'directionAverage', 'wavesAverage', 'swell1Average', 'swell1PeriodAverage', 'wavesPeriodAverage', 'wavesPowerAverage', 'arrival', 'clouds', 'temperature', 'rain', 'windAverage', 'wind', 'ecmwfWind', 'mblueWind', 'iconWind', 'aromeWind', 'ecmwfWindDirection', 'mblueWindDirection', 'iconWindDirection', 'aromeWindDirection', 'gust', 'direction', 'waves', 'swell1', 'swell1Period', 'swell2', 'swell2Period', 'windWaves', 'windWavesPeriod', 'current', 'currentTide', 'wavesPeriod', 'wavesPower', 'ecmwfWaves', 'ecmwfSwell1', 'ecmwfSwell1Period', 'ecmwfWavesPeriod', 'ecmwfWavesPower'];
-    const windModelFieldKeys: WindowConditionKey[] = ['wind', 'ecmwfWind', 'mblueWind', 'iconWind', 'aromeWind'];
+    // Campos sin proveedor validado se excluyen de selectores y condiciones.
+    const unsupportedFields = new Set(['skyAverage', 'clouds', 'ecmwfSky', 'mblueSky', 'iconSky', 'aromeSky', 'current', 'currentTide', 'ecmwfSwell1', 'ecmwfSwell1Period', 'wavesPower', 'ecmwfWavesPower', 'wavesPowerAverage']);
+    for (let i = windowFieldKeys.length - 1; i >= 0; i--) {
+        const field = windowFieldKeys[i];
+        if (field.startsWith('mblue') || field.startsWith('arome') || unsupportedFields.has(field)) windowFieldKeys.splice(i, 1);
+    }
+    const windModelFieldKeys: WindowConditionKey[] = ['wind', 'ecmwfWind', 'iconWind'];
     const additionalGroups: Partial<Record<WindowConditionKey, { fields: WindowConditionKey[]; label: string; unit: string; decimals: number; circular: boolean }>> = {
         skyAverage: { fields: ['clouds', 'ecmwfSky', 'mblueSky', 'iconSky', 'aromeSky'], label: 'Cielo', unit: '', decimals: 0, circular: false },
         dewAverage: { fields: ['gfsDew', 'ecmwfDew', 'mblueDew', 'iconDew', 'aromeDew'], label: 'Punto de rocío', unit: ' °C', decimals: 1, circular: false },
@@ -467,6 +473,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
     let routeFieldOrder: WindowConditionKey[] = [...windowFieldKeys];
     for (const key of Object.keys(additionalGroups) as WindowConditionKey[]) {
+        if (!windowFieldKeys.includes(key)) continue;
         routeFieldOrder = routeFieldOrder.filter(field => field !== key);
         const index = routeFieldOrder.findIndex(field => additionalGroups[key]!.fields.includes(field));
         routeFieldOrder.splice(Math.max(0, index), 0, key);
@@ -1520,10 +1527,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 : ['iconWind', 'iconWindDirection'].includes(key) ? ['ICON · 13 km', 'is-icon']
                 : ['aromeWind', 'aromeWindDirection'].includes(key) ? ['AROME · 2.5 km', 'is-arome']
                 : ['current', 'currentTide'].includes(key) ? ['CMEMS · 8 km', 'is-cmems']
-                : ['ecmwfWaves', 'ecmwfSwell1', 'ecmwfSwell1Period', 'ecmwfWavesPeriod', 'ecmwfWavesPower'].includes(key) ? ['ECMWF Waves · 9 km', 'is-ecmwf-waves']
-                : ['waves', 'swell1', 'swell1Period', 'swell2', 'swell2Period', 'windWaves', 'windWavesPeriod', 'wavesPeriod', 'wavesPower'].includes(key) ? ['GFS Waves · 22 km', 'is-gfs-waves']
-                : ['wind', 'gust', 'direction'].includes(key) ? ['GFS · 22 km', 'is-gfs']
-                : ['GFS · 22 km', 'is-gfs'];
+                : ['ecmwfWaves', 'ecmwfSwell1', 'ecmwfSwell1Period', 'ecmwfWavesPeriod', 'ecmwfWavesPower'].includes(key) ? ['ECMWF WAM', 'is-ecmwf-waves']
+                : ['waves', 'swell1', 'swell1Period', 'swell2', 'swell2Period', 'windWaves', 'windWavesPeriod', 'wavesPeriod', 'wavesPower'].includes(key) ? ['GFS Waves · 0.25°', 'is-gfs-waves']
+                : ['wind', 'gust', 'direction'].includes(key) ? ['GFS · global', 'is-gfs']
+                : ['GFS · global', 'is-gfs'];
             const modelBadge = modelInfo ? `<span class="forecast-model-badge ${modelInfo[1]}">${modelInfo[0]}</span>` : '';
             const windToggle = group ? `<button type="button" class="forecast-wind-group-toggle" data-group-toggle="${key}" aria-expanded="${collapsedGroups[key as WindowConditionKey] === false}" aria-label="${collapsedGroups[key as WindowConditionKey] === false ? 'Plegar' : 'Desplegar'} modelos">${collapsedGroups[key as WindowConditionKey] === false ? '▾' : '▸'}</button>` : key === 'windAverage' ? `<button type="button" class="forecast-wind-group-toggle" data-wind-models-toggle aria-expanded="${!windModelRowsCollapsed}" aria-label="${windModelRowsCollapsed ? 'Desplegar' : 'Plegar'} pronósticos de viento por modelo" title="${windModelRowsCollapsed ? 'Desplegar modelos' : 'Plegar modelos'}">${windModelRowsCollapsed ? '▸' : '▾'}</button>` : '';
             const removeButton = group ? `<button type="button" class="forecast-field-remove" data-route-field-remove="${key}" aria-label="Eliminar grupo ${label} y sus modelos" title="Eliminar todos los modelos del grupo">×</button>` : key === 'windAverage'
@@ -3005,6 +3012,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             }
             try { collapsedGroups = JSON.parse(localStorage.getItem('route-builder-model-groups-collapsed') || '{}'); } catch { collapsedGroups = {}; }
             for (const groupKey of Object.keys(additionalGroups) as WindowConditionKey[]) {
+                if (!windowFieldKeys.includes(groupKey)) continue;
                 if (!savedRouteFieldOrder?.includes(groupKey)) {
                     routeFieldOrder = routeFieldOrder.filter(field => field !== groupKey);
                     const index = routeFieldOrder.findIndex(field => additionalGroups[groupKey]!.fields.includes(field));
@@ -5023,7 +5031,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
 <div class="plugin__mobile-header">{pluginTitle}</div>
 <section class="plugin__content route-builder">
     <div class="plugin__title plugin__title--chevron-back">{pluginTitle}</div>
-    <div class="panel-kicker"><span class="status-dot"></span><span>PLANIFICADOR DE RUTA</span><span class="beta">BETA</span></div>
+    <div class="panel-kicker"><span class="status-dot"></span><span>PLANIFICADOR DE RUTA</span></div>
     <div class="forecast-launcher">
         <button class="forecast-button" on:click={calculateRouteForecast} disabled={forecastBusy || points.length < 2}>{forecastBusy ? 'Calculando…' : 'Pronóstico de la ruta'}</button>
     </div>

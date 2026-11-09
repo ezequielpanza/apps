@@ -7,7 +7,7 @@ test('model data preserve units, missing values and time', async () => {
     time:['2026-11-09T12:00'],temperature_2m:[20],apparent_temperature:[null],precipitation:[2.54],
     wind_speed_10m:[10],wind_direction_10m:[90],wind_gusts_10m:[12],cloud_cover:[50],dew_point_2m:[10]}})}; };
   const result=await getPointForecastData('gfs',{lat:18,lon:-67,days:2});
-  assert.equal(requested.searchParams.get('models'),'gfs_seamless');
+  assert.equal(requested.searchParams.get('models'),'gfs_global');
   assert.equal(requested.searchParams.get('wind_speed_unit'),'ms');
   assert.equal(result.data.data.temperature[0],293.15);
   assert.equal(result.data.data.feelTemperature[0],null);

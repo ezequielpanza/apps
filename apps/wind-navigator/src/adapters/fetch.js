@@ -1,5 +1,5 @@
 // Never substitute a different model under the original model's label.
-const models = {gfs:'gfs_seamless', ecmwf:'ecmwf_ifs', icon:'icon_global'};
+const models = {gfs:'gfs_global', ecmwf:'ecmwf_ifs', icon:'icon_global'};
 const waveModels = {gfsWaves:'ncep_gfswave025',ecmwfWaves:'ecmwf_wam'};
 const times = a => a.map(v=>Date.parse(v.endsWith('Z')?v:v+'Z'));
 async function waveForecast(model, options) {
