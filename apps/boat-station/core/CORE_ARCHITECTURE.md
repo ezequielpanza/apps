@@ -13,6 +13,7 @@ Boat Station has one application UI: `apps/boat-station/web/index.html` and the 
 ## Core responsibilities
 
 - Android permissions and hardware access.
+- The persistent foreground service owns server snapshot publishing and client polling for the APK; the PWA supplies and applies snapshot data.
 - GPS, phone status, motion/orientation and compass sensors.
 - BLE/BMS access and persistent native battery configuration.
 - Data-folder storage, backup ZIP and GPX import/export.
@@ -25,7 +26,8 @@ Boat Station has one application UI: `apps/boat-station/web/index.html` and the 
 - All application UI, cards, menus, layouts, graphs and interaction logic.
 - Local station and remote browser presentation.
 - Module state and presentation logic.
-- Station pairing and remote snapshot synchronization.
+- Station pairing, snapshot composition and application of remote state.
+- Browser clients use web requests; the APK delegates its background transport to the native service.
 - PWA service-worker caching and web lifecycle.
 
 ## Runtime
@@ -39,6 +41,7 @@ The Android asset `index.html` is only a neutral startup bootstrap inherited fro
 ## Native bridge contract
 
 - `CoreBridge`: stable Core capabilities such as mode/version, sensors, TTS/alarm and reload.
+- `CoreRuntimeBridge`: server/client sync configuration, snapshot handoff and cached remote state for the native service.
 - `NativeBridge`: BLE/BMS and lower-level hardware configuration inherited from the native layer.
 - `StorageBridge`: data-folder, backup and persistent storage operations.
 - `NativeToolsBridge`: native QR and GPX file operations.

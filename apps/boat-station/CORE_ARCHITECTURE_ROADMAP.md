@@ -175,12 +175,12 @@ La APK nunca debe emitir eventos como `battery-soc` o `humsienk-data`: eso ya es
 
 ### Fase 2 — Background Service
 
-- [ ] Crear `BoatStationCoreService` como foreground service.
-- [ ] Hacer que el service sea dueño de transports persistentes.
-- [ ] Desacoplar BLE/GPS de la Activity/WebView.
-- [ ] Mantener conexiones aunque la Activity se pause/recree.
-- [ ] Implementar wake lock únicamente cuando sea necesario.
-- [ ] Validar pantalla apagada y retorno a foreground.
+- [x] Mantener `BoatStationCoreService` como foreground service persistente.
+- [x] Hacer que el service sea dueño del transporte HTTP de publicación del servidor y sondeo del cliente, con reintentos al recuperar la red.
+- [ ] Desacoplar BLE/GPS/sensores de la Activity y la WebView para que las lecturas sigan actualizándose sin interfaz.
+- [x] Mantener la conexión backend aunque la Activity se pause o se recree.
+- [ ] Ajustar el wake lock para usarlo solo mientras haya transportes activos.
+- [ ] Validar sensores y conexión con pantalla apagada en S24 y A50.
 
 ### Fase 3 — CoreLocation
 
