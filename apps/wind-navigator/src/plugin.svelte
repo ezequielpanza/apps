@@ -5333,7 +5333,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(body.route-builder-forecast-open #mobile-ovr-select),
     :global(body.route-builder-forecast-open #embed-zoom) { display: none !important; }
     :global(body.route-builder-fullscreen .rhpane), :global(body.route-builder-fullscreen .plugin-rhpane) { display: none !important; }
-    :global(body.route-builder-fullscreen > section:first-of-type) { transform: none !important; width: 100vw !important; }
+    :global(body.route-builder-fullscreen > section:first-of-type:not(.route-navigation-dashboard)) { transform: none !important; width: 100vw !important; }
     :global(body.route-builder-fullscreen .route-builder-forecast-drawer-host) { left: 0 !important; right: 0 !important; }
     :global(.route-builder-reopen-button) { position: fixed; left: 16px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 2147483647; padding: 8px 12px; border: 1px solid #1689a6; border-radius: 5px; background: #07566a; color: #fff; font: 12px Arial,sans-serif; cursor: pointer; box-shadow: 0 2px 8px #0005; }
     :global(.route-builder-reopen-button[hidden]) { display: none !important; }
