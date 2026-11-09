@@ -1,0 +1,1 @@
+export const pickerDot = null;
