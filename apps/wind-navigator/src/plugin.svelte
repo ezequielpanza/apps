@@ -747,6 +747,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         onBundleLoaded: (index: number, result: ForecastBundleResult) => void,
     ): Promise<void> {
         let next = 0;
+        let completed = 0;
+        const yieldToBrowser = () => new Promise<void>(resolve => window.setTimeout(resolve, 0));
         const worker = async () => {
             while (next < samples.length && job === forecastJob) {
                 const index = next++;
@@ -759,6 +761,11 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                     if (job !== forecastJob) return;
                     onBundleLoaded(index, { error: error instanceof Error ? error.message : 'No se pudo consultar el pronóstico de Windy.' });
                 }
+                completed++;
+                // Cached responses can all resolve in the same microtask burst. Yield
+                // periodically so map gestures and paints get time on the main thread.
+                if (completed % 4 === 0) await yieldToBrowser();
+                if (job !== forecastJob) return;
             }
         };
         await Promise.all(Array.from({ length: Math.min(4, samples.length) }, worker));
@@ -4683,8 +4690,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                         if (ecmwfError || ecmwfSeaError || currentsError || mblueError || iconError || aromeError) sample.diagnostic = [ecmwfError && `ECMWF: ${ecmwfError}`, ecmwfSeaError && `ECMWF Waves: ${ecmwfSeaError}`, currentsError && `CMEMS: ${currentsError}`, mblueError && `mBlue AI: ${mblueError}`, iconError && `ICON: ${iconError}`, aromeError && `AROME Antillas: ${aromeError}`].filter(Boolean).join(' · ');
                     }
                 }
-                routeForecast = [...samples];
-                if (!showWeatherSettingsMenu) renderForecastDrawer();
+                // Keep forecast results in the current sample objects and paint once
+                // after the batch. Rebuilding the full forecast table for every point
+                // starves Leaflet's pan and zoom handlers on mobile devices.
             });
             if (job !== forecastJob) return;
             const unavailable = samples.filter(sample => sample.error).length;
@@ -4807,13 +4815,19 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         if (job !== forecastJob) return;
         const durationHours = points.slice(1).reduce((total, point, index) => total + haversineNm(points[index], point) / Math.max(0.1, speedKnots), 0);
         const conditions = windowConstraints;
-        departureEvaluations = departures.map(departure => {
+        const nextEvaluations: DepartureEvaluation[] = [];
+        let lastYieldAt = performance.now();
+        let lastProgressUpdateAt = lastYieldAt;
+        const yieldToBrowser = () => new Promise<void>(resolve => window.setTimeout(resolve, 0));
+        for (let departureIndex = 0; departureIndex < departures.length; departureIndex++) {
+            const departure = departures[departureIndex];
             const routeValues: { [key: string]: any; temperature: number | null; rain: number | null; wind: number | null; ecmwfWind: number | null; mblueWind: number | null; iconWind: number | null; aromeWind: number | null; gust: number | null; direction: number | null; ecmwfWindDirection: number | null; mblueWindDirection: number | null; iconWindDirection: number | null; aromeWindDirection: number | null; waves: number | null; swell1: number | null; swell1Period: number | null; swell2: number | null; swell2Period: number | null; windWaves: number | null; windWavesPeriod: number | null; current: number | null; currentTide: number | null; wavesPeriod: number | null; wavesPower: number | null; ecmwfWaves: number | null; ecmwfSwell1: number | null; ecmwfSwell1Period: number | null; ecmwfWavesPeriod: number | null; ecmwfWavesPower: number | null; clouds: number | null; skyState: string | null; icon?: number; hours: number }[] = [];
             let available = true;
-            baseSamples.forEach((sample, index) => {
+            for (let index = 0; index < baseSamples.length; index++) {
+                const sample = baseSamples[index];
                 const bundle = dataBySample[index];
                 const data = bundle?.data;
-                if (!data) { available = false; return; }
+                if (!data) { available = false; continue; }
                 const target = departure.getTime() + sample.distanceNm / Math.max(0.1, speedKnots) * 3600000;
                 const rowIndex = coveredForecastIndex(data.ts, target);
                 const numeric = (source: any, key: string, at = rowIndex) => Number.isFinite(source?.[key]?.[at]) ? Number(source[key][at]) : null;
@@ -4870,7 +4884,19 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                     ecmwfWavesPower: ecmwfSeaIndex >= 0 ? numeric(bundle.ecmwfSeaData, 'wavesPower', ecmwfSeaIndex) : null,
                     clouds: numeric(data, 'clouds'), skyState: forecastSkyState(data, rowIndex), icon: data.icon?.[rowIndex], hours,
                 });
-            });
+                // A single departure can include many route samples. Yield inside
+                // that loop too, so long routes never monopolize the map's UI thread.
+                if ((index + 1) % 8 === 0 && performance.now() - lastYieldAt >= 8) {
+                    const now = performance.now();
+                    if (now - lastProgressUpdateAt >= 250) {
+                        updateForecastStatus(`Evaluando salida ${departureIndex + 1}/${departures.length}; tramo ${index + 1}/${baseSamples.length}…`);
+                        lastProgressUpdateAt = now;
+                    }
+                    await yieldToBrowser();
+                    if (job !== forecastJob) return;
+                    lastYieldAt = performance.now();
+                }
+            }
             const average = (key: 'temperature') => {
                 const values = routeValues.map(value => value[key]).filter((value): value is number => value !== null);
                 return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
@@ -4979,8 +5005,19 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 result.qualityMargin = quality?.margin ?? null;
                 result.qualityAverage = quality?.average ?? null;
             }
-            return result;
-        });
+            nextEvaluations.push(result);
+            const now = performance.now();
+            if (now - lastYieldAt >= 8) {
+                if (now - lastProgressUpdateAt >= 250) {
+                    updateForecastStatus(`Evaluando salidas: ${departureIndex + 1}/${departures.length} horarios calculados…`);
+                    lastProgressUpdateAt = now;
+                }
+                await yieldToBrowser();
+                if (job !== forecastJob) return;
+                lastYieldAt = performance.now();
+            }
+        }
+        departureEvaluations = nextEvaluations;
         rankPassingDepartures(departureEvaluations);
         departureAnalysisBusy = false;
         departureEligibilityDirty = false;
