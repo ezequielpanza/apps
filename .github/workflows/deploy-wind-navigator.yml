@@ -24,8 +24,10 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes wrangler@latest pages project list --json > /tmp/wind-navigator-projects.json
-          node -e 'const p=require("/tmp/wind-navigator-projects.json"); if (!Array.isArray(p)) throw Error("Formato de lista inesperado"); if (p.some(x=>x.name==="wind-navigator")) throw Error("El proyecto ya existe; revisar antes de publicar");'
-          npx --yes wrangler@latest pages project create wind-navigator --production-branch=main
+          wind_navigator_exists=$(node -e 'const p=require("/tmp/wind-navigator-projects.json"); if (!Array.isArray(p)) throw Error("Formato de lista inesperado"); process.stdout.write(p.some(x=>x.name==="wind-navigator") ? "yes" : "no");')
+          if [ "$wind_navigator_exists" = "no" ]; then
+            npx --yes wrangler@latest pages project create wind-navigator --production-branch=main
+          fi
       - name: Prepare public assets
         shell: bash
         run: |
