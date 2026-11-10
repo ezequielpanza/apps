@@ -8,6 +8,7 @@
     import { pickerDot } from './adapters/picker.js';
 import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes, routeProgress, averageRouteSpeed, visibleMapCenter, destinationAtBearing } from './navigation.js';
     import { earliestDeparture, coveredForecastIndex, restoredDeparture } from './departure-timeline.js';
+    import { interpolateForecastDirection } from './forecast-time.js';
     import { saveTemporaryPlan, loadTemporaryPlan, clearTemporaryPlan, currentRouteSpeed, prepareLiveRefresh, liveAverageSpeed, buildLiveRoutePoints, buildLiveRouteSnapshot } from './live-route.js';
     import config from './pluginConfig.js';
 
@@ -2599,10 +2600,12 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             if (passiveTrackingDisposed) return;
             const t = Date.now();
             const val = (d: any, key: string) => { const index = d ? coveredForecastIndex(d.ts, t) : -1; return index >= 0 ? forecastNumber(d, key, index) : null; };
+            const direction = (d: any, key: string) => forecastDirectionValue(d, key, t, d ? coveredForecastIndex(d.ts, t) : -1);
             localForecast = { lat, lon, distanceNm: 0, eta: new Date(t), values: {
-                direction: val(b.data, 'windDir'), ecmwfWindDirection: val(b.ecmwfData, 'windDir'), iconWindDirection: val(b.iconData, 'windDir'),
-                wavesDir: val(b.seaData, 'wavesDir'), ecmwfWavesDir: val(b.ecmwfSeaData, 'wavesDir'), swell1Dir: val(b.seaData, 'swell1Dir'),
-                ecmwfSwell1Dir: val(b.ecmwfSeaData, 'swell1Dir'), swell2Dir: val(b.seaData, 'swell2Dir'), windWavesDir: val(b.seaData, 'windWavesDir')
+                direction: direction(b.data, 'windDir'), ecmwfWindDirection: direction(b.ecmwfData, 'windDir'), iconWindDirection: direction(b.iconData, 'windDir'),
+                wavesDir: direction(b.seaData, 'wavesDir'), ecmwfWavesDir: direction(b.ecmwfSeaData, 'wavesDir'), swell1Dir: direction(b.seaData, 'swell1Dir'),
+                ecmwfSwell1Dir: direction(b.ecmwfSeaData, 'swell1Dir'), swell2Dir: direction(b.seaData, 'swell2Dir'),
+                windWavesDir: forecastDirectionFirstValue(b.seaData, ['windWavesDir', 'wwavesDir', 'wwaves_direction', 'wwaves_direction-surface', 'windwavesDir'], t, b.seaData ? coveredForecastIndex(b.seaData.ts, t) : -1)
             }};
             redrawWindIndicator(); redrawWaveIndicator(); redrawLaylines();
         } catch { localForecast = null; }
@@ -4560,6 +4563,24 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         return Number.isFinite(value) ? value : null;
     }
 
+    function forecastDirectionValue(source: any, key: string, target: number, fallbackIndex: number): number | null {
+        if (!source) return null;
+        const interpolated = interpolateForecastDirection(source.ts, source[key], target);
+        return interpolated !== null ? interpolated : forecastNumber(source, key, fallbackIndex);
+    }
+
+    function forecastDirectionFirstValue(source: any, keys: string[], target: number, fallbackIndex: number): number | null {
+        if (!source) return null;
+        for (const key of keys) {
+            if (!Array.isArray(source[key])) continue;
+            const interpolated = interpolateForecastDirection(source.ts, source[key], target);
+            if (interpolated !== null) return interpolated;
+            const fallback = forecastNumber(source, key, fallbackIndex);
+            if (fallback !== null) return fallback;
+        }
+        return null;
+    }
+
     function forecastFirstNumber(source: any, keys: string[], index: number): number | null {
         for (const key of keys) {
             const value = forecastNumber(source, key, index);
@@ -4756,22 +4777,22 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                             mblueWind: modelWindKnots(mblueData, mblueIndex),
                             iconWind: modelWindKnots(iconData, iconIndex),
                             aromeWind: modelWindKnots(aromeData, aromeIndex),
-                            ecmwfWindDirection: ecmwfIndex >= 0 ? forecastNumber(ecmwfData, 'windDir', ecmwfIndex) : null,
-                            mblueWindDirection: mblueIndex >= 0 ? forecastNumber(mblueData, 'windDir', mblueIndex) : null,
-                            iconWindDirection: iconIndex >= 0 ? forecastNumber(iconData, 'windDir', iconIndex) : null,
-                            aromeWindDirection: aromeIndex >= 0 ? forecastNumber(aromeData, 'windDir', aromeIndex) : null,
+                            ecmwfWindDirection: forecastDirectionValue(ecmwfData, 'windDir', sample.eta.getTime(), ecmwfIndex),
+                            mblueWindDirection: forecastDirectionValue(mblueData, 'windDir', sample.eta.getTime(), mblueIndex),
+                            iconWindDirection: forecastDirectionValue(iconData, 'windDir', sample.eta.getTime(), iconIndex),
+                            aromeWindDirection: forecastDirectionValue(aromeData, 'windDir', sample.eta.getTime(), aromeIndex),
                             gust: numeric('windGust') === null ? null : (numeric('windGust') as number) * 1.94384,
-                            direction: numeric('windDir'),
+                            direction: forecastDirectionValue(data, 'windDir', sample.eta.getTime(), rowIndex),
                             waves: seaIndex >= 0 ? seaNumeric('waves') : null,
-                            wavesDir: seaIndex >= 0 ? seaNumeric('wavesDir') : null,
+                            wavesDir: forecastDirectionValue(seaData, 'wavesDir', sample.eta.getTime(), seaIndex),
                             swell1: seaIndex >= 0 ? seaNumeric('swell1') : null,
-                            swell1Dir: seaIndex >= 0 ? seaNumeric('swell1Dir') : null,
+                            swell1Dir: forecastDirectionValue(seaData, 'swell1Dir', sample.eta.getTime(), seaIndex),
                             swell1Period: seaIndex >= 0 ? seaNumeric('swell1Period') : null,
                             swell2: seaIndex >= 0 ? seaNumeric('swell2') : null,
-                            swell2Dir: seaIndex >= 0 ? seaNumeric('swell2Dir') : null,
+                            swell2Dir: forecastDirectionValue(seaData, 'swell2Dir', sample.eta.getTime(), seaIndex),
                             swell2Period: seaIndex >= 0 ? seaNumeric('swell2Period') : null,
                             windWaves: seaIndex >= 0 ? forecastFirstNumber(seaData, ['windWaves', 'windWavesHeight', 'wwaves', 'wwaves_height', 'wwaves_height-surface', 'windwaves'], seaIndex) : null,
-                            windWavesDir: seaIndex >= 0 ? forecastFirstNumber(seaData, ['windWavesDir', 'wwavesDir', 'wwaves_direction', 'wwaves_direction-surface', 'windwavesDir'], seaIndex) : null,
+                            windWavesDir: forecastDirectionFirstValue(seaData, ['windWavesDir', 'wwavesDir', 'wwaves_direction', 'wwaves_direction-surface', 'windwavesDir'], sample.eta.getTime(), seaIndex),
                             windWavesPeriod: seaIndex >= 0 ? forecastFirstNumber(seaData, ['windWavesPeriod', 'wwavesPeriod', 'wwaves_period', 'wwaves_period-surface', 'windwavesPeriod'], seaIndex) : null,
                             current: current.speedKnots,
                             currentDir: current.direction,
@@ -4780,9 +4801,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                             wavesPeriod: seaIndex >= 0 ? seaNumeric('wavesPeriod') : null,
                             wavesPower: seaIndex >= 0 ? seaNumeric('wavesPower') : null,
                             ecmwfWaves: ecmwfSeaIndex >= 0 ? ecmwfSeaNumeric('waves') : null,
-                            ecmwfWavesDir: ecmwfSeaIndex >= 0 ? ecmwfSeaNumeric('wavesDir') : null,
+                            ecmwfWavesDir: forecastDirectionValue(ecmwfSeaData, 'wavesDir', sample.eta.getTime(), ecmwfSeaIndex),
                             ecmwfSwell1: ecmwfSeaIndex >= 0 ? ecmwfSeaNumeric('swell1') : null,
-                            ecmwfSwell1Dir: ecmwfSeaIndex >= 0 ? ecmwfSeaNumeric('swell1Dir') : null,
+                            ecmwfSwell1Dir: forecastDirectionValue(ecmwfSeaData, 'swell1Dir', sample.eta.getTime(), ecmwfSeaIndex),
                             ecmwfSwell1Period: ecmwfSeaIndex >= 0 ? ecmwfSeaNumeric('swell1Period') : null,
                             ecmwfWavesPeriod: ecmwfSeaIndex >= 0 ? ecmwfSeaNumeric('wavesPeriod') : null,
                             ecmwfWavesPower: ecmwfSeaIndex >= 0 ? ecmwfSeaNumeric('wavesPower') : null,
@@ -4938,6 +4959,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 const target = departure.getTime() + sample.distanceNm / Math.max(0.1, speedKnots) * 3600000;
                 const rowIndex = coveredForecastIndex(data.ts, target);
                 const numeric = (source: any, key: string, at = rowIndex) => Number.isFinite(source?.[key]?.[at]) ? Number(source[key][at]) : null;
+                const direction = (source: any, key: string, at: number) => forecastDirectionValue(source, key, target, at);
                 const ecmwfIndex = bundle.ecmwfData ? coveredForecastIndex(bundle.ecmwfData.ts, target) : -1;
                 const mblueIndex = bundle.mblueData ? coveredForecastIndex(bundle.mblueData.ts, target) : -1;
                 const iconIndex = bundle.iconData ? coveredForecastIndex(bundle.iconData.ts, target) : -1;
@@ -4962,18 +4984,18 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                     iconWind: iconIndex < 0 || numeric(bundle.iconData, 'wind', iconIndex) === null ? null : (numeric(bundle.iconData, 'wind', iconIndex) as number) * 1.94384,
                     aromeWind: aromeIndex < 0 || numeric(bundle.aromeData, 'wind', aromeIndex) === null ? null : (numeric(bundle.aromeData, 'wind', aromeIndex) as number) * 1.94384,
                     gust: numeric(data, 'windGust') === null ? null : (numeric(data, 'windGust') as number) * 1.94384,
-                    direction: numeric(data, 'windDir'), waves,
-                    wavesDir: seaIndex >= 0 ? numeric(bundle.seaData, 'wavesDir', seaIndex) : null,
-                    swell1Dir: seaIndex >= 0 ? numeric(bundle.seaData, 'swell1Dir', seaIndex) : null,
-                    swell2Dir: seaIndex >= 0 ? numeric(bundle.seaData, 'swell2Dir', seaIndex) : null,
-                    windWavesDir: seaIndex >= 0 ? forecastFirstNumber(bundle.seaData, ['windWavesDir', 'wwavesDir', 'wwaves_direction', 'wwaves_direction-surface', 'windwavesDir'], seaIndex) : null,
+                    direction: direction(data, 'windDir', rowIndex), waves,
+                    wavesDir: direction(bundle.seaData, 'wavesDir', seaIndex),
+                    swell1Dir: direction(bundle.seaData, 'swell1Dir', seaIndex),
+                    swell2Dir: direction(bundle.seaData, 'swell2Dir', seaIndex),
+                    windWavesDir: forecastDirectionFirstValue(bundle.seaData, ['windWavesDir', 'wwavesDir', 'wwaves_direction', 'wwaves_direction-surface', 'windwavesDir'], target, seaIndex),
                     currentDir: current.direction, currentTideDir: currentTide.direction,
-                    ecmwfWavesDir: ecmwfSeaIndex >= 0 ? numeric(bundle.ecmwfSeaData, 'wavesDir', ecmwfSeaIndex) : null,
-                    ecmwfSwell1Dir: ecmwfSeaIndex >= 0 ? numeric(bundle.ecmwfSeaData, 'swell1Dir', ecmwfSeaIndex) : null,
-                    ecmwfWindDirection: ecmwfIndex < 0 ? null : numeric(bundle.ecmwfData, 'windDir', ecmwfIndex),
-                    mblueWindDirection: mblueIndex < 0 ? null : numeric(bundle.mblueData, 'windDir', mblueIndex),
-                    iconWindDirection: iconIndex < 0 ? null : numeric(bundle.iconData, 'windDir', iconIndex),
-                    aromeWindDirection: aromeIndex < 0 ? null : numeric(bundle.aromeData, 'windDir', aromeIndex),
+                    ecmwfWavesDir: direction(bundle.ecmwfSeaData, 'wavesDir', ecmwfSeaIndex),
+                    ecmwfSwell1Dir: direction(bundle.ecmwfSeaData, 'swell1Dir', ecmwfSeaIndex),
+                    ecmwfWindDirection: direction(bundle.ecmwfData, 'windDir', ecmwfIndex),
+                    mblueWindDirection: direction(bundle.mblueData, 'windDir', mblueIndex),
+                    iconWindDirection: direction(bundle.iconData, 'windDir', iconIndex),
+                    aromeWindDirection: direction(bundle.aromeData, 'windDir', aromeIndex),
                     swell1: seaIndex >= 0 ? numeric(bundle.seaData, 'swell1', seaIndex) : null,
                     swell1Period: seaIndex >= 0 ? numeric(bundle.seaData, 'swell1Period', seaIndex) : null,
                     swell2: seaIndex >= 0 ? numeric(bundle.seaData, 'swell2', seaIndex) : null,
