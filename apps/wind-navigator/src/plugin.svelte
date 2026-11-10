@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
+    import { directionalIndicatorLayout, directionalIndicatorMarkup } from './directional-indicator.js';
     import { map, getMapType, setMapType } from './adapters/map.js';
     import windyStore from './adapters/store.js';
     import { getPointForecastData } from './adapters/fetch.js';
@@ -2711,10 +2712,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         }
         if (!overlay) {
             overlay = document.createElement('div');
-            overlay.className = isWave ? 'route-wind-indicator route-wave-indicator' : 'route-wind-indicator';
+            overlay.className = 'route-wind-indicator';
             const fill = isWave ? '#f4d03f' : '#087bd1';
             const label = isWave ? 'W' : 'T';
-            overlay.innerHTML = `<b class="route-wind-degrees"></b><svg viewBox="0 0 26 30" aria-hidden="true"><path d="M2 2 L24 2 L13 28 Z" fill="${fill}" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg><span>${label}</span>`;
+            overlay.innerHTML = directionalIndicatorMarkup(fill, label);
             map.getContainer().appendChild(overlay);
             if (isWave) waveIndicatorOverlay = overlay;
             else windIndicatorOverlay = overlay;
@@ -2726,13 +2727,13 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const textSize = windIndicatorTextSize;
         const origin = map.latLngToContainerPoint([fix.lat, fix.lon]);
         const bearing = map.maplibreMap?.getBearing?.() ?? 0;
-        const screenDirection = (direction - bearing) * Math.PI / 180;
-        const rotation = `rotate(${direction - bearing}deg)`;
-        overlay.style.left = `${origin.x + distance * Math.sin(screenDirection)}px`;
-        overlay.style.top = `${origin.y - distance * Math.cos(screenDirection)}px`;
-        overlay.style.setProperty('--wind-indicator-size', `${size}px`);
-        overlay.style.setProperty('--wind-indicator-height', `${size * 30 / 26}px`);
-        overlay.style.setProperty('--wind-indicator-padding', `${size * 5 / 26}px`);
+        const layout = directionalIndicatorLayout(origin, direction, bearing, distance, size);
+        const rotation = `rotate(${layout.rotation}deg)`;
+        overlay.style.left = `${layout.x}px`;
+        overlay.style.top = `${layout.y}px`;
+        overlay.style.setProperty('--wind-indicator-size', `${layout.width}px`);
+        overlay.style.setProperty('--wind-indicator-height', `${layout.height}px`);
+        overlay.style.setProperty('--wind-indicator-padding', `${layout.padding}px`);
         overlay.style.setProperty('--wind-indicator-text-size', `${textSize}px`);
         const triangle = overlay.querySelector<SVGElement>('svg');
         if (triangle) triangle.style.transform = rotation;
@@ -2742,9 +2743,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         if (degreesLabel) {
             degreesLabel.textContent = String(Math.round(direction) % 360).padStart(3, '0');
             degreesLabel.hidden = !windIndicatorDegreesEnabled;
-            const labelOffset = size * 0.5 + 10;
-            degreesLabel.style.left = `calc(50% + ${labelOffset * Math.sin(screenDirection)}px)`;
-            degreesLabel.style.top = `calc(50% - ${labelOffset * Math.cos(screenDirection)}px)`;
+            const labelRadians = layout.rotation * Math.PI / 180;
+            degreesLabel.style.left = `calc(50% + ${layout.degreesOffset * Math.sin(labelRadians)}px)`;
+            degreesLabel.style.top = `calc(50% - ${layout.degreesOffset * Math.cos(labelRadians)}px)`;
             degreesLabel.style.transform = `translate(-50%, -50%) ${rotation}`;
         }
         overlay.title = isWave ? `Olas desde ${Math.round(direction)}°` : `Viento previsto desde ${Math.round(direction)}°`;
