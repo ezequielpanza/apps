@@ -1,13 +1,13 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
-    import { map, getBaseMap, setBaseMap } from './adapters/map.js';
+    import { map, getMapType, setMapType } from './adapters/map.js';
     import windyStore from './adapters/store.js';
     import { getPointForecastData } from './adapters/fetch.js';
     import colors from './adapters/colors.js';
     import { getGPSlocation } from './adapters/geolocation.js';
     import { pickerDot } from './adapters/picker.js';
 import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes, routeProgress, averageRouteSpeed, visibleMapCenter, destinationAtBearing } from './navigation.js';
-    import { earliestDeparture, coveredForecastIndex, restoredDeparture } from './departure-timeline.js';
+    import { earliestDeparture, coveredForecastIndex, restoredDeparture, nearestHourlyDeparture } from './departure-timeline.js';
     import { interpolateForecastDirection } from './forecast-time.js';
     import { saveTemporaryPlan, loadTemporaryPlan, clearTemporaryPlan, currentRouteSpeed, prepareLiveRefresh, liveAverageSpeed, buildLiveRoutePoints, buildLiveRouteSnapshot } from './live-route.js';
     import config from './pluginConfig.js';
@@ -28,6 +28,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let routeSampleIntervalHours = 3;
     let weatherSearchDays = 15;
     let departureIntervalHours = 6;
+    let showSpeedSettings = false;
     let forecastDrawerMaxHeightPercent = 50;
     let forecastColumnResize: { table: HTMLTableElement; index: number; startX: number; startWidth: number } | null = null;
     type RouteForecastSample = { lat: number; lon: number; distanceNm: number; eta: Date; values?: Record<string, number | null>; icon?: number; error?: string; seaError?: string; diagnostic?: string; forecastCachedAt?: number };
@@ -664,6 +665,14 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     }
 
+    function resetCleanRouteDeparture(): void {
+        const rounded = nearestHourlyDeparture(new Date());
+        if (!rounded) return;
+        departureDateTime = toLocalDateTimeInput(rounded);
+        restoredDepartureTimestamp = null;
+        recenterDepartureTimeline = true;
+    }
+
     function hasValidCoordinates(lat: unknown, lon: unknown): boolean {
         return typeof lat === 'number' && Number.isFinite(lat) && lat >= -90 && lat <= 90
             && typeof lon === 'number' && Number.isFinite(lon) && lon >= -180 && lon <= 180;
@@ -918,8 +927,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 nextPointId: Math.max(maxId + 1, Number.isSafeInteger(storedNextId) && storedNextId > 0 ? storedNextId : 1),
                 departureDateTime: typeof snapshot.departureDateTime === 'string'
                     && Number.isFinite(new Date(snapshot.departureDateTime).getTime()) ? snapshot.departureDateTime : undefined,
-                speedKnots: Number.isFinite(Number(snapshot.speedKnots)) && Number(snapshot.speedKnots) > 0
-                    ? Number(snapshot.speedKnots) : undefined,
+                speedKnots: snapshot.speedKnots !== null && Number.isFinite(Number(snapshot.speedKnots)) && Number(snapshot.speedKnots) >= 0
+                    ? Math.min(20, Number(snapshot.speedKnots)) : undefined,
             };
         } catch { return null; }
     }
@@ -936,7 +945,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 restoredDepartureTimestamp = new Date(snapshot.departureDateTime).getTime();
                 recenterDepartureTimeline = true;
             }
-            if (snapshot.speedKnots) speedKnots = snapshot.speedKnots;
+            if (points.length === 0) resetCleanRouteDeparture();
+            if (snapshot.speedKnots !== undefined) speedKnots = Math.max(0, Math.min(20, snapshot.speedKnots));
             return true;
         } catch { return false; }
     }
@@ -1024,8 +1034,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         departureDateTime = toLocalDateTimeInput(new Date(departure));
         restoredDepartureTimestamp = departure;
         recenterDepartureTimeline = true;
-        if (snapshot.speedKnots) {
-            speedKnots = snapshot.speedKnots;
+        if (snapshot.speedKnots !== undefined) {
+            speedKnots = Math.max(0, Math.min(20, snapshot.speedKnots));
             try { localStorage.setItem('route-builder-speed-knots', String(speedKnots)); } catch { /* Current session still uses the restored speed. */ }
         }
         recalculate(true);
@@ -1037,7 +1047,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         let restorePreviousWarning = false;
         if (restorePreviousRoute) {
             snapshot = navigationPlanBackupActive ? loadTemporaryPlan(localStorage, parseRouteSnapshot) : null;
-            if (!snapshot || !snapshot.departureDateTime || !snapshot.speedKnots) {
+            if (!snapshot || !snapshot.departureDateTime || snapshot.speedKnots === undefined) {
                 snapshot = null;
                 restorePreviousRoute = false;
                 restorePreviousWarning = true;
@@ -1441,7 +1451,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const minDeparture = earliestDeparture(new Date(), restoredDepartureTimestamp);
         const maxDeparture = Math.max(departureSlots[departureSlots.length - 1] ?? minDeparture + 24 * 3600000, minDeparture, restoredDepartureTimestamp ?? minDeparture);
         const actualDeparture = new Date(departureDateTime).getTime();
-        const selectedDeparture = restoredDepartureTimestamp !== null && actualDeparture === restoredDepartureTimestamp ? restoredDepartureTimestamp : snapDepartureTimestamp(Number.isFinite(actualDeparture) ? actualDeparture : minDeparture, minDeparture, maxDeparture);
+        const cleanRouteDeparture = points.length === 0 ? nearestHourlyDeparture(Number.isFinite(actualDeparture) ? actualDeparture : new Date())?.getTime() : null;
+        const selectedDeparture = cleanRouteDeparture !== null && cleanRouteDeparture !== undefined
+            ? Math.max(minDeparture, Math.min(maxDeparture, cleanRouteDeparture))
+            : restoredDepartureTimestamp !== null && actualDeparture === restoredDepartureTimestamp ? restoredDepartureTimestamp : snapDepartureTimestamp(Number.isFinite(actualDeparture) ? actualDeparture : minDeparture, minDeparture, maxDeparture);
         const alignedDepartureValue = toLocalDateTimeInput(new Date(selectedDeparture));
         if (departureDateTime !== alignedDepartureValue) {
             departureDateTime = alignedDepartureValue;
@@ -1699,7 +1712,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             const colorStyle = item.qualityColor ? `--departure-quality-color:${item.qualityColor};` : '';
             return `<span class="route-analysis-slot ${status}${qualityClass}${optimalClass}" style="left:${left}px;${colorStyle}transform:translateX(-50%)" title="Salida ${formatTimelineDateTime(item.departure)}: ${label}"></span>`;
         }).join('');
-        const speedControl = `<label class="forecast-bottom-action forecast-bottom-speed"><span>Velocidad</span><span class="forecast-departure-speed-input"><input type="number" min="0.1" step="0.1" value="${Number(speedKnots).toFixed(1)}" data-route-speed aria-label="Velocidad del vehículo en nudos"><small>kt</small></span></label>`;
+        const speedLabel = Number(speedKnots).toFixed(1);
+        const speedControl = `<button type="button" class="forecast-bottom-action forecast-bottom-speed" data-route-speed-open aria-haspopup="dialog" aria-expanded="${showSpeedSettings}" aria-label="Velocidad ${speedLabel} nudos. Toca para modificar"><span>Velocidad</span><span class="forecast-speed-reading"><strong data-route-speed-label>${speedLabel}</strong><small>kt</small></span></button>`;
+        const speedDialog = `<div class="speed-settings-backdrop" data-route-speed-backdrop${showSpeedSettings ? '' : ' hidden'}><section class="speed-settings-dialog" role="dialog" aria-modal="true" aria-label="Velocidad de navegación"><header><strong>Velocidad de navegación</strong><button type="button" data-route-speed-dismiss aria-label="Cerrar velocidad">×</button></header><div class="speed-settings-reading"><output data-route-speed-value>${speedLabel}</output><small>kt</small></div><label class="speed-settings-label" for="route-speed-slider">Velocidad estimada</label><input id="route-speed-slider" type="range" min="0" max="20" step="0.1" value="${speedLabel}" data-route-speed-slider aria-label="Velocidad estimada en nudos"><div class="speed-settings-endpoints"><span>0 kt</span><span>20 kt</span></div><button type="button" class="speed-settings-done" data-route-speed-dismiss>Listo</button></section></div>`;
         const waypointDistances = [0];
         for (let index = 1; index < points.length; index++) waypointDistances.push(waypointDistances[index - 1] + haversineNm(points[index - 1], points[index]));
         const waypointTrackLength = waypointDistances[waypointDistances.length - 1] || 0;
@@ -1717,7 +1732,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const routeColumnCount = routeForecast.length + 4;
         const routeColgroup = `<colgroup>${Array.from({ length: routeColumnCount }, (_, index) => `<col data-forecast-col="${index}">`).join('')}</colgroup>`;
         const routeTable = `${routeDepartureFooter}<div class="forecast-table-scroll"><table class="forecast-table">${routeColgroup}<thead>${routeWaypointRow}</thead><tbody>${visibleRouteRows}</tbody></table></div>`;
-        forecastDrawer.innerHTML = `<div class="forecast-drawer"><header class="forecast-drawer-header"><span class="forecast-drawer-header-actions"><button type="button" class="forecast-drawer-close" aria-label="Cerrar pronóstico">×</button></span></header>${renderWindowConditionDialog()}${routeTable}<footer class="forecast-drawer-bottom-bar"><div class="forecast-bottom-add-field">${routeFieldAddControl}</div><button type="button" class="forecast-bottom-action" data-route-clear aria-label="Limpiar ruta">Limpiar ruta</button>${renderWeatherSettingsMenu()}${speedControl}<div class="forecast-saved-routes">${routeSnapshotActions.map((action, slot) => `<button type="button" class="forecast-bottom-action${action === 'load' ? ' route-snapshot-saved' : ''}" data-route-save-load="${slot}" aria-label="${action === 'save' ? 'Guardar' : 'Cargar'} ruta ${slot + 1}" title="${action === 'save' ? 'Toca para guardar' : 'Toca para cargar; mantén apretado para reemplazar o borrar'}">${action === 'save' ? 'Guardar' : 'Cargar'} ${slot + 1}</button>`).join('')}</div></footer></div>`;
+        forecastDrawer.innerHTML = `<div class="forecast-drawer"><header class="forecast-drawer-header"><span class="forecast-drawer-header-actions"><button type="button" class="forecast-drawer-close" aria-label="Cerrar pronóstico">×</button></span></header>${renderWindowConditionDialog()}${speedDialog}${routeTable}<footer class="forecast-drawer-bottom-bar"><div class="forecast-bottom-add-field">${routeFieldAddControl}</div><button type="button" class="forecast-bottom-action" data-route-clear aria-label="Limpiar ruta">Limpiar ruta</button>${renderWeatherSettingsMenu()}${speedControl}<div class="forecast-saved-routes">${routeSnapshotActions.map((action, slot) => `<button type="button" class="forecast-bottom-action${action === 'load' ? ' route-snapshot-saved' : ''}" data-route-save-load="${slot}" aria-label="${action === 'save' ? 'Guardar' : 'Cargar'} ruta ${slot + 1}" title="${action === 'save' ? 'Toca para guardar' : 'Toca para cargar; mantén apretado para reemplazar o borrar'}">${action === 'save' ? 'Guardar' : 'Cargar'} ${slot + 1}</button>`).join('')}</div></footer></div>`;
         if (gpsButton) forecastDrawer.appendChild(gpsButton);
         if (liveButton) forecastDrawer.appendChild(liveButton);
         if (centerButton) forecastDrawer.appendChild(centerButton);
@@ -3029,6 +3044,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const index = points.findIndex(point => String(point.id) === key);
         if (index < 0) return;
         points = points.filter(point => String(point.id) !== key);
+        if (points.length === 0) resetCleanRouteDeparture();
         // Removing a waypoint only invalidates samples whose route position or
         // passage time changed. Keep the prior samples available for matching.
         recalculate(true, true);
@@ -3036,6 +3052,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
 
     function clearRoute(): void {
         points = [];
+        resetCleanRouteDeparture();
         navigationTargetId = null;
         waypointArrivalConfirmations = 0;
         updateNavigationPanel();
@@ -3293,7 +3310,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 waypointSize = savedWaypointSize;
             }
             const savedSpeed = Number(localStorage.getItem('route-builder-speed-knots'));
-            if (Number.isFinite(savedSpeed) && savedSpeed > 0) speedKnots = savedSpeed;
+            if (Number.isFinite(savedSpeed) && savedSpeed >= 0) speedKnots = Math.max(0, Math.min(20, savedSpeed));
             const savedSampleIntervalHours = Number(localStorage.getItem('route-builder-sample-interval-hours'));
             const storedLiveSpeed = Number(localStorage.getItem('route-builder-live-speed-seconds'));
             const storedLiveForecast = Number(localStorage.getItem('route-builder-live-forecast-seconds'));
@@ -3428,17 +3445,17 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         });
         mapTypeControl = document.createElement('div');
         mapTypeControl.className = 'route-builder-map-type';
-        mapTypeControl.innerHTML = `<button type="button" class="route-builder-gps-label-button route-builder-map-type-button" aria-label="Tipo de mapa" aria-expanded="false" title="Tipo de mapa"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5"/></svg></button><div class="route-builder-map-type-menu" role="group" aria-label="Tipo de mapa" hidden><button type="button" data-map-type="standard">Estándar</button><button type="button" data-map-type="satellite">Satélite</button><button type="button" data-map-type="topographic">Topográfico</button></div>`;
+        mapTypeControl.innerHTML = `<button type="button" class="route-builder-gps-label-button route-builder-map-type-button" aria-label="Tipo de mapa" aria-expanded="false" title="Tipo de mapa"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5"/></svg></button><div class="route-builder-map-type-menu" role="group" aria-label="Tipo de mapa" hidden><button type="button" data-map-type="standard">Estándar</button><button type="button" data-map-type="satellite">Satélite</button><button type="button" data-map-type="topographic">Topográfico</button><button type="button" data-map-type="nautical">Náutico (con marcas)</button></div>`;
         const mapTypeButton = mapTypeControl.querySelector<HTMLButtonElement>('.route-builder-map-type-button')!;
         const mapTypeMenu = mapTypeControl.querySelector<HTMLDivElement>('.route-builder-map-type-menu')!;
-        const syncMapType = () => mapTypeMenu.querySelectorAll<HTMLButtonElement>('[data-map-type]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mapType === getBaseMap())));
+        const syncMapType = () => mapTypeMenu.querySelectorAll<HTMLButtonElement>('[data-map-type]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mapType === getMapType())));
         syncMapType();
         mapTypeButton.addEventListener('click', event => { event.stopPropagation(); mapTypeMenu.hidden = !mapTypeMenu.hidden; mapTypeButton.setAttribute('aria-expanded', String(!mapTypeMenu.hidden)); });
         mapTypeMenu.addEventListener('click', event => {
             event.stopPropagation();
             const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-map-type]');
             if (!button?.dataset.mapType) return;
-            setBaseMap(button.dataset.mapType); syncMapType(); mapTypeMenu.hidden = true; mapTypeButton.setAttribute('aria-expanded', 'false');
+            setMapType(button.dataset.mapType); syncMapType(); mapTypeMenu.hidden = true; mapTypeButton.setAttribute('aria-expanded', 'false');
         });
         const makeZoomButton = (label: string, symbol: string, className: string, delta: number): HTMLButtonElement => {
             const button = document.createElement('button');
@@ -3930,6 +3947,18 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         });
         forecastDrawer.addEventListener('click', event => {
             const target = event.target as HTMLElement;
+            if (target.closest('[data-route-speed-open]')) {
+                showSpeedSettings = true;
+                renderForecastDrawer();
+                requestAnimationFrame(() => forecastDrawer?.querySelector<HTMLInputElement>('[data-route-speed-slider]')?.focus());
+                return;
+            }
+            if (target.matches('[data-route-speed-backdrop]') || target.closest('[data-route-speed-dismiss]')) {
+                showSpeedSettings = false;
+                renderForecastDrawer();
+                requestAnimationFrame(() => forecastDrawer?.querySelector<HTMLButtonElement>('[data-route-speed-open]')?.focus());
+                return;
+            }
             const groupToggle = target.closest<HTMLButtonElement>('[data-group-toggle]');
             if (groupToggle) {
                 const key = groupToggle.dataset.groupToggle as WindowConditionKey;
@@ -4137,8 +4166,28 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 return;
             }
         });
+        forecastDrawer.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || !showSpeedSettings) return;
+            event.preventDefault();
+            showSpeedSettings = false;
+            renderForecastDrawer();
+        });
         forecastDrawer.addEventListener('input', event => {
             const target = event.target as HTMLElement;
+            const speedSlider = target.closest<HTMLInputElement>('[data-route-speed-slider]');
+            if (speedSlider) {
+                const value = Number(speedSlider.value);
+                if (!Number.isFinite(value)) return;
+                speedKnots = Math.max(0, Math.min(20, Math.round(value * 10) / 10));
+                const formatted = speedKnots.toFixed(1);
+                const output = forecastDrawer?.querySelector<HTMLOutputElement>('[data-route-speed-value]');
+                const label = forecastDrawer?.querySelector<HTMLElement>('[data-route-speed-label]');
+                const button = forecastDrawer?.querySelector<HTMLButtonElement>('[data-route-speed-open]');
+                if (output) output.value = formatted;
+                if (label) label.textContent = formatted;
+                button?.setAttribute('aria-label', `Velocidad ${formatted} nudos. Toca para modificar`);
+                return;
+            }
             const drawerHeightInput = target.closest<HTMLInputElement>('[data-forecast-drawer-height]');
             if (drawerHeightInput) {
                 forecastDrawerMaxHeightPercent = Number(drawerHeightInput.value);
@@ -4156,6 +4205,11 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         });
         forecastDrawer.addEventListener('change', event => {
             const target = event.target as HTMLElement;
+            const speedSlider = target.closest<HTMLInputElement>('[data-route-speed-slider]');
+            if (speedSlider) {
+                applyRouteSettings();
+                return;
+            }
             const windIndicatorSelect = target.closest<HTMLSelectElement>('[data-wind-indicator-field]');
             if (windIndicatorSelect) {
                 const field = windIndicatorSelect.value as WindowConditionKey | '';
@@ -4304,12 +4358,6 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 try { localStorage.setItem('route-builder-drawer-max-height-percent', String(forecastDrawerMaxHeightPercent)); } catch { /* Keep the current session setting. */ }
                 applyForecastDrawerHeightLimit();
                 scheduleCenterForLayoutChange();
-                return;
-            }
-            const speedInput = target.closest<HTMLInputElement>('[data-route-speed]');
-            if (speedInput) {
-                speedKnots = Number(speedInput.value);
-                applyRouteSettings();
                 return;
             }
             const liveSetting = target.closest<HTMLSelectElement>('[data-live-setting]');
@@ -5226,7 +5274,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
 
     function applyRouteSettings(): void {
         const parsedSpeed = Number(speedKnots);
-        speedKnots = Number.isFinite(parsedSpeed) && parsedSpeed > 0 ? parsedSpeed : 10;
+        speedKnots = Number.isFinite(parsedSpeed) ? Math.max(0, Math.min(20, parsedSpeed)) : 10;
         try {
             localStorage.setItem('route-builder-speed-knots', String(speedKnots));
         } catch { /* Keep the current settings for this session. */ }
@@ -5545,6 +5593,18 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.forecast-settings-backdrop) { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; box-sizing: border-box; padding: 12px; background: #16212688; }
     :global(.forecast-settings-backdrop[hidden]) { display: none !important; }
     :global(.forecast-settings-dialog) { width: min(420px, calc(100vw - 24px)); max-height: min(80vh, calc(100dvh - 24px)); overflow: auto; box-sizing: border-box; border: 1px solid #b6c1c2; border-radius: 9px; background: #f4f6f6; box-shadow: 0 8px 26px #17252966; }
+    :global(.speed-settings-backdrop) { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; box-sizing: border-box; padding: 16px; background: #16212688; }
+    :global(.speed-settings-backdrop[hidden]) { display: none !important; }
+    :global(.speed-settings-dialog) { width: min(340px, calc(100vw - 32px)); box-sizing: border-box; padding: 0 18px 18px; border: 1px solid #b6c1c2; border-radius: 14px; background: #f4f6f6; color: #354043; box-shadow: 0 8px 26px #17252966; }
+    :global(.speed-settings-dialog > header) { display: flex; align-items: center; justify-content: space-between; min-height: 52px; margin: 0 -18px; padding: 0 15px; border-bottom: 1px solid #d3dcdd; font: 700 16px Arial,sans-serif; }
+    :global(.speed-settings-dialog > header button) { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid #a5b1b3; border-radius: 50%; background: #fff; color: #465255; font: 22px/1 Arial,sans-serif; cursor: pointer; }
+    :global(.speed-settings-reading) { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin: 22px 0 12px; color: #16363d; }
+    :global(.speed-settings-reading output) { font: 700 48px/1 Arial,sans-serif; font-variant-numeric: tabular-nums; }
+    :global(.speed-settings-reading small) { font: 600 16px Arial,sans-serif; }
+    :global(.speed-settings-label) { display: block; margin: 0 0 10px; color: #536164; font: 12px Arial,sans-serif; }
+    :global(.speed-settings-dialog input[type="range"]) { display: block; width: 100%; margin: 0; accent-color: #087f95; touch-action: pan-x; }
+    :global(.speed-settings-endpoints) { display: flex; justify-content: space-between; margin-top: 7px; color: #667477; font: 11px Arial,sans-serif; }
+    :global(.speed-settings-done) { display: block; width: 100%; min-height: 42px; margin-top: 22px; border: 0; border-radius: 7px; background: #087f95; color: #fff; font: 700 14px Arial,sans-serif; cursor: pointer; }
     :global(.forecast-settings-dialog > header) { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; box-sizing: border-box; padding: 10px 12px; border-bottom: 1px solid #d3dcdd; background: #f4f6f6; color: #354043; font: 700 13px Arial,sans-serif; }
     :global(.forecast-settings-dialog > header button) { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid #a5b1b3; border-radius: 50%; background: #fff; color: #465255; font: 21px/1 Arial,sans-serif; cursor: pointer; }
     :global(.forecast-settings-tabs) { position: sticky; top: 50px; z-index: 4; display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #d3dcdd; background: #f4f6f6; }
@@ -5649,17 +5709,15 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.forecast-saved-routes .route-snapshot-saved) { border-color: #16764f; background: #178653; color: #fff; font-weight: 600; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     :global(.forecast-saved-routes .route-snapshot-saved:active) { background: #116d43; }
     :global(.forecast-bottom-action:disabled) { opacity: .48; cursor: default; }
-    :global(.forecast-bottom-speed) { flex-direction: column; gap: 1px; padding: 2px; cursor: default; }
+    :global(.forecast-bottom-speed) { flex-direction: column; gap: 1px; padding: 2px; cursor: pointer; }
     :global(.forecast-bottom-speed > span:first-child) { font-size: 8px; line-height: 1; }
-    :global(.forecast-bottom-speed .forecast-departure-speed-input) { width: 58px; max-width: 100%; height: 17px; flex: 0 1 auto; padding: 0 3px; }
-    :global(.forecast-bottom-speed .forecast-departure-speed-input input) { font-size: 9px; }
-    :global(.forecast-bottom-speed .forecast-departure-speed-input small) { font-size: 8px; }
+    :global(.forecast-speed-reading) { display: inline-flex; align-items: baseline; justify-content: center; gap: 2px; line-height: 1; }
+    :global(.forecast-speed-reading strong) { color: #26383c; font: 700 17px/1 Arial,sans-serif; font-variant-numeric: tabular-nums; }
+    :global(.forecast-speed-reading small) { color: #687477; font: 9px Arial,sans-serif; }
     :global(.route-builder-forecast-drawer-host .forecast-drawer-bottom-bar > .forecast-bottom-action), :global(.route-builder-forecast-drawer-host .forecast-drawer-bottom-bar > .forecast-weather-settings-menu .forecast-settings-toggle), :global(.route-builder-forecast-drawer-host .forecast-saved-routes > .forecast-bottom-action) { min-height: 32px; padding: 2px 1px; font-size: 8px; }
     :global(.route-builder-forecast-drawer-host .forecast-bottom-speed) { gap: 2px; padding: 2px 1px; }
     :global(.route-builder-forecast-drawer-host .forecast-bottom-speed > span:first-child) { font-size: 7px; }
-    :global(.route-builder-forecast-drawer-host .forecast-bottom-speed .forecast-departure-speed-input) { width: 100%; max-width: 54px; height: 17px; padding: 0 2px; }
-    :global(.route-builder-forecast-drawer-host .forecast-bottom-speed .forecast-departure-speed-input input) { min-width: 0; font-size: 8px; }
-    :global(.route-builder-forecast-drawer-host .forecast-bottom-speed .forecast-departure-speed-input small) { font-size: 7px; }
+    :global(.route-builder-forecast-drawer-host .forecast-speed-reading strong) { font-size: 16px; }
     :global(.forecast-drawer-bottom-bar .forecast-weather-settings-menu) { display: block; width: 100%; min-width: 0; }
     :global(.forecast-drawer-bottom-bar .forecast-settings-toggle) { font-size: 9px; }
     :global(.forecast-drawer-bottom-bar .forecast-settings-toggle) { flex-direction: column; gap: 1px; line-height: 1.05; }
@@ -5866,9 +5924,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-builder-zoom-button) { font-size: 27px; font-weight: 400; }
     :global(.route-builder-map-type) { position: absolute; z-index: 2147483646; top: -152px; right: 8px; width: 42px; height: 42px; pointer-events: auto; touch-action: manipulation; }
     :global(.route-builder-map-type-button) { position: static; display: grid; place-items: center; }
-    :global(.route-builder-map-type-menu) { position: absolute; right: 50px; top: 0; z-index: 2; width: 138px; padding: 4px; border-radius: 8px; background: #f4f6f6; box-shadow: 0 2px 8px #14252c88; pointer-events: auto; touch-action: manipulation; }
+    :global(.route-builder-map-type-menu) { position: absolute; right: 50px; top: 0; z-index: 2; width: 176px; padding: 4px; border-radius: 8px; background: #f4f6f6; box-shadow: 0 2px 8px #14252c88; pointer-events: auto; touch-action: manipulation; }
     :global(.route-builder-map-type-menu[hidden]) { display: none; }
-    :global(.route-builder-map-type-menu button) { display: block; width: 100%; padding: 10px; border: 0; border-radius: 5px; background: transparent; color: #27383d; text-align: left; font: 14px Arial,sans-serif; pointer-events: auto; touch-action: manipulation; }
+    :global(.route-builder-map-type-menu button) { display: block; width: 100%; box-sizing: border-box; padding: 10px; border: 0; border-radius: 5px; background: transparent; color: #27383d; text-align: left; white-space: nowrap; font: 14px Arial,sans-serif; pointer-events: auto; touch-action: manipulation; }
     :global(.route-builder-map-type-menu button[aria-pressed="true"]) { background: #d5ece9; color: #066d63; font-weight: 700; }
     :global(.route-builder-zoom-in) { top: -256px; }
     :global(.route-builder-zoom-out) { top: -204px; }

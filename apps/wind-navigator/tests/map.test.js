@@ -1,22 +1,30 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-test('switching base maps preserves nautical marks and the saved choice', async () => {
+test('map type selection toggles the nautical overlay and persists the selected mode', async () => {
   const layers = new Set(); const values = new Map();
-  const map = {setView(){return this}, removeLayer(layer){layers.delete(layer)}};
+  const map = {setView(){return this}, removeLayer(layer){layers.delete(layer)}, hasLayer(layer){return layers.has(layer)}};
   globalThis.localStorage = {getItem:key => values.get(key), setItem:(key,value) => values.set(key,value)};
   globalThis.L = {map:()=>map, tileLayer:(url,options)=>({url,options, addTo(){layers.add(this);return this}, bringToBack(){return this}})};
-  const {getBaseMap,setBaseMap,seamarks} = await import('../src/adapters/map.js');
+  const {getBaseMap,getMapType,setMapType,seamarks} = await import('../src/adapters/map.js');
   assert.equal(getBaseMap(), 'standard');
+  assert.equal(getMapType(), 'nautical');
   assert.ok(layers.has(seamarks));
-  setBaseMap('satellite');
+  setMapType('satellite');
   assert.equal(getBaseMap(), 'satellite');
-  assert.equal(values.get('wind-navigator-base-map'), 'satellite');
+  assert.equal(getMapType(), 'satellite');
+  assert.equal(values.get('wind-navigator-map-type'), 'satellite');
+  assert.ok(!layers.has(seamarks));
+  assert.equal(layers.size, 1);
+  setMapType('nautical');
+  assert.equal(getBaseMap(), 'standard');
+  assert.equal(getMapType(), 'nautical');
   assert.ok(layers.has(seamarks));
   assert.equal(layers.size, 2);
-  setBaseMap('topographic');
+  setMapType('topographic');
   assert.equal(getBaseMap(), 'topographic');
-  assert.ok(layers.has(seamarks));
-  setBaseMap('unknown');
+  assert.equal(getMapType(), 'topographic');
+  assert.ok(!layers.has(seamarks));
+  setMapType('unknown');
   assert.equal(getBaseMap(), 'topographic');
 });

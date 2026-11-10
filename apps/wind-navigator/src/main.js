@@ -1,12 +1,5 @@
 import Navigator from './plugin.svelte';
-import { map, seamarks } from './adapters/map.js';
 new Navigator({target: document.getElementById('navigator')});
-const toggle = document.getElementById('seamarks');
-toggle.addEventListener('click', () => {
-  const active = map.hasLayer(seamarks);
-  if (active) map.removeLayer(seamarks); else seamarks.addTo(map);
-  toggle.setAttribute('aria-pressed', String(!active));
-});
 const installButton = document.getElementById('install-app');
 const installHelp = document.getElementById('install-help');
 const installInstructions = document.getElementById('install-help-instructions');

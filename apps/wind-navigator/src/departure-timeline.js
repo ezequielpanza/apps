@@ -11,6 +11,16 @@ export function restoredDeparture(value, now = Date.now()) {
     return Number.isFinite(saved) ? saved : Math.floor(now / 60000) * 60000;
 }
 
+export function nearestHourlyDeparture(value = new Date()) {
+    const current = new Date(value instanceof Date ? value.getTime() : value);
+    if (!Number.isFinite(current.getTime())) return null;
+    const roundUp = current.getMinutes() > 30
+        || (current.getMinutes() === 30 && (current.getSeconds() > 0 || current.getMilliseconds() > 0));
+    current.setMinutes(0, 0, 0);
+    if (roundUp) current.setHours(current.getHours() + 1);
+    return current;
+}
+
 export function nearestForecastIndex(timestamps, target, now = Date.now()) {
     if (!Array.isArray(timestamps) || !timestamps.length || !Number.isFinite(target)) return -1;
     let closest = -1, delta = Infinity, earliest = Infinity;
