@@ -36,6 +36,7 @@ public final class GpsHistoryStore extends SQLiteOpenHelper {
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {}
 
     public synchronized void append(long time, double lat, double lon, int retentionHours) {
+        if (retentionHours <= 0) return;
         SQLiteDatabase db = getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put("time", time);
@@ -49,9 +50,10 @@ public final class GpsHistoryStore extends SQLiteOpenHelper {
     }
 
     public synchronized JSONArray sinceJson(long afterTime, int retentionHours) {
+        JSONArray result = new JSONArray();
+        if (retentionHours <= 0) return result;
         SQLiteDatabase db = getWritableDatabase();
         long cutoff = timeCutoff(retentionHours);
-        JSONArray result = new JSONArray();
         try (Cursor cursor = db.query(TABLE, new String[]{"time", "lat", "lon"},
                 "time >= ? AND time > ?", new String[]{String.valueOf(cutoff), String.valueOf(afterTime)},
                 null, null, "time ASC")) {
@@ -67,6 +69,7 @@ public final class GpsHistoryStore extends SQLiteOpenHelper {
     }
 
     public synchronized void pruneOlderThan(int retentionHours) {
+        if (retentionHours <= 0) { clear(); return; }
         prune(getWritableDatabase(), timeCutoff(retentionHours));
     }
 
@@ -79,7 +82,7 @@ public final class GpsHistoryStore extends SQLiteOpenHelper {
     }
 
     private long timeCutoff(int retentionHours) {
-        int hours = retentionHours == 3 || retentionHours == 6 || retentionHours == 12 || retentionHours == 24
+        int hours = retentionHours == 1 || retentionHours == 3 || retentionHours == 6 || retentionHours == 12 || retentionHours == 24
                 ? retentionHours : 6;
         return System.currentTimeMillis() - hours * 60L * 60L * 1000L;
     }

@@ -18,6 +18,8 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.Uri;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
@@ -48,6 +50,10 @@ public class BoatStationCoreService extends Service implements LocationListener 
     public static final String EXTRA_GPS_HISTORY_ENABLED = "gpsHistoryEnabled";
     public static final String EXTRA_GPS_HISTORY_HOURS = "gpsHistoryHours";
     public static final String EXTRA_GPS_HISTORY_FREQUENCY = "gpsHistoryFrequency";
+    public static final String EXTRA_GPS_ANCHOR_ENABLED = "gpsAnchorEnabled";
+    public static final String EXTRA_GPS_ANCHOR_LAT = "gpsAnchorLat";
+    public static final String EXTRA_GPS_ANCHOR_LON = "gpsAnchorLon";
+    public static final String EXTRA_GPS_ANCHOR_RADIUS = "gpsAnchorRadius";
     public static final String EXTRA_STATION_ID = "stationId";
     public static final String EXTRA_TOKEN = "token";
     public static final String EXTRA_BACKEND = "backend";
@@ -55,7 +61,9 @@ public class BoatStationCoreService extends Service implements LocationListener 
     public static final String EXTRA_CLIENT_ID = "clientId";
 
     private static final String CHANNEL_ID = "boat_station_core";
+    private static final String ANCHOR_CHANNEL_ID = "boat_station_anchor_alarm";
     private static final int NOTIFICATION_ID = 4101;
+    private static final int ANCHOR_NOTIFICATION_ID = 4102;
     private static final String PREFS = "boat_station_core";
     private static final String PREF_SYNC_MODE = "syncMode";
     private static final String MODE_SERVER = "server";
@@ -68,6 +76,11 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private static final String PREF_GPS_HISTORY_ENABLED = "gpsHistoryEnabled";
     private static final String PREF_GPS_HISTORY_HOURS = "gpsHistoryHours";
     private static final String PREF_GPS_HISTORY_FREQUENCY = "gpsHistoryFrequency";
+    private static final String PREF_GPS_ANCHOR_ENABLED = "gpsAnchorEnabled";
+    private static final String PREF_GPS_ANCHOR_LAT = "gpsAnchorLat";
+    private static final String PREF_GPS_ANCHOR_LON = "gpsAnchorLon";
+    private static final String PREF_GPS_ANCHOR_RADIUS = "gpsAnchorRadius";
+    private static final String PREF_GPS_ANCHOR_TRIPPED = "gpsAnchorTripped";
     private static final long SYNC_INTERVAL_MS = 5000L;
     private static final long MAX_BACKOFF_MS = 60000L;
     private static final int HTTP_TIMEOUT_MS = 7000;
@@ -82,6 +95,11 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private boolean gpsHistoryEnabled;
     private int gpsHistoryHours = 6;
     private int gpsHistoryFrequencySeconds = 10;
+    private boolean gpsAnchorEnabled;
+    private double gpsAnchorLat;
+    private double gpsAnchorLon;
+    private int gpsAnchorRadius = 30;
+    private boolean gpsAnchorTripped;
     private long lastGpsSampleElapsedRealtime;
     private long lastGpsHistoryPruneElapsedRealtime;
     private long startedAtElapsedRealtime;
@@ -118,6 +136,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
             stopGpsHistoryUpdates();
+            cancelAnchorAlarm();
             stopForeground(true);
             stopSelf();
             return START_NOT_STICKY;
@@ -125,18 +144,21 @@ public class BoatStationCoreService extends Service implements LocationListener 
         if (intent != null && ACTION_CONFIGURE_REMOTE.equals(intent.getAction())) persistRemoteConfig(intent);
         else if (intent != null && ACTION_CONFIGURE_CLIENT.equals(intent.getAction())) persistRemoteClientConfig(intent);
         else if (intent != null && ACTION_CLEAR_REMOTE_SYNC.equals(intent.getAction())) clearRemoteSync();
-        else if (intent != null && ACTION_CONFIGURE_GPS_HISTORY.equals(intent.getAction())) persistGpsHistorySettings(intent);
+        else if (intent != null && ACTION_CONFIGURE_GPS_HISTORY.equals(intent.getAction())) {
+            persistGpsHistorySettings(intent);
+            persistGpsAnchorSettings(intent);
+        }
 
         loadGpsHistorySettings();
         Notification notification = buildNotification();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             int serviceTypes = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE;
-            if (gpsHistoryEnabled && hasLocationPermission()) serviceTypes |= ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+            if ((gpsHistoryEnabled || gpsAnchorEnabled) && hasLocationPermission()) serviceTypes |= ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
             startForeground(NOTIFICATION_ID, notification, serviceTypes);
         } else {
             startForeground(NOTIFICATION_ID, notification);
         }
-        if (gpsHistoryEnabled) startGpsHistoryUpdates(); else stopGpsHistoryUpdates();
+        if (gpsHistoryEnabled || gpsAnchorEnabled) startGpsHistoryUpdates(); else stopGpsHistoryUpdates();
         scheduleSync(0L);
         return START_STICKY;
     }
@@ -153,23 +175,57 @@ public class BoatStationCoreService extends Service implements LocationListener 
                 .apply();
     }
 
-    private void loadGpsHistorySettings() {
+    private void persistGpsAnchorSettings(Intent intent) {
+        boolean enabled = intent.getBooleanExtra(EXTRA_GPS_ANCHOR_ENABLED, false);
+        double lat = intent.getDoubleExtra(EXTRA_GPS_ANCHOR_LAT, Double.NaN);
+        double lon = intent.getDoubleExtra(EXTRA_GPS_ANCHOR_LON, Double.NaN);
+        int radius = validAnchorRadius(intent.getIntExtra(EXTRA_GPS_ANCHOR_RADIUS, 30));
+        boolean validPoint = Double.isFinite(lat) && lat >= -90d && lat <= 90d
+                && Double.isFinite(lon) && lon >= -180d && lon <= 180d;
         SharedPreferences settings = getSharedPreferences(PREFS, MODE_PRIVATE);
-        gpsHistoryEnabled = settings.getBoolean(PREF_GPS_HISTORY_ENABLED, false);
-        gpsHistoryHours = validHours(settings.getInt(PREF_GPS_HISTORY_HOURS, 6));
-        gpsHistoryFrequencySeconds = validFrequency(settings.getInt(PREF_GPS_HISTORY_FREQUENCY, 10));
-        if (gpsHistoryStore != null) gpsHistoryStore.pruneOlderThan(gpsHistoryHours);
+        double oldLat = readDouble(settings, PREF_GPS_ANCHOR_LAT, Double.NaN);
+        double oldLon = readDouble(settings, PREF_GPS_ANCHOR_LON, Double.NaN);
+        boolean changed = !Double.isFinite(oldLat) || !Double.isFinite(oldLon)
+                || Math.abs(lat - oldLat) > 0.000001d || Math.abs(lon - oldLon) > 0.000001d
+                || radius != settings.getInt(PREF_GPS_ANCHOR_RADIUS, 30);
+        SharedPreferences.Editor editor = settings.edit()
+                .putBoolean(PREF_GPS_ANCHOR_ENABLED, enabled && validPoint)
+                .putString(PREF_GPS_ANCHOR_LAT, Double.toString(lat))
+                .putString(PREF_GPS_ANCHOR_LON, Double.toString(lon))
+                .putInt(PREF_GPS_ANCHOR_RADIUS, radius);
+        if (changed || !enabled || !validPoint) editor.putBoolean(PREF_GPS_ANCHOR_TRIPPED, false);
+        editor.apply();
+        if (changed || !enabled || !validPoint) cancelAnchorAlarm();
     }
 
-    private int validHours(int hours) { return hours == 3 || hours == 6 || hours == 12 || hours == 24 ? hours : 6; }
+    private void loadGpsHistorySettings() {
+        SharedPreferences settings = getSharedPreferences(PREFS, MODE_PRIVATE);
+        gpsHistoryHours = validHours(settings.getInt(PREF_GPS_HISTORY_HOURS, 6));
+        gpsHistoryEnabled = settings.getBoolean(PREF_GPS_HISTORY_ENABLED, false) && gpsHistoryHours > 0;
+        gpsHistoryFrequencySeconds = validFrequency(settings.getInt(PREF_GPS_HISTORY_FREQUENCY, 10));
+        gpsAnchorEnabled = settings.getBoolean(PREF_GPS_ANCHOR_ENABLED, false);
+        gpsAnchorLat = readDouble(settings, PREF_GPS_ANCHOR_LAT, 0d);
+        gpsAnchorLon = readDouble(settings, PREF_GPS_ANCHOR_LON, 0d);
+        gpsAnchorRadius = validAnchorRadius(settings.getInt(PREF_GPS_ANCHOR_RADIUS, 30));
+        gpsAnchorTripped = settings.getBoolean(PREF_GPS_ANCHOR_TRIPPED, false);
+        if (gpsHistoryStore != null && gpsHistoryEnabled) gpsHistoryStore.pruneOlderThan(gpsHistoryHours);
+        if (!gpsAnchorEnabled) cancelAnchorAlarm();
+    }
+
+    private int validHours(int hours) { return hours == 0 || hours == 1 || hours == 3 || hours == 6 || hours == 12 || hours == 24 ? hours : 6; }
     private int validFrequency(int seconds) { return seconds == 2 || seconds == 5 || seconds == 10 || seconds == 30 || seconds == 60 ? seconds : 10; }
+    private int validAnchorRadius(int radius) { return Math.min(5000, Math.max(5, radius)); }
+    private double readDouble(SharedPreferences settings, String key, double fallback) {
+        try { return Double.parseDouble(settings.getString(key, Double.toString(fallback))); }
+        catch (Exception ignored) { return fallback; }
+    }
     private boolean hasLocationPermission() {
         return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void startGpsHistoryUpdates() {
-        if (!gpsHistoryEnabled || locationManager == null || !hasLocationPermission()) return;
+        if ((!gpsHistoryEnabled && !gpsAnchorEnabled) || locationManager == null || !hasLocationPermission()) return;
         try {
             locationManager.removeUpdates(this);
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 0f, this, getMainLooper());
@@ -185,7 +241,9 @@ public class BoatStationCoreService extends Service implements LocationListener 
     }
 
     @Override public void onLocationChanged(Location location) {
-        if (!gpsHistoryEnabled || location == null) return;
+        if (location == null) return;
+        evaluateAnchorAlarm(location);
+        if (!gpsHistoryEnabled) return;
         long elapsed = SystemClock.elapsedRealtime();
         if (lastGpsSampleElapsedRealtime != 0L
                 && elapsed - lastGpsSampleElapsedRealtime < gpsHistoryFrequencySeconds * 1000L) return;
@@ -196,6 +254,58 @@ public class BoatStationCoreService extends Service implements LocationListener 
             gpsHistoryStore.pruneOlderThan(gpsHistoryHours);
             lastGpsHistoryPruneElapsedRealtime = elapsed;
         }
+    }
+
+    private void evaluateAnchorAlarm(Location location) {
+        if (!gpsAnchorEnabled || location == null) return;
+        float[] result = new float[1];
+        Location.distanceBetween(gpsAnchorLat, gpsAnchorLon, location.getLatitude(), location.getLongitude(), result);
+        float accuracy = location.hasAccuracy() ? Math.max(0f, location.getAccuracy()) : 0f;
+        float distance = result[0];
+        if (!gpsAnchorTripped && distance - accuracy > gpsAnchorRadius && canPostNotifications()) {
+            gpsAnchorTripped = true;
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(PREF_GPS_ANCHOR_TRIPPED, true).apply();
+            postAnchorAlarm();
+        } else if (gpsAnchorTripped && distance < Math.max(3f, gpsAnchorRadius * 0.5f)) {
+            gpsAnchorTripped = false;
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(PREF_GPS_ANCHOR_TRIPPED, false).apply();
+            cancelAnchorAlarm();
+        }
+    }
+
+    private boolean canPostNotifications() {
+        return Build.VERSION.SDK_INT < 33
+                || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void postAnchorAlarm() {
+        Intent openIntent = new Intent(this, BoatStationActivity.class);
+        openIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent open = PendingIntent.getActivity(this, 1, openIntent, flags);
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, ANCHOR_CHANNEL_ID) : new Notification.Builder(this);
+        builder.setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("Alarma de fondeo")
+                .setContentText("La embarcación salió del radio de fondeo de " + gpsAnchorRadius + " m.")
+                .setContentIntent(open)
+                .setCategory(Notification.CATEGORY_ALARM)
+                .setPriority(Notification.PRIORITY_HIGH)
+                .setAutoCancel(false)
+                .setOnlyAlertOnce(true)
+                .setOngoing(true);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            builder.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+                    .setVibrate(new long[]{0, 700, 350, 700, 350, 1200});
+        }
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager != null && canPostNotifications()) manager.notify(ANCHOR_NOTIFICATION_ID, builder.build());
+    }
+
+    private void cancelAnchorAlarm() {
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager != null) manager.cancel(ANCHOR_NOTIFICATION_ID);
     }
 
     @Override public void onStatusChanged(String provider, int status, android.os.Bundle extras) {}
@@ -498,6 +608,13 @@ public class BoatStationCoreService extends Service implements LocationListener 
         channel.setDescription("Mantiene activa la comunicación con la estación Boat Station");
         channel.setShowBadge(false);
         manager.createNotificationChannel(channel);
+        NotificationChannel alarm = new NotificationChannel(ANCHOR_CHANNEL_ID, "Alarma de fondeo", NotificationManager.IMPORTANCE_HIGH);
+        alarm.setDescription("Alerta sonora cuando la embarcación sale del radio de fondeo configurado");
+        alarm.enableVibration(true);
+        alarm.setVibrationPattern(new long[]{0, 700, 350, 700, 350, 1200});
+        alarm.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+        manager.createNotificationChannel(alarm);
     }
 
     private Notification buildNotification() {
@@ -508,9 +625,14 @@ public class BoatStationCoreService extends Service implements LocationListener 
         PendingIntent open = PendingIntent.getActivity(this, 0, openIntent, pendingFlags);
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
+        String status = gpsHistoryEnabled && gpsAnchorEnabled
+                ? "Grabando ubicación · últimas " + gpsHistoryHours + " h · alarma de fondeo activa"
+                : gpsHistoryEnabled ? "Grabando ubicación en segundo plano · últimas " + gpsHistoryHours + " h"
+                : gpsAnchorEnabled ? "Alarma de fondeo activa · radio " + gpsAnchorRadius + " m"
+                : "Conexión de estación activa";
         return builder.setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Boat Station")
-                .setContentText(gpsHistoryEnabled && hasLocationPermission() ? "Grabando GPS en segundo plano · últimas " + gpsHistoryHours + " h" : "Conexión de estación activa")
+                .setContentText(status)
                 .setContentIntent(open)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)

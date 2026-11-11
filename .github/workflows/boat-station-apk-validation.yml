@@ -32,8 +32,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Check changed web JavaScript
+      - name: Check changed web JavaScript and tests
         run: |
+          node --check apps/boat-station/web/app.js
+          node --check apps/boat-station/web/modules/gps-stable.js
+          node --check apps/boat-station/web/gps-location-model.mjs
+          node --check apps/boat-station/web/sw.js
+          node --test apps/boat-station/web/tests/*.test.cjs apps/boat-station/web/tests/*.test.mjs
           node --check apps/boat-station/web/runtime-mode.js
           node --check apps/boat-station/web/remote_landing.js
           node --check apps/boat-station/web/stations.js
@@ -53,7 +58,7 @@ jobs:
       - name: Upload final APK
         uses: actions/upload-artifact@v4
         with:
-          name: BoatStation-1.2.17
+          name: BoatStation-validation-${{ github.event.pull_request.head.sha }}
           path: apps/boat-station/core/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
