@@ -69,7 +69,7 @@ test('map anchor center is draggable and map telemetry is compact', () => {
   const gps = fs.readFileSync(new URL('../modules/gps-stable.js', import.meta.url), 'utf8');
   const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
   assert.match(gps, /draggable:true/);
-  assert.match(gps, /dragend,event=>\{const point=event\.target\.getLatLng\(\);setAnchorPoint\(point\.lat,point\.lng\)\}/);
+  assert.match(gps, /gpsAnchorMarker\.on\('dragend',event=>\{const point=event\.target\.getLatLng\(\);setAnchorPoint\(point\.lat,point\.lng\)\}\)/);
   assert.match(app, /data-gps-anchor-unit/);
   assert.match(app, /Pies \(ft\)/);
   assert.match(gps, /gps-map-speed-icon/);
