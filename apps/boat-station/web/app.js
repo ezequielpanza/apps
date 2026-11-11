@@ -43,7 +43,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&pendingRe
 function pager(count,current){return `<div class="pager">${Array.from({length:count},(_,i)=>`<span class="${i===current?'on':''}">●</span>`).join('')}</div>`}
 function dragHandle(){return '<button class="drag-handle" type="button" aria-label="Mover módulo"><i></i><i></i><i></i><i></i><i></i><i></i></button>'}
 function resizeHandle(){return '<button class="resize-handle" type="button" aria-label="Cambiar tamaño del contenido"><i></i><i></i><i></i></button>'}
-function pageHtml(module,index,current){return `<div class="page" data-page="${index}"><div class="page-content">${module.page(index)}</div>${pager(module.pages,current)}</div>`}
+function pageHtml(module,index,current){return `<div class="page" data-page="${index}"><div class="page-content">${module.page(index)}</div>${module.pages>1?pager(module.pages,current):""}</div>`}
 function moduleHtml(id){const module=modules[id],current=layout.getPage(id,module.pages);const pages=Array.from({length:module.pages},(_,i)=>pageHtml(module,i,current)).join('');return `<section class="card${ui.collapsed[id]?' collapsed':''}" data-id="${id}"><header class="card-head">${dragHandle()}<span class="dot"></span><span class="title">${module.name}</span><span class="summary">${module.summary()}</span><button class="more" type="button">⋮</button></header><div class="card-body"><div class="viewport"><div class="track">${pages}</div></div></div>${resizeHandle()}</section>`}
 function saveOrder(){localStorage.setItem('bs.ui.order',JSON.stringify(ui.order))}
 
