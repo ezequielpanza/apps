@@ -219,7 +219,6 @@ public class BoatStationCoreService extends Service implements LocationListener 
         try { return Double.parseDouble(settings.getString(key, Double.toString(fallback))); }
         catch (Exception ignored) { return fallback; }
     }
-    private int validFrequency(int seconds) { return seconds == 2 || seconds == 5 || seconds == 10 || seconds == 30 || seconds == 60 ? seconds : 10; }
     private boolean hasLocationPermission() {
         return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
