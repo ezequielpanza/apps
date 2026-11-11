@@ -5,10 +5,15 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -33,12 +38,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class BoatStationCoreService extends Service {
+public class BoatStationCoreService extends Service implements LocationListener {
     public static final String ACTION_START = "com.boatstation.app.action.START_CORE";
     public static final String ACTION_STOP = "com.boatstation.app.action.STOP_CORE";
     public static final String ACTION_CONFIGURE_REMOTE = "com.boatstation.app.action.CONFIGURE_REMOTE";
     public static final String ACTION_CONFIGURE_CLIENT = "com.boatstation.app.action.CONFIGURE_CLIENT";
     public static final String ACTION_CLEAR_REMOTE_SYNC = "com.boatstation.app.action.CLEAR_REMOTE_SYNC";
+    public static final String ACTION_CONFIGURE_GPS_HISTORY = "com.boatstation.app.action.CONFIGURE_GPS_HISTORY";
+    public static final String EXTRA_GPS_HISTORY_ENABLED = "gpsHistoryEnabled";
+    public static final String EXTRA_GPS_HISTORY_HOURS = "gpsHistoryHours";
+    public static final String EXTRA_GPS_HISTORY_FREQUENCY = "gpsHistoryFrequency";
     public static final String EXTRA_STATION_ID = "stationId";
     public static final String EXTRA_TOKEN = "token";
     public static final String EXTRA_BACKEND = "backend";
@@ -56,6 +65,9 @@ public class BoatStationCoreService extends Service {
     private static final String PREF_CLIENT_BACKEND = "clientBackend";
     private static final String PREF_CLIENT_NAME = "clientName";
     private static final String PREF_CLIENT_ID = "clientId";
+    private static final String PREF_GPS_HISTORY_ENABLED = "gpsHistoryEnabled";
+    private static final String PREF_GPS_HISTORY_HOURS = "gpsHistoryHours";
+    private static final String PREF_GPS_HISTORY_FREQUENCY = "gpsHistoryFrequency";
     private static final long SYNC_INTERVAL_MS = 5000L;
     private static final long MAX_BACKOFF_MS = 60000L;
     private static final int HTTP_TIMEOUT_MS = 7000;
@@ -65,6 +77,13 @@ public class BoatStationCoreService extends Service {
     private static volatile String pendingStationSnapshot = "";
 
     private final LocalBinder binder = new LocalBinder();
+    private LocationManager locationManager;
+    private GpsHistoryStore gpsHistoryStore;
+    private boolean gpsHistoryEnabled;
+    private int gpsHistoryHours = 6;
+    private int gpsHistoryFrequencySeconds = 10;
+    private long lastGpsSampleElapsedRealtime;
+    private long lastGpsHistoryPruneElapsedRealtime;
     private long startedAtElapsedRealtime;
     private PowerManager.WakeLock wakeLock;
     private Handler syncHandler;
@@ -85,6 +104,8 @@ public class BoatStationCoreService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         activeService = this;
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        gpsHistoryStore = GpsHistoryStore.get(this);
         startedAtElapsedRealtime = SystemClock.elapsedRealtime();
         latestStationSnapshot = pendingStationSnapshot;
         syncHandler = new Handler(getMainLooper());
@@ -96,6 +117,7 @@ public class BoatStationCoreService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+            stopGpsHistoryUpdates();
             stopForeground(true);
             stopSelf();
             return START_NOT_STICKY;
@@ -103,16 +125,83 @@ public class BoatStationCoreService extends Service {
         if (intent != null && ACTION_CONFIGURE_REMOTE.equals(intent.getAction())) persistRemoteConfig(intent);
         else if (intent != null && ACTION_CONFIGURE_CLIENT.equals(intent.getAction())) persistRemoteClientConfig(intent);
         else if (intent != null && ACTION_CLEAR_REMOTE_SYNC.equals(intent.getAction())) clearRemoteSync();
+        else if (intent != null && ACTION_CONFIGURE_GPS_HISTORY.equals(intent.getAction())) persistGpsHistorySettings(intent);
 
+        loadGpsHistorySettings();
         Notification notification = buildNotification();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+            int serviceTypes = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE;
+            if (gpsHistoryEnabled && hasLocationPermission()) serviceTypes |= ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+            startForeground(NOTIFICATION_ID, notification, serviceTypes);
         } else {
             startForeground(NOTIFICATION_ID, notification);
         }
+        if (gpsHistoryEnabled) startGpsHistoryUpdates(); else stopGpsHistoryUpdates();
         scheduleSync(0L);
         return START_STICKY;
     }
+
+    public static boolean isRunning() { return activeService != null; }
+
+    private void persistGpsHistorySettings(Intent intent) {
+        int hours = validHours(intent.getIntExtra(EXTRA_GPS_HISTORY_HOURS, 6));
+        int frequency = validFrequency(intent.getIntExtra(EXTRA_GPS_HISTORY_FREQUENCY, 10));
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putBoolean(PREF_GPS_HISTORY_ENABLED, intent.getBooleanExtra(EXTRA_GPS_HISTORY_ENABLED, false))
+                .putInt(PREF_GPS_HISTORY_HOURS, hours)
+                .putInt(PREF_GPS_HISTORY_FREQUENCY, frequency)
+                .apply();
+    }
+
+    private void loadGpsHistorySettings() {
+        SharedPreferences settings = getSharedPreferences(PREFS, MODE_PRIVATE);
+        gpsHistoryEnabled = settings.getBoolean(PREF_GPS_HISTORY_ENABLED, false);
+        gpsHistoryHours = validHours(settings.getInt(PREF_GPS_HISTORY_HOURS, 6));
+        gpsHistoryFrequencySeconds = validFrequency(settings.getInt(PREF_GPS_HISTORY_FREQUENCY, 10));
+        if (gpsHistoryStore != null) gpsHistoryStore.pruneOlderThan(gpsHistoryHours);
+    }
+
+    private int validHours(int hours) { return hours == 3 || hours == 6 || hours == 12 || hours == 24 ? hours : 6; }
+    private int validFrequency(int seconds) { return seconds == 2 || seconds == 5 || seconds == 10 || seconds == 30 || seconds == 60 ? seconds : 10; }
+    private boolean hasLocationPermission() {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void startGpsHistoryUpdates() {
+        if (!gpsHistoryEnabled || locationManager == null || !hasLocationPermission()) return;
+        try {
+            locationManager.removeUpdates(this);
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 0f, this, getMainLooper());
+            lastGpsSampleElapsedRealtime = 0L;
+        lastGpsHistoryPruneElapsedRealtime = 0L;
+        } catch (Exception ignored) {}
+    }
+
+    private void stopGpsHistoryUpdates() {
+        if (locationManager != null) {
+            try { locationManager.removeUpdates(this); } catch (Exception ignored) {}
+        }
+    }
+
+    @Override public void onLocationChanged(Location location) {
+        if (!gpsHistoryEnabled || location == null) return;
+        long elapsed = SystemClock.elapsedRealtime();
+        if (lastGpsSampleElapsedRealtime != 0L
+                && elapsed - lastGpsSampleElapsedRealtime < gpsHistoryFrequencySeconds * 1000L) return;
+        lastGpsSampleElapsedRealtime = elapsed;
+        long time = location.getTime() > 0L ? location.getTime() : System.currentTimeMillis();
+        gpsHistoryStore.append(time, location.getLatitude(), location.getLongitude(), gpsHistoryHours);
+        if (lastGpsHistoryPruneElapsedRealtime == 0L || elapsed - lastGpsHistoryPruneElapsedRealtime >= 60000L) {
+            gpsHistoryStore.pruneOlderThan(gpsHistoryHours);
+            lastGpsHistoryPruneElapsedRealtime = elapsed;
+        }
+    }
+
+    @Override public void onStatusChanged(String provider, int status, android.os.Bundle extras) {}
+    @Override public void onProviderEnabled(String provider) {}
+    @Override public void onProviderDisabled(String provider) {}
+
 
     @Override public IBinder onBind(Intent intent) { return binder; }
 
@@ -421,7 +510,7 @@ public class BoatStationCoreService extends Service {
                 ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
         return builder.setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Boat Station")
-                .setContentText("Conexión de estación activa")
+                .setContentText(gpsHistoryEnabled && hasLocationPermission() ? "Grabando GPS en segundo plano · últimas " + gpsHistoryHours + " h" : "Conexión de estación activa")
                 .setContentIntent(open)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
@@ -430,6 +519,7 @@ public class BoatStationCoreService extends Service {
     }
 
     @Override public void onDestroy() {
+        stopGpsHistoryUpdates();
         if (syncHandler != null) syncHandler.removeCallbacksAndMessages(null);
         try {
             if (connectivityManager != null && networkCallback != null) connectivityManager.unregisterNetworkCallback(networkCallback);

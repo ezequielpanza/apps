@@ -42,7 +42,7 @@
         <service
             android:name=".BoatStationCoreService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice|location" />
         <service
             android:name=".BatteryDiagnosticsService"
             android:exported="false"
