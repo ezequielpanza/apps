@@ -22,8 +22,8 @@
   function menuInner(){return document.querySelector('#menuSheet .sheet-inner')}
   function removeRow(){document.querySelectorAll('[data-core-apk-update]').forEach(el=>el.remove())}
   function setDownloadState(state){downloadState=state;render()}
-  function download(version){
-    if(!window.confirm(version?`Descargar Boat Station ${version}?`:'Descargar la última versión de Boat Station?'))return;
+  function download(version,ask=false){
+    if(ask&&!window.confirm(version?`Descargar Boat Station ${version}?`:'Descargar la última versión de Boat Station?'))return;
     const url=APK_URL;
     setDownloadState('starting');
     try{
@@ -103,5 +103,5 @@
   window.addEventListener('boatstation-core-ready',()=>{try{if(window.CoreBridge&&typeof CoreBridge.getApkVersion==='function')installed=String(CoreBridge.getApkVersion()||'').trim()}catch(_){}check(true)});
   window.addEventListener('focus',()=>check(false));
   setTimeout(()=>check(true),1000);
-  window.BoatStationApkUpdate={check:()=>check(true),getInstalled:()=>installed,getLatest:()=>latest,getLatestApkUrl:()=>APK_URL,downloadLatest:()=>download(latest)};
+  window.BoatStationApkUpdate={check:()=>check(true),getInstalled:()=>installed,getLatest:()=>latest,getLatestApkUrl:()=>APK_URL,downloadLatest:()=>download(latest,false)};
 })();
