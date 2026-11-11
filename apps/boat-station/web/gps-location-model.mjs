@@ -1,5 +1,15 @@
 export const LOCATION_RETENTION_HOURS = Object.freeze([0, 1, 3, 6, 12, 24]);
 const finite = (value, fallback) => { const n = Number(value); return Number.isFinite(n) ? n : fallback; };
+export function anchorRadiusToMeters(value, unit = 'm') {
+  const number = finite(value, NaN);
+  if (!Number.isFinite(number) || !['m', 'ft'].includes(unit)) return null;
+  return unit === 'ft' ? number * 0.3048 : number;
+}
+export function anchorRadiusValue(meters, unit = 'm') {
+  const value = finite(meters, NaN);
+  if (!Number.isFinite(value) || !['m', 'ft'].includes(unit)) return null;
+  return Math.round(value / (unit === 'ft' ? 0.3048 : 1));
+}
 export function normalizeVesselConfig(value = {}) {
   return { type: value.type === 'cat' ? 'cat' : 'mono',
     length: Math.min(100, Math.max(2, finite(value.length, 12.5))),
@@ -12,7 +22,7 @@ export function normalizeAnchorSettings(value = {}) {
   const lat = value.lat === null || value.lat === undefined ? NaN : Number(value.lat), lon = value.lon === null || value.lon === undefined ? NaN : Number(value.lon);
   const hasPoint = Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lon) && lon >= -180 && lon <= 180;
   return { enabled: Boolean(value.enabled) && hasPoint, hasPoint, lat: hasPoint ? lat : null, lon: hasPoint ? lon : null,
-    radius: Math.min(5000, Math.max(5, Math.round(finite(value.radius, 30)))) };
+    radius: Math.min(5000, Math.max(5, finite(value.radius, 30))), radiusUnit: value.radiusUnit === 'ft' ? 'ft' : 'm' };
 }
 export function distanceMeters(a, b) {
   const latA = Number(a?.lat), lonA = Number(a?.lon), latB = Number(b?.lat), lonB = Number(b?.lon);

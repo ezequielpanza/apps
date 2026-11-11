@@ -54,6 +54,8 @@ public class BoatStationCoreService extends Service implements LocationListener 
     public static final String EXTRA_GPS_ANCHOR_LAT = "gpsAnchorLat";
     public static final String EXTRA_GPS_ANCHOR_LON = "gpsAnchorLon";
     public static final String EXTRA_GPS_ANCHOR_RADIUS = "gpsAnchorRadius";
+    public static final String EXTRA_GPS_ANCHOR_RADIUS_METERS = "gpsAnchorRadiusMeters";
+    public static final String EXTRA_GPS_ANCHOR_RADIUS_UNIT = "gpsAnchorRadiusUnit";
     public static final String EXTRA_STATION_ID = "stationId";
     public static final String EXTRA_TOKEN = "token";
     public static final String EXTRA_BACKEND = "backend";
@@ -80,6 +82,8 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private static final String PREF_GPS_ANCHOR_LAT = "gpsAnchorLat";
     private static final String PREF_GPS_ANCHOR_LON = "gpsAnchorLon";
     private static final String PREF_GPS_ANCHOR_RADIUS = "gpsAnchorRadius";
+    private static final String PREF_GPS_ANCHOR_RADIUS_METERS = "gpsAnchorRadiusMeters";
+    private static final String PREF_GPS_ANCHOR_RADIUS_UNIT = "gpsAnchorRadiusUnit";
     private static final String PREF_GPS_ANCHOR_TRIPPED = "gpsAnchorTripped";
     private static final long SYNC_INTERVAL_MS = 5000L;
     private static final long MAX_BACKOFF_MS = 60000L;
@@ -98,7 +102,8 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private boolean gpsAnchorEnabled;
     private double gpsAnchorLat;
     private double gpsAnchorLon;
-    private int gpsAnchorRadius = 30;
+    private double gpsAnchorRadius = 30d;
+    private String gpsAnchorRadiusUnit = "m";
     private boolean gpsAnchorTripped;
     private long lastGpsSampleElapsedRealtime;
     private long lastGpsHistoryPruneElapsedRealtime;
@@ -179,7 +184,10 @@ public class BoatStationCoreService extends Service implements LocationListener 
         boolean enabled = intent.getBooleanExtra(EXTRA_GPS_ANCHOR_ENABLED, false);
         double lat = intent.getDoubleExtra(EXTRA_GPS_ANCHOR_LAT, Double.NaN);
         double lon = intent.getDoubleExtra(EXTRA_GPS_ANCHOR_LON, Double.NaN);
-        int radius = validAnchorRadius(intent.getIntExtra(EXTRA_GPS_ANCHOR_RADIUS, 30));
+        double radius = intent.hasExtra(EXTRA_GPS_ANCHOR_RADIUS_METERS)
+                ? validAnchorRadius(intent.getDoubleExtra(EXTRA_GPS_ANCHOR_RADIUS_METERS, 30d))
+                : validAnchorRadius(intent.getIntExtra(EXTRA_GPS_ANCHOR_RADIUS, 30));
+        String radiusUnit = "ft".equals(intent.getStringExtra(EXTRA_GPS_ANCHOR_RADIUS_UNIT)) ? "ft" : "m";
         boolean validPoint = Double.isFinite(lat) && lat >= -90d && lat <= 90d
                 && Double.isFinite(lon) && lon >= -180d && lon <= 180d;
         SharedPreferences settings = getSharedPreferences(PREFS, MODE_PRIVATE);
@@ -187,12 +195,14 @@ public class BoatStationCoreService extends Service implements LocationListener 
         double oldLon = readDouble(settings, PREF_GPS_ANCHOR_LON, Double.NaN);
         boolean changed = !Double.isFinite(oldLat) || !Double.isFinite(oldLon)
                 || Math.abs(lat - oldLat) > 0.000001d || Math.abs(lon - oldLon) > 0.000001d
-                || radius != settings.getInt(PREF_GPS_ANCHOR_RADIUS, 30);
+                || Math.abs(radius - readDouble(settings, PREF_GPS_ANCHOR_RADIUS_METERS, settings.getInt(PREF_GPS_ANCHOR_RADIUS, 30))) > 0.001d;
         SharedPreferences.Editor editor = settings.edit()
                 .putBoolean(PREF_GPS_ANCHOR_ENABLED, enabled && validPoint)
                 .putString(PREF_GPS_ANCHOR_LAT, Double.toString(lat))
                 .putString(PREF_GPS_ANCHOR_LON, Double.toString(lon))
-                .putInt(PREF_GPS_ANCHOR_RADIUS, radius);
+                .putInt(PREF_GPS_ANCHOR_RADIUS, Math.round((float) radius))
+                .putString(PREF_GPS_ANCHOR_RADIUS_METERS, Double.toString(radius))
+                .putString(PREF_GPS_ANCHOR_RADIUS_UNIT, radiusUnit);
         if (changed || !enabled || !validPoint) editor.putBoolean(PREF_GPS_ANCHOR_TRIPPED, false);
         editor.apply();
         if (changed || !enabled || !validPoint) cancelAnchorAlarm();
@@ -206,7 +216,8 @@ public class BoatStationCoreService extends Service implements LocationListener 
         gpsAnchorEnabled = settings.getBoolean(PREF_GPS_ANCHOR_ENABLED, false);
         gpsAnchorLat = readDouble(settings, PREF_GPS_ANCHOR_LAT, 0d);
         gpsAnchorLon = readDouble(settings, PREF_GPS_ANCHOR_LON, 0d);
-        gpsAnchorRadius = validAnchorRadius(settings.getInt(PREF_GPS_ANCHOR_RADIUS, 30));
+        gpsAnchorRadius = validAnchorRadius(readDouble(settings, PREF_GPS_ANCHOR_RADIUS_METERS, settings.getInt(PREF_GPS_ANCHOR_RADIUS, 30)));
+        gpsAnchorRadiusUnit = "ft".equals(settings.getString(PREF_GPS_ANCHOR_RADIUS_UNIT, "m")) ? "ft" : "m";
         gpsAnchorTripped = settings.getBoolean(PREF_GPS_ANCHOR_TRIPPED, false);
         if (gpsHistoryStore != null && gpsHistoryEnabled) gpsHistoryStore.pruneOlderThan(gpsHistoryHours);
         if (!gpsAnchorEnabled) cancelAnchorAlarm();
@@ -214,7 +225,8 @@ public class BoatStationCoreService extends Service implements LocationListener 
 
     private int validHours(int hours) { return hours == 0 || hours == 1 || hours == 3 || hours == 6 || hours == 12 || hours == 24 ? hours : 6; }
     private int validFrequency(int seconds) { return seconds == 2 || seconds == 5 || seconds == 10 || seconds == 30 || seconds == 60 ? seconds : 10; }
-    private int validAnchorRadius(int radius) { return Math.min(5000, Math.max(5, radius)); }
+    private double validAnchorRadius(double radius) { return Math.min(5000d, Math.max(5d, radius)); }
+    private String anchorRadiusLabel() { return "ft".equals(gpsAnchorRadiusUnit) ? Math.round(gpsAnchorRadius / 0.3048d) + " ft" : Math.round(gpsAnchorRadius) + " m"; }
     private double readDouble(SharedPreferences settings, String key, double fallback) {
         try { return Double.parseDouble(settings.getString(key, Double.toString(fallback))); }
         catch (Exception ignored) { return fallback; }
@@ -288,7 +300,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
                 ? new Notification.Builder(this, ANCHOR_CHANNEL_ID) : new Notification.Builder(this);
         builder.setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Alarma de fondeo")
-                .setContentText("La embarcación salió del radio de fondeo de " + gpsAnchorRadius + " m.")
+                .setContentText("La embarcación salió del radio de fondeo de " + anchorRadiusLabel() + ".")
                 .setContentIntent(open)
                 .setCategory(Notification.CATEGORY_ALARM)
                 .setPriority(Notification.PRIORITY_HIGH)
@@ -628,7 +640,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
         String status = gpsHistoryEnabled && gpsAnchorEnabled
                 ? "Grabando ubicación · últimas " + gpsHistoryHours + " h · alarma de fondeo activa"
                 : gpsHistoryEnabled ? "Grabando ubicación en segundo plano · últimas " + gpsHistoryHours + " h"
-                : gpsAnchorEnabled ? "Alarma de fondeo activa · radio " + gpsAnchorRadius + " m"
+                : gpsAnchorEnabled ? "Alarma de fondeo activa · radio " + anchorRadiusLabel()
                 : "Conexión de estación activa";
         return builder.setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Boat Station")
