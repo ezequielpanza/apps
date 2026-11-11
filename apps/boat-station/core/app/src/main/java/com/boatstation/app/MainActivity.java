@@ -114,7 +114,10 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
         service.putExtra(BoatStationCoreService.EXTRA_GPS_ANCHOR_ENABLED, anchorEnabled);
         service.putExtra(BoatStationCoreService.EXTRA_GPS_ANCHOR_LAT, readPreferenceDouble(settings, "gps_anchor_lat", Double.NaN));
         service.putExtra(BoatStationCoreService.EXTRA_GPS_ANCHOR_LON, readPreferenceDouble(settings, "gps_anchor_lon", Double.NaN));
-        service.putExtra(BoatStationCoreService.EXTRA_GPS_ANCHOR_RADIUS, settings.getInt("gps_anchor_radius", 30));
+        double radiusMeters = readPreferenceDouble(settings, "gps_anchor_radius_meters", settings.getInt("gps_anchor_radius", 30));
+        service.putExtra(BoatStationCoreService.EXTRA_GPS_ANCHOR_RADIUS, Math.round((float) radiusMeters));
+        service.putExtra(BoatStationCoreService.EXTRA_GPS_ANCHOR_RADIUS_METERS, radiusMeters);
+        service.putExtra(BoatStationCoreService.EXTRA_GPS_ANCHOR_RADIUS_UNIT, settings.getString("gps_anchor_radius_unit", "m"));
         try {
             if (shouldRun && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(service);
             else startService(service);
@@ -154,13 +157,21 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
             runOnUiThread(()->applyGpsHistoryServiceSettings(active));
             return !active||checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
         }
-        @JavascriptInterface public boolean setGpsAnchorSettings(boolean enabled,double lat,double lon,int radius){
+        @JavascriptInterface public boolean setGpsAnchorSettings(boolean enabled,double lat,double lon,double radiusMeters){
             boolean validPoint=Double.isFinite(lat)&&lat>=-90d&&lat<=90d&&Double.isFinite(lon)&&lon>=-180d&&lon<=180d;
             if(enabled&&!validPoint)return false;
-            int safeRadius=Math.min(5000,Math.max(5,radius));
-            prefs().edit().putBoolean("gps_anchor_enabled",enabled).putString("gps_anchor_lat",Double.toString(lat)).putString("gps_anchor_lon",Double.toString(lon)).putInt("gps_anchor_radius",safeRadius).apply();
+            double safeRadius=Math.min(5000d,Math.max(5d,radiusMeters));
+            SharedPreferences settings=prefs();
+            settings.edit().putBoolean("gps_anchor_enabled",enabled).putString("gps_anchor_lat",Double.toString(lat)).putString("gps_anchor_lon",Double.toString(lon)).putString("gps_anchor_radius_meters",Double.toString(safeRadius)).putInt("gps_anchor_radius",Math.round((float)safeRadius)).apply();
             runOnUiThread(()->applyGpsHistoryServiceSettings(enabled));
             return !enabled||(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED));
+        }
+        @JavascriptInterface public boolean setGpsAnchorRadiusUnit(String unit){
+            String safeUnit="ft".equals(unit)?"ft":"m";
+            SharedPreferences settings=prefs();
+            settings.edit().putString("gps_anchor_radius_unit",safeUnit).apply();
+            runOnUiThread(()->applyGpsHistoryServiceSettings(settings.getBoolean("gps_history_enabled",false)));
+            return true;
         }
         @JavascriptInterface public String getGpsHistory(int retentionHours){int hours=(retentionHours==0||retentionHours==1||retentionHours==3||retentionHours==6||retentionHours==12||retentionHours==24)?retentionHours:6;return GpsHistoryStore.get(MainActivity.this).recentJson(hours).toString();}
         @JavascriptInterface public String getGpsHistorySince(long afterTime,int retentionHours){int hours=(retentionHours==0||retentionHours==1||retentionHours==3||retentionHours==6||retentionHours==12||retentionHours==24)?retentionHours:6;return GpsHistoryStore.get(MainActivity.this).sinceJson(afterTime,hours).toString();}

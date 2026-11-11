@@ -6,7 +6,9 @@ import {
   normalizeAnchorSettings,
   normalizeVesselConfig,
   distanceMeters,
-  evaluateAnchorBoundary
+  evaluateAnchorBoundary,
+  anchorRadiusToMeters,
+  anchorRadiusValue
 } from '../gps-location-model.mjs';
 import { boatFootprint, vesselPosition } from '../dashboard-model.mjs';
 
@@ -52,4 +54,25 @@ test('Ubicación exposes the requested map and recording controls without a rout
   assert.match(app, /\[0,'Desactivado'\]/);
   assert.match(app, /data-gps-anchor-pick/);
   assert.match(app, /data-gps-vessel-setting='length'/);
+});
+
+test('anchor radius can be configured in meters or feet while calculations stay metric', () => {
+  assert.equal(anchorRadiusToMeters(100, 'ft'), 30.48);
+  assert.equal(anchorRadiusValue(30.48, 'ft'), 100);
+  assert.equal(anchorRadiusToMeters(30, 'm'), 30);
+  const anchor = normalizeAnchorSettings({ enabled: true, lat: 18, lon: -66, radius: 30.48, radiusUnit: 'ft' });
+  assert.equal(anchor.radius, 30.48);
+  assert.equal(anchor.radiusUnit, 'ft');
+});
+
+test('map anchor center is draggable and map telemetry is compact', () => {
+  const gps = fs.readFileSync(new URL('../modules/gps-stable.js', import.meta.url), 'utf8');
+  const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+  assert.match(gps, /draggable:true/);
+  assert.match(gps, /dragend,event=>\{const point=event\.target\.getLatLng\(\);setAnchorPoint\(point\.lat,point\.lng\)\}/);
+  assert.match(app, /data-gps-anchor-unit/);
+  assert.match(app, /Pies \(ft\)/);
+  assert.match(gps, /gps-map-speed-icon/);
+  assert.match(gps, /data-gps-heading-icon/);
+  assert.doesNotMatch(gps, /data-gps-accuracy|>Precisi[oó]n</);
 });
