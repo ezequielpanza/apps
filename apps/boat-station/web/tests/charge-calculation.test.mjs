@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {interpolate,validateCurve,estimatedSoc} from '../charge-calculation.mjs';
+const curve=[[11.8,0],[12.2,50],[12.7,100]];
+assert.equal(interpolate(curve,11),0);assert.equal(interpolate(curve,13),100);assert.ok(Math.abs(interpolate(curve,12.45)-75)<1e-9);assert.equal(interpolate(curve,null),null);
+assert.equal(validateCurve(curve),true);assert.equal(validateCurve([[12,0],[12,50]]),false);assert.equal(validateCurve([[12,80],[13,20]]),false);assert.equal(validateCurve([[12,0],[13,101]]),false);
+assert.ok(Math.abs(estimatedSoc({voltage:12.45,chargeCalculation:{mode:'manual',points:curve}})-75)<1e-9);assert.equal(estimatedSoc({voltage:null,chargeCalculation:{mode:'manual',points:curve}}),null);assert.equal(estimatedSoc({voltage:12.8,chargeCalculation:{mode:'lifepo4',cells:4}}),10);
+const store=new Map();globalThis.localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)};globalThis.window={addEventListener(){}};globalThis.requestAnimationFrame=()=>{};
+const {createBatteriesModule}=await import('../modules/batteries-clean.js');const m=createBatteriesModule(()=>{},()=>{});
+m.updateBattery({id:'a',capacityAh:100,soc:80,remainingAh:80,voltage:12.45,connected:true});m.updateBattery({id:'b',capacityAh:200,soc:40,remainingAh:80,voltage:12.45,connected:true});assert.ok(Math.abs(m.stats().soc-160/300*100)<1e-9);
+m.setChargeCalculation('a',{mode:'manual',points:curve});assert.ok(Math.abs(m.stats().soc-155/300*100)<1e-9);assert.equal(m.state.batteries[0].soc,80);assert.equal(m.state.batteries[0].remainingAh,80);m.setChargeCalculation('a',{mode:'bms'});assert.ok(Math.abs(m.stats().soc-160/300*100)<1e-9);
+console.log('Charge calculation and bank integration passed');
