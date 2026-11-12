@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   LOCATION_RETENTION_HOURS,
+  LOCATION_FREQUENCY_SECONDS,
+  normalizeLocationFrequency,
   normalizeAnchorSettings,
   normalizeVesselConfig,
   distanceMeters,
@@ -11,9 +13,16 @@ import {
   anchorRadiusValue
 } from '../gps-location-model.mjs';
 import { boatFootprint, vesselPosition } from '../dashboard-model.mjs';
+import { createGpsModule } from '../modules/gps-stable.js';
 
 test('retention choices include disabled and one hour', () => {
   assert.deepEqual(LOCATION_RETENTION_HOURS, [0, 1, 3, 6, 12, 24]);
+});
+
+test('location recording offers only the five requested intervals', () => {
+  assert.deepEqual(LOCATION_FREQUENCY_SECONDS, [30, 60, 150, 300, 600]);
+  assert.equal(normalizeLocationFrequency(150), 150);
+  assert.equal(normalizeLocationFrequency(2), 60, 'legacy intervals fall back to one minute');
 });
 
 test('an unset anchor cannot become a point at zero coordinates', () => {
@@ -51,9 +60,48 @@ test('Ubicación exposes the requested map and recording controls without a rout
   assert.match(gps, /data-gps-action='map-type'/);
   assert.doesNotMatch(gps, /gps-map-record|gps-route-new/);
   assert.match(app, /data-gps-retention/);
+  assert.match(gps, /2 minutos 30 segundos/);
+  assert.match(gps, /remote\.routePointCount/);
+  assert.match(gps, /remote\.anchor/);
+  assert.match(gps, /gps\.anchor\.settings/);
   assert.match(app, /\[0,'Desactivado'\]/);
   assert.match(app, /data-gps-anchor-pick/);
   assert.match(app, /data-gps-vessel-setting='length'/);
+});
+
+test('remote location state synchronizes point counts, history and anchor settings', () => {
+  const previousWindow=globalThis.window,previousStorage=globalThis.localStorage,sent=[];
+  globalThis.localStorage={getItem:()=>null,setItem(){}};
+  globalThis.window={addEventListener(){},BoatStationRemoteCommand:{send:(command,payload)=>{sent.push({command,payload});return Promise.resolve(true)}}};
+  try{
+    const server=createGpsModule(()=>{});
+    server.state.recording=true;
+    server.state.route=Array.from({length:3001},(_,i)=>({lat:18+i/100000,lon:-66,time:1000+i}));
+    server.state.alwaysRecord=true;server.state.historyHours=3;
+    server.state.historyRoute=Array.from({length:1200},(_,i)=>({lat:18,lon:-66+i/100000,time:2000+i}));
+    server.state.anchor=normalizeAnchorSettings({lat:18,lon:-66,radius:40});
+    const serverRemote=globalThis.window.BoatStationGpsState,snapshot=serverRemote.exportRemoteState();
+    assert.equal(snapshot.routePointCount,3001);
+    assert.equal(snapshot.route.length,2000,'route geometry stays sampled for remote transfer');
+    assert.equal(snapshot.historyPointCount,1200);
+    assert.equal(snapshot.historyRoute.length,1000,'continuous history is sampled for remote transfer');
+    const client=createGpsModule(()=>{}),clientRemote=globalThis.window.BoatStationGpsState;
+    clientRemote.applyRemoteState(snapshot);
+    assert.equal(client.state.remoteRoutePointCount,3001);
+    assert.equal(client.state.remoteHistoryPointCount,1200);
+    assert.equal(client.state.historyRoute.length,1000);
+    server.state.historyRoute.push({lat:18,lon:-66,time:Date.now()});
+    const compactSnapshot=serverRemote.exportRemoteState();
+    assert.equal(Object.hasOwn(compactSnapshot,'historyRoute'),false,'history geometry is not resent every sync');
+    assert.equal(compactSnapshot.historyPointCount,1201,'the exact point count is still refreshed every sync');
+    clientRemote.applyRemoteState(compactSnapshot);
+    assert.equal(client.state.historyRoute.length,1000,'the client keeps its sampled line between full history refreshes');
+    assert.equal(client.state.remoteHistoryPointCount,1201);
+    assert.equal(client.getAnchorSettings().hasPoint,true);
+    assert.equal(client.setAnchorEnabled(true),true);
+    assert.equal(sent.at(-1)?.command,'gps.anchor.settings','client sends anchor changes to the authoritative server');
+    assert.equal(sent.at(-1)?.payload.enabled,true);
+  }finally{globalThis.window=previousWindow;globalThis.localStorage=previousStorage}
 });
 
 test('anchor radius can be configured in meters or feet while calculations stay metric', () => {

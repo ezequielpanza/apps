@@ -98,7 +98,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private GpsHistoryStore gpsHistoryStore;
     private boolean gpsHistoryEnabled;
     private int gpsHistoryHours = 6;
-    private int gpsHistoryFrequencySeconds = 10;
+    private int gpsHistoryFrequencySeconds = 60;
     private boolean gpsAnchorEnabled;
     private double gpsAnchorLat;
     private double gpsAnchorLon;
@@ -172,7 +172,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
 
     private void persistGpsHistorySettings(Intent intent) {
         int hours = validHours(intent.getIntExtra(EXTRA_GPS_HISTORY_HOURS, 6));
-        int frequency = validFrequency(intent.getIntExtra(EXTRA_GPS_HISTORY_FREQUENCY, 10));
+        int frequency = validFrequency(intent.getIntExtra(EXTRA_GPS_HISTORY_FREQUENCY, 60));
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean(PREF_GPS_HISTORY_ENABLED, intent.getBooleanExtra(EXTRA_GPS_HISTORY_ENABLED, false))
                 .putInt(PREF_GPS_HISTORY_HOURS, hours)
@@ -212,7 +212,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
         SharedPreferences settings = getSharedPreferences(PREFS, MODE_PRIVATE);
         gpsHistoryHours = validHours(settings.getInt(PREF_GPS_HISTORY_HOURS, 6));
         gpsHistoryEnabled = settings.getBoolean(PREF_GPS_HISTORY_ENABLED, false) && gpsHistoryHours > 0;
-        gpsHistoryFrequencySeconds = validFrequency(settings.getInt(PREF_GPS_HISTORY_FREQUENCY, 10));
+        gpsHistoryFrequencySeconds = validFrequency(settings.getInt(PREF_GPS_HISTORY_FREQUENCY, 60));
         gpsAnchorEnabled = settings.getBoolean(PREF_GPS_ANCHOR_ENABLED, false);
         gpsAnchorLat = readDouble(settings, PREF_GPS_ANCHOR_LAT, 0d);
         gpsAnchorLon = readDouble(settings, PREF_GPS_ANCHOR_LON, 0d);
@@ -224,7 +224,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
     }
 
     private int validHours(int hours) { return hours == 0 || hours == 1 || hours == 3 || hours == 6 || hours == 12 || hours == 24 ? hours : 6; }
-    private int validFrequency(int seconds) { return seconds == 2 || seconds == 5 || seconds == 10 || seconds == 30 || seconds == 60 ? seconds : 10; }
+    private int validFrequency(int seconds) { return seconds == 30 || seconds == 60 || seconds == 150 || seconds == 300 || seconds == 600 ? seconds : 60; }
     private double validAnchorRadius(double radius) { return Math.min(5000d, Math.max(5d, radius)); }
     private String anchorRadiusLabel() { return "ft".equals(gpsAnchorRadiusUnit) ? Math.round(gpsAnchorRadius / 0.3048d) + " ft" : Math.round(gpsAnchorRadius) + " m"; }
     private double readDouble(SharedPreferences settings, String key, double fallback) {

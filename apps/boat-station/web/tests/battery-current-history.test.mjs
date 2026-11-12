@@ -74,6 +74,19 @@ try{
   assert.equal(leftAxis.style.height,rightAxis.style.height,'both axes align to the plotted region');
   assert.match(legend.innerHTML,/Batería A · Ah/);
   assert.ok(lineCalls.some(([kind,x])=>kind==='line'&&x>0&&x<300),'draws Ah as a curve on the right axis');
+  assert.equal(graph.setCurrentHistoryColor('battery-a','#abcdef'),true);
+  assert.equal(graph.setBankHistoryColor('#123456'),true);
+  assert.equal(graph.state.batteries[0].historyCurrentColor,'#abcdef');
+  assert.equal(graph.state.bankHistoryColor,'#123456');
+  graph.afterRender(root);
+  assert.match(legend.innerHTML,/#abcdef/,'the battery current curve uses its selected color');
+  const bankGraph=setup(()=>now,[{time:now-600_000,soc:50,current:5,storedAh:.05},{time:now-300_000,soc:51,current:5,storedAh:.05}]);
+  bankGraph.setBankHistoryColor('#123456');
+  legend.innerHTML='';bankGraph.afterRender(root);
+  assert.match(legend.innerHTML,/#123456/,'the bank current curve uses its selected color');
+  const appSource=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
+  assert.match(appSource,/data-bank-history-color/,'the bank current color is configurable');
+  assert.match(appSource,/data-battery-history-color/,'each battery current color is configurable');
 
   const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
   const addStart=app.indexOf("bluetoothScanner.addEventListener('click',async");
@@ -84,7 +97,7 @@ try{
   assert.match(addFlow,/Podés seleccionar más o volver atrás/,'scanner remains open after adding a batch');
   assert.doesNotMatch(addCompletion,/closeSheet\(bluetoothScanner\)|stopBluetoothScanner/,'successful add does not close or stop scanning');
   assert.match(addFlow,/catch\{failed\.push\(device\)\}/,'a failed device add does not lock the scanner');
-  console.log('Battery current correction, 99% Ah integration, centered Ah curves and batch scanner: passed');
+  console.log('Battery current correction, 99% Ah integration, centered Ah curves, selectable series colors and batch scanner: passed');
 }finally{
   Date.now=originalNow;
 }

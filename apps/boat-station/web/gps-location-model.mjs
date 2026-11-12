@@ -1,4 +1,9 @@
 export const LOCATION_RETENTION_HOURS = Object.freeze([0, 1, 3, 6, 12, 24]);
+export const LOCATION_FREQUENCY_SECONDS = Object.freeze([30, 60, 150, 300, 600]);
+export function normalizeLocationFrequency(value, fallback = 60) {
+  const candidate = Number(value), safeFallback = LOCATION_FREQUENCY_SECONDS.includes(Number(fallback)) ? Number(fallback) : 60;
+  return LOCATION_FREQUENCY_SECONDS.includes(candidate) ? candidate : safeFallback;
+}
 const finite = (value, fallback) => { const n = Number(value); return Number.isFinite(n) ? n : fallback; };
 export function anchorRadiusToMeters(value, unit = 'm') {
   const number = finite(value, NaN);
