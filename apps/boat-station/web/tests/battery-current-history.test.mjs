@@ -78,6 +78,7 @@ try{
   const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
   const addStart=app.indexOf("bluetoothScanner.addEventListener('click',async");
   const addEnd=app.indexOf('});\n[menu,add,moduleMenu]',addStart);
+  assert.ok(addEnd>addStart,'scanner listener ends before the remaining menu listeners are bound');
   const addFlow=app.slice(addStart,addEnd);
   const addCompletion=addFlow.slice(addFlow.indexOf('const added=selected.filter'));
   assert.match(addFlow,/Podés seleccionar más o volver atrás/,'scanner remains open after adding a batch');
