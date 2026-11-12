@@ -14,12 +14,12 @@ export function createGpsModule(requestRender){
   const savedFrequency=[2,5,10,30,60].includes(Number(readSetting('bs.gps.frequencySeconds','10')))?Number(readSetting('bs.gps.frequencySeconds','10')):10;
   const savedHistoryColor=/^#[0-9a-f]{6}$/i.test(readSetting('bs.gps.historyColor','#ff3b30'))?readSetting('bs.gps.historyColor','#ff3b30'):'#ff3b30';
   const savedBoatColor=/^#[0-9a-f]{6}$/i.test(readSetting('bs.gps.boatColor','#ff3b30'))?readSetting('bs.gps.boatColor','#ff3b30'):'#ff3b30';
-  const MAX_ROUTE_POINTS=12000,REMOTE_ROUTE_POINTS=2000;
+  const GPS_MAX_ZOOM=22,MAX_ROUTE_POINTS=12000,REMOTE_ROUTE_POINTS=2000;
   const state={fix:null,recording:false,route:[],routeId:'',routeStartedAt:0,routeStoppedAt:0,importName:'',root:null,remoteAuthoritative:false,followPosition:true,units:['nautical','metric','imperial'].includes(savedUnits)?savedUnits:'nautical',coordFormat:['dd','dm','dms'].includes(savedCoordFormat)?savedCoordFormat:'dd',alwaysRecord:savedHistoryHours>0,historyHours:savedHistoryHours,frequencySeconds:savedFrequency,historyRoute:[],historyColor:savedHistoryColor,boatColor:savedBoatColor,anchor:savedAnchor,anchorSelection:false,anchorTripped:false,vessel:savedVessel,mapType:savedMapType};
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const unitDefs={nautical:{label:'Náuticas',speed:'kn',accuracy:'m'},metric:{label:'Métricas',speed:'km/h',accuracy:'m'},imperial:{label:'Imperiales',speed:'mph',accuracy:'ft'}};
   const coordDefs={dd:{label:'Grados decimales'},dm:{label:'Grados y minutos'},dms:{label:'Grados, minutos y segundos'}};
-  let gpsMap=null,gpsMapElement=null,gpsRouteLayer=null,gpsHistoryLayer=null,gpsPositionLayer=null,gpsBoatLayers=[],gpsAnchorCircle=null,gpsAnchorMarker=null,gpsOsmLayer=null,gpsSatelliteLayer=null,gpsSeamarkLayer=null,gpsMapResizeObserver=null,gpsMapZoom=(()=>{try{const value=Number(localStorage.getItem('bs.gps.mapZoom'));return Number.isFinite(value)&&value>=1&&value<=19?value:null}catch{return null}})();
+  let gpsMap=null,gpsMapElement=null,gpsRouteLayer=null,gpsHistoryLayer=null,gpsPositionLayer=null,gpsBoatLayers=[],gpsAnchorCircle=null,gpsAnchorMarker=null,gpsOsmLayer=null,gpsSatelliteLayer=null,gpsSeamarkLayer=null,gpsMapResizeObserver=null,gpsMapZoom=(()=>{try{const value=Number(localStorage.getItem('bs.gps.mapZoom'));return Number.isFinite(value)&&value>=1&&value<=GPS_MAX_ZOOM?value:null}catch{return null}})();
   function unitDef(){return unitDefs[state.units]||unitDefs.nautical}
   function speedValue(f){const kts=Number(f?.speedKts);if(!Number.isFinite(kts))return'—';if(state.units==='metric')return(kts*1.852).toFixed(1);if(state.units==='imperial')return(kts*1.150779).toFixed(1);return kts.toFixed(1)}
   function coordValue(value,isLat){const n=Number(value);if(!Number.isFinite(n))return'—';const hemi=isLat?(n<0?'S':'N'):(n<0?'W':'E'),a=Math.abs(n);if(state.coordFormat==='dm'){const d=Math.floor(a),m=(a-d)*60;return`${d}° ${m.toFixed(3)}′ ${hemi}`}if(state.coordFormat==='dms'){const d=Math.floor(a),mins=(a-d)*60,m=Math.floor(mins),s=(mins-m)*60;return`${d}° ${m}′ ${s.toFixed(1)}″ ${hemi}`}return`${a.toFixed(6)}° ${hemi}`}
@@ -84,10 +84,10 @@ export function createGpsModule(requestRender){
     const L=window.L;
     if(!L){element.textContent='No se pudo cargar el mapa';return null}
     const center=currentMapPosition()||state.route[state.route.length-1]||state.historyRoute[state.historyRoute.length-1]||{lat:20,lon:-69};
-    const initialZoom=Number.isFinite(gpsMapZoom)?gpsMapZoom:(state.route.length>1||state.historyRoute.length>1?12:15);gpsMapZoom=initialZoom;const map=L.map(element,{zoomControl:false,attributionControl:false,zoomSnap:.25,zoomDelta:1,preferCanvas:true}).setView([center.lat,center.lon],initialZoom);
-    gpsOsmLayer=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'});
-    gpsSatelliteLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,attribution:'Tiles © Esri'});
-    gpsSeamarkLayer=L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap / OpenStreetMap contributors'});
+    const initialZoom=Number.isFinite(gpsMapZoom)?gpsMapZoom:(state.route.length>1||state.historyRoute.length>1?12:15);gpsMapZoom=initialZoom;const map=L.map(element,{zoomControl:false,attributionControl:false,zoomSnap:.25,zoomDelta:1,preferCanvas:true,maxZoom:GPS_MAX_ZOOM}).setView([center.lat,center.lon],initialZoom);
+    gpsOsmLayer=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxNativeZoom:19,maxZoom:GPS_MAX_ZOOM,attribution:'© OpenStreetMap contributors'});
+    gpsSatelliteLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:18,maxZoom:GPS_MAX_ZOOM,attribution:'Tiles © Esri'});
+    gpsSeamarkLayer=L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',{maxNativeZoom:18,maxZoom:GPS_MAX_ZOOM,attribution:'© OpenSeaMap / OpenStreetMap contributors'});
     gpsHistoryLayer=L.polyline([],{color:state.historyColor,weight:3,opacity:.78,lineCap:'round',lineJoin:'round'}).addTo(map);
     gpsRouteLayer=L.polyline([],{color:'#1ed7e5',weight:3,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(map);
     gpsPositionLayer=L.circleMarker([center.lat,center.lon],{radius:3,color:'#ffffff',weight:1,fillColor:state.boatColor,fillOpacity:1}).addTo(map);
