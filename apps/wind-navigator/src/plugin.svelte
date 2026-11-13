@@ -4675,12 +4675,18 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         forecastReopenButton.setAttribute('aria-label', 'Abrir pronóstico de la ruta');
         forecastReopenButton.hidden = true;
         forecastReopenButton.addEventListener('click', () => {
-            if (forecastDrawer && !forecastDrawer.hidden && forecastDrawerMaxHeightPercent < 20) {
+            if (!forecastDrawer) return;
+            if (forecastDrawerMaxHeightPercent < 20) {
                 forecastDrawerMaxHeightPercent = 50;
                 try { localStorage.setItem('route-builder-drawer-max-height-percent', '50'); } catch { /* Current session still uses the restored height. */ }
-                applyForecastDrawerHeightLimit();
-                renderForecastDrawer();
-            } else void calculateRouteForecast();
+            }
+            forecastDrawer.classList.add('is-open');
+            forecastDrawer.hidden = false;
+            if (forecastReopenButton) forecastReopenButton.hidden = true;
+            applyForecastDrawerHeightLimit();
+            renderForecastDrawer();
+            positionForecastDrawer();
+            if (!forecastBusy && points.length >= 2) void calculateRouteForecast();
         });
         document.body.appendChild(forecastReopenButton);
         applyForecastDrawerHeightLimit();
