@@ -1780,7 +1780,11 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const routeWaypointRow = routeForecast.length ? `<tr class="route-waypoint-row"><th class="route-waypoint-label" colspan="4" data-column-index="0" data-column-span="4">Waypoints</th><td class="route-waypoint-track" colspan="${routeForecast.length}">${waypointTrackMarkers}<span class="route-waypoint-boat" hidden title="Posición GPS aproximada en la ruta" aria-label="Posición GPS aproximada en la ruta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4 L21 12 L3 20 L7 12 Z" fill="#087bd1" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg></span></td></tr>` : '';
         const distanceNm = points.slice(1).reduce((distance, point, index) => distance + haversineNm(points[index], point), 0);
         const distanceLabel = distanceUnit === 'km' ? `${(distanceNm * 1.852).toFixed(1)} km` : `${distanceNm.toFixed(1)} Nm`;
-        const routeDepartureFooter = `<div class="forecast-departure-control${liveRouteActive ? ' is-live' : ''}"><div class="departure-timebar-frame"><div class="departure-timebar-scroll" data-timeline-start="${timelineStart}" data-pixels-per-hour="${pixelsPerHour}" data-timebar-left-pad="${timelinePadding}" data-min-departure="${minDeparture}" data-max-departure="${maxDeparture}" data-departure-interval-hours="${departureIntervalHours}" aria-label="${liveRouteActive ? 'Hora de salida bloqueada en modo EN VIVO' : 'Desplazar los días para elegir la hora de salida'}"><div class="departure-timebar" style="width:${timebarWidth}px"><div class="departure-timebar-days">${dayBands.join('')}</div><div class="departure-timebar-hours">${hourTicks.join('')}</div><div class="route-analysis-track" style="width:${timebarWidth}px">${departurePassSegments}</div></div></div><div class="departure-timebar-indicator"><span class="departure-timebar-cursor"></span><span class="departure-timebar-callout"><span>Inicio ${formatTimelineDateTime(selectedDeparture)} → Llega ${formatTimelineDateTime(arrivalTimestamp)}</span><small>Duración: ${formatDuration(routeDurationHours)} · ${distanceLabel}</small></span><span class="departure-timebar-callout-tail"></span></div></div></div>`;
+        const passingDepartureTimes = liveRouteActive ? [] : departureEvaluations.filter(item => item.hasConstraints && item.passes === true).map(item => item.departure.getTime()).filter(Number.isFinite).sort((a, b) => a - b);
+        const previousValidDeparture = passingDepartureTimes.some(time => time < selectedDeparture);
+        const nextValidDeparture = passingDepartureTimes.some(time => time > selectedDeparture);
+        const validDepartureButton = (direction: 'previous' | 'next', enabled: boolean) => `<button type="button" class="departure-valid-arrow" data-valid-departure="${direction}" aria-label="${direction === 'previous' ? 'Partida válida anterior' : 'Partida válida siguiente'}" title="${direction === 'previous' ? 'Partida válida anterior' : 'Partida válida siguiente'}"${enabled ? '' : ' disabled'}>${direction === 'previous' ? '‹' : '›'}</button>`;
+        const routeDepartureFooter = `<div class="forecast-departure-control${liveRouteActive ? ' is-live' : ''}"><div class="departure-timebar-frame"><div class="departure-timebar-scroll" data-timeline-start="${timelineStart}" data-pixels-per-hour="${pixelsPerHour}" data-timebar-left-pad="${timelinePadding}" data-min-departure="${minDeparture}" data-max-departure="${maxDeparture}" data-departure-interval-hours="${departureIntervalHours}" aria-label="${liveRouteActive ? 'Hora de salida bloqueada en modo EN VIVO' : 'Desplazar los días para elegir la hora de salida'}"><div class="departure-timebar" style="width:${timebarWidth}px"><div class="departure-timebar-days">${dayBands.join('')}</div><div class="departure-timebar-hours">${hourTicks.join('')}</div><div class="route-analysis-track" style="width:${timebarWidth}px">${departurePassSegments}</div></div></div><div class="departure-timebar-indicator"><span class="departure-timebar-cursor"></span><span class="departure-timebar-callout-group">${passingDepartureTimes.length ? validDepartureButton('previous', previousValidDeparture) : ''}<span class="departure-timebar-callout"><span>Inicio ${formatTimelineDateTime(selectedDeparture)} → Llega ${formatTimelineDateTime(arrivalTimestamp)}</span><small>Duración: ${formatDuration(routeDurationHours)} · ${distanceLabel}</small></span>${passingDepartureTimes.length ? validDepartureButton('next', nextValidDeparture) : ''}</span><span class="departure-timebar-callout-tail"></span></div></div></div>`;
         const routeColumnCount = routeForecast.length + 4;
         const routeColgroup = `<colgroup>${Array.from({ length: routeColumnCount }, (_, index) => `<col data-forecast-col="${index}">`).join('')}</colgroup>`;
         const routeTable = `${routeDepartureFooter}<div class="forecast-table-scroll"><table class="forecast-table">${routeColgroup}<thead>${routeWaypointRow}</thead><tbody>${visibleRouteRows}</tbody></table></div>`;
@@ -4143,6 +4147,23 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         });
         forecastDrawer.addEventListener('click', event => {
             const target = event.target as HTMLElement;
+            const validDepartureArrow = target.closest<HTMLButtonElement>('[data-valid-departure]');
+            if (validDepartureArrow) {
+                if (liveRouteActive || validDepartureArrow.disabled) return;
+                const current = new Date(departureDateTime).getTime();
+                const times = departureEvaluations.filter(item => item.hasConstraints && item.passes === true)
+                    .map(item => item.departure.getTime()).filter(Number.isFinite).sort((a, b) => a - b);
+                const next = validDepartureArrow.dataset.validDeparture === 'previous'
+                    ? times.filter(time => time < current).pop()
+                    : times.find(time => time > current);
+                if (next !== undefined) {
+                    if (departureScrollCommitTimer !== null) window.clearTimeout(departureScrollCommitTimer);
+                    departureScrollCommitTimer = null;
+                    recenterDepartureTimeline = true;
+                    selectDepartureTime(next);
+                }
+                return;
+            }
             if (target.closest('[data-route-speed-open]')) {
                 showSpeedSettings = true;
                 renderForecastDrawer();
@@ -6042,7 +6063,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.departure-timebar-scroll::-webkit-scrollbar) { display: none; width: 0; height: 0; }
     :global(.departure-timebar) { position: relative; height: 58px; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     :global(.departure-timebar-indicator) { position: absolute; z-index: 6; inset: 0; pointer-events: none; }
-    :global(.departure-timebar-callout) { position: absolute; top: auto; bottom: calc(100% + 1px); left: 50%; z-index: 4; display: grid; gap: 2px; width: max-content; max-width: min(310px, calc(100vw - 48px)); overflow: hidden; padding: 4px 8px; border-radius: 5px; background: #c69b2d; color: #fff; font: 700 9px/1.2 Arial,sans-serif; text-align: center; text-overflow: ellipsis; white-space: normal; box-shadow: 0 1px 4px #0003; transform: translateX(-50%); pointer-events: none; }
+    :global(.departure-timebar-callout-group) { position: absolute; bottom: calc(100% + 1px); left: 50%; z-index: 4; display: flex; align-items: center; gap: 4px; max-width: calc(100vw - 12px); transform: translateX(-50%); pointer-events: none; }
+    :global(.departure-valid-arrow) { flex: none; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: #168b58; color: white; font: 700 28px/1 Arial,sans-serif; pointer-events: auto; cursor: pointer; }
+    :global(.departure-valid-arrow:disabled) { opacity: .35; cursor: default; }
+    :global(.departure-timebar-callout) { position: relative; min-width: 0; top: auto; bottom: auto; left: auto; z-index: 4; display: grid; gap: 2px; width: max-content; max-width: min(310px, calc(100vw - 48px)); overflow: hidden; padding: 4px 8px; border-radius: 5px; background: #c69b2d; color: #fff; font: 700 9px/1.2 Arial,sans-serif; text-align: center; text-overflow: ellipsis; white-space: normal; box-shadow: 0 1px 4px #0003; transform: none; pointer-events: none; }
     :global(.departure-timebar-callout) { pointer-events: auto; cursor: ns-resize; touch-action: none; user-select: none; -webkit-user-select: none; }
     :global(.departure-timebar-callout small) { font: 700 8px/1.1 Arial,sans-serif; opacity: .95; }
     :global(.departure-timebar-callout-tail) { position: absolute; top: -7px; left: 50%; z-index: 4; width: 0; height: 0; border-top: 6px solid #c69b2d; border-right: 6px solid transparent; border-left: 6px solid transparent; transform: translateX(-50%); }
