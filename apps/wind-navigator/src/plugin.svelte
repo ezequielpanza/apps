@@ -627,6 +627,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     };
     let nextPointId = 1;
     let recentlyDraggedWaypoint: { id: number; expiresAt: number } | null = null;
+    let waypointDragInProgress = false;
     let waypointLayer: L.LayerGroup | null = null;
     let pastWaypointLayer: L.LayerGroup | null = null;
     let pastRouteLine: L.Polyline | null = null;
@@ -2271,6 +2272,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                     bubblingMouseEvents: false,
                 });
                 marker.on('dragstart', () => {
+                    waypointDragInProgress = true;
+                    redrawRoutePointIndicators();
                     recentlyDraggedWaypoint = { id: point.id, expiresAt: Date.now() + 5000 };
                 });
                 marker.on('drag', (event: any) => {
@@ -2279,6 +2282,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                         ? { ...current, lat: position.lat, lon: position.lng } : current));
                 });
                 marker.on('dragend', (event: any) => {
+                    waypointDragInProgress = false;
                     recentlyDraggedWaypoint = { id: point.id, expiresAt: Date.now() + 500 };
                     const position = event.target.getLatLng();
                     points = points.map(current => current.id === point.id
@@ -2841,6 +2845,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
 
     function redrawRoutePointIndicators(): void {
+        if (waypointDragInProgress) {
+            for (const overlay of routePointIndicatorOverlays.values()) overlay.hidden = true;
+            return;
+        }
         const activeKeys = new Set<string>();
         if (points.length >= 2 && routeForecast.length) {
             const cumulativeDistances = [0];
