@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
-    import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText } from './directional-indicator.js';
+    import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorValuePosition } from './directional-indicator.js';
     import { map, getMapType, setMapType } from './adapters/map.js';
     import windyStore from './adapters/store.js';
     import { getPointForecastData } from './adapters/fetch.js';
@@ -2811,6 +2811,17 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         valueLabel.textContent = value === null ? '' : (kind === 'wind' ? value.toFixed(1) + ' kn' : value.toFixed(1) + ' m');
     }
 
+    function positionIndicatorValue(overlay: HTMLDivElement, layout: { rotation: number; degreesOffset: number }): void {
+        const valueLabel = overlay.querySelector<HTMLElement>('.route-indicator-value');
+        if (!valueLabel || valueLabel.hidden) return;
+        const degreesLabel = overlay.querySelector<HTMLElement>('.route-wind-degrees');
+        const showDegrees = Boolean(degreesLabel && !degreesLabel.hidden);
+        const pos = indicatorValuePosition(layout.rotation, layout.degreesOffset, showDegrees ? degreesLabel!.offsetHeight : 0, valueLabel.offsetHeight, indicatorAppearance.textMargin, showDegrees);
+        valueLabel.style.left = 'calc(50% + ' + pos.x + 'px)';
+        valueLabel.style.top = 'calc(50% + ' + pos.y + 'px)';
+        valueLabel.style.transform = 'translate(-50%, -50%) rotate(' + layout.rotation + 'deg)';
+    }
+
     function routePointDirectionAtDistance(field: WindowConditionKey, distanceNm: number): number | null {
         const samples = routeForecast
             .filter(sample => sample.values && Number.isFinite(sample.distanceNm))
@@ -2886,6 +2897,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                     }
                     overlay.title = (config.kind === 'wave' ? 'Olas' : 'Viento') + ' en waypoint ' + String(index + 1) + ' desde ' + Math.round(direction) + '°';
                     overlay.hidden = false;
+                    positionIndicatorValue(overlay, layout);
                 }
             });
         }
@@ -2955,6 +2967,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         }
         overlay.title = isWave ? `Olas desde ${Math.round(direction)}°` : `Viento previsto desde ${Math.round(direction)}°`;
         overlay.hidden = false;
+        positionIndicatorValue(overlay, layout);
     }
 
     function redrawWindIndicator(): void { redrawDirectionalIndicator('wind'); }
@@ -6211,7 +6224,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-wind-indicator span) { position: absolute; inset: 0; display: block; pointer-events: none; }
     :global(.route-wind-indicator .route-wind-degrees) { position: absolute; top: 50%; left: 50%; padding: 1px 3px; border-radius: 3px; background: #263238cc; color: #fff; font: 700 var(--wind-indicator-text-size, 10px)/1.2 Arial,sans-serif; white-space: nowrap; text-shadow: 0 1px 1px #000; }
     :global(.route-wind-indicator .route-wind-degrees[hidden]) { display: none; }
-    :global(.route-indicator-value) { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 4px); white-space: nowrap; padding: 1px 3px; border-radius: 3px; background: #263238cc; color: #fff; font: 700 var(--wind-indicator-text-size, 10px)/1.2 Arial,sans-serif; }
+    :global(.route-indicator-value) { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); white-space: nowrap; padding: 1px 3px; border-radius: 3px; background: #263238cc; color: #fff; font: 700 var(--wind-indicator-text-size, 10px)/1.2 Arial,sans-serif; }
     :global(.route-indicator-value[hidden]) { display: none; }
     :global(.route-navigation-dashboard) { position: fixed; z-index: 2147483000; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); box-sizing: border-box; display: grid; grid-template-columns: 24px minmax(0,1fr) minmax(0,1.08fr) minmax(0,1fr) 14px; width: min(520px, calc(100vw - 12px)); min-height: 92px; padding: 3px 2px; border: 1px solid #aab5b8; border-radius: 10px; background: #edf0f0f5; color: #343c3e; box-shadow: 0 2px 7px #14252c66; font-family: Arial,sans-serif; }
     :global(.route-navigation-dashboard[hidden]) { display: none; }

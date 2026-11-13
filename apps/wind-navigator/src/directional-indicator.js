@@ -18,3 +18,11 @@ export function fitIndicatorText(size, margin, ink, height = size * HEIGHT / 5) 
     const fontSize = size > 0 && denominator > 0 ? Math.max(0, available / denominator) : 0;
     return { height, fontSize, x: (size - fontSize * (ink.left + ink.right)) / 2, y: m - ink.minY * fontSize };
 }
+
+/** Position the value outside the direction label along the indicator axis. */
+export function indicatorValuePosition(rotation, degreesOffset, directionHeight, valueHeight, margin, showDirection) {
+    const gap = Math.max(0, Number(margin) || 0);
+    const distance = degreesOffset + (showDirection ? (directionHeight + valueHeight) / 2 + gap : 0);
+    const angle = rotation * Math.PI / 180;
+    return { x: distance * Math.sin(angle), y: -distance * Math.cos(angle), distance };
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText } from '../src/directional-indicator.js';
+import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorValuePosition } from '../src/directional-indicator.js';
 
 test('the triangle tip stays at the configured distance for every size and map bearing', () => {
     const origin = { x: 324, y: 491 };
@@ -67,4 +67,15 @@ test('text clearance follows the selected triangle height', () => {
         assert.ok(Math.abs((v.x - slope * v.y + v.fontSize * ink.left) / Math.hypot(1, slope) - effective) < 1e-9);
         assert.ok(Math.abs((size - v.x - slope * v.y - v.fontSize * ink.right) / Math.hypot(1, slope) - effective) < 1e-9);
     }
+});
+
+test('value labels follow direction, leaving the configured gap outside direction labels', () => {
+    for (const rotation of [0, 45, 90, 180, 270]) {
+        const pos = indicatorValuePosition(rotation, 20, 14, 18, 3, true);
+        assert.ok(Math.abs(pos.distance - 39) < 1e-10);
+        assert.ok(Math.abs(Math.hypot(pos.x, pos.y) - 39) < 1e-10);
+        assert.ok(Math.abs(pos.x - 39 * Math.sin(rotation * Math.PI / 180)) < 1e-10);
+        assert.ok(Math.abs(pos.y + 39 * Math.cos(rotation * Math.PI / 180)) < 1e-10);
+    }
+    assert.equal(indicatorValuePosition(0, 20, 0, 18, 3, false).distance, 20);
 });
