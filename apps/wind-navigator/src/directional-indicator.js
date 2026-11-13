@@ -44,3 +44,17 @@ export function readableIndicatorRotation(rotation) {
     else if (angle < -90) angle += 180;
     return angle;
 }
+
+/** Three-piece indicator ordered from outer name to tip nearest the reference point. */
+export function indicatorBarMarkup() {
+    return '<div class="bar-indicator"><div class="bar-indicator-name"><b class="bar-indicator-name-text"></b></div><div class="bar-indicator-data"><b class="bar-indicator-direction"></b><b class="bar-indicator-value"></b></div><svg class="bar-indicator-tip" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 L1 0 L0.5 1 Z"/></svg></div>';
+}
+
+/** Fit all visible rows within the width and length of their field. */
+export function indicatorBarTextSize(width, length, margin, maximum, measuredWidthPerPixel, rows) {
+    const inset = Math.max(0, Number(margin) || 0);
+    const innerWidth = width - 2 * inset, innerLength = length - 2 * inset;
+    if (innerWidth <= 0 || innerLength <= 0 || rows <= 0) return 0;
+    const widthLimit = measuredWidthPerPixel > 0 ? innerWidth / measuredWidthPerPixel : maximum;
+    return Math.max(0, Math.min(maximum, widthLimit, innerLength / (rows * 1.1)));
+}

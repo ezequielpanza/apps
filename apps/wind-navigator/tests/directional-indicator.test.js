@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorValuePosition, indicatorLabelOffsets, readableIndicatorRotation } from '../src/directional-indicator.js';
+import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorValuePosition, indicatorLabelOffsets, readableIndicatorRotation, indicatorBarMarkup, indicatorBarTextSize } from '../src/directional-indicator.js';
 
 test('the triangle tip stays at the configured distance for every size and map bearing', () => {
     const origin = { x: 324, y: 491 };
@@ -103,4 +103,26 @@ test('direction and value labels remain readable and perpendicular at any rotati
     assert.equal(readableIndicatorRotation(180), 0);
     assert.equal(readableIndicatorRotation(135), -45);
     assert.equal(readableIndicatorRotation(225), 45);
+});
+
+test('bar indicator puts name outside data and its triangle at the inner tip', () => {
+    const html = indicatorBarMarkup();
+    assert.ok(html.indexOf('bar-indicator-name') < html.indexOf('bar-indicator-data'));
+    assert.ok(html.indexOf('bar-indicator-data') < html.indexOf('bar-indicator-tip'));
+    assert.ok(html.includes('bar-indicator-direction') && html.includes('bar-indicator-value'));
+});
+
+test('bar dimensions keep the tip at the requested distance from the boat or waypoint', () => {
+    for (const angle of [0, 30, 90, 180, 270]) for (const parts of [[14, 60, 36], [8, 20, 90], [60, 80, 15]]) {
+        const height = parts.reduce((x, y) => x + y, 0), origin = { x: 12, y: 18 };
+        const layout = directionalIndicatorLayout(origin, angle, 0, 80, 30, height);
+        const r = angle * Math.PI / 180;
+        assert.ok(Math.abs(Math.hypot(layout.x - Math.sin(r)*height/2 - origin.x, layout.y + Math.cos(r)*height/2 - origin.y) - 80) < 1e-9);
+    }
+});
+
+test('indicator field text respects its available width and length', () => {
+    assert.equal(indicatorBarTextSize(30, 60, 2, 10, 5, 2), 5.2);
+    assert.ok(indicatorBarTextSize(30, 12, 2, 40, 1, 2) <= 8 / 2.2);
+    assert.equal(indicatorBarTextSize(10, 20, 5, 10, 1, 1), 0);
 });

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
-    import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorLabelOffsets, readableIndicatorRotation } from './directional-indicator.js';
+    import { directionalIndicatorLayout, indicatorBarMarkup, indicatorBarTextSize, readableIndicatorRotation } from './directional-indicator.js';
     import { map, getMapType, setMapType } from './adapters/map.js';
     import windyStore from './adapters/store.js';
     import { getPointForecastData } from './adapters/fetch.js';
@@ -316,12 +316,15 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const meaning = key === 'current' || key === 'currentTide' ? 'Dirección de la corriente' : 'Dirección del pronóstico';
         return `<div class="direction-wheel-box"><strong>${meaning}</strong><div class="direction-wheel" aria-label="Direcciones aceptadas">${buttons}</div><button type="button" class="forecast-button" data-direction-all>Seleccionar todas</button><small>Sin selección: se aceptan todas las direcciones.</small></div>`;
     }
-    let indicatorAppearance = { size: 5, height: Math.sqrt(100 - 2.5 * 2.5), distance: 80, pointDistance: 80, textSize: 10, textMargin: 2, showDirection: true, showValue: true, windColor: '#087bd1', waveColor: '#f4d03f', windLetter: 'T', waveLetter: 'W', windValue: 'wind', waveValue: 'waves' };
+    let indicatorAppearance = { size: 5, height: Math.sqrt(100 - 2.5 * 2.5), barWidth: 30, tipHeight: 14, dataLength: 60, nameLength: 36, distance: 80, pointDistance: 80, textSize: 10, textMargin: 2, showDirection: true, showValue: true, windColor: '#087bd1', waveColor: '#f4d03f', windLetter: 'T', waveLetter: 'W', windValue: 'wind', waveValue: 'waves' };
     try {
         const saved = JSON.parse(localStorage.getItem('route-builder-indicator-appearance-v1') || '{}');
         for (const key of ['size', 'distance', 'pointDistance', 'textSize', 'textMargin']) if (Number.isFinite(Number(saved[key]))) (indicatorAppearance as any)[key] = Number(saved[key]);
         indicatorAppearance.height = typeof saved.height === 'number' && Number.isFinite(saved.height) && saved.height >= 5 && saved.height <= 250 ? saved.height : indicatorAppearance.size * Math.sqrt(100 - 2.5 * 2.5) / 5;
         if (!Number.isFinite(Number(saved.pointDistance))) { const legacy = Number(localStorage.getItem('route-builder-waypoint-wind-indicator-distance')); if (legacy >= 20 && legacy <= 200) indicatorAppearance.pointDistance = legacy; }
+        for (const key of ['barWidth', 'tipHeight', 'dataLength', 'nameLength']) {
+            if (typeof saved[key] === 'number' && Number.isFinite(saved[key]) && saved[key] > 0) (indicatorAppearance as any)[key] = saved[key];
+        }
         for (const key of ['showDirection', 'showValue']) if (typeof saved[key] === 'boolean') (indicatorAppearance as any)[key] = saved[key];
         for (const key of ['windColor', 'waveColor']) if (/^#[0-9a-f]{6}$/i.test(saved[key] || '')) (indicatorAppearance as any)[key] = saved[key];
         for (const key of ['windLetter', 'waveLetter']) if (typeof saved[key] === 'string') (indicatorAppearance as any)[key] = saved[key];
@@ -2733,98 +2736,53 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         for (const sample of samples) { if (sample.distance < distance) before = sample; else { after = sample; break; } }
         return before && after && after.distance > before.distance ? before.value + (after.value - before.value) * (distance - before.distance) / (after.distance - before.distance) : null;
     }
-    const indicatorInkCache = new Map<string, { minY: number; left: number; right: number } | null>();
-    function measureIndicatorInk(text: string, slope: number): { minY: number; left: number; right: number } | null {
-        const cacheKey = String(slope) + ':' + text;
-        if (indicatorInkCache.has(cacheKey)) return indicatorInkCache.get(cacheKey) ?? null;
-        const canvas = document.createElement('canvas');
-        let ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx || !text.trim()) return null;
-        const reference = 100;
-        ctx.font = '700 100px Arial, sans-serif';
-        const metrics = ctx.measureText(text);
-        const left = Math.max(0, metrics.actualBoundingBoxLeft || 0);
-        const right = Math.max(metrics.width, metrics.actualBoundingBoxRight || 0);
-        const ascent = metrics.actualBoundingBoxAscent || 100;
-        const descent = metrics.actualBoundingBoxDescent || 30;
-        const width = Math.ceil(left + right + 8), height = Math.ceil(ascent + descent + 8);
-        if (width > 16384 || height > 4096) return null;
-        canvas.width = width; canvas.height = height;
-        ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) return null;
-        ctx.font = '700 100px Arial, sans-serif'; ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic';
-        const originX = left + 4, baselineY = ascent + 4;
-        ctx.fillText(text, originX, baselineY);
-        const pixels = ctx.getImageData(0, 0, width, height).data;
-        let minY = Infinity, minLeft = Infinity, maxRight = -Infinity;
-        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-            if (pixels[(y * width + x) * 4 + 3] < 16) continue;
-            const px = (x + 0.5 - originX) / reference, py = (y + 0.5 - baselineY) / reference;
-            minY = Math.min(minY, py);
-            minLeft = Math.min(minLeft, px - slope * py);
-            maxRight = Math.max(maxRight, px + slope * py);
-        }
-        const ink = Number.isFinite(minY) ? { minY, left: minLeft, right: maxRight } : null;
-        if (indicatorInkCache.size >= 128) indicatorInkCache.delete(indicatorInkCache.keys().next().value as string);
-        indicatorInkCache.set(cacheKey, ink);
-        return ink;
-    }
-    function styleIndicator(overlay: HTMLDivElement, kind: 'wind' | 'wave', value: number | null): void {
+    const indicatorTextCanvas = document.createElement('canvas');
+    function renderBarIndicator(overlay: HTMLDivElement, kind: 'wind' | 'wave', direction: number, value: number | null, rotation: number): void {
         const a = indicatorAppearance;
-        const path = overlay.querySelector<SVGPathElement>('svg path');
-        if (path) {
-            path.setAttribute('fill', kind === 'wind' ? a.windColor : a.waveColor);
-            path.setAttribute('d', 'M0 0 L' + a.size + ' 0 L' + (a.size / 2) + ' ' + a.height + ' Z');
-            path.setAttribute('stroke-width', String(a.size * 0.04));
-            path.ownerSVGElement?.setAttribute('viewBox', '0 0 ' + a.size + ' ' + a.height);
-            path.ownerSVGElement?.setAttribute('preserveAspectRatio', 'none');
-        }
-        const letter = overlay.querySelector<HTMLElement>('span');
-        if (letter) {
-            const text = kind === 'wind' ? a.windLetter : a.waveLetter;
-            let svg = letter.querySelector<SVGSVGElement>('svg');
-            if (!svg) {
-                svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                svg.classList.add('route-indicator-letter');
-                svg.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'text'));
-                letter.replaceChildren(svg);
-            }
-            const node = svg.querySelector('text')!;
-            node.textContent = text;
-            const ink = measureIndicatorInk(text, a.size / (2 * a.height));
-            if (ink) {
-                const box = fitIndicatorText(a.size, a.textMargin, ink, a.height);
-                svg.setAttribute('viewBox', '0 0 ' + a.size + ' ' + box.height);
-                svg.setAttribute('preserveAspectRatio', 'none');
-                node.setAttribute('x', String(box.x));
-                node.setAttribute('y', String(box.y));
-                node.setAttribute('font-size', String(box.fontSize));
-                node.setAttribute('font-family', 'Arial, sans-serif');
-                node.setAttribute('font-weight', '700');
-                node.setAttribute('fill', '#fff');
-                svg.style.display = box.fontSize > 0 ? 'block' : 'none';
-            } else svg.style.display = 'none';
-        }
-        let valueLabel = overlay.querySelector<HTMLElement>('.route-indicator-value');
-        if (!valueLabel) { valueLabel = document.createElement('b'); valueLabel.className = 'route-indicator-value'; overlay.appendChild(valueLabel); }
-        valueLabel.hidden = !a.showValue || value === null;
-        valueLabel.textContent = value === null ? '' : (kind === 'wind' ? value.toFixed(1) + ' kn' : value.toFixed(1) + ' m');
-    }
-
-    function positionIndicatorLabels(overlay: HTMLDivElement, layout: { rotation: number; height: number }): void {
-        const degreesLabel = overlay.querySelector<HTMLElement>('.route-wind-degrees');
-        const valueLabel = overlay.querySelector<HTMLElement>('.route-indicator-value');
-        const showDegrees = Boolean(degreesLabel && !degreesLabel.hidden);
-        const showValue = Boolean(valueLabel && !valueLabel.hidden);
-        const offsets = indicatorLabelOffsets(layout.height, indicatorAppearance.textMargin, showDegrees ? degreesLabel!.offsetHeight : 0, showValue ? valueLabel!.offsetHeight : 0, showDegrees, showValue);
-        const radians = layout.rotation * Math.PI / 180;
-        const place = (label: HTMLElement, distance: number) => {
-            label.style.left = 'calc(50% + ' + distance * Math.sin(radians) + 'px)';
-            label.style.top = 'calc(50% - ' + distance * Math.cos(radians) + 'px)';
-            label.style.transform = 'translate(-50%, -50%) rotate(' + readableIndicatorRotation(layout.rotation) + 'deg)';
+        const marker = overlay.querySelector<HTMLElement>('.bar-indicator');
+        const nameBox = overlay.querySelector<HTMLElement>('.bar-indicator-name');
+        const dataBox = overlay.querySelector<HTMLElement>('.bar-indicator-data');
+        const tipPath = overlay.querySelector<SVGPathElement>('.bar-indicator-tip path');
+        const name = overlay.querySelector<HTMLElement>('.bar-indicator-name-text');
+        const directionText = overlay.querySelector<HTMLElement>('.bar-indicator-direction');
+        const valueText = overlay.querySelector<HTMLElement>('.bar-indicator-value');
+        if (!marker || !nameBox || !dataBox || !tipPath || !name || !directionText || !valueText) return;
+        const color = kind === 'wind' ? a.windColor : a.waveColor;
+        const title = kind === 'wind' ? a.windLetter : a.waveLetter;
+        const formattedValue = value === null ? '' : kind === 'wind' ? value.toFixed(1) + ' kn' : value.toFixed(1) + ' m';
+        marker.style.transform = 'rotate(' + rotation + 'deg)';
+        marker.style.setProperty('--bar-width', a.barWidth + 'px');
+        marker.style.setProperty('--bar-tip-height', a.tipHeight + 'px');
+        marker.style.setProperty('--bar-data-length', a.dataLength + 'px');
+        marker.style.setProperty('--bar-name-length', a.nameLength + 'px');
+        dataBox.style.backgroundColor = color;
+        tipPath.setAttribute('fill', color);
+        name.textContent = title;
+        directionText.textContent = String(Math.round(direction) % 360).padStart(3, '0') + '°';
+        valueText.textContent = formattedValue;
+        directionText.hidden = !a.showDirection;
+        valueText.hidden = !a.showValue || value === null;
+        const ctx = indicatorTextCanvas.getContext('2d');
+        const margin = Math.max(0, a.textMargin);
+        const textWidth = (text: string) => {
+            if (!ctx || !text) return 0;
+            ctx.font = '700 100px Arial, sans-serif';
+            return ctx.measureText(text).width / 100;
         };
-        if (degreesLabel && offsets.direction !== null) place(degreesLabel, offsets.direction);
-        if (valueLabel && offsets.value !== null) place(valueLabel, offsets.value);
+        const shown = [!directionText.hidden ? directionText.textContent : '', !valueText.hidden ? valueText.textContent : ''].filter(Boolean) as string[];
+        const widest = Math.max(0, ...shown.map(textWidth));
+        const dataFont = shown.length ? indicatorBarTextSize(a.barWidth, a.dataLength, margin, a.textSize, widest, shown.length) : 0;
+        const nameFont = indicatorBarTextSize(a.barWidth, a.nameLength, margin, a.textSize, textWidth(title), 1);
+        dataBox.style.setProperty('--bar-text-size', dataFont + 'px');
+        nameBox.style.setProperty('--bar-text-size', nameFont + 'px');
+        directionText.style.visibility = dataFont > 0 ? 'visible' : 'hidden';
+        valueText.style.visibility = dataFont > 0 ? 'visible' : 'hidden';
+        name.style.visibility = nameFont > 0 ? 'visible' : 'hidden';
+        const normalized = ((rotation + 180) % 360 + 360) % 360 - 180;
+        const flip = Math.abs(normalized - readableIndicatorRotation(rotation)) > 90 ? 'rotate(180deg)' : 'none';
+        directionText.style.transform = flip;
+        valueText.style.transform = flip;
+        name.style.transform = flip;
     }
 
     function routePointDirectionAtDistance(field: WindowConditionKey, distanceNm: number): number | null {
@@ -2873,32 +2831,21 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                     if (!overlay) {
                         overlay = document.createElement('div');
                         overlay.className = 'route-wind-indicator route-waypoint-direction-indicator';
-                        overlay.innerHTML = directionalIndicatorMarkup(config.fill, '');
+                        overlay.innerHTML = indicatorBarMarkup();
                         map.getContainer().appendChild(overlay);
                         routePointIndicatorOverlays.set(key, overlay);
                     }
-                    styleIndicator(overlay, config.kind, routePointValueAtDistance(config.kind === 'wind' ? indicatorAppearance.windValue : indicatorAppearance.waveValue, cumulativeDistances[index]));
                     const origin = map.latLngToContainerPoint([point.lat, point.lon]);
-                    const layout = directionalIndicatorLayout(origin, direction, bearing, config.distance, config.size, indicatorAppearance.height);
-                    const rotation = 'rotate(' + layout.rotation + 'deg)';
+                    const totalLength = indicatorAppearance.tipHeight + indicatorAppearance.dataLength + indicatorAppearance.nameLength;
+                    const layout = directionalIndicatorLayout(origin, direction, bearing, config.distance, indicatorAppearance.barWidth, totalLength);
                     overlay.style.left = layout.x + 'px';
                     overlay.style.top = layout.y + 'px';
                     overlay.style.setProperty('--wind-indicator-size', layout.width + 'px');
                     overlay.style.setProperty('--wind-indicator-height', layout.height + 'px');
-                    overlay.style.setProperty('--wind-indicator-padding', layout.padding + 'px');
-                    overlay.style.setProperty('--wind-indicator-text-size', config.textSize + 'px');
-                    const triangle = overlay.querySelector<SVGElement>('svg');
-                    if (triangle) triangle.style.transform = rotation;
-                    const label = overlay.querySelector<HTMLElement>('span:not(.route-wind-degrees)');
-                    if (label) label.style.transform = rotation;
-                    const degreesLabel = overlay.querySelector<HTMLElement>('.route-wind-degrees');
-                    if (degreesLabel) {
-                        degreesLabel.textContent = String(Math.round(direction) % 360).padStart(3, '0');
-                        degreesLabel.hidden = !config.degreesEnabled;
-                    }
+                    const value = routePointValueAtDistance(config.kind === 'wind' ? indicatorAppearance.windValue : indicatorAppearance.waveValue, cumulativeDistances[index]);
+                    renderBarIndicator(overlay, config.kind, direction, value, layout.rotation);
                     overlay.title = (config.kind === 'wave' ? 'Olas' : 'Viento') + ' en waypoint ' + String(index + 1) + ' desde ' + Math.round(direction) + '°';
                     overlay.hidden = false;
-                    positionIndicatorLabels(overlay, layout);
                 }
             });
         }
@@ -2932,39 +2879,23 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             overlay.className = 'route-wind-indicator';
             const fill = isWave ? '#f4d03f' : '#087bd1';
             const label = isWave ? 'W' : 'T';
-            overlay.innerHTML = directionalIndicatorMarkup(fill, label);
+            overlay.innerHTML = indicatorBarMarkup();
             map.getContainer().appendChild(overlay);
             if (isWave) waveIndicatorOverlay = overlay;
             else windIndicatorOverlay = overlay;
         }
-        // Both symbols share size, offset, text size, and bearing math.
-        // Their color and letter distinguish wind from waves.
-        styleIndicator(overlay, kind, indicatorValue(isWave ? indicatorAppearance.waveValue : indicatorAppearance.windValue, sample?.values));
         const distance = indicatorAppearance.distance;
-        const size = indicatorAppearance.size;
-        const textSize = indicatorAppearance.textSize;
+        const totalLength = indicatorAppearance.tipHeight + indicatorAppearance.dataLength + indicatorAppearance.nameLength;
         const origin = map.latLngToContainerPoint([fix.lat, fix.lon]);
         const bearing = map.maplibreMap?.getBearing?.() ?? 0;
-        const layout = directionalIndicatorLayout(origin, direction, bearing, distance, size, indicatorAppearance.height);
-        const rotation = `rotate(${layout.rotation}deg)`;
+        const layout = directionalIndicatorLayout(origin, direction, bearing, distance, indicatorAppearance.barWidth, totalLength);
         overlay.style.left = `${layout.x}px`;
         overlay.style.top = `${layout.y}px`;
-        overlay.style.setProperty('--wind-indicator-size', `${layout.width}px`);
-        overlay.style.setProperty('--wind-indicator-height', `${layout.height}px`);
-        overlay.style.setProperty('--wind-indicator-padding', `${layout.padding}px`);
-        overlay.style.setProperty('--wind-indicator-text-size', `${textSize}px`);
-        const triangle = overlay.querySelector<SVGElement>('svg');
-        if (triangle) triangle.style.transform = rotation;
-        const label = overlay.querySelector<HTMLElement>('span:not(.route-wind-degrees)');
-        if (label) label.style.transform = rotation;
-        const degreesLabel = overlay.querySelector<HTMLElement>('.route-wind-degrees');
-        if (degreesLabel) {
-            degreesLabel.textContent = String(Math.round(direction) % 360).padStart(3, '0');
-            degreesLabel.hidden = !indicatorAppearance.showDirection;
-        }
+        overlay.style.setProperty('--wind-indicator-size', layout.width + 'px');
+        overlay.style.setProperty('--wind-indicator-height', layout.height + 'px');
+        renderBarIndicator(overlay, kind, direction, indicatorValue(isWave ? indicatorAppearance.waveValue : indicatorAppearance.windValue, sample?.values), layout.rotation);
         overlay.title = isWave ? `Olas desde ${Math.round(direction)}°` : `Viento previsto desde ${Math.round(direction)}°`;
         overlay.hidden = false;
-        positionIndicatorLabels(overlay, layout);
     }
 
     function redrawWindIndicator(): void { redrawDirectionalIndicator('wind'); }
@@ -4437,14 +4368,14 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             const indicatorControl = target.closest<HTMLInputElement | HTMLSelectElement>('[data-indicator-common], [data-indicator-individual]');
             if (indicatorControl) {
                 const key = indicatorControl.dataset.indicatorCommon || indicatorControl.dataset.indicatorIndividual || '';
-                const allowed = ['size', 'height', 'distance', 'pointDistance', 'textSize', 'textMargin', 'showDirection', 'showValue', 'windColor', 'waveColor', 'windLetter', 'waveLetter', 'windValue', 'waveValue'];
+                const allowed = ['size', 'height', 'barWidth', 'tipHeight', 'dataLength', 'nameLength', 'distance', 'pointDistance', 'textSize', 'textMargin', 'showDirection', 'showValue', 'windColor', 'waveColor', 'windLetter', 'waveLetter', 'windValue', 'waveValue'];
                 if (!allowed.includes(key)) return;
                 let value: any = indicatorControl.value;
                 if (key === 'showDirection' || key === 'showValue') value = (indicatorControl as HTMLInputElement).checked;
-                else if (key === 'size' || key === 'height' || key === 'distance' || key === 'pointDistance' || key === 'textSize' || key === 'textMargin') {
+                else if (key === 'size' || key === 'height' || key === 'barWidth' || key === 'tipHeight' || key === 'dataLength' || key === 'nameLength' || key === 'distance' || key === 'pointDistance' || key === 'textSize' || key === 'textMargin') {
                     const n = Number(value);
                     if (!Number.isFinite(n)) return;
-                    value = key === 'size' ? Math.max(5, Math.min(80, n)) : key === 'height' ? Math.max(5, Math.min(250, n)) : (key === 'distance' || key === 'pointDistance') ? Math.max(20, Math.min(200, n)) : key === 'textMargin' ? Math.max(0, Math.min(40, n)) : Math.max(6, Math.min(40, n));
+                    value = key === 'barWidth' ? Math.max(12, Math.min(100, n)) : key === 'tipHeight' ? Math.max(5, Math.min(100, n)) : key === 'dataLength' ? Math.max(12, Math.min(250, n)) : key === 'nameLength' ? Math.max(12, Math.min(150, n)) : key === 'size' ? Math.max(5, Math.min(80, n)) : key === 'height' ? Math.max(5, Math.min(250, n)) : (key === 'distance' || key === 'pointDistance') ? Math.max(20, Math.min(200, n)) : key === 'textMargin' ? Math.max(0, Math.min(40, n)) : Math.max(6, Math.min(40, n));
                     indicatorControl.value = String(value);
                 } else if (key.endsWith('Letter')) { value = value.replace(/[\r\n]/g, ' '); indicatorControl.value = value; }
                 else if (key.endsWith('Color') && !/^#[0-9a-f]{6}$/i.test(value)) return;
@@ -4826,9 +4757,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const windValueFields = activeWindModelFields();
         const windValueOptions: WindowConditionKey[] = windValueFields.length > 1 ? ['windAverage', ...windValueFields] : windValueFields;
         const valueOptions = (fields: WindowConditionKey[], selected: string) => fields.map(field => `<option value="${field}"${field === selected ? ' selected' : ''}>${field === 'windAverage' || field === 'wavesAverage' || field === 'swell1Average' ? 'Promedio' : routeFieldPickerLabels[field]}</option>`).join('');
-        const commonIndicatorSettings = `<details class="navigation-visual-group"><summary>Formato de indicadores</summary><div class="navigation-visual-group-body"><label>Tamaño del triángulo (base en px)<input type="number" min="5" max="80" step="1" data-indicator-common="size" value="${indicatorAppearance.size}"></label><label>Altura del triángulo (px)<input type="number" min="5" max="250" step="0.5" data-indicator-common="height" value="${indicatorAppearance.height}"></label><label>Distancia al barco (px)<input type="number" min="20" max="200" step="1" data-indicator-common="distance" value="${indicatorAppearance.distance}"></label><label>Distancia al punto (px)<input type="number" min="20" max="200" step="1" data-indicator-common="pointDistance" value="${indicatorAppearance.pointDistance}"></label><label>Margen del texto (px)<input type="number" min="0" max="40" step="0.5" data-indicator-common="textMargin" value="${indicatorAppearance.textMargin}"></label><small>El texto se ajusta dentro del triángulo con el mismo margen en sus tres lados. Si no cabe, se oculta.</small><label>Tamaño de números (px)<input type="number" min="6" max="40" step="1" data-indicator-common="textSize" value="${indicatorAppearance.textSize}"></label><label>Mostrar dirección<input type="checkbox" data-indicator-common="showDirection"${indicatorAppearance.showDirection ? ' checked' : ''}></label><label>Mostrar valor<input type="checkbox" data-indicator-common="showValue"${indicatorAppearance.showValue ? ' checked' : ''}></label></div></details>`;
-        const windIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wind"${windIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de viento</summary><div class="navigation-visual-group-body"><label>Fuente de dirección<select data-wind-indicator-field><option value="">Ninguno</option>${windOptions}</select></label><label>Fuente de valor<select data-indicator-individual="windValue"><option value="">Ninguno</option>${valueOptions(windValueOptions, indicatorAppearance.windValue)}</select></label><label>Color<input type="color" data-indicator-individual="windColor" value="${indicatorAppearance.windColor}"></label><label>Letra<input type="text" data-indicator-individual="windLetter" value="${escapeIndicatorAttribute(indicatorAppearance.windLetter)}"></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wind"${routeWindIndicatorsEnabled ? ' checked' : ''}></label></div></details>`;
-        const waveIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wave"${waveIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de olas</summary><div class="navigation-visual-group-body"><label>Fuente de dirección<select data-wave-indicator-field><option value="">Ninguno</option>${waveOptions}</select></label><label>Fuente de valor<select data-indicator-individual="waveValue"><option value="">Ninguno</option>${valueOptions(waveFields, indicatorAppearance.waveValue)}</select></label><label>Color<input type="color" data-indicator-individual="waveColor" value="${indicatorAppearance.waveColor}"></label><label>Letra<input type="text" data-indicator-individual="waveLetter" value="${escapeIndicatorAttribute(indicatorAppearance.waveLetter)}"></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wave"${routeWaveIndicatorsEnabled ? ' checked' : ''}></label></div></details>`;
+        const commonIndicatorSettings = `<details class="navigation-visual-group"><summary>Formato de indicadores</summary><div class="navigation-visual-group-body"><label>Distancia al barco (px)<input type="number" min="20" max="200" step="1" data-indicator-common="distance" value="${indicatorAppearance.distance}"></label><label>Distancia al punto (px)<input type="number" min="20" max="200" step="1" data-indicator-common="pointDistance" value="${indicatorAppearance.pointDistance}"></label><label>Alto del triángulo (px)<input type="number" min="5" max="100" step="1" data-indicator-common="tipHeight" value="${indicatorAppearance.tipHeight}"></label><label>Ancho del campo de datos (px)<input type="number" min="12" max="100" step="1" data-indicator-common="barWidth" value="${indicatorAppearance.barWidth}"></label><label>Largo del campo de datos (px)<input type="number" min="12" max="250" step="1" data-indicator-common="dataLength" value="${indicatorAppearance.dataLength}"></label><label>Largo del campo de nombre (px)<input type="number" min="12" max="150" step="1" data-indicator-common="nameLength" value="${indicatorAppearance.nameLength}"></label><label>Margen del texto (px)<input type="number" min="0" max="40" step="0.5" data-indicator-common="textMargin" value="${indicatorAppearance.textMargin}"></label><label>Tamaño máximo de texto (px)<input type="number" min="6" max="40" step="1" data-indicator-common="textSize" value="${indicatorAppearance.textSize}"></label><label>Mostrar dirección<input type="checkbox" data-indicator-common="showDirection"${indicatorAppearance.showDirection ? ' checked' : ''}></label><label>Mostrar valor<input type="checkbox" data-indicator-common="showValue"${indicatorAppearance.showValue ? ' checked' : ''}></label></div></details>`;
+        const windIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wind"${windIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de viento</summary><div class="navigation-visual-group-body"><label>Fuente de dirección<select data-wind-indicator-field><option value="">Ninguno</option>${windOptions}</select></label><label>Fuente de valor<select data-indicator-individual="windValue"><option value="">Ninguno</option>${valueOptions(windValueOptions, indicatorAppearance.windValue)}</select></label><label>Color<input type="color" data-indicator-individual="windColor" value="${indicatorAppearance.windColor}"></label><label>Nombre<input type="text" data-indicator-individual="windLetter" value="${escapeIndicatorAttribute(indicatorAppearance.windLetter)}"></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wind"${routeWindIndicatorsEnabled ? ' checked' : ''}></label></div></details>`;
+        const waveIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wave"${waveIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de olas</summary><div class="navigation-visual-group-body"><label>Fuente de dirección<select data-wave-indicator-field><option value="">Ninguno</option>${waveOptions}</select></label><label>Fuente de valor<select data-indicator-individual="waveValue"><option value="">Ninguno</option>${valueOptions(waveFields, indicatorAppearance.waveValue)}</select></label><label>Color<input type="color" data-indicator-individual="waveColor" value="${indicatorAppearance.waveColor}"></label><label>Nombre<input type="text" data-indicator-individual="waveLetter" value="${escapeIndicatorAttribute(indicatorAppearance.waveLetter)}"></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wave"${routeWaveIndicatorsEnabled ? ' checked' : ''}></label></div></details>`;
         const laylinesSettings = `<details class="navigation-visual-group" data-visual-group="laylines"${laylinesSettingsOpen ? ' open' : ''}><summary>Laylines</summary><div class="navigation-visual-group-body"><label>Modo<select data-layline-mode>${laylineModes.map(([value, label]) => `<option value="${value}"${value === laylineMode ? ' selected' : ''}>${label}</option>`).join('')}</select></label><label>Ángulo Upwind (0–90°)<input type="number" min="0" max="90" step="1" value="${upwindLaylineAngle}" data-layline-setting="upwind-angle"></label><label>Ángulo Downwind (90–180°)<input type="number" min="90" max="180" step="1" value="${downwindLaylineAngle}" data-layline-setting="downwind-angle"></label><label>Color babor del viento<input type="color" data-layline-color="port" value="${portWindLaylineColor}" aria-label="Color de las laylines por babor del viento"></label><label>Color estribor del viento<input type="color" data-layline-color="starboard" value="${starboardWindLaylineColor}" aria-label="Color de las laylines por estribor del viento"></label><small>Los ángulos se miden respecto a la dirección de donde viene el viento. Automático compara el viento seleccionado con el rumbo GPS del barco.</small></div></details>`;
         const windRoseSettings = `<details class="navigation-visual-group" data-visual-group="rose"${windRoseSettingsOpen ? ' open' : ''}><summary>Rosa de los vientos</summary><div class="navigation-visual-group-body"><label class="wind-rose-toggle">Mostrar rosa<input type="checkbox" data-wind-rose-enabled${windRoseEnabled ? ' checked' : ''}></label><label>Radio del círculo (px)<input type="number" min="20" max="200" step="1" value="${windRoseRadius}" data-wind-rose-setting="radius"></label><label>Ancho (px)<input type="number" min="1" max="20" step="1" value="${windRoseLineWidth}" data-wind-rose-setting="width" title="Grosor de las líneas de la rosa"></label><label>Tamaño de fuente (px)<input type="number" min="4" max="24" step="1" value="${windRoseFontSize}" data-wind-rose-setting="font-size"></label><label>Transparencia (%)<input type="number" min="0" max="100" step="1" value="${windRoseTransparency}" data-wind-rose-setting="transparency"></label><label>Etiquetas<select data-wind-rose-label-mode><option value="cardinal"${windRoseLabelMode === 'cardinal' ? ' selected' : ''}>Signos cardinales</option><option value="degrees"${windRoseLabelMode === 'degrees' ? ' selected' : ''}>Grados</option></select></label><hr><strong>Indicador de grados del heading</strong><label class="wind-rose-toggle">Mostrar grados<input type="checkbox" data-heading-degrees-enabled${headingDegreesEnabled ? ' checked' : ''}></label><label>Tamaño de letra (px)<input type="number" min="6" max="40" step="1" value="${headingDegreesFontSize}" data-heading-degrees-setting="font-size"></label><label>Ancho (px)<input type="number" min="30" max="200" step="1" value="${headingDegreesWidth}" data-heading-degrees-setting="width"></label><label>Alto (px)<input type="number" min="16" max="100" step="1" value="${headingDegreesHeight}" data-heading-degrees-setting="height"></label></div></details>`;
         const navigationSettings = `<div class="route-forecast-settings"><strong>Ubicación</strong><label>Fuente de ubicación<select aria-label="Fuente de ubicación"><option selected>Automática (alta precisión)</option><option disabled>Solo GPS (solo en la App de celular)</option></select></label><small>La ubicación es proporcionada por el celular o el navegador.</small><strong>En vivo</strong><label>Promedio de velocidad<select data-live-setting="speed">${liveSpeedOptions.map(value => option(value, liveSpeedSeconds)).join('')}</select></label><label>Actualizar pronóstico<select data-live-setting="forecast">${liveForecastOptions.map(value => option(value, liveForecastSeconds)).join('')}</select></label><label>Refrescar waypoints<select data-live-setting="waypoints">${liveWaypointOptions.map(value => option(value, liveWaypointSeconds)).join('')}</select></label><label class="nav-restore-route-setting">Cargar ruta anterior al salir del modo NAV<input type="checkbox" data-nav-restore-previous-route${restorePreviousRouteOnNavExit ? ' checked' : ''}></label><small>Apagado: conserva la ruta que estabas navegando.</small><details class="navigation-visual-aids"${visualAidsOpen ? ' open' : ''}><summary>Ayudas visuales</summary><div class="navigation-visual-aids-list">${commonIndicatorSettings}${windIndicatorSettings}${waveIndicatorSettings}${laylinesSettings}${windRoseSettings}</div></details></div>`;
@@ -6212,6 +6143,14 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-builder-gps-position-icon .gps-position-dot) { position: absolute; inset: 9px; display: block; border: 2px solid #fff; border-radius: 50%; background: #087bd1; box-shadow: 0 1px 3px #102b3b99; }
     :global(.route-builder-gps-position-icon svg) { display: block; filter: drop-shadow(0 1px 2px #102b3b99); }
     :global(.route-wind-indicator) { position: absolute; z-index: 650; width: var(--wind-indicator-size, 26px); height: var(--wind-indicator-height, 30px); transform: translate(-50%, -50%); pointer-events: none; }
+    :global(.bar-indicator) { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: stretch; transform-origin: center; pointer-events: none; }
+    :global(.bar-indicator-name) { height: var(--bar-name-length); flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #111; }
+    :global(.bar-indicator-data) { height: var(--bar-data-length); flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+    :global(.bar-indicator-name-text), :global(.bar-indicator-direction), :global(.bar-indicator-value) { display: block; flex: none; max-width: 100%; white-space: nowrap; font: 700 var(--bar-text-size, 10px)/1.1 Arial,sans-serif; }
+    :global(.bar-indicator-name-text) { color: #fff; }
+    :global(.bar-indicator-direction), :global(.bar-indicator-value) { color: #000; }
+    :global(.bar-indicator-direction[hidden]), :global(.bar-indicator-value[hidden]) { display: none; }
+    :global(.bar-indicator-tip) { width: 100%; height: var(--bar-tip-height); flex: none; display: block; overflow: visible; }
     :global(.route-wind-rose) { position: absolute; z-index: 640; transform: translate(-50%, -50%); pointer-events: none; }
     :global(.route-wind-rose[hidden]) { display: none; }
     :global(.route-heading-degrees) { position: absolute; z-index: 645; display: grid; place-items: center; box-sizing: border-box; transform: translate(-50%, -50%); overflow: hidden; border: 2px solid #202426; border-radius: 6px; background: #f7f7f2; color: #202426; font-family: Arial,sans-serif; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 1px 3px #17252988; pointer-events: none; }
