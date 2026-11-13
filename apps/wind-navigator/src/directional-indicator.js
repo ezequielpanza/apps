@@ -1,8 +1,7 @@
 const HEIGHT = Math.sqrt(10 * 10 - 2.5 * 2.5);
-export function directionalIndicatorLayout(origin, direction, mapBearing, distance, size) {
+export function directionalIndicatorLayout(origin, direction, mapBearing, distance, size, height = size * HEIGHT / 5) {
     const rotation = direction - mapBearing;
     const radians = rotation * Math.PI / 180;
-    const height = size * HEIGHT / 5;
     const centerDistance = distance + height / 2;
     return { x: origin.x + centerDistance * Math.sin(radians), y: origin.y - centerDistance * Math.cos(radians), rotation, width: size, height, padding: 0, degreesOffset: size * 0.5 + 10 };
 }
@@ -11,8 +10,7 @@ export function directionalIndicatorMarkup(fill, letter) {
 }
 
 /** Fit the visible glyph contour at equal clearance from the stroked triangle. */
-export function fitIndicatorText(size, margin, ink) {
-    const height = size * HEIGHT / 5;
+export function fitIndicatorText(size, margin, ink, height = size * HEIGHT / 5) {
     const m = Math.max(0, Number(margin) || 0) + size * 0.02;
     const slope = size / (2 * height);
     const available = size - 2 * slope * m - 2 * m * Math.hypot(1, slope);

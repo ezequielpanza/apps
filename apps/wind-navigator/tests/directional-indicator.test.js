@@ -42,3 +42,29 @@ test('visible text contour clears all three stroked edges by the configured marg
     }
     assert.equal(fitIndicatorText(5, 2, {minY: -0.8, left: -0.2, right: 1}).fontSize, 0);
 });
+
+test('height can change independently while the tip distance remains fixed', () => {
+    for (const size of [10, 40, 80]) for (const height of [8, 40, 160]) for (const bearing of [0, 120, 270]) {
+        const o = {x: 10, y: 20};
+        const v = directionalIndicatorLayout(o, bearing, 0, 35, size, height);
+        const theta = v.rotation * Math.PI / 180;
+        const tx = v.x - Math.sin(theta) * height / 2;
+        const ty = v.y + Math.cos(theta) * height / 2;
+        assert.equal(v.width, size);
+        assert.equal(v.height, height);
+        assert.ok(Math.abs(Math.hypot(tx - o.x, ty - o.y) - 35) < 1e-9);
+    }
+});
+
+test('text clearance follows the selected triangle height', () => {
+    const size = 50, margin = 2, ink = { minY: -0.7, left: -0.08, right: 1.5 };
+    for (const height of [20, 50, 100, 200]) {
+        const slope = size / (2 * height), effective = margin + size * 0.02;
+        const v = fitIndicatorText(size, margin, ink, height);
+        assert.equal(v.height, height);
+        if (!v.fontSize) continue;
+        assert.ok(Math.abs(v.y + v.fontSize * ink.minY - effective) < 1e-9);
+        assert.ok(Math.abs((v.x - slope * v.y + v.fontSize * ink.left) / Math.hypot(1, slope) - effective) < 1e-9);
+        assert.ok(Math.abs((size - v.x - slope * v.y - v.fontSize * ink.right) / Math.hypot(1, slope) - effective) < 1e-9);
+    }
+});
