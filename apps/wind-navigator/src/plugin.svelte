@@ -316,6 +316,15 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const meaning = key === 'current' || key === 'currentTide' ? 'Dirección de la corriente' : 'Dirección del pronóstico';
         return `<div class="direction-wheel-box"><strong>${meaning}</strong><div class="direction-wheel" aria-label="Direcciones aceptadas">${buttons}</div><button type="button" class="forecast-button" data-direction-all>Seleccionar todas</button><small>Sin selección: se aceptan todas las direcciones.</small></div>`;
     }
+    let indicatorAppearance = { size: 5, distance: 80, textSize: 10, showDirection: true, showValue: true, windColor: '#087bd1', waveColor: '#f4d03f', windLetter: 'T', waveLetter: 'W', windValue: 'wind', waveValue: 'waves' };
+    try {
+        const saved = JSON.parse(localStorage.getItem('route-builder-indicator-appearance-v1') || '{}');
+        for (const key of ['size', 'distance', 'textSize']) if (Number.isFinite(Number(saved[key]))) (indicatorAppearance as any)[key] = Number(saved[key]);
+        for (const key of ['showDirection', 'showValue']) if (typeof saved[key] === 'boolean') (indicatorAppearance as any)[key] = saved[key];
+        for (const key of ['windColor', 'waveColor']) if (/^#[0-9a-f]{6}$/i.test(saved[key] || '')) (indicatorAppearance as any)[key] = saved[key];
+        for (const key of ['windLetter', 'waveLetter']) if (typeof saved[key] === 'string') (indicatorAppearance as any)[key] = saved[key].replace(/[^a-z0-9]/gi, '').slice(0, 2);
+        for (const key of ['windValue', 'waveValue']) if (typeof saved[key] === 'string') (indicatorAppearance as any)[key] = saved[key];
+    } catch { /* Use the defaults. */ }
     let windModelRowsCollapsed = true;
     let windIndicatorField: WindowConditionKey | '' = '';
     let windIndicatorUserChoice = false;
@@ -2625,6 +2634,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             const val = (d: any, key: string) => { const index = d ? coveredForecastIndex(d.ts, t) : -1; return index >= 0 ? forecastNumber(d, key, index) : null; };
             const direction = (d: any, key: string) => forecastDirectionValue(d, key, t, d ? coveredForecastIndex(d.ts, t) : -1);
             localForecast = { lat, lon, distanceNm: 0, eta: new Date(t), values: {
+                wind: val(b.data, 'wind') === null ? null : (val(b.data, 'wind') as number) * 1.94384,
+                ecmwfWind: val(b.ecmwfData, 'wind') === null ? null : (val(b.ecmwfData, 'wind') as number) * 1.94384,
+                iconWind: val(b.iconData, 'wind') === null ? null : (val(b.iconData, 'wind') as number) * 1.94384,
+                waves: val(b.seaData, 'waves'), ecmwfWaves: val(b.ecmwfSeaData, 'waves'), swell1: val(b.seaData, 'swell1'), ecmwfSwell1: val(b.ecmwfSeaData, 'swell1'), swell2: val(b.seaData, 'swell2'), windWaves: val(b.seaData, 'windWaves'),
                 direction: direction(b.data, 'windDir'), ecmwfWindDirection: direction(b.ecmwfData, 'windDir'), iconWindDirection: direction(b.iconData, 'windDir'),
                 wavesDir: direction(b.seaData, 'wavesDir'), ecmwfWavesDir: direction(b.ecmwfSeaData, 'wavesDir'), swell1Dir: direction(b.seaData, 'swell1Dir'),
                 ecmwfSwell1Dir: direction(b.ecmwfSeaData, 'swell1Dir'), swell2Dir: direction(b.seaData, 'swell2Dir'),
@@ -2700,6 +2713,36 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         redrawRoutePointIndicators();
     }
 
+    function indicatorValue(field: string, values?: Record<string, number | null>): number | null {
+        if (!field || !values) return null;
+        if (field === 'windAverage') return averageWindForValues(values);
+        if (field === 'wavesAverage' || field === 'swell1Average') return groupValue(field as WindowConditionKey, values);
+        const value = values[field];
+        return typeof value === 'number' && Number.isFinite(value) ? value : null;
+    }
+    function routePointValueAtDistance(field: string, distance: number): number | null {
+        const samples = routeForecast.map(sample => ({ distance: sample.distanceNm, value: indicatorValue(field, sample.values) }))
+            .filter((sample): sample is { distance: number; value: number } => Number.isFinite(sample.distance) && sample.value !== null)
+            .sort((a, b) => a.distance - b.distance);
+        const exact = samples.find(sample => Math.abs(sample.distance - distance) < 0.001);
+        if (exact) return exact.value;
+        let before: { distance: number; value: number } | undefined;
+        let after: { distance: number; value: number } | undefined;
+        for (const sample of samples) { if (sample.distance < distance) before = sample; else { after = sample; break; } }
+        return before && after && after.distance > before.distance ? before.value + (after.value - before.value) * (distance - before.distance) / (after.distance - before.distance) : null;
+    }
+    function styleIndicator(overlay: HTMLDivElement, kind: 'wind' | 'wave', value: number | null): void {
+        const a = indicatorAppearance;
+        const path = overlay.querySelector<SVGPathElement>('svg path');
+        if (path) path.setAttribute('fill', kind === 'wind' ? a.windColor : a.waveColor);
+        const letter = overlay.querySelector<HTMLElement>('span');
+        if (letter) letter.textContent = kind === 'wind' ? a.windLetter : a.waveLetter;
+        let valueLabel = overlay.querySelector<HTMLElement>('.route-indicator-value');
+        if (!valueLabel) { valueLabel = document.createElement('b'); valueLabel.className = 'route-indicator-value'; overlay.appendChild(valueLabel); }
+        valueLabel.hidden = !a.showValue || value === null;
+        valueLabel.textContent = value === null ? '' : (kind === 'wind' ? value.toFixed(1) + ' kn' : value.toFixed(1) + ' m');
+    }
+
     function routePointDirectionAtDistance(field: WindowConditionKey, distanceNm: number): number | null {
         const samples = routeForecast
             .filter(sample => sample.values && Number.isFinite(sample.distanceNm))
@@ -2730,8 +2773,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 cumulativeDistances.push(cumulativeDistances[index - 1] + haversineNm(points[index - 1], points[index]));
             }
             const configs = [
-                { kind: 'wind' as const, enabled: routeWindIndicatorsEnabled, field: windIndicatorField, distance: routeWindIndicatorDistance, size: windIndicatorSize, textSize: windIndicatorTextSize, degreesEnabled: windIndicatorDegreesEnabled, fill: '#087bd1', letter: 'T' },
-                { kind: 'wave' as const, enabled: routeWaveIndicatorsEnabled, field: waveIndicatorField, distance: routeWaveIndicatorDistance, size: waveIndicatorSize, textSize: waveIndicatorTextSize, degreesEnabled: waveIndicatorDegreesEnabled, fill: '#f4d03f', letter: 'W' },
+                { kind: 'wind' as const, enabled: routeWindIndicatorsEnabled, field: windIndicatorField, distance: routeWindIndicatorDistance, size: indicatorAppearance.size, textSize: indicatorAppearance.textSize, degreesEnabled: indicatorAppearance.showDirection, fill: indicatorAppearance.windColor, letter: indicatorAppearance.windLetter },
+                { kind: 'wave' as const, enabled: routeWaveIndicatorsEnabled, field: waveIndicatorField, distance: routeWaveIndicatorDistance, size: indicatorAppearance.size, textSize: indicatorAppearance.textSize, degreesEnabled: indicatorAppearance.showDirection, fill: indicatorAppearance.waveColor, letter: indicatorAppearance.waveLetter },
             ];
             const bearing = map.maplibreMap?.getBearing?.() ?? 0;
             points.forEach((point, index) => {
@@ -2750,6 +2793,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                         map.getContainer().appendChild(overlay);
                         routePointIndicatorOverlays.set(key, overlay);
                     }
+                    styleIndicator(overlay, config.kind, routePointValueAtDistance(config.kind === 'wind' ? indicatorAppearance.windValue : indicatorAppearance.waveValue, cumulativeDistances[index]));
                     const origin = map.latLngToContainerPoint([point.lat, point.lon]);
                     const layout = directionalIndicatorLayout(origin, direction, bearing, config.distance, config.size);
                     const rotation = 'rotate(' + layout.rotation + 'deg)';
@@ -2814,9 +2858,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         }
         // Both symbols share size, offset, text size, and bearing math.
         // Their color and letter distinguish wind from waves.
-        const distance = windIndicatorDistance;
-        const size = windIndicatorSize;
-        const textSize = windIndicatorTextSize;
+        styleIndicator(overlay, kind, indicatorValue(isWave ? indicatorAppearance.waveValue : indicatorAppearance.windValue, sample?.values));
+        const distance = indicatorAppearance.distance;
+        const size = indicatorAppearance.size;
+        const textSize = indicatorAppearance.textSize;
         const origin = map.latLngToContainerPoint([fix.lat, fix.lon]);
         const bearing = map.maplibreMap?.getBearing?.() ?? 0;
         const layout = directionalIndicatorLayout(origin, direction, bearing, distance, size);
@@ -2834,7 +2879,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const degreesLabel = overlay.querySelector<HTMLElement>('.route-wind-degrees');
         if (degreesLabel) {
             degreesLabel.textContent = String(Math.round(direction) % 360).padStart(3, '0');
-            degreesLabel.hidden = !windIndicatorDegreesEnabled;
+            degreesLabel.hidden = !indicatorAppearance.showDirection;
             const labelRadians = layout.rotation * Math.PI / 180;
             degreesLabel.style.left = `calc(50% + ${layout.degreesOffset * Math.sin(labelRadians)}px)`;
             degreesLabel.style.top = `calc(50% - ${layout.degreesOffset * Math.cos(labelRadians)}px)`;
@@ -4311,6 +4356,27 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 applyRouteSettings();
                 return;
             }
+            const indicatorControl = target.closest<HTMLInputElement | HTMLSelectElement>('[data-indicator-common], [data-indicator-individual]');
+            if (indicatorControl) {
+                const key = indicatorControl.dataset.indicatorCommon || indicatorControl.dataset.indicatorIndividual || '';
+                const allowed = ['size', 'distance', 'textSize', 'showDirection', 'showValue', 'windColor', 'waveColor', 'windLetter', 'waveLetter', 'windValue', 'waveValue'];
+                if (!allowed.includes(key)) return;
+                let value: any = indicatorControl.value;
+                if (key === 'showDirection' || key === 'showValue') value = (indicatorControl as HTMLInputElement).checked;
+                else if (key === 'size' || key === 'distance' || key === 'textSize') {
+                    const n = Number(value);
+                    if (!Number.isFinite(n)) return;
+                    value = key === 'size' ? Math.max(5, Math.min(80, n)) : key === 'distance' ? Math.max(20, Math.min(200, n)) : Math.max(6, Math.min(40, n));
+                    indicatorControl.value = String(value);
+                } else if (key.endsWith('Letter')) { value = value.replace(/[^a-z0-9]/gi, '').slice(0, 2); indicatorControl.value = value; }
+                else if (key.endsWith('Color') && !/^#[0-9a-f]{6}$/i.test(value)) return;
+                else if (key === 'windValue' && value && !(['windAverage', ...activeWindModelFields()] as string[]).includes(value)) return;
+                else if (key === 'waveValue' && value && !(waveIndicatorOptions() as string[]).includes(value)) return;
+                (indicatorAppearance as any)[key] = value;
+                try { localStorage.setItem('route-builder-indicator-appearance-v1', JSON.stringify(indicatorAppearance)); } catch { /* Keep settings in memory. */ }
+                redrawMapOverlays();
+                return;
+            }
             const windIndicatorSelect = target.closest<HTMLSelectElement>('[data-wind-indicator-field]');
             if (windIndicatorSelect) {
                 const field = windIndicatorSelect.value as WindowConditionKey | '';
@@ -4676,11 +4742,15 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         }
         const waveOptions = waveFields.map(field => `<option value="${field}"${field === waveIndicatorField ? ' selected' : ''}>${field === 'wavesAverage' || field === 'swell1Average' ? 'Promedio' : routeFieldPickerLabels[field]}</option>`).join('');
         const laylineModes = [['none', 'Ninguno'], ['upwind', 'Solo Upwind'], ['downwind', 'Solo Downwind'], ['both', 'Ambos'], ['automatic', 'Automático']] as const;
-        const windIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wind"${windIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de viento</summary><div class="navigation-visual-group-body"><label>Fuente<select data-wind-indicator-field aria-label="Fuente del indicador de viento"><option value="">Ninguno</option>${windOptions}</select></label><label class="wind-degrees-setting">Mostrar grados del viento<input type="checkbox" data-wind-indicator-degrees${windIndicatorDegreesEnabled ? ' checked' : ''}></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wind"${routeWindIndicatorsEnabled ? ' checked' : ''}></label><label>Distancia al punto (px)<input type="number" min="20" max="200" step="1" value="${routeWindIndicatorDistance}" data-waypoint-indicator-distance="wind"></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wave"${routeWaveIndicatorsEnabled ? ' checked' : ''}></label><label>Distancia al punto (px)<input type="number" min="20" max="200" step="1" value="${routeWaveIndicatorDistance}" data-waypoint-indicator-distance="wave"></label><label>Distancia al barco (px)<input type="number" min="20" max="200" step="1" value="${windIndicatorDistance}" data-wind-indicator-setting="distance"></label><label>Tamaño del indicador (px)<input type="number" min="16" max="80" step="1" value="${windIndicatorSize}" data-wind-indicator-setting="size"></label><label>Tamaño de la letra (px)<input type="number" min="6" max="40" step="1" value="${windIndicatorTextSize}" data-wind-indicator-setting="text-size"></label></div></details>`;
-        const waveIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wave"${waveIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de olas</summary><div class="navigation-visual-group-body"><label>Fuente<select data-wave-indicator-field aria-label="Fuente del indicador de olas"><option value="">Ninguno</option>${waveOptions}</select></label><label>Mostrar grados de las olas<input type="checkbox" data-wave-indicator-degrees${waveIndicatorDegreesEnabled ? ' checked' : ''}></label><label>Distancia al barco (px)<input type="number" min="20" max="200" step="1" value="${waveIndicatorDistance}" data-wave-indicator-setting="distance"></label><label>Tamaño del indicador (px)<input type="number" min="16" max="80" step="1" value="${waveIndicatorSize}" data-wave-indicator-setting="size"></label><label>Tamaño de la letra (px)<input type="number" min="6" max="40" step="1" value="${waveIndicatorTextSize}" data-wave-indicator-setting="text-size"></label></div></details>`;
+        const windValueFields = activeWindModelFields();
+        const windValueOptions: WindowConditionKey[] = windValueFields.length > 1 ? ['windAverage', ...windValueFields] : windValueFields;
+        const valueOptions = (fields: WindowConditionKey[], selected: string) => fields.map(field => `<option value="${field}"${field === selected ? ' selected' : ''}>${field === 'windAverage' || field === 'wavesAverage' || field === 'swell1Average' ? 'Promedio' : routeFieldPickerLabels[field]}</option>`).join('');
+        const commonIndicatorSettings = `<details class="navigation-visual-group"><summary>Formato de indicadores</summary><div class="navigation-visual-group-body"><label>Tamaño del triángulo (base en px)<input type="number" min="5" max="80" step="1" data-indicator-common="size" value="${indicatorAppearance.size}"></label><label>Distancia al barco (px)<input type="number" min="20" max="200" step="1" data-indicator-common="distance" value="${indicatorAppearance.distance}"></label><label>Tamaño de letra (px)<input type="number" min="6" max="40" step="1" data-indicator-common="textSize" value="${indicatorAppearance.textSize}"></label><label>Mostrar dirección<input type="checkbox" data-indicator-common="showDirection"${indicatorAppearance.showDirection ? ' checked' : ''}></label><label>Mostrar valor<input type="checkbox" data-indicator-common="showValue"${indicatorAppearance.showValue ? ' checked' : ''}></label></div></details>`;
+        const windIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wind"${windIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de viento</summary><div class="navigation-visual-group-body"><label>Fuente de dirección<select data-wind-indicator-field><option value="">Ninguno</option>${windOptions}</select></label><label>Fuente de valor<select data-indicator-individual="windValue"><option value="">Ninguno</option>${valueOptions(windValueOptions, indicatorAppearance.windValue)}</select></label><label>Color<input type="color" data-indicator-individual="windColor" value="${indicatorAppearance.windColor}"></label><label>Letra<input type="text" maxlength="2" data-indicator-individual="windLetter" value="${indicatorAppearance.windLetter}"></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wind"${routeWindIndicatorsEnabled ? ' checked' : ''}></label><label>Distancia al punto (px)<input type="number" min="20" max="200" step="1" value="${routeWindIndicatorDistance}" data-waypoint-indicator-distance="wind"></label></div></details>`;
+        const waveIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wave"${waveIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de olas</summary><div class="navigation-visual-group-body"><label>Fuente de dirección<select data-wave-indicator-field><option value="">Ninguno</option>${waveOptions}</select></label><label>Fuente de valor<select data-indicator-individual="waveValue"><option value="">Ninguno</option>${valueOptions(waveFields, indicatorAppearance.waveValue)}</select></label><label>Color<input type="color" data-indicator-individual="waveColor" value="${indicatorAppearance.waveColor}"></label><label>Letra<input type="text" maxlength="2" data-indicator-individual="waveLetter" value="${indicatorAppearance.waveLetter}"></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wave"${routeWaveIndicatorsEnabled ? ' checked' : ''}></label><label>Distancia al punto (px)<input type="number" min="20" max="200" step="1" value="${routeWaveIndicatorDistance}" data-waypoint-indicator-distance="wave"></label></div></details>`;
         const laylinesSettings = `<details class="navigation-visual-group" data-visual-group="laylines"${laylinesSettingsOpen ? ' open' : ''}><summary>Laylines</summary><div class="navigation-visual-group-body"><label>Modo<select data-layline-mode>${laylineModes.map(([value, label]) => `<option value="${value}"${value === laylineMode ? ' selected' : ''}>${label}</option>`).join('')}</select></label><label>Ángulo Upwind (0–90°)<input type="number" min="0" max="90" step="1" value="${upwindLaylineAngle}" data-layline-setting="upwind-angle"></label><label>Ángulo Downwind (90–180°)<input type="number" min="90" max="180" step="1" value="${downwindLaylineAngle}" data-layline-setting="downwind-angle"></label><label>Color babor del viento<input type="color" data-layline-color="port" value="${portWindLaylineColor}" aria-label="Color de las laylines por babor del viento"></label><label>Color estribor del viento<input type="color" data-layline-color="starboard" value="${starboardWindLaylineColor}" aria-label="Color de las laylines por estribor del viento"></label><small>Los ángulos se miden respecto a la dirección de donde viene el viento. Automático compara el viento seleccionado con el rumbo GPS del barco.</small></div></details>`;
         const windRoseSettings = `<details class="navigation-visual-group" data-visual-group="rose"${windRoseSettingsOpen ? ' open' : ''}><summary>Rosa de los vientos</summary><div class="navigation-visual-group-body"><label class="wind-rose-toggle">Mostrar rosa<input type="checkbox" data-wind-rose-enabled${windRoseEnabled ? ' checked' : ''}></label><label>Radio del círculo (px)<input type="number" min="20" max="200" step="1" value="${windRoseRadius}" data-wind-rose-setting="radius"></label><label>Ancho (px)<input type="number" min="1" max="20" step="1" value="${windRoseLineWidth}" data-wind-rose-setting="width" title="Grosor de las líneas de la rosa"></label><label>Tamaño de fuente (px)<input type="number" min="4" max="24" step="1" value="${windRoseFontSize}" data-wind-rose-setting="font-size"></label><label>Transparencia (%)<input type="number" min="0" max="100" step="1" value="${windRoseTransparency}" data-wind-rose-setting="transparency"></label><label>Etiquetas<select data-wind-rose-label-mode><option value="cardinal"${windRoseLabelMode === 'cardinal' ? ' selected' : ''}>Signos cardinales</option><option value="degrees"${windRoseLabelMode === 'degrees' ? ' selected' : ''}>Grados</option></select></label><hr><strong>Indicador de grados del heading</strong><label class="wind-rose-toggle">Mostrar grados<input type="checkbox" data-heading-degrees-enabled${headingDegreesEnabled ? ' checked' : ''}></label><label>Tamaño de letra (px)<input type="number" min="6" max="40" step="1" value="${headingDegreesFontSize}" data-heading-degrees-setting="font-size"></label><label>Ancho (px)<input type="number" min="30" max="200" step="1" value="${headingDegreesWidth}" data-heading-degrees-setting="width"></label><label>Alto (px)<input type="number" min="16" max="100" step="1" value="${headingDegreesHeight}" data-heading-degrees-setting="height"></label></div></details>`;
-        const navigationSettings = `<div class="route-forecast-settings"><strong>Ubicación</strong><label>Fuente de ubicación<select aria-label="Fuente de ubicación"><option selected>Automática (alta precisión)</option><option disabled>Solo GPS (solo en la App de celular)</option></select></label><small>La ubicación es proporcionada por el celular o el navegador.</small><strong>En vivo</strong><label>Promedio de velocidad<select data-live-setting="speed">${liveSpeedOptions.map(value => option(value, liveSpeedSeconds)).join('')}</select></label><label>Actualizar pronóstico<select data-live-setting="forecast">${liveForecastOptions.map(value => option(value, liveForecastSeconds)).join('')}</select></label><label>Refrescar waypoints<select data-live-setting="waypoints">${liveWaypointOptions.map(value => option(value, liveWaypointSeconds)).join('')}</select></label><label class="nav-restore-route-setting">Cargar ruta anterior al salir del modo NAV<input type="checkbox" data-nav-restore-previous-route${restorePreviousRouteOnNavExit ? ' checked' : ''}></label><small>Apagado: conserva la ruta que estabas navegando.</small><details class="navigation-visual-aids"${visualAidsOpen ? ' open' : ''}><summary>Ayudas visuales</summary><div class="navigation-visual-aids-list">${windIndicatorSettings}${waveIndicatorSettings}${laylinesSettings}${windRoseSettings}</div></details></div>`;
+        const navigationSettings = `<div class="route-forecast-settings"><strong>Ubicación</strong><label>Fuente de ubicación<select aria-label="Fuente de ubicación"><option selected>Automática (alta precisión)</option><option disabled>Solo GPS (solo en la App de celular)</option></select></label><small>La ubicación es proporcionada por el celular o el navegador.</small><strong>En vivo</strong><label>Promedio de velocidad<select data-live-setting="speed">${liveSpeedOptions.map(value => option(value, liveSpeedSeconds)).join('')}</select></label><label>Actualizar pronóstico<select data-live-setting="forecast">${liveForecastOptions.map(value => option(value, liveForecastSeconds)).join('')}</select></label><label>Refrescar waypoints<select data-live-setting="waypoints">${liveWaypointOptions.map(value => option(value, liveWaypointSeconds)).join('')}</select></label><label class="nav-restore-route-setting">Cargar ruta anterior al salir del modo NAV<input type="checkbox" data-nav-restore-previous-route${restorePreviousRouteOnNavExit ? ' checked' : ''}></label><small>Apagado: conserva la ruta que estabas navegando.</small><details class="navigation-visual-aids"${visualAidsOpen ? ' open' : ''}><summary>Ayudas visuales</summary><div class="navigation-visual-aids-list">${commonIndicatorSettings}${windIndicatorSettings}${waveIndicatorSettings}${laylinesSettings}${windRoseSettings}</div></details></div>`;
         const settingsContent = settingsTab === 'forecast'
             ? renderRouteForecastSettingsControls('route-forecast-settings')
             : settingsTab === 'navigation' ? navigationSettings : '<div class="forecast-settings-map-tab"></div>';
@@ -6070,6 +6140,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-wind-indicator span) { position: absolute; inset: 0; display: grid; place-items: center; padding-bottom: var(--wind-indicator-padding, 5px); box-sizing: border-box; color: #fff; font: bold var(--wind-indicator-text-size, 12px) Arial,sans-serif; text-shadow: 0 1px 2px #003a68; }
     :global(.route-wind-indicator .route-wind-degrees) { position: absolute; top: 50%; left: 50%; padding: 1px 3px; border-radius: 3px; background: #263238cc; color: #fff; font: 700 10px/1.2 Arial,sans-serif; white-space: nowrap; text-shadow: 0 1px 1px #000; }
     :global(.route-wind-indicator .route-wind-degrees[hidden]) { display: none; }
+    :global(.route-indicator-value) { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 4px); white-space: nowrap; padding: 1px 3px; border-radius: 3px; background: #263238cc; color: #fff; font: 700 var(--wind-indicator-text-size, 10px)/1.2 Arial,sans-serif; }
+    :global(.route-indicator-value[hidden]) { display: none; }
     :global(.route-navigation-dashboard) { position: fixed; z-index: 2147483000; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); box-sizing: border-box; display: grid; grid-template-columns: 24px minmax(0,1fr) minmax(0,1.08fr) minmax(0,1fr) 14px; width: min(520px, calc(100vw - 12px)); min-height: 92px; padding: 3px 2px; border: 1px solid #aab5b8; border-radius: 10px; background: #edf0f0f5; color: #343c3e; box-shadow: 0 2px 7px #14252c66; font-family: Arial,sans-serif; }
     :global(.route-navigation-dashboard[hidden]) { display: none; }
     :global(.route-nav-side-label) { writing-mode: vertical-rl; transform: rotate(180deg); align-self: center; justify-self: center; font-size: 9px; font-weight: 700; color: #566467; white-space: nowrap; }
