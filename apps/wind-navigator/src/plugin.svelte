@@ -794,7 +794,12 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         forecastDataCache.set(key, { expiresAt: Date.now() + 30 * 60 * 1000, promise });
         while (forecastDataCache.size > 240) forecastDataCache.delete(forecastDataCache.keys().next().value as string);
         try {
-            return await promise;
+            const bundle = await promise;
+            if (bundle.seaError || bundle.ecmwfError || bundle.ecmwfSeaError || bundle.currentsError || bundle.mblueError || bundle.iconError || bundle.aromeError || !bundle.data.ts.length) {
+                const cached = forecastDataCache.get(key);
+                if (cached?.promise === promise) cached.expiresAt = Date.now() + 15000;
+            }
+            return bundle;
         } catch (error) {
             if (forecastDataCache.get(key)?.promise === promise) forecastDataCache.delete(key);
             throw error;
@@ -844,7 +849,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         // The selected departure changes each route sample's ETA, so refresh
         // the route forecast and, when configured, re-evaluate all candidate
         // departures against their new passage times.
-        if (forecastDrawer?.classList.contains('is-open')) void calculateRouteForecast();
+        if (points.length >= 2) void calculateRouteForecast();
     }
 
     function departureTimestampAtTimelineCenter(scroller: HTMLElement): number | null {
@@ -1301,7 +1306,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         invalidateForecast(preserveForecastPrefix);
         redrawMap();
         saveRoute();
-        if (refreshForecast && points.length >= 2 && forecastDrawer?.classList.contains('is-open')) {
+        if (refreshForecast && points.length >= 2) {
             void calculateRouteForecast();
         } else if (points.length < 2 && forecastDrawer?.classList.contains('is-open')) {
             forecastMessage = 'Agrega al menos dos Waypoints para consultar el pronóstico.';
@@ -2288,10 +2293,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                     points = points.map(current => current.id === point.id
                         ? { ...current, lat: position.lat, lon: position.lng }
                         : current);
-                    // Reuse forecasts for samples whose position and ETA stay
-                    // unchanged before the moved waypoint; the affected leg
-                    // and everything after it will get fresh samples.
-                    recalculate(true, true);
+                    recalculate(true);
                 });
                 waypointMarkerSizes.set(marker, waypointSize);
                 waypointMarkerLabelLayouts.set(marker, waypointFieldOrder.filter(field => isWaypointFieldVisible(field)).join('|')
@@ -2578,7 +2580,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             if (!points.some(current => current.id === id)) { backdrop.remove(); return; }
             points = points.map(current => current.id === id ? { ...current, lat: values.lat, lon: values.lon } : current);
             backdrop.remove();
-            recalculate(true, true);
+            recalculate(true);
         });
         document.body.appendChild(backdrop);
         render();
@@ -2635,7 +2637,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             }
             else next.push(point);
             points = next;
-            recalculate(true, true);
+            recalculate(true);
         });
     }
 
@@ -3233,9 +3235,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         if (index < 0) return;
         points = points.filter(point => String(point.id) !== key);
         if (points.length === 0) resetCleanRouteDeparture();
-        // Removing a waypoint only invalidates samples whose route position or
-        // passage time changed. Keep the prior samples available for matching.
-        recalculate(true, true);
+        recalculate(true);
     }
 
     function clearRoute(): void {
@@ -4999,7 +4999,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         departureAnalysisBusy = false;
         forecastDrawer?.classList.remove('is-calculating');
         const previousSamples = new Map(routeForecast
-            .filter(sample => sample.forecastCachedAt && Date.now() - sample.forecastCachedAt < 30 * 60 * 1000)
+            .filter(sample => sample.forecastCachedAt && !sample.error && !sample.seaError && !sample.diagnostic && Date.now() - sample.forecastCachedAt < 30 * 60 * 1000)
             .map(sample => [routeForecastSampleKey(sample), sample] as const));
         const samples = buildRouteForecastSamples();
         const pendingSamples: RouteForecastSample[] = [];
@@ -5018,9 +5018,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             }
         });
         routeForecast = samples;
-        if (forecastDrawer) forecastDrawer.classList.add('is-open');
-        if (forecastReopenButton) forecastReopenButton.hidden = true;
-        positionForecastDrawer();
+        if (forecastDrawer?.classList.contains('is-open')) positionForecastDrawer();
         if (samples.length === 0) { forecastMessage = 'Agrega al menos dos Waypoints para consultar el pronóstico.'; return; }
         const reusedCount = samples.length - pendingSamples.length;
         forecastMessage = pendingSamples.length
@@ -5522,9 +5520,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         departureEvaluations = [];
         saveRoute();
         redrawMap();
-        if (forecastDrawer?.classList.contains('is-open')) {
-            void calculateRouteForecast();
-        }
+        if (points.length >= 2) void calculateRouteForecast();
     }
 
     onDestroy(() => {
