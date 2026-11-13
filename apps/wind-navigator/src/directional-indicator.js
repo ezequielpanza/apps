@@ -36,3 +36,11 @@ export function indicatorLabelOffsets(height, margin, directionHeight, valueHeig
     if (showValue) value = boundary + gap + valueHeight / 2;
     return { direction, value };
 }
+
+/** Keep label baselines perpendicular to the arrow while preventing upside-down text. */
+export function readableIndicatorRotation(rotation) {
+    let angle = ((rotation + 180) % 360 + 360) % 360 - 180;
+    if (angle > 90) angle -= 180;
+    else if (angle < -90) angle += 180;
+    return angle;
+}

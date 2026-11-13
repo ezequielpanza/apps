@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorValuePosition, indicatorLabelOffsets } from '../src/directional-indicator.js';
+import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorValuePosition, indicatorLabelOffsets, readableIndicatorRotation } from '../src/directional-indicator.js';
 
 test('the triangle tip stays at the configured distance for every size and map bearing', () => {
     const origin = { x: 324, y: 491 };
@@ -92,4 +92,15 @@ test('configured margin separates triangle, direction and value at all sizes', (
         assert.equal(valueOnly.value - valueSize / 2 - height / 2, gap);
         assert.equal(valueOnly.direction, null);
     }
+});
+
+test('direction and value labels remain readable and perpendicular at any rotation', () => {
+    for (let rotation = -1080; rotation <= 1080; rotation += 5) {
+        const result = readableIndicatorRotation(rotation);
+        assert.ok(result >= -90 && result <= 90);
+        assert.ok(Math.abs(Math.sin((rotation - result) * Math.PI / 180)) < 1e-10);
+    }
+    assert.equal(readableIndicatorRotation(180), 0);
+    assert.equal(readableIndicatorRotation(135), -45);
+    assert.equal(readableIndicatorRotation(225), 45);
 });

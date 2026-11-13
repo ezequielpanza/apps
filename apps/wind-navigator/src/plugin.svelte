@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
-    import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorLabelOffsets } from './directional-indicator.js';
+    import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorLabelOffsets, readableIndicatorRotation } from './directional-indicator.js';
     import { map, getMapType, setMapType } from './adapters/map.js';
     import windyStore from './adapters/store.js';
     import { getPointForecastData } from './adapters/fetch.js';
@@ -2821,7 +2821,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const place = (label: HTMLElement, distance: number) => {
             label.style.left = 'calc(50% + ' + distance * Math.sin(radians) + 'px)';
             label.style.top = 'calc(50% - ' + distance * Math.cos(radians) + 'px)';
-            label.style.transform = 'translate(-50%, -50%) rotate(' + layout.rotation + 'deg)';
+            label.style.transform = 'translate(-50%, -50%) rotate(' + readableIndicatorRotation(layout.rotation) + 'deg)';
         };
         if (degreesLabel && offsets.direction !== null) place(degreesLabel, offsets.direction);
         if (valueLabel && offsets.value !== null) place(valueLabel, offsets.value);
