@@ -2789,7 +2789,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const normalized = ((textRotation + 180) % 360 + 360) % 360 - 180;
         const flip = Math.abs(normalized - readableIndicatorRotation(textRotation)) > 90 ? 180 : 0;
         dataLine.style.transform = 'translate(-50%, -50%) rotate(' + (-90 + flip) + 'deg)';
-        name.style.transform = 'rotate(' + (-90 + flip) + 'deg)';
+        name.style.transform = 'translate(-50%, -50%) rotate(' + (-90 + flip) + 'deg)';
     }
 
     function routePointDirectionAtDistance(field: WindowConditionKey, distanceNm: number): number | null {
@@ -6151,11 +6151,11 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-builder-gps-position-icon svg) { display: block; filter: drop-shadow(0 1px 2px #102b3b99); }
     :global(.route-wind-indicator) { position: absolute; z-index: 650; width: var(--wind-indicator-size, 26px); height: var(--wind-indicator-height, 30px); transform: translate(-50%, -50%); pointer-events: none; }
     :global(.bar-indicator) { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: stretch; transform-origin: center; pointer-events: none; }
-    :global(.bar-indicator-name) { height: var(--bar-name-length); flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #111; }
+    :global(.bar-indicator-name) { position: relative; height: var(--bar-name-length); flex: none; overflow: hidden; background: #111; }
     :global(.bar-indicator-data) { position: relative; height: var(--bar-data-length); flex: none; overflow: hidden; }
     :global(.bar-indicator-data-line) { position: absolute; left: 50%; top: 50%; display: flex; align-items: center; gap: 0.35em; width: max-content; white-space: nowrap; font-size: var(--bar-text-size, 10px); }
     :global(.bar-indicator-name-text), :global(.bar-indicator-direction), :global(.bar-indicator-value) { display: block; flex: none; white-space: nowrap; font: 700 var(--bar-text-size, 10px)/1.1 Arial,sans-serif; }
-    :global(.bar-indicator-name-text) { color: #fff; }
+    :global(.bar-indicator-name-text) { position: absolute; left: 50%; top: 50%; color: #fff; }
     :global(.bar-indicator-direction), :global(.bar-indicator-value) { color: #000; }
     :global(.bar-indicator-direction[hidden]), :global(.bar-indicator-value[hidden]) { display: none; }
     :global(.bar-indicator-tip) { width: 100%; height: var(--bar-tip-height); flex: none; display: block; overflow: visible; }
