@@ -2,13 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { directionalIndicatorLayout, directionalIndicatorMarkup } from '../src/directional-indicator.js';
 
-test('directional markers use the same size and radial offset at every bearing', () => {
+test('the triangle tip stays at the configured distance for every size and map bearing', () => {
     const origin = { x: 324, y: 491 };
-    for (const direction of [24, 164]) {
-        const layout = directionalIndicatorLayout(origin, direction, 0, 80, 20);
-        assert.ok(Math.abs(Math.hypot(layout.x - origin.x, layout.y - origin.y) - 80) < 1e-10);
-        assert.equal(layout.width, 20);
-        assert.equal(layout.height, 20 * Math.sqrt(100 - 2.5 * 2.5) / 5);
+    for (const direction of [0, 24, 164, 270]) for (const bearing of [0, 35]) for (const size of [5, 20, 60]) {
+        const layout = directionalIndicatorLayout(origin, direction, bearing, 80, size);
+        const angle = layout.rotation * Math.PI / 180;
+        const tipX = layout.x - Math.sin(angle) * layout.height / 2;
+        const tipY = layout.y + Math.cos(angle) * layout.height / 2;
+        assert.ok(Math.abs(Math.hypot(tipX - origin.x, tipY - origin.y) - 80) < 1e-10);
+        assert.equal(layout.width, size);
     }
 });
 
