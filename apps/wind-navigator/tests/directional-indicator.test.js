@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorValuePosition } from '../src/directional-indicator.js';
+import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorValuePosition, indicatorLabelOffsets } from '../src/directional-indicator.js';
 
 test('the triangle tip stays at the configured distance for every size and map bearing', () => {
     const origin = { x: 324, y: 491 };
@@ -78,4 +78,18 @@ test('value labels follow direction, leaving the configured gap outside directio
         assert.ok(Math.abs(pos.y + 39 * Math.cos(rotation * Math.PI / 180)) < 1e-10);
     }
     assert.equal(indicatorValuePosition(0, 20, 0, 18, 3, false).distance, 20);
+});
+
+test('configured margin separates triangle, direction and value at all sizes', () => {
+    for (const height of [10, 40, 180]) for (const gap of [0, 2, 8]) for (const dirSize of [10, 22]) for (const valueSize of [12, 28]) {
+        const both = indicatorLabelOffsets(height, gap, dirSize, valueSize, true, true);
+        assert.equal(both.direction - dirSize / 2 - height / 2, gap);
+        assert.equal(both.value - valueSize / 2 - (both.direction + dirSize / 2), gap);
+        const directionOnly = indicatorLabelOffsets(height, gap, dirSize, valueSize, true, false);
+        assert.equal(directionOnly.direction - dirSize / 2 - height / 2, gap);
+        assert.equal(directionOnly.value, null);
+        const valueOnly = indicatorLabelOffsets(height, gap, dirSize, valueSize, false, true);
+        assert.equal(valueOnly.value - valueSize / 2 - height / 2, gap);
+        assert.equal(valueOnly.direction, null);
+    }
 });

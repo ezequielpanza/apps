@@ -26,3 +26,13 @@ export function indicatorValuePosition(rotation, degreesOffset, directionHeight,
     const angle = rotation * Math.PI / 180;
     return { x: distance * Math.sin(angle), y: -distance * Math.cos(angle), distance };
 }
+
+/** Label centers along the outward axis, maintaining the same visible gap. */
+export function indicatorLabelOffsets(height, margin, directionHeight, valueHeight, showDirection, showValue) {
+    const gap = Math.max(0, Number(margin) || 0);
+    let boundary = height / 2;
+    let direction = null, value = null;
+    if (showDirection) { direction = boundary + gap + directionHeight / 2; boundary = direction + directionHeight / 2; }
+    if (showValue) value = boundary + gap + valueHeight / 2;
+    return { direction, value };
+}

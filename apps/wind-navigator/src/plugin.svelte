@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
-    import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorValuePosition } from './directional-indicator.js';
+    import { directionalIndicatorLayout, directionalIndicatorMarkup, fitIndicatorText, indicatorLabelOffsets } from './directional-indicator.js';
     import { map, getMapType, setMapType } from './adapters/map.js';
     import windyStore from './adapters/store.js';
     import { getPointForecastData } from './adapters/fetch.js';
@@ -2811,15 +2811,20 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         valueLabel.textContent = value === null ? '' : (kind === 'wind' ? value.toFixed(1) + ' kn' : value.toFixed(1) + ' m');
     }
 
-    function positionIndicatorValue(overlay: HTMLDivElement, layout: { rotation: number; degreesOffset: number }): void {
-        const valueLabel = overlay.querySelector<HTMLElement>('.route-indicator-value');
-        if (!valueLabel || valueLabel.hidden) return;
+    function positionIndicatorLabels(overlay: HTMLDivElement, layout: { rotation: number; height: number }): void {
         const degreesLabel = overlay.querySelector<HTMLElement>('.route-wind-degrees');
+        const valueLabel = overlay.querySelector<HTMLElement>('.route-indicator-value');
         const showDegrees = Boolean(degreesLabel && !degreesLabel.hidden);
-        const pos = indicatorValuePosition(layout.rotation, layout.degreesOffset, showDegrees ? degreesLabel!.offsetHeight : 0, valueLabel.offsetHeight, indicatorAppearance.textMargin, showDegrees);
-        valueLabel.style.left = 'calc(50% + ' + pos.x + 'px)';
-        valueLabel.style.top = 'calc(50% + ' + pos.y + 'px)';
-        valueLabel.style.transform = 'translate(-50%, -50%) rotate(' + layout.rotation + 'deg)';
+        const showValue = Boolean(valueLabel && !valueLabel.hidden);
+        const offsets = indicatorLabelOffsets(layout.height, indicatorAppearance.textMargin, showDegrees ? degreesLabel!.offsetHeight : 0, showValue ? valueLabel!.offsetHeight : 0, showDegrees, showValue);
+        const radians = layout.rotation * Math.PI / 180;
+        const place = (label: HTMLElement, distance: number) => {
+            label.style.left = 'calc(50% + ' + distance * Math.sin(radians) + 'px)';
+            label.style.top = 'calc(50% - ' + distance * Math.cos(radians) + 'px)';
+            label.style.transform = 'translate(-50%, -50%) rotate(' + layout.rotation + 'deg)';
+        };
+        if (degreesLabel && offsets.direction !== null) place(degreesLabel, offsets.direction);
+        if (valueLabel && offsets.value !== null) place(valueLabel, offsets.value);
     }
 
     function routePointDirectionAtDistance(field: WindowConditionKey, distanceNm: number): number | null {
@@ -2890,14 +2895,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                     if (degreesLabel) {
                         degreesLabel.textContent = String(Math.round(direction) % 360).padStart(3, '0');
                         degreesLabel.hidden = !config.degreesEnabled;
-                        const labelRadians = layout.rotation * Math.PI / 180;
-                        degreesLabel.style.left = 'calc(50% + ' + (layout.degreesOffset * Math.sin(labelRadians)) + 'px)';
-                        degreesLabel.style.top = 'calc(50% - ' + (layout.degreesOffset * Math.cos(labelRadians)) + 'px)';
-                        degreesLabel.style.transform = 'translate(-50%, -50%) ' + rotation;
                     }
                     overlay.title = (config.kind === 'wave' ? 'Olas' : 'Viento') + ' en waypoint ' + String(index + 1) + ' desde ' + Math.round(direction) + '°';
                     overlay.hidden = false;
-                    positionIndicatorValue(overlay, layout);
+                    positionIndicatorLabels(overlay, layout);
                 }
             });
         }
@@ -2960,14 +2961,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         if (degreesLabel) {
             degreesLabel.textContent = String(Math.round(direction) % 360).padStart(3, '0');
             degreesLabel.hidden = !indicatorAppearance.showDirection;
-            const labelRadians = layout.rotation * Math.PI / 180;
-            degreesLabel.style.left = `calc(50% + ${layout.degreesOffset * Math.sin(labelRadians)}px)`;
-            degreesLabel.style.top = `calc(50% - ${layout.degreesOffset * Math.cos(labelRadians)}px)`;
-            degreesLabel.style.transform = `translate(-50%, -50%) ${rotation}`;
         }
         overlay.title = isWave ? `Olas desde ${Math.round(direction)}°` : `Viento previsto desde ${Math.round(direction)}°`;
         overlay.hidden = false;
-        positionIndicatorValue(overlay, layout);
+        positionIndicatorLabels(overlay, layout);
     }
 
     function redrawWindIndicator(): void { redrawDirectionalIndicator('wind'); }
