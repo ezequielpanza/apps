@@ -382,6 +382,31 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         if (activeGroupFields('swell1Average').length > 1) averages.push('swell1Average');
         return [...averages, ...directFields];
     }
+    // Keep indicator sources in sync with the currently visible forecast fields.
+    function syncIndicatorSources(): void {
+        const windDirections = windIndicatorOptions();
+        const waves = waveIndicatorOptions();
+        const windValues = activeWindModelFields();
+        const windValueOptions: WindowConditionKey[] = windValues.length > 1 ? ['windAverage', ...windValues] : windValues;
+        const resolve = (selected: string, options: WindowConditionKey[], members: WindowConditionKey[]): string => {
+            if (!selected) return '';
+            if (options.includes(selected as WindowConditionKey)) return selected;
+            return members.length === 1 ? members[0] : '';
+        };
+        const oldWind = windIndicatorField, oldWave = waveIndicatorField;
+        const oldWindValue = indicatorAppearance.windValue, oldWaveValue = indicatorAppearance.waveValue;
+        if (!windIndicatorUserChoice) windIndicatorField = (windDirections.includes('directionAverage') ? 'directionAverage' : windDirections[0] ?? '') as WindowConditionKey | '';
+        else windIndicatorField = resolve(windIndicatorField, windDirections, windIndicatorField === 'directionAverage' ? activeGroupFields('directionAverage') : []) as WindowConditionKey | '';
+        if (!waveIndicatorUserChoice) waveIndicatorField = (waves.includes('wavesAverage') ? 'wavesAverage' : waves.includes('swell1Average') ? 'swell1Average' : waves[0] ?? '') as WindowConditionKey | '';
+        else waveIndicatorField = resolve(waveIndicatorField, waves, waveIndicatorField === 'wavesAverage' || waveIndicatorField === 'swell1Average' ? activeGroupFields(waveIndicatorField) : []) as WindowConditionKey | '';
+        indicatorAppearance.windValue = resolve(oldWindValue, windValueOptions, oldWindValue === 'windAverage' ? windValues : []);
+        indicatorAppearance.waveValue = resolve(oldWaveValue, waves, oldWaveValue === 'wavesAverage' || oldWaveValue === 'swell1Average' ? activeGroupFields(oldWaveValue as WindowConditionKey) : []);
+        try {
+            if (oldWind !== windIndicatorField && windIndicatorUserChoice) localStorage.setItem('route-builder-wind-indicator-field', windIndicatorField);
+            if (oldWave !== waveIndicatorField && waveIndicatorUserChoice) localStorage.setItem('route-builder-wave-indicator-field', waveIndicatorField);
+            if (oldWindValue !== indicatorAppearance.windValue || oldWaveValue !== indicatorAppearance.waveValue) localStorage.setItem('route-builder-indicator-appearance-v1', JSON.stringify(indicatorAppearance));
+        } catch { /* Keep the current settings in memory. */ }
+    }
     function averageWindForValues(values?: Record<string, number | null>): number | null {
         const readings = activeWindModelFields().map(key => values?.[key]).filter((value): value is number => value !== null && value !== undefined && Number.isFinite(value));
         return readings.length ? readings.reduce((sum, value) => sum + value, 0) / readings.length : null;
@@ -1411,7 +1436,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const data: Record<string, string> = { waypoint: index >= 0 ? `Waypoint ${waypointNumber(index)}` : 'Waypoint', bearing: degrees(metrics?.bearing), nextDistance: distance(metrics?.distanceNext), nextTime: duration(metrics?.hoursNext), speed: fix?.speed != null ? fix.speed.toFixed(1) : '—', averageSpeed: averageSpeed !== null ? averageSpeed.toFixed(1) : '—', heading: degrees(fix?.heading), finalTime: duration(metrics?.hoursFinal), finalDistance: distance(metrics?.distanceFinal), eta };
         for (const [key, value] of Object.entries(data)) { const element = navigationPanel.querySelector<HTMLElement>(`[data-nav-value="${key}"]`); if (element) element.textContent = value; }
         updateBoatTrackMarker();
-        redrawMapOverlays();
+        redrawWindIndicator();
     }
 
     function updateBoatTrackMarker(): void {
@@ -1450,6 +1475,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
 
     function renderForecastDrawer(): void {
         if (!forecastDrawer) return;
+        syncIndicatorSources();
         const visualAids = forecastDrawer.querySelector<HTMLDetailsElement>('.navigation-visual-aids');
         if (visualAids) visualAidsOpen = visualAids.open;
         const windSettings = forecastDrawer.querySelector<HTMLDetailsElement>('[data-visual-group="wind"]');
@@ -1760,7 +1786,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         if (zoomInButton) forecastDrawer.appendChild(zoomInButton);
         if (zoomOutButton) forecastDrawer.appendChild(zoomOutButton);
         updateBoatTrackMarker();
-        redrawWindIndicator();
+        redrawMapOverlays();
         const mapSettingsTab = forecastDrawer.querySelector<HTMLElement>('.forecast-settings-map-tab');
         if (mapLabelSettings && mapSettingsTab) {
             mapLabelSettings.classList.add('label-settings--settings-tab');
@@ -3374,7 +3400,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             windIndicatorUserChoice = savedWindIndicator !== null;
             const legacyWindIndicator: Partial<Record<WindowConditionKey, WindowConditionKey>> = { wind: 'direction', ecmwfWind: 'ecmwfWindDirection', mblueWind: 'mblueWindDirection', iconWind: 'iconWindDirection', aromeWind: 'aromeWindDirection', windAverage: 'directionAverage' };
             const directionIndicator = savedWindIndicator ? legacyWindIndicator[savedWindIndicator] ?? savedWindIndicator : null;
-            windIndicatorField = directionIndicator && windIndicatorOptions().includes(directionIndicator) ? directionIndicator : '';
+            windIndicatorField = directionIndicator || '';
             const savedWindDistance = Number(localStorage.getItem('route-builder-wind-indicator-distance'));
             const savedWindSize = Number(localStorage.getItem('route-builder-wind-indicator-size'));
             const savedWindTextSize = Number(localStorage.getItem('route-builder-wind-indicator-text-size'));
@@ -3385,7 +3411,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             if (savedWindDegrees !== null) windIndicatorDegreesEnabled = savedWindDegrees !== 'false';
             const savedWaveIndicator = localStorage.getItem('route-builder-wave-indicator-field') as WindowConditionKey | null;
             waveIndicatorUserChoice = savedWaveIndicator !== null;
-            waveIndicatorField = savedWaveIndicator && waveIndicatorOptions().includes(savedWaveIndicator) ? savedWaveIndicator : '';
+            waveIndicatorField = savedWaveIndicator || '';
             const savedWaveDistance = Number(localStorage.getItem('route-builder-wave-indicator-distance'));
             const savedWaveSize = Number(localStorage.getItem('route-builder-wave-indicator-size'));
             const savedWaveTextSize = Number(localStorage.getItem('route-builder-wave-indicator-text-size'));
@@ -4195,6 +4221,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 saveRouteFieldLayout();
                 departureEligibilityDirty = true;
                 renderForecastDrawer();
+                redrawMapOverlays();
                 void calculateDepartureEligibility();
                 return;
             }
@@ -4284,6 +4311,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 showRouteFieldPicker = false;
                 saveRouteFieldLayout();
                 renderForecastDrawer();
+                redrawMapOverlays();
                 windowConditionsDirty = false;
                 void calculateDepartureEligibility();
                 return;
@@ -4747,18 +4775,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     function renderWeatherSettingsMenu(): string {
         const option = (value: number, current: number) => `<option value="${value}"${value === current ? ' selected' : ''}>${value >= 60 ? `${value / 60} min` : `${value} s`}</option>`;
         const windFields = windIndicatorOptions();
-        if (!windIndicatorUserChoice) windIndicatorField = windFields.includes('directionAverage') ? 'directionAverage' : '';
-        if (windIndicatorField && !windFields.includes(windIndicatorField)) {
-            windIndicatorField = '';
-            try { localStorage.setItem('route-builder-wind-indicator-field', ''); } catch { /* Keep current setting in memory. */ }
-        }
         const windOptions = windFields.map(field => `<option value="${field}"${field === windIndicatorField ? ' selected' : ''}>${field === 'directionAverage' ? 'Promedio' : routeFieldPickerLabels[field]}</option>`).join('');
         const waveFields = waveIndicatorOptions();
-        if (!waveIndicatorUserChoice) waveIndicatorField = waveFields.includes('wavesAverage') ? 'wavesAverage' : waveFields.includes('swell1Average') ? 'swell1Average' : waveFields[0] ?? '';
-        if (waveIndicatorField && !waveFields.includes(waveIndicatorField)) {
-            waveIndicatorField = '';
-            try { localStorage.setItem('route-builder-wave-indicator-field', ''); } catch { /* Keep current setting in memory. */ }
-        }
         const waveOptions = waveFields.map(field => `<option value="${field}"${field === waveIndicatorField ? ' selected' : ''}>${field === 'wavesAverage' || field === 'swell1Average' ? 'Promedio' : routeFieldPickerLabels[field]}</option>`).join('');
         const laylineModes = [['none', 'Ninguno'], ['upwind', 'Solo Upwind'], ['downwind', 'Solo Downwind'], ['both', 'Ambos'], ['automatic', 'Automático']] as const;
         const windValueFields = activeWindModelFields();
