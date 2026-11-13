@@ -2732,6 +2732,42 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         for (const sample of samples) { if (sample.distance < distance) before = sample; else { after = sample; break; } }
         return before && after && after.distance > before.distance ? before.value + (after.value - before.value) * (distance - before.distance) / (after.distance - before.distance) : null;
     }
+    const indicatorInkCache = new Map<string, { minY: number; left: number; right: number } | null>();
+    function measureIndicatorInk(text: string): { minY: number; left: number; right: number } | null {
+        if (indicatorInkCache.has(text)) return indicatorInkCache.get(text) ?? null;
+        const canvas = document.createElement('canvas');
+        let ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx || !text.trim()) return null;
+        const reference = 100;
+        ctx.font = '700 100px Arial, sans-serif';
+        const metrics = ctx.measureText(text);
+        const left = Math.max(0, metrics.actualBoundingBoxLeft || 0);
+        const right = Math.max(metrics.width, metrics.actualBoundingBoxRight || 0);
+        const ascent = metrics.actualBoundingBoxAscent || 100;
+        const descent = metrics.actualBoundingBoxDescent || 30;
+        const width = Math.ceil(left + right + 8), height = Math.ceil(ascent + descent + 8);
+        if (width > 16384 || height > 4096) return null;
+        canvas.width = width; canvas.height = height;
+        ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return null;
+        ctx.font = '700 100px Arial, sans-serif'; ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic';
+        const originX = left + 4, baselineY = ascent + 4;
+        ctx.fillText(text, originX, baselineY);
+        const pixels = ctx.getImageData(0, 0, width, height).data;
+        const slope = 5 / (2 * Math.sqrt(100 - 2.5 * 2.5));
+        let minY = Infinity, minLeft = Infinity, maxRight = -Infinity;
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            if (pixels[(y * width + x) * 4 + 3] < 16) continue;
+            const px = (x + 0.5 - originX) / reference, py = (y + 0.5 - baselineY) / reference;
+            minY = Math.min(minY, py);
+            minLeft = Math.min(minLeft, px - slope * py);
+            maxRight = Math.max(maxRight, px + slope * py);
+        }
+        const ink = Number.isFinite(minY) ? { minY, left: minLeft, right: maxRight } : null;
+        if (indicatorInkCache.size >= 128) indicatorInkCache.delete(indicatorInkCache.keys().next().value as string);
+        indicatorInkCache.set(text, ink);
+        return ink;
+    }
     function styleIndicator(overlay: HTMLDivElement, kind: 'wind' | 'wave', value: number | null): void {
         const a = indicatorAppearance;
         const path = overlay.querySelector<SVGPathElement>('svg path');
@@ -2748,16 +2784,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             }
             const node = svg.querySelector('text')!;
             node.textContent = text;
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (ctx && text) {
-                ctx.font = '700 100px Arial, sans-serif';
-                const metrics = ctx.measureText(text);
-                const left = Number.isFinite(metrics.actualBoundingBoxLeft) ? metrics.actualBoundingBoxLeft : 0;
-                const right = Number.isFinite(metrics.actualBoundingBoxRight) ? metrics.actualBoundingBoxRight : metrics.width;
-                const ascent = metrics.actualBoundingBoxAscent || 75;
-                const descent = metrics.actualBoundingBoxDescent || 25;
-                const box = fitIndicatorText(a.size, a.textMargin, { left: left / 100, right: right / 100, ascent: ascent / 100, descent: descent / 100 });
+            const ink = measureIndicatorInk(text);
+            if (ink) {
+                const box = fitIndicatorText(a.size, a.textMargin, ink);
                 svg.setAttribute('viewBox', '0 0 ' + a.size + ' ' + box.height);
                 svg.setAttribute('preserveAspectRatio', 'none');
                 node.setAttribute('x', String(box.x));

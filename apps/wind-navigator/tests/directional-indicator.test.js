@@ -27,17 +27,18 @@ test('the base triangle has equal 10 px sides and a 5 px base', () => {
     assert.ok(Math.abs(Math.hypot(layout.width / 2, layout.height) - 10) < 1e-10);
 });
 
-test('text fits with equal perpendicular margins at the base and sloping sides', () => {
-    for (const size of [20, 50, 80]) for (const margin of [0, 2, 4]) for (const width of [0.5, 2, 5]) {
-        const metrics = { left: 0, right: width, ascent: 0.75, descent: 0.2 };
-        const result = fitIndicatorText(size, margin, metrics);
+test('visible text contour clears all three stroked edges by the configured margin', () => {
+    const slope = 5 / (2 * Math.sqrt(100 - 2.5 * 2.5));
+    for (const size of [20, 50, 80]) for (const margin of [0, 2, 4]) {
+        const ink = { minY: -0.7, left: -0.08, right: 1.5 };
+        const result = fitIndicatorText(size, margin, ink);
         if (result.fontSize <= 0) continue;
-        const bottom = result.y + metrics.descent * result.fontSize;
-        const left = result.x - metrics.left * result.fontSize;
-        const slope = size / (2 * result.height);
-        const sideClearance = (left - slope * bottom) / Math.hypot(1, slope);
-        assert.ok(Math.abs((result.y - metrics.ascent * result.fontSize) - margin) < 1e-9);
-        assert.ok(Math.abs(sideClearance - margin) < 1e-9);
+        const effective = margin + size * 0.02;
+        const leftClearance = (result.x - slope * result.y + result.fontSize * ink.left) / Math.hypot(1, slope);
+        const rightClearance = (size - result.x - slope * result.y - result.fontSize * ink.right) / Math.hypot(1, slope);
+        assert.ok(Math.abs(result.y + result.fontSize * ink.minY - effective) < 1e-9);
+        assert.ok(Math.abs(leftClearance - effective) < 1e-9);
+        assert.ok(Math.abs(rightClearance - effective) < 1e-9);
     }
-    assert.equal(fitIndicatorText(5, 2, {left: 0, right: 1, ascent: .8, descent: .2}).fontSize, 0);
+    assert.equal(fitIndicatorText(5, 2, {minY: -0.8, left: -0.2, right: 1}).fontSize, 0);
 });
