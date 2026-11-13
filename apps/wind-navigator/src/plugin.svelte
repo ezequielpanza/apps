@@ -6137,7 +6137,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-heading-degrees[hidden]) { display: none; }
     :global(.route-wind-indicator[hidden]) { display: none; }
     :global(.route-wind-indicator svg) { position: absolute; inset: 0; width: 100%; height: 100%; }
-    :global(.route-wind-indicator span) { position: absolute; inset: 0; display: grid; place-items: center; padding-bottom: var(--wind-indicator-padding, 5px); box-sizing: border-box; color: #fff; font: bold var(--wind-indicator-text-size, 12px) Arial,sans-serif; text-shadow: 0 1px 2px #003a68; }
+    :global(.route-wind-indicator span) { position: absolute; inset: 0; display: grid; place-items: start center; padding-top: calc(var(--wind-indicator-height, 10px) * 0.12); box-sizing: border-box; color: #fff; font: bold var(--wind-indicator-text-size, 12px) Arial,sans-serif; text-shadow: 0 1px 2px #003a68; }
     :global(.route-wind-indicator .route-wind-degrees) { position: absolute; top: 50%; left: 50%; padding: 1px 3px; border-radius: 3px; background: #263238cc; color: #fff; font: 700 var(--wind-indicator-text-size, 10px)/1.2 Arial,sans-serif; white-space: nowrap; text-shadow: 0 1px 1px #000; }
     :global(.route-wind-indicator .route-wind-degrees[hidden]) { display: none; }
     :global(.route-indicator-value) { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 4px); white-space: nowrap; padding: 1px 3px; border-radius: 3px; background: #263238cc; color: #fff; font: 700 var(--wind-indicator-text-size, 10px)/1.2 Arial,sans-serif; }
