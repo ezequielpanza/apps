@@ -52,6 +52,17 @@ function saveOrder(){localStorage.setItem('bs.ui.order',JSON.stringify(ui.order)
 const layout=createPageLayoutEngine(cards);
 function hydrate(card){if(!card)return;const id=card.dataset.id;modules[id]?.afterRender?.(card);layout.mountCard(card)}
 function renderAll(){cards.innerHTML=ui.order.map(moduleHtml).join('');cards.querySelectorAll('.card').forEach(hydrate)}
+// In the three-column dashboard, size grid rows from each card's actual height.
+// The same cards and their saved order remain in use on the dashboard and APK.
+let masonryQueued=false;
+const masonryObserved=new Set();
+const masonryResize=window.ResizeObserver?new ResizeObserver(()=>queueMasonry()):null;
+function queueMasonry(){if(masonryQueued)return;masonryQueued=true;requestAnimationFrame(()=>{masonryQueued=false;const active=document.documentElement.classList.contains('bs-dashboard-expanded')&&document.documentElement.classList.contains('bs-dashboard-three');for(const card of cards.querySelectorAll(':scope > .card')){if(masonryResize&&!masonryObserved.has(card)){masonryObserved.add(card);masonryResize.observe(card)}const span=active?`span ${Math.max(1,Math.ceil((card.getBoundingClientRect().height+11)/4))}`:'';if(card.style.gridRowEnd!==span)card.style.gridRowEnd=span}for(const card of masonryObserved)if(!card.isConnected){masonryResize?.unobserve(card);masonryObserved.delete(card)}})}
+new MutationObserver(queueMasonry).observe(cards,{childList:true});
+new MutationObserver(queueMasonry).observe(document.documentElement,{attributes:true,attributeFilter:['class']});
+window.addEventListener('resize',queueMasonry);
+window.addEventListener('boatstation-page-resize-end',queueMasonry);
+queueMasonry();
 function renderPageContent(card,id,page){const module=modules[id],content=card?.querySelector(`.page[data-page="${page}"] > .page-content`);if(!module||!content)return;content.innerHTML=module.page(page);module.afterRender?.(card);layout.refreshPage(card,page)}
 function renderModule(id,preserveLayout=false){
   const card=cards.querySelector(`.card[data-id="${id}"]`);if(!card)return;
@@ -213,3 +224,4 @@ window.BoatStation={
   updateBattery:data=>modules.batteries.updateBattery(data),
   bluetoothDevices:list=>{scanDevices=Array.isArray(list)?list:[];if(bluetoothScanner.classList.contains('open'))renderBluetoothScanner(scanDevices.length?`${scanDevices.length} dispositivo${scanDevices.length===1?'':'s'} encontrado${scanDevices.length===1?'':'s'}`:'Escaneando dispositivos Bluetooth…')}
 };
+
