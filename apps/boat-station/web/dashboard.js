@@ -6,6 +6,10 @@ const save=(key,value)=>localStorage.setItem(key,JSON.stringify(value));
 const records=new Map();let selected=localStorage.getItem('bs.remote.activeStation')||stations()[0]?.stationId||'',timer=0,running=false,pending=false,map=null,layer=null,baseLayer=null,baseMode=localStorage.getItem('bs.dashboard.basemap')||'street',fitPending=true;
 const sensorFrame=$('sensorFrame');
 const sensorResize=$('sensorResize');
+const maximizeSensors=$('maximizeSensors'),dashboardMain=document.querySelector('main');let sensorsMaximized=false;
+function applySensorLayout(){try{const doc=sensorFrame.contentDocument;doc?.documentElement.classList.toggle('bs-dashboard-expanded',sensorsMaximized);const win=sensorFrame.contentWindow;if(win)setTimeout(()=>win.dispatchEvent(new win.Event('resize')),80)}catch(error){console.warn('No se pudo actualizar el diseño de sensores',error)}}
+sensorFrame.addEventListener('load',applySensorLayout);
+maximizeSensors.addEventListener('click',()=>{sensorsMaximized=!sensorsMaximized;dashboardMain.classList.toggle('sensors-maximized',sensorsMaximized);maximizeSensors.textContent=sensorsMaximized?'Volver al mapa':'Maximizar sensores';maximizeSensors.setAttribute('aria-pressed',String(sensorsMaximized));applySensorLayout();requestAnimationFrame(()=>map?.invalidateSize({pan:false}))});
 function applySensorWidth(value){const tabletLandscape=window.matchMedia('(min-width: 768px) and (max-width: 1100px) and (orientation: landscape)').matches,available=Math.max(260,window.innerWidth-(tabletLandscape?190:250)-(tabletLandscape?240:280)-8),width=Math.max(260,Math.min(640,available,Number(value)||360));document.documentElement.style.setProperty('--sensor-width',width+'px');localStorage.setItem('bs.dashboard.sensorWidth',String(width));sensorResize.setAttribute('aria-valuenow',String(width));requestAnimationFrame(()=>map?.invalidateSize({pan:false}))}
 applySensorWidth(localStorage.getItem('bs.dashboard.sensorWidth')||360);
 let resizePointer=null;
