@@ -6,6 +6,30 @@ const save=(key,value)=>localStorage.setItem(key,JSON.stringify(value));
 const records=new Map();let selected=localStorage.getItem('bs.remote.activeStation')||stations()[0]?.stationId||'',timer=0,running=false,pending=false,map=null,layer=null,baseLayer=null,baseMode=localStorage.getItem('bs.dashboard.basemap')||'street',fitPending=true;
 const sensorFrame=$('sensorFrame');
 const sensorResize=$('sensorResize');
+const wakeButton=$('keepScreenOn'),wakeStatus=$('screenWakeStatus'),wakeKey='bs.dashboard.keepScreenOn';
+let wakeEnabled=localStorage.getItem(wakeKey)==='true',wakeLock=null,wakeRequest=null,wakeGeneration=0;
+function renderWakeStatus(message){wakeButton.setAttribute('aria-pressed',String(wakeEnabled));wakeStatus.textContent=message;wakeStatus.classList.toggle('connected',!!wakeLock)}
+async function acquireWakeLock(){
+  if(!wakeEnabled||document.hidden||wakeLock||wakeRequest)return;
+  if(!navigator.wakeLock?.request){renderWakeStatus('No disponible en este dispositivo o navegador.');return}
+  const generation=wakeGeneration;
+  renderWakeStatus('Activando…');
+  wakeRequest=navigator.wakeLock.request('screen');
+  try{
+    const lock=await wakeRequest;
+    if(!wakeEnabled||document.hidden||generation!==wakeGeneration){await lock.release();return}
+    wakeLock=lock;
+    lock.addEventListener('release',()=>{if(wakeLock!==lock)return;wakeLock=null;if(wakeEnabled)renderWakeStatus(document.hidden?'En pausa hasta volver al Dashboard.':'El sistema liberó la pantalla. Desactivá y activá para reintentar.');else renderWakeStatus('Desactivado.');});
+    renderWakeStatus('Pantalla encendida activa.');
+  }catch(error){if(wakeEnabled&&generation===wakeGeneration)renderWakeStatus('No se pudo mantener la pantalla encendida. Desactivá y activá para reintentar.');}
+  finally{wakeRequest=null;if(wakeEnabled&&!document.hidden&&generation!==wakeGeneration)acquireWakeLock()}
+}
+wakeButton.addEventListener('click',()=>{
+  wakeEnabled=!wakeEnabled;wakeGeneration++;localStorage.setItem(wakeKey,String(wakeEnabled));
+  if(wakeEnabled)acquireWakeLock();else{const lock=wakeLock;wakeLock=null;if(lock)lock.release().catch(()=>{});renderWakeStatus('Desactivado.')}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&wakeEnabled){wakeGeneration++;const lock=wakeLock;wakeLock=null;if(lock)lock.release().catch(()=>{});renderWakeStatus('En pausa hasta volver al Dashboard.')}else if(wakeEnabled)acquireWakeLock()});
+renderWakeStatus(wakeEnabled?'Activando…':'Desactivado.');if(wakeEnabled)acquireWakeLock();
 const maximizeSensors=$('maximizeSensors'),maximizeSensorsThree=$('maximizeSensorsThree'),showMap=$('showMap'),sensorStatus=$('sensorStatus'),dashboardMain=document.querySelector('main');let sensorColumns=0,statusObserver=null,bootstrapObserver=null;
 const toggleFleet=$('toggleFleet');let sidebarClosed=localStorage.getItem('bs.dashboard.sidebarClosed')==='true';function setSidebarClosed(value){sidebarClosed=!!value;dashboardMain.classList.toggle('sidebar-closed',sidebarClosed);toggleFleet.setAttribute('aria-expanded',String(!sidebarClosed));toggleFleet.setAttribute('aria-label',sidebarClosed?'Abrir barra de Mi flota':'Cerrar barra de Mi flota');localStorage.setItem('bs.dashboard.sidebarClosed',String(sidebarClosed));requestAnimationFrame(()=>{map?.invalidateSize({pan:false});try{const win=sensorFrame.contentWindow;if(win)win.dispatchEvent(new win.Event('resize'))}catch{}})}toggleFleet.addEventListener('click',()=>setSidebarClosed(!sidebarClosed));setSidebarClosed(sidebarClosed);
 function applySensorLayout(){try{const doc=sensorFrame.contentDocument,root=doc?.documentElement;if(root){root.classList.add('bs-dashboard-embedded');root.classList.toggle('bs-dashboard-expanded',sensorColumns>0);root.classList.toggle('bs-dashboard-three',sensorColumns===3)}const win=sensorFrame.contentWindow;if(win)setTimeout(()=>win.dispatchEvent(new win.Event('resize')),80)}catch(error){console.warn('No se pudo actualizar el diseño de sensores',error)}}
@@ -80,3 +104,4 @@ $('vesselForm').onsubmit=event=>{event.preventDefault();if(!selected)return;cons
 function fillVessel(){const row=stations().find(s=>s.stationId===selected),name=records.get(selected)?.telemetry?.stationName||row?.name||'',knownChez=/\bchez\b/i.test(name);const c=getVesselConfig(selected);$('hullType').value=c.type||'mono';$('hullLength').value=c.length??(knownChez?12.5:'');$('hullBeam').value=c.beam??(knownChez?4.2:'');$('phoneForward').value=c.phoneForward??0;$('phoneStarboard').value=c.phoneStarboard??0;$('magneticCorrection').value=c.magneticCorrection??0;$('vesselStatus').textContent=c.length&&c.beam?'Configuración guardada en este navegador.':knownChez?'SV Chez: monocasco, 12,5 m × 4,2 m. Verificá dimensiones y posición del teléfono.':'Configurá la forma y las dimensiones para dibujar la silueta del barco.'}
 document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden)cycle()});window.addEventListener('online',cycle);window.addEventListener('storage',event=>{if(event.key==='bs.remote.stations'||event.key==='bs.remote.activeStation'){selected=localStorage.getItem('bs.remote.activeStation')||'';fillVessel();render();cycle()}});
 fillVessel();render();syncSensorFrame(selected);cycle();if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
