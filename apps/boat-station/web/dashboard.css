@@ -9,3 +9,19 @@
 
 
 .sidebar-controls #keepScreenOn[aria-pressed=true]{border-color:#84d3b4;color:#84d3b4}
+
+
+/* El encabezado permanece visible mientras la barra de la flota se desliza. */
+.dashboard-header{height:52px;padding:5px 12px;display:flex;align-items:center;background:#0b2532;border-bottom:1px solid #26414e}
+.dashboard-header .brand-toggle{display:flex;align-items:center;gap:9px;border:0;background:transparent;padding:2px;color:#f4fafc;text-align:left}
+.dashboard-header .brand-toggle:hover{background:#173e48}
+main{transition:grid-template-columns .25s ease}
+main .fleet{min-width:0;transition:opacity .2s ease,visibility 0s linear 0s;overflow-x:hidden}
+main.sidebar-closed .fleet{opacity:0;visibility:hidden;pointer-events:none;padding:0;border:0;overflow:hidden;transition:opacity .18s ease,visibility 0s linear .25s}
+@media(min-width:1101px){main{height:calc(100dvh - 52px)}main.sidebar-closed{grid-template-columns:0 minmax(280px,1fr) 8px var(--sensor-width,360px)}}
+@media(max-width:1100px) and (min-width:651px){main.sidebar-closed{grid-template-columns:0 minmax(0,1fr)}}
+@media(min-width:768px) and (max-width:1100px) and (orientation:landscape){main{height:calc(100dvh - 52px)}main.sidebar-closed{grid-template-columns:0 minmax(240px,1fr) 8px var(--sensor-width,360px)}}
+main.sensors-maximized{height:calc(100dvh - 52px)}
+main.sensors-maximized.sidebar-closed{grid-template-columns:0 minmax(0,1fr)}
+@media(max-width:650px){main .fleet{max-height:70dvh;overflow-y:auto;transition:max-height .25s ease,opacity .2s ease,visibility 0s linear 0s,padding .25s ease}main.sidebar-closed .fleet,main.sensors-maximized.sidebar-closed .fleet{display:block;flex:0 0 auto;min-height:0;height:auto;max-height:0;padding:0;overflow:hidden;transition:max-height .25s ease,opacity .18s ease,visibility 0s linear .25s,padding .25s ease}main.sensors-maximized{height:calc(100dvh - 52px)}}
+@media(prefers-reduced-motion:reduce){main,main .fleet,main.sidebar-closed .fleet{transition:none}}
