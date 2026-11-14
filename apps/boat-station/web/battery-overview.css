@@ -12,3 +12,5 @@
 .battery-mini-estimated{display:flex;align-items:center;justify-content:center;gap:5px;flex-wrap:wrap;border-top:1px solid #17445f;padding-top:3px}.battery-mini-estimated b{font-size:9px;white-space:nowrap}.battery-mini-estimated small{font-size:7px;color:var(--muted)}.voltage-curve-head,.voltage-curve-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:center}.voltage-curve-head{font-size:12px;color:var(--muted);margin-top:14px}.voltage-curve-row{margin:8px 0}.voltage-curve-row .full-input{min-width:0;margin:0}.battery-manage-row>div:last-child{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
 
 .voltage-curve-head,.voltage-curve-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto}.voltage-curve-head{font-size:11px}.voltage-curve-row .full-input{width:100%}
+
+.voltage-auto-box{border-top:1px solid var(--line);margin-top:16px;padding-top:14px}.voltage-auto-log{max-height:220px;overflow:auto;margin-top:10px;padding:8px;border-radius:8px;background:#071b29;color:#cadce5;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.voltage-auto-log time{color:var(--muted)}
