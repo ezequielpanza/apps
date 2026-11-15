@@ -27,3 +27,8 @@ html.bs-dashboard-embedded .topbar,html.bs-dashboard-embedded #remoteFreshness{d
 /* Tres columnas con módulos de altura independiente. */
 html.bs-dashboard-expanded.bs-dashboard-three #cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:4px;grid-auto-flow:row dense;column-gap:11px;row-gap:0}
 html.bs-dashboard-expanded.bs-dashboard-three #cards>.card{display:block;align-self:start;margin:0 0 11px}
+
+
+.gps-anchor-marker-icon svg{display:block;width:26px;height:26px;padding:3px;border-radius:50%;background:#ee553e;color:#fff;border:2px solid #fff;box-shadow:0 1px 6px #000c}
+.gps-anchor-link-label{background:transparent!important;border:0!important;pointer-events:none}
+.gps-anchor-link-label span{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;color:#fff;background:#071b27d9;border-radius:5px;padding:3px 6px;font-size:12px;font-weight:750;text-shadow:0 1px 2px #000}
