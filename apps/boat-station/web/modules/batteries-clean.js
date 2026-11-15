@@ -227,7 +227,7 @@ export function createBatteriesModule(requestRender,openManager){
         return{
           parts:[...b.parts.values()].filter(item=>item.n&&(!isOpen||item.last!==null)).map(item=>({id:item.id,name:item.name,value:isOpen?item.last:item.sum/item.n})),
           current:isOpen?b.currentLast:(b.currentN?b.current/b.currentN:null),
-          soc:isOpen?b.socLast:(b.socN?b.soc/b.socN:null),
+          soc:b.socLast,
           ah:[...ah.values()],currents,isOpen
         };
       }),
