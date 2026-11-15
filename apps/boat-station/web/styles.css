@@ -32,3 +32,9 @@ html.bs-dashboard-expanded.bs-dashboard-three #cards>.card{display:block;align-s
 .gps-anchor-marker-icon svg{display:block;width:26px;height:26px;padding:3px;border-radius:50%;background:#ee553e;color:#fff;border:2px solid #fff;box-shadow:0 1px 6px #000c}
 .gps-anchor-link-label{background:transparent!important;border:0!important;pointer-events:none}
 .gps-anchor-link-label span{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;color:#fff;background:#071b27d9;border-radius:5px;padding:3px 6px;font-size:12px;font-weight:750;text-shadow:0 1px 2px #000}
+
+
+/* Controles compactos del mapa de ubicación. */
+.gps-map-data{width:min(260px,calc(100% - 70px));right:auto}
+.gps-anchor-controls{left:auto;right:8px;bottom:8px}
+.gps-map-attribution{left:8px;right:auto;max-width:calc(100% - 130px)}
