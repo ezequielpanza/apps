@@ -77,6 +77,7 @@ export function createGpsModule(requestRender){
   }
   async function runAnchorControl(action,direction){
     if(action==='move'&&state.remoteAuthoritative){const result=performAnchorControl(action,direction,true);if(!result.ok)anchorFeedback(result.error);return}
+    if(action==='toggle'&&state.remoteAuthoritative){const result=performAnchorControl(action,direction);state.anchorControlMessage=result.error||'';requestRender('gps');return}
     if(state.anchorControlPending)return;state.anchorControlPending=true;state.anchorControlMessage='';requestRender('gps');
     if(!state.remoteAuthoritative){const result=performAnchorControl(action,direction);state.anchorControlPending=false;state.anchorControlMessage=result.error||'';requestRender('gps');return}
     const send=window.BoatStationRemoteCommand?.send,id='anchor-'+Date.now()+'-'+Math.random().toString(36).slice(2);let result=null;
@@ -183,6 +184,7 @@ export function createGpsModule(requestRender){
   initializeHistory();
   return{id:'gps',name:'Ubicación',pages:1,summary,page,afterRender,update,state,setUnits,getUnits,getUnitOptions,setCoordFormat,getCoordFormat,getCoordFormatOptions,getFrequencyOptions,getHistorySettings,setAlwaysRecord,setHistoryHours,setFrequencySeconds,setHistoryColor,setBoatColor,getAnchorSettings,setAnchorEnabled,setAnchorRadius,setAnchorRadiusUnit,setAnchorPoint,beginAnchorSelection,getVesselSettings,setVesselSettings,mapTypeLabel,setMapType};
 }
+
 
 
 

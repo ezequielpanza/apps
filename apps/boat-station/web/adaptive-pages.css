@@ -108,3 +108,13 @@
   .battery-history-control-row button{width:25px;height:28px;min-height:28px}
   .battery-history-control-row b{font-size:9px}
 }
+
+/* Boat Station 1.2.85: compact Boat Status after removing the level plot. */
+.page-content>.sea-attitude{grid-template-columns:minmax(0,1fr) minmax(108px,.7fr);grid-template-rows:minmax(86px,.75fr) auto 16px}
+.sea-attitude-stage{min-height:86px}
+.sea-attitude-boat{width:86px;height:70px;top:calc(54% - 52px);margin-left:-43px}
+.phone-details-grid{margin-top:8px}
+.phone-detail-value{font-size:14px!important;overflow-wrap:anywhere}
+@container pagecontent (max-height:330px){.page-content>.sea-attitude{grid-template-rows:minmax(76px,.7fr) auto 0}.sea-attitude-stage{min-height:76px}}
+@container pagecontent (max-width:340px){.page-content>.sea-attitude{grid-template-columns:minmax(0,1fr) 82px}.sea-attitude-boat{width:78px;margin-left:-39px}}
+
