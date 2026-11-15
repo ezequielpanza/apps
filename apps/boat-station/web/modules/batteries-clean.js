@@ -129,7 +129,7 @@ export function createBatteriesModule(requestRender,openManager){
   const metric=(v,l)=>`<div class="metric"><div class="value">${v}</div><div class="label">${l}</div></div>`;
   function mini(b,i){const soc=charge(b).soc,v=num(b.voltage),estimated=estimatedVoltage(b),a=num(b.current),cap=num(b.capacityAh)||0,rem=charge(b).rem,shown=rem!==null?rem:(soc!==null?soc*cap/100:null),online=b.connected!==false;return `<div class="battery-mini ${online?'online':'offline'}"><div class="battery-mini-head"><strong>${esc(b.name||b.deviceName||`Batería ${i+1}`)}</strong><span class="battery-mini-link">${online?'⌁':'×'}</span></div><div class="battery-mini-body"><div class="battery-mini-ring" style="--soc:${soc??0}"><span>${soc===null?'—':Math.round(soc)+'%'}</span></div><div class="battery-mini-right"><div class="battery-mini-top"><div><b>${v===null?'—':v.toFixed(2)+' V'}</b><small>Voltaje</small></div><div><b>${a===null?'—':(a>=0?'+':'')+a.toFixed(1)+' A'}</b><small>Corriente</small></div></div><div class="battery-mini-estimated"><b>${estimated===null?'—':estimated.toFixed(2)+' V'}</b><small>Voltaje estimado</small></div><div class="battery-mini-charge"><span>${shown===null?'—':`${Math.round(shown)} / ${Math.round(cap)} Ah`}</span><small>${!online?'Última carga registrada':b.chargeCalculation&&b.chargeCalculation.mode!=='bms'?'Carga estimada':'Carga'}</small></div></div></div></div>`}
   function overview(){const s=stats(),autonomy=autonomyLabel(s),chargeEta=chargeEtaLabel(s),minis=state.batteries.length?state.batteries.map(mini).join(''):'<div class="battery-mini-empty">Sin baterías vinculadas</div>';return `<div class="battery-overview"><div class="battery-bank-panel"><div class="battery-hero"><div class="battery-ring" style="--soc:${s.soc??0}"><div><strong>${s.soc===null?'—':Math.round(s.soc)+'%'}</strong><span>Carga</span></div></div><div class="battery-bank-name">${esc(state.bankName)}</div><div class="battery-bank-details"><span class="battery-ah">${s.rem===null?'—':Math.round(s.rem)} / ${Math.round(s.cap)} Ah</span><span class="battery-autonomy">Autonomía <b>${autonomy}</b></span><span class="battery-autonomy" title="Estimación al ritmo neto de carga actual">Carga completa en <b>${chargeEta}</b></span></div></div><div class="metric-grid three compact-bank-metrics">${metric(s.voltage===null?'—':s.voltage.toFixed(2)+' V','Voltaje')}${metric(s.current===null?'—':s.current.toFixed(1)+' A','Corriente')}${metric(s.power===null?'—':Math.round(s.power)+' W','Potencia')}</div><div class="battery-connected">${s.connected} de ${s.total} baterías conectadas${s.connected<s.total?' · Carga con última lectura disponible':''}</div></div><div class="battery-mini-column">${minis}</div></div>`}
-  function historyPage(){const [label,ms]=ZOOMS[zoom],total=ms*BARS,span=total>=86400000?`${Math.round(total/86400000)} días`:total<3600000?`${Math.round(total/60000)} min`:`${Number((total/3600000).toFixed(1)).toLocaleString('es')} h`;return `<div class="battery-history-page"><div class="battery-history-head"><div><strong>Histórico de carga</strong><small>30 intervalos · ${label} por intervalo · ${span}</small></div><div class="battery-history-zoom"><button type="button" data-battery-history-zoom="out" ${zoom===0?'disabled':''}>−</button><b>${label}</b><button type="button" data-battery-history-zoom="in" ${zoom===ZOOMS.length-1?'disabled':''}>+</button></div></div><div class="battery-history-chart"><div class="battery-history-y"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><canvas data-battery-history-chart></canvas><div class="battery-history-y battery-history-y-ah"><span data-ah-label="top">+— Ah</span><span data-ah-label="upper">+— Ah</span><span data-ah-label="zero">0 Ah</span><span data-ah-label="lower">−— Ah</span><span data-ah-label="bottom">−— Ah</span></div><div class="battery-history-y battery-history-y-current"><span data-current-label="top">+— A</span><span data-current-label="upper">+— A</span><span data-current-label="zero">0 A</span><span data-current-label="lower">−— A</span><span data-current-label="bottom">−— A</span></div></div><div class="battery-history-legend" data-battery-history-legend></div><small class="battery-history-foot">Barras: carga (%). Líneas continuas: Ah acumulados por intervalo (carga al 99% y descarga negativa). Líneas discontinuas: corriente promedio (A). Elegí los indicadores desde la configuración del gráfico.</small></div>`}
+  function historyPage(){const [label,ms]=ZOOMS[zoom],total=ms*BARS,span=total>=86400000?`${Math.round(total/86400000)} días`:total<3600000?`${Math.round(total/60000)} min`:`${Number((total/3600000).toFixed(1)).toLocaleString('es')} h`;return `<div class="battery-history-page"><div class="battery-history-head"><div><strong>Histórico de carga</strong><small>30 intervalos · ${label} por intervalo · ${span}</small></div><div class="battery-history-zoom"><button type="button" data-battery-history-zoom="out" ${zoom===0?'disabled':''}>−</button><b>${label}</b><button type="button" data-battery-history-zoom="in" ${zoom===ZOOMS.length-1?'disabled':''}>+</button></div></div><div class="battery-history-chart"><div class="battery-history-y"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><canvas data-battery-history-chart></canvas><div class="battery-history-y battery-history-y-ah"><span data-ah-label="top">+— Ah</span><span data-ah-label="upper">+— Ah</span><span data-ah-label="zero">0 Ah</span><span data-ah-label="lower">−— Ah</span><span data-ah-label="bottom">−— Ah</span></div><div class="battery-history-y battery-history-y-current"><span data-current-label="top">+— A</span><span data-current-label="upper">+— A</span><span data-current-label="zero">0 A</span><span data-current-label="lower">−— A</span><span data-current-label="bottom">−— A</span></div></div><div class="battery-history-legend" data-battery-history-legend></div><small class="battery-history-foot">Los intervalos cerrados muestran promedios. En el intervalo abierto, las barras y la corriente muestran la última lectura; los Ah muestran una proyección basada en la corriente promedio hasta ahora. La barra tenue marca el intervalo abierto.</small></div>`}
   function statPage(){const s=stats();return `<div class="battery-list battery-stats-list">${row('Carga actual',s.soc===null?'—':Math.round(s.soc)+'%',`${s.rem===null?'—':Math.round(s.rem)} / ${Math.round(s.cap)} Ah`)}${row('Potencia actual',s.power===null?'—':Math.round(s.power)+' W',s.current===null?'Sin datos de corriente':s.current>=0?'Cargando':'Descargando')}</div>`}
   const row=(name,value,detail)=>`<div class="battery-item"><div class="battery-item-top"><span class="battery-name">${name}</span><span class="battery-soc">${value}</span></div><div class="battery-item-sub"><span>${detail}</span></div></div>`;
   function listPage(){if(!state.batteries.length)return `<div class="battery-empty"><div>No hay baterías vinculadas</div><button class="gps-action primary" type="button" data-battery-manage>Administrar Banco de Baterías</button></div>`;return `<div class="battery-list">${state.batteries.map(b=>row(esc(b.name||b.deviceName||'Batería'),charge(b).soc===null?'—':Math.round(charge(b).soc)+'%',`${num(b.capacityAh)||0} Ah · ${b.connected===false?'Offline':'Conectada'}`)).join('')}</div>`}
@@ -145,12 +145,94 @@ export function createBatteriesModule(requestRender,openManager){
     historyDirty=true;saveHistory();
   }
   function chartData(){
-    ensureHistoryAh();const [_,ms]=ZOOMS[zoom],end=Math.floor(Date.now()/ms)*ms+ms,start=end-ms*BARS,bars=Array.from({length:BARS},()=>({parts:new Map(),current:0,currentN:0,soc:null,ah:new Map(),currents:new Map()}));
-    for(const p of state.history){const i=Math.floor((Number(p?.time)-start)/ms);if(i<0||i>=BARS)continue;const b=bars[i],c=num(p.current),soc=num(p.soc);if(c!==null){b.current+=c;b.currentN++;const line=b.currents.get('bank')||{id:'bank',name:'Banco',sum:0,n:0};line.sum+=c;line.n++;b.currents.set('bank',line)}if(soc!==null)b.soc=soc;
-      for(const part of p.batteries||[]){const id=String(part.id||part.name||'battery'),name=String(part.name||'Batería'),v=num(part.contribution),x=b.parts.get(id)||{id,name,sum:0,n:0};if(v!==null){x.sum+=v;x.n++}b.parts.set(id,x);const current=num(part.current);if(current!==null){const line=b.currents.get(id)||{id,name,sum:0,n:0};line.sum+=current;line.n++;line.name=name;b.currents.set(id,line)}const ah=num(part.storedAh);if(ah!==null){const line=b.ah.get(id)||{id,name,value:0,n:0};line.value+=ah;line.n++;line.name=name;b.ah.set(id,line)}}
-      const batteryAh=(p.batteries||[]).map(part=>num(part.storedAh)).filter(value=>value!==null),bankAh=batteryAh.length?batteryAh.reduce((sum,value)=>sum+value,0):num(p.storedAh);if(bankAh!==null){const line=b.ah.get('bank')||{id:'bank',name:'Banco',value:0,n:0};line.value+=bankAh;line.n++;b.ah.set('bank',line)}
+    ensureHistoryAh();
+    const now=Date.now(),[_,ms]=ZOOMS[zoom],end=Math.floor(now/ms)*ms+ms,start=end-ms*BARS,openIndex=BARS-1,openStart=start+openIndex*ms;
+    const bars=Array.from({length:BARS},()=>({parts:new Map(),current:0,currentN:0,currentLast:null,currentLastTime:-Infinity,soc:0,socN:0,socLast:null,socLastTime:-Infinity,ah:new Map(),currents:new Map()}));
+    let previousTime=null,latestBeforeOpen=null;
+    for(const p of state.history){
+      const time=Number(p?.time);
+      if(!Number.isFinite(time)||time>now)continue;
+      const i=Math.floor((time-start)/ms),coverage=previousTime!==null&&time>previousTime&&time-previousTime<=MAX_AH_GAP_MS?time-previousTime:0;
+      if(time<openStart)latestBeforeOpen=p;
+      if(i>=0&&i<BARS){
+        const b=bars[i],current=num(p.current),soc=num(p.soc);
+        if(current!==null){b.current+=current;b.currentN++}
+        if(time>=b.currentLastTime){b.currentLast=num(p.currentLast??p.current);b.currentLastTime=time}
+        if(soc!==null){b.soc+=soc;b.socN++}
+        if(time>=b.socLastTime){b.socLast=soc;b.socLastTime=time}
+        const bankCurrent=b.currents.get('bank')||{id:'bank',name:'Banco',sum:0,n:0,last:null,lastTime:-Infinity};
+        if(current!==null){bankCurrent.sum+=current;bankCurrent.n++}
+        if(time>=bankCurrent.lastTime){bankCurrent.last=num(p.currentLast??p.current);bankCurrent.lastTime=time}
+        b.currents.set('bank',bankCurrent);
+        for(const part of p.batteries||[]){
+          const id=String(part.id||part.name||'battery'),name=String(part.name||'Batería'),contribution=num(part.contribution);
+          const item=b.parts.get(id)||{id,name,sum:0,n:0,last:null,lastTime:-Infinity};
+          if(contribution!==null){item.sum+=contribution;item.n++}
+          if(time>=item.lastTime){item.last=contribution;item.lastTime=time}
+          item.name=name;b.parts.set(id,item);
+          const currentLine=b.currents.get(id)||{id,name,sum:0,n:0,last:null,lastTime:-Infinity},batteryCurrent=num(part.current);
+          if(batteryCurrent!==null){currentLine.sum+=batteryCurrent;currentLine.n++}
+          if(time>=currentLine.lastTime){currentLine.last=num(part.currentLast??part.current);currentLine.lastTime=time}
+          currentLine.name=name;b.currents.set(id,currentLine);
+          const ah=num(part.storedAh);
+          if(ah!==null){const line=b.ah.get(id)||{id,name,value:0,n:0,coveredMs:0};line.value+=ah;line.n++;line.coveredMs+=coverage;line.name=name;b.ah.set(id,line)}
+        }
+        const batteryAh=(p.batteries||[]).map(part=>num(part.storedAh)).filter(value=>value!==null),bankAh=batteryAh.length?batteryAh.reduce((sum,value)=>sum+value,0):num(p.storedAh);
+        if(bankAh!==null){const line=b.ah.get('bank')||{id:'bank',name:'Banco',value:0,n:0,coveredMs:0};line.value+=bankAh;line.n++;line.coveredMs+=coverage;b.ah.set('bank',line)}
+      }
+      previousTime=time;
     }
-    return{bars:bars.map(b=>({parts:[...b.parts.values()].filter(x=>x.n).map(x=>({...x,value:x.sum/x.n})),current:b.currentN?b.current/b.currentN:null,soc:b.soc,ah:[...b.ah.values()].filter(x=>x.n).map(({id,name,value})=>({id,name,value})),currents:[...b.currents.values()].filter(x=>x.n).map(({id,name,sum,n})=>({id,name,value:sum/n}))})),start,ms};
+    const open=bars[openIndex];
+    if(latestBeforeOpen&&now-Number(latestBeforeOpen.time)>=0&&now-Number(latestBeforeOpen.time)<=MAX_AH_GAP_MS){
+      const time=Number(latestBeforeOpen.time);
+      if(open.socLastTime===-Infinity)open.socLast=num(latestBeforeOpen.soc);
+      for(const part of latestBeforeOpen.batteries||[]){
+        const id=String(part.id||part.name||'battery'),name=String(part.name||'Batería'),contribution=num(part.contribution);
+        if(contribution!==null){
+          const item=open.parts.get(id)||{id,name,sum:0,n:0,last:null,lastTime:-Infinity};
+          if(item.lastTime===-Infinity){item.sum=contribution;item.n=1;item.last=contribution;item.lastTime=time}
+          item.name=name;open.parts.set(id,item);
+        }
+        const currentLine=open.currents.get(id)||{id,name,sum:0,n:0,last:null,lastTime:-Infinity},current=num(part.currentLast??part.current);
+        if(current!==null&&currentLine.lastTime===-Infinity){currentLine.sum=current;currentLine.n=1;currentLine.last=current;currentLine.lastTime=time}
+        currentLine.name=name;open.currents.set(id,currentLine);
+      }
+      const currentLine=open.currents.get('bank')||{id:'bank',name:'Banco',sum:0,n:0,last:null,lastTime:-Infinity},current=num(latestBeforeOpen.currentLast??latestBeforeOpen.current);
+      if(current!==null&&currentLine.lastTime===-Infinity){open.current=current;open.currentN=1;open.currentLast=current;open.currentLastTime=time;currentLine.sum=current;currentLine.n=1;currentLine.last=current;currentLine.lastTime=time}
+      open.currents.set('bank',currentLine);
+    }
+    const projectAh=current=>{const value=current*ms/3600000;return value>=0?value*CHARGE_EFFICIENCY:value};
+    return{
+      bars:bars.map((b,index)=>{
+        const isOpen=index===openIndex,averageCurrents=new Map([...b.currents.values()].filter(line=>line.n).map(line=>[line.id,line.sum/line.n]));
+        const currents=[...b.currents.values()].filter(line=>line.n).map(line=>({id:line.id,name:line.name,value:isOpen?line.last:line.sum/line.n})),ah=new Map();
+        for(const line of b.ah.values()){
+          if(line.id==='bank')continue;
+          const currentLine=b.currents.get(line.id),average=averageCurrents.get(line.id);
+          const value=isOpen?(currentLine&&currentLine.last===null?line.value:average!==undefined?projectAh(average):line.coveredMs>0?line.value/line.coveredMs*ms:line.value):line.value;
+          ah.set(line.id,{id:line.id,name:line.name,value});
+        }
+        if(isOpen)for(const line of b.currents.values())if(line.id!=='bank'&&line.n&&line.last!==null&&!ah.has(line.id))ah.set(line.id,{id:line.id,name:line.name,value:projectAh(line.sum/line.n)});
+        if(isOpen){
+          if(ah.size)ah.set('bank',{id:'bank',name:'Banco',value:[...ah.values()].reduce((sum,line)=>sum+line.value,0)});
+          else{
+            const currentLine=b.currents.get('bank'),average=averageCurrents.get('bank'),bankRaw=b.ah.get('bank');
+            if(currentLine&&currentLine.last!==null&&average!==undefined)ah.set('bank',{id:'bank',name:'Banco',value:projectAh(average)});
+            else if(bankRaw?.n){const value=currentLine?.last===null?bankRaw.value:bankRaw.coveredMs>0?bankRaw.value/bankRaw.coveredMs*ms:bankRaw.value;ah.set('bank',{id:'bank',name:'Banco',value})}
+          }
+        }else{
+          const bank=b.ah.get('bank');
+          if(bank?.n)ah.set('bank',{id:'bank',name:'Banco',value:bank.value});
+        }
+        return{
+          parts:[...b.parts.values()].filter(item=>item.n&&(!isOpen||item.last!==null)).map(item=>({id:item.id,name:item.name,value:isOpen?item.last:item.sum/item.n})),
+          current:isOpen?b.currentLast:(b.currentN?b.current/b.currentN:null),
+          soc:isOpen?b.socLast:(b.socN?b.soc/b.socN:null),
+          ah:[...ah.values()],currents,isOpen
+        };
+      }),
+      start,ms,openIndex
+    };
   }
   function getCurrentHistoryColor(id,lineIds=null){if(String(id)==='bank')return validColor(state.bankHistoryColor,'#20d7e5');const battery=state.batteries.find(item=>String(item.id)===String(id)),configured=validColor(battery?.historyCurrentColor,'');if(configured)return configured;const ids=lineIds||[...new Set(chartData().bars.flatMap(bar=>bar.ah.map(x=>x.id)))].sort();if(!ids.includes(String(id)))ids.push(String(id)),ids.sort();return CURRENT_LINE_COLORS[Math.max(0,ids.indexOf(String(id)))%CURRENT_LINE_COLORS.length]}
   function fillHistoryGaps(bars){const previous=Array(bars.length).fill(-1),next=Array(bars.length).fill(-1);let last=-1;for(let i=0;i<bars.length;i++){previous[i]=last;if(bars[i].parts.length)last=i}last=-1;for(let i=bars.length-1;i>=0;i--){next[i]=last;if(bars[i].parts.length)last=i}for(let i=0;i<bars.length;i++){if(bars[i].parts.length||previous[i]<0||next[i]<0)continue;const leftIndex=previous[i],rightIndex=next[i],left=bars[leftIndex],right=bars[rightIndex],fraction=(i-leftIndex)/(rightIndex-leftIndex),leftParts=new Map(left.parts.map(p=>[p.id,p])),rightParts=new Map(right.parts.map(p=>[p.id,p])),ids=new Set([...leftParts.keys(),...rightParts.keys()]);bars[i].parts=[...ids].map(id=>{const a=leftParts.get(id),b=rightParts.get(id),start=a?.value||0,end=b?.value||0;return{id,name:a?.name||b?.name||'Batería',value:start+(end-start)*fraction}}).filter(p=>p.value>0);const a=num(left.soc),b=num(right.soc);if(bars[i].soc===null&&a!==null&&b!==null)bars[i].soc=a+(b-a)*fraction}return bars}
@@ -166,13 +248,13 @@ export function createBatteriesModule(requestRender,openManager){
     const currentLabels={'top':`+${formatAhTick(currentScale)} A`,'upper':`+${formatAhTick(currentScale/2)} A`,'zero':'0 A','lower':`−${formatAhTick(currentScale/2)} A`,'bottom':`−${formatAhTick(currentScale)} A`};for(const [position,label] of Object.entries(currentLabels)){const node=root.querySelector(`[data-current-label="${position}"]`);if(node)node.textContent=label}for(const [selector,shown] of [['.battery-history-y-ah',ahValues.length],['.battery-history-y-current',currentValues.length]]){const axis=root.querySelector(selector);if(axis)axis.hidden=!shown}const chart=root.querySelector('.battery-history-chart');if(chart){const changed=chart.classList.contains('hide-ah')===!!ahValues.length||chart.classList.contains('hide-current')===!!currentValues.length;chart.classList.toggle('hide-ah',!ahValues.length);chart.classList.toggle('hide-current',!currentValues.length);if(changed)queueDraw(root)}
     c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,r.width,r.height);c.strokeStyle='#28516a';c.lineWidth=1;for(let i=0;i<=4;i++){const y=Math.round(i*plotH/4)+.5;c.beginPath();c.moveTo(0,y);c.lineTo(r.width,y);c.stroke()}
     const paletteIds=historyBatteries().map(b=>b.id).sort();
-    bars.forEach((b,i)=>{if(!b.parts.length||directions[i]===null)return;const direction=directions[i]>0?'charge':'discharge';let y=plotH;b.parts.sort((a,b)=>a.id.localeCompare(b.id)).forEach((p,n)=>{const ph=Math.max(0,Math.min(100,p.value))/100*plotH;if(!ph)return;y-=ph;const key=`soc:${p.id}`;const color=getHistorySeriesColor('soc-'+direction+':'+p.id,paletteIds);c.fillStyle=color;if(!hiddenSeries[key])c.fillRect(i*slot+(slot-bw)/2,y,bw,Math.max(1,ph));legend.set(key,{name:p.name,color,kind:'bar'})})});
+    bars.forEach((b,i)=>{if(!b.parts.length||directions[i]===null)return;const direction=directions[i]>0?'charge':'discharge',isOpen=i===data.openIndex;if(isOpen){c.save();c.globalAlpha=.72}let y=plotH;b.parts.sort((a,b)=>a.id.localeCompare(b.id)).forEach((p,n)=>{const ph=Math.max(0,Math.min(100,p.value))/100*plotH;if(!ph)return;y-=ph;const key=`soc:${p.id}`;const color=getHistorySeriesColor('soc-'+direction+':'+p.id,paletteIds);c.fillStyle=color;if(!hiddenSeries[key])c.fillRect(i*slot+(slot-bw)/2,y,bw,Math.max(1,ph));legend.set(key,{name:p.name,color,kind:'bar'})});if(isOpen)c.restore()});
     const zeroY=plotH/2;c.strokeStyle='#7c9bad';c.lineWidth=1.5;c.beginPath();c.moveTo(0,zeroY+.5);c.lineTo(r.width,zeroY+.5);c.stroke();
     const lineIds=[...new Set(bars.flatMap(b=>[...b.ah,...b.currents].map(x=>x.id)))].sort();
     for(const [field,prefix,scale,kind,unit] of [['ah','ah',ahScale,'line','Ah'],['currents','current',currentScale,'current','A prom.']]){
       const ids=[...new Set(bars.flatMap(b=>b[field].map(x=>x.id)))].sort();
       for(const id of ids){const key=`${prefix}:${id}`,color=getHistorySeriesColor(key,paletteIds),sample=bars.flatMap(b=>b[field]).find(x=>x.id===id);if(sample)legend.set(key,{name:`${sample.name} · ${unit}`,color,kind});if(hiddenSeries[key])continue;
-        let open=false;c.save();c.setLineDash(field==='currents'?[5,4]:[]);c.beginPath();bars.forEach((b,i)=>{const value=b[field].find(x=>x.id===id)?.value;if(!Number.isFinite(value)){open=false;return}const x=(i+.5)*slot,y=Math.max(2,Math.min(plotH-2,zeroY-(value/scale)*zeroY));if(!open){c.moveTo(x,y);open=true}else c.lineTo(x,y)});c.strokeStyle=color;c.lineWidth=2;c.lineJoin='round';c.stroke();c.setLineDash([]);bars.forEach((b,i)=>{const value=b[field].find(x=>x.id===id)?.value;if(!Number.isFinite(value))return;const x=(i+.5)*slot,y=Math.max(2,Math.min(plotH-2,zeroY-(value/scale)*zeroY));c.fillStyle=color;c.beginPath();c.arc(x,y,Math.max(1.5,Math.min(2.5,slot*.1)),0,Math.PI*2);c.fill()});c.restore();
+        let open=false;c.save();c.setLineDash(field==='currents'?[5,4]:[]);c.beginPath();bars.forEach((b,i)=>{const value=b[field].find(x=>x.id===id)?.value;if(!Number.isFinite(value)){open=false;return}const x=(i+.5)*slot,y=Math.max(2,Math.min(plotH-2,zeroY-(value/scale)*zeroY));if(!open){c.moveTo(x,y);open=true}else c.lineTo(x,y)});c.strokeStyle=color;c.lineWidth=2;c.lineJoin='round';c.stroke();c.setLineDash([]);bars.forEach((b,i)=>{const value=b[field].find(x=>x.id===id)?.value;if(!Number.isFinite(value))return;const x=(i+.5)*slot,y=Math.max(2,Math.min(plotH-2,zeroY-(value/scale)*zeroY)),radius=Math.max(1.5,Math.min(2.5,slot*.1));c.globalAlpha=i===data.openIndex ? .72 : 1;c.fillStyle=color;c.beginPath();c.arc(x,y,radius,0,Math.PI*2);c.fill();if(i===data.openIndex){c.globalAlpha=1;c.strokeStyle=color;c.lineWidth=1;c.beginPath();c.arc(x,y,radius+1,0,Math.PI*2);c.stroke()}});c.restore();
       }
     }
     c.save();c.strokeStyle='#17394f';c.lineWidth=1;c.beginPath();c.moveTo(0,plotH+.5);c.lineTo(r.width,plotH+.5);c.stroke();c.fillStyle='#7890a1';c.font=`${r.width<520?7:8}px system-ui, sans-serif`;c.textAlign='left';c.textBaseline='middle';for(let i=0;i<BARS;i++){const x=(i+.5)*slot,y=plotH+axisH-3,label=axisLabel(data.start+i*data.ms,data.ms);c.save();c.translate(x,y);c.rotate(-Math.PI/2);c.fillText(label,0,0);c.restore()}c.restore();
