@@ -2410,7 +2410,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 const relativeAt = (distance: number) => left.direction! + delta * (distance - left.distance) / (right.distance - left.distance) - bearing;
                 const x0 = relativeAt(lo), x1 = relativeAt(hi);
                 const cuts = [lo, hi];
-                if (Math.abs(x1 - x0) > 1e-9) for (let turn = -3; turn <= 3; turn++) for (const boundary of [-180, -upwindLaylineAngle, upwindLaylineAngle, 180]) {
+                if (Math.abs(x1 - x0) > 1e-9) for (let turn = -3; turn <= 3; turn++) for (const boundary of [-180, -downwindLaylineAngle, -upwindLaylineAngle, upwindLaylineAngle, downwindLaylineAngle, 180]) {
                     const t = (boundary + turn * 360 - x0) / (x1 - x0);
                     if (t > 1e-8 && t < 1 - 1e-8) cuts.push(lo + (hi - lo) * t);
                 }
@@ -2418,7 +2418,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 for (let k = 1; k < cuts.length; k++) {
                     if (cuts[k] - cuts[k - 1] < 1e-8) continue;
                     const angle = ((relativeAt((cuts[k] + cuts[k - 1]) / 2) + 540) % 360 + 360) % 360 - 180;
-                    const color = Math.abs(angle) < upwindLaylineAngle ? sailingRouteColors.motor : angle < 0 ? sailingRouteColors.port : sailingRouteColors.starboard;
+                    const absoluteAngle = Math.abs(angle);
+                    const insideUpwindNoGo = absoluteAngle < upwindLaylineAngle;
+                    const insideDownwindNoGo = absoluteAngle > downwindLaylineAngle;
+                    const color = insideUpwindNoGo || insideDownwindNoGo ? sailingRouteColors.motor : angle < 0 ? sailingRouteColors.port : sailingRouteColors.starboard;
                     const p = interpolatePoint(start, end, (cuts[k - 1] - legStart) / length);
                     const q = interpolatePoint(start, end, (cuts[k] - legStart) / length);
                     sailingRouteLayers.push(L.polyline([[p.lat, p.lon], [q.lat, q.lon]], { color, weight: 4, opacity: 0.95, interactive: false }).addTo(map));
