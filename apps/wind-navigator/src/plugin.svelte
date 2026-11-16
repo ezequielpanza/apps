@@ -367,6 +367,22 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let windIndicatorSettingsOpen = false;
     let waveIndicatorSettingsOpen = false;
     let laylinesSettingsOpen = false;
+    let sailingRouteSettingsOpen = false;
+    type SailRange = { name: string; min: number; max: number; color: string };
+    let sailRanges: SailRange[] = [];
+    let sailingRouteEnabled = false;
+    let sailingRouteColors = { port: '#20a668', starboard: '#df5048', motor: '#e0a126' };
+    let sailingRouteLayers: L.Polyline[] = [];
+    try {
+        const saved = JSON.parse(localStorage.getItem('route-builder-sailing-route-v1') || '{}');
+        if (typeof saved.enabled === 'boolean') sailingRouteEnabled = saved.enabled;
+        for (const key of ['port', 'starboard', 'motor'] as const) if (/^#[0-9a-f]{6}$/i.test(saved.colors?.[key] || '')) sailingRouteColors[key] = saved.colors[key];
+        if (Array.isArray(saved.ranges)) sailRanges = saved.ranges.filter((r: any) => r && typeof r.name === 'string' && Number.isFinite(r.min) && Number.isFinite(r.max) && r.min >= 0 && r.max >= r.min && /^#[0-9a-f]{6}$/i.test(r.color));
+    } catch { /* Use defaults. */ }
+    function saveSailingRouteSettings(): void {
+        try { localStorage.setItem('route-builder-sailing-route-v1', JSON.stringify({ enabled: sailingRouteEnabled, colors: sailingRouteColors, ranges: sailRanges })); } catch { /* Keep the settings for this session. */ }
+    }
+
     let windRoseSettingsOpen = false;
     function activeWindModelFields(): WindowConditionKey[] {
         return routeFieldOrder.filter(key => windModelFieldKeys.includes(key) && !hiddenRouteFields.has(key));
@@ -1491,6 +1507,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         if (windSettings) windIndicatorSettingsOpen = windSettings.open;
         if (waveSettings) waveIndicatorSettingsOpen = waveSettings.open;
         if (laylineSettings) laylinesSettingsOpen = laylineSettings.open;
+        const sailingSettings = forecastDrawer.querySelector<HTMLDetailsElement>('[data-visual-group="sailing-route"]');
+        if (sailingSettings) sailingRouteSettingsOpen = sailingSettings.open;
         if (roseSettings) windRoseSettingsOpen = roseSettings.open;
         applyForecastDrawerHeightLimit();
         const existingScroll = forecastDrawer.querySelector<HTMLElement>('.forecast-table-scroll')?.scrollLeft || 0;
@@ -2368,6 +2386,46 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             routeLine = null;
         }
         redrawDistanceLabels(routePoints);
+        redrawSailingRoute(routePoints);
+    }
+
+
+    function redrawSailingRoute(routePoints: Waypoint[] = points): void {
+        for (const layer of sailingRouteLayers) layer.removeFrom(map);
+        sailingRouteLayers = [];
+        if (!sailingRouteEnabled || !windIndicatorField || routePoints.length < 2 || routeForecast.length < 2) return;
+        const samples = routeForecast.map(sample => ({ distance: sample.distanceNm, direction: fieldDirection(windIndicatorField as WindowConditionKey, sample.values) }))
+            .filter(sample => Number.isFinite(sample.distance)).sort((a, b) => a.distance - b.distance);
+        let legStart = 0;
+        for (let i = 1; i < routePoints.length; i++) {
+            const start = routePoints[i - 1], end = routePoints[i];
+            const length = haversineNm(start, end), legEnd = legStart + length;
+            if (!(length > 0)) { legStart = legEnd; continue; }
+            const bearing = trueBearing(start, end);
+            for (let j = 1; j < samples.length; j++) {
+                const left = samples[j - 1], right = samples[j];
+                const lo = Math.max(legStart, left.distance), hi = Math.min(legEnd, right.distance);
+                if (left.direction === null || right.direction === null || !(hi > lo) || !(right.distance > left.distance)) continue;
+                const delta = ((right.direction - left.direction + 540) % 360) - 180;
+                const relativeAt = (distance: number) => left.direction! + delta * (distance - left.distance) / (right.distance - left.distance) - bearing;
+                const x0 = relativeAt(lo), x1 = relativeAt(hi);
+                const cuts = [lo, hi];
+                if (Math.abs(x1 - x0) > 1e-9) for (let turn = -3; turn <= 3; turn++) for (const boundary of [-180, -upwindLaylineAngle, upwindLaylineAngle, 180]) {
+                    const t = (boundary + turn * 360 - x0) / (x1 - x0);
+                    if (t > 1e-8 && t < 1 - 1e-8) cuts.push(lo + (hi - lo) * t);
+                }
+                cuts.sort((a, b) => a - b);
+                for (let k = 1; k < cuts.length; k++) {
+                    if (cuts[k] - cuts[k - 1] < 1e-8) continue;
+                    const angle = ((relativeAt((cuts[k] + cuts[k - 1]) / 2) + 540) % 360 + 360) % 360 - 180;
+                    const color = Math.abs(angle) < upwindLaylineAngle ? sailingRouteColors.motor : angle < 0 ? sailingRouteColors.port : sailingRouteColors.starboard;
+                    const p = interpolatePoint(start, end, (cuts[k - 1] - legStart) / length);
+                    const q = interpolatePoint(start, end, (cuts[k] - legStart) / length);
+                    sailingRouteLayers.push(L.polyline([[p.lat, p.lon], [q.lat, q.lon]], { color, weight: 4, opacity: 0.95, interactive: false }).addTo(map));
+                }
+            }
+            legStart = legEnd;
+        }
     }
 
     function redrawDistanceLabels(routePoints: Waypoint[] = points): void {
@@ -2750,6 +2808,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         redrawWindIndicator();
         redrawWaveIndicator();
         redrawLaylines();
+        redrawSailingRoute(liveDisplayPoints ?? points);
         redrawWindRose();
         redrawRoutePointIndicators();
     }
@@ -4148,6 +4207,20 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         });
         forecastDrawer.addEventListener('click', event => {
             const target = event.target as HTMLElement;
+            const addSail = target.closest<HTMLButtonElement>('[data-sail-add]');
+            const deleteSail = target.closest<HTMLButtonElement>('[data-sail-delete]');
+            if (addSail || deleteSail) {
+                if (addSail) sailRanges = [...sailRanges, { name: 'Nueva vela', min: 0, max: 20, color: '#1595c4' }];
+                else {
+                    const index = Number(deleteSail!.dataset.sailDelete);
+                    if (!Number.isInteger(index) || index < 0 || index >= sailRanges.length) return;
+                    sailRanges = sailRanges.filter((_, i) => i !== index);
+                }
+                saveSailingRouteSettings();
+                sailingRouteSettingsOpen = true;
+                renderForecastDrawer();
+                return;
+            }
             const validDepartureArrow = target.closest<HTMLButtonElement>('[data-valid-departure]');
             if (validDepartureArrow) {
                 if (liveRouteActive || validDepartureArrow.disabled) return;
@@ -4425,6 +4498,41 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         });
         forecastDrawer.addEventListener('change', event => {
             const target = event.target as HTMLElement;
+            const sailingEnabled = target.closest<HTMLInputElement>('[data-sailing-enabled]');
+            if (sailingEnabled) {
+                sailingRouteEnabled = sailingEnabled.checked;
+                saveSailingRouteSettings();
+                redrawSailingRoute();
+                return;
+            }
+            const sailingColor = target.closest<HTMLInputElement>('[data-sailing-color]');
+            if (sailingColor) {
+                const key = sailingColor.dataset.sailingColor;
+                if ((key === 'port' || key === 'starboard' || key === 'motor') && /^#[0-9a-f]{6}$/i.test(sailingColor.value)) {
+                    sailingRouteColors[key] = sailingColor.value;
+                    saveSailingRouteSettings();
+                    redrawSailingRoute();
+                }
+                return;
+            }
+            const sailInput = target.closest<HTMLInputElement>('[data-sail-index][data-sail-field]');
+            if (sailInput) {
+                const index = Number(sailInput.dataset.sailIndex), field = sailInput.dataset.sailField;
+                const range = sailRanges[index];
+                if (!range) return;
+                if (field === 'name') range.name = sailInput.value.trim();
+                else if (field === 'color' && /^#[0-9a-f]{6}$/i.test(sailInput.value)) range.color = sailInput.value;
+                else if (field === 'min' || field === 'max') {
+                    const number = Number(sailInput.value);
+                    if (!Number.isFinite(number) || number < 0 || (field === 'min' && number > range.max) || (field === 'max' && number < range.min)) {
+                        sailInput.value = String(range[field]);
+                        return;
+                    }
+                    range[field] = number;
+                }
+                saveSailingRouteSettings();
+                return;
+            }
             const speedSlider = target.closest<HTMLInputElement>('[data-route-speed-slider]');
             if (speedSlider) {
                 applyRouteSettings();
@@ -4603,6 +4711,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 laylineSetting.value = String(setting === 'upwind-angle' ? upwindLaylineAngle : downwindLaylineAngle);
                 try { localStorage.setItem(`route-builder-${setting}`, laylineSetting.value); } catch { /* Keep the setting in memory. */ }
                 redrawLaylines();
+                redrawSailingRoute();
                 return;
             }
             const laylineColorInput = target.closest<HTMLInputElement>('[data-layline-color]');
@@ -4822,8 +4931,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const windIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wind"${windIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de viento</summary><div class="navigation-visual-group-body"><label>Fuente de dirección<select data-wind-indicator-field><option value="">Ninguno</option>${windOptions}</select></label><label>Fuente de valor<select data-indicator-individual="windValue"><option value="">Ninguno</option>${valueOptions(windValueOptions, indicatorAppearance.windValue)}</select></label><label>Color<input type="color" data-indicator-individual="windColor" value="${indicatorAppearance.windColor}"></label><label>Nombre<input type="text" data-indicator-individual="windLetter" value="${escapeIndicatorAttribute(indicatorAppearance.windLetter)}"></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wind"${routeWindIndicatorsEnabled ? ' checked' : ''}></label></div></details>`;
         const waveIndicatorSettings = `<details class="navigation-visual-group" data-visual-group="wave"${waveIndicatorSettingsOpen ? ' open' : ''}><summary>Indicador de olas</summary><div class="navigation-visual-group-body"><label>Fuente de dirección<select data-wave-indicator-field><option value="">Ninguno</option>${waveOptions}</select></label><label>Fuente de valor<select data-indicator-individual="waveValue"><option value="">Ninguno</option>${valueOptions(waveFields, indicatorAppearance.waveValue)}</select></label><label>Color<input type="color" data-indicator-individual="waveColor" value="${indicatorAppearance.waveColor}"></label><label>Nombre<input type="text" data-indicator-individual="waveLetter" value="${escapeIndicatorAttribute(indicatorAppearance.waveLetter)}"></label><label>Mostrar en cada punto de ruta<input type="checkbox" data-waypoint-indicator-enabled="wave"${routeWaveIndicatorsEnabled ? ' checked' : ''}></label></div></details>`;
         const laylinesSettings = `<details class="navigation-visual-group" data-visual-group="laylines"${laylinesSettingsOpen ? ' open' : ''}><summary>Laylines</summary><div class="navigation-visual-group-body"><label>Modo<select data-layline-mode>${laylineModes.map(([value, label]) => `<option value="${value}"${value === laylineMode ? ' selected' : ''}>${label}</option>`).join('')}</select></label><label>Ángulo Upwind (0–90°)<input type="number" min="0" max="90" step="1" value="${upwindLaylineAngle}" data-layline-setting="upwind-angle"></label><label>Ángulo Downwind (90–180°)<input type="number" min="90" max="180" step="1" value="${downwindLaylineAngle}" data-layline-setting="downwind-angle"></label><label>Color babor del viento<input type="color" data-layline-color="port" value="${portWindLaylineColor}" aria-label="Color de las laylines por babor del viento"></label><label>Color estribor del viento<input type="color" data-layline-color="starboard" value="${starboardWindLaylineColor}" aria-label="Color de las laylines por estribor del viento"></label><small>Los ángulos se miden respecto a la dirección de donde viene el viento. Automático compara el viento seleccionado con el rumbo GPS del barco.</small></div></details>`;
+        const sailRangeRows = sailRanges.map((range, index) => `<div class="navigation-visual-group-body"><label>Nombre<input type="text" data-sail-index="${index}" data-sail-field="name" value="${escapeIndicatorAttribute(range.name)}"></label><label>Viento mínimo (kn)<input type="number" min="0" step="0.1" data-sail-index="${index}" data-sail-field="min" value="${range.min}"></label><label>Viento máximo (kn)<input type="number" min="0" step="0.1" data-sail-index="${index}" data-sail-field="max" value="${range.max}"></label><label>Color<input type="color" data-sail-index="${index}" data-sail-field="color" value="${range.color}"></label><button type="button" data-sail-delete="${index}">Eliminar vela o rango</button></div>`).join('');
+        const sailingRouteSettings = `<details class="navigation-visual-group" data-visual-group="sailing-route"${sailingRouteSettingsOpen ? ' open' : ''}><summary>Ruta a Vela</summary><div class="navigation-visual-group-body"><label>Colorear ruta<input type="checkbox" data-sailing-enabled${sailingRouteEnabled ? ' checked' : ''}></label><label>Viento por babor<input type="color" data-sailing-color="port" value="${sailingRouteColors.port}"></label><label>Viento por estribor<input type="color" data-sailing-color="starboard" value="${sailingRouteColors.starboard}"></label><label>Motor<input type="color" data-sailing-color="motor" value="${sailingRouteColors.motor}"></label><small>Utiliza el ángulo Upwind y la fuente de dirección del indicador de viento. Sin datos, la ruta queda blanca.</small><strong>Velas y rangos de viento</strong>${sailRangeRows}<button type="button" data-sail-add>Agregar vela o rango</button></div></details>`;
         const windRoseSettings = `<details class="navigation-visual-group" data-visual-group="rose"${windRoseSettingsOpen ? ' open' : ''}><summary>Rosa de los vientos</summary><div class="navigation-visual-group-body"><label class="wind-rose-toggle">Mostrar rosa<input type="checkbox" data-wind-rose-enabled${windRoseEnabled ? ' checked' : ''}></label><label>Radio del círculo (px)<input type="number" min="20" max="200" step="1" value="${windRoseRadius}" data-wind-rose-setting="radius"></label><label>Ancho (px)<input type="number" min="1" max="20" step="1" value="${windRoseLineWidth}" data-wind-rose-setting="width" title="Grosor de las líneas de la rosa"></label><label>Tamaño de fuente (px)<input type="number" min="4" max="24" step="1" value="${windRoseFontSize}" data-wind-rose-setting="font-size"></label><label>Transparencia (%)<input type="number" min="0" max="100" step="1" value="${windRoseTransparency}" data-wind-rose-setting="transparency"></label><label>Etiquetas<select data-wind-rose-label-mode><option value="cardinal"${windRoseLabelMode === 'cardinal' ? ' selected' : ''}>Signos cardinales</option><option value="degrees"${windRoseLabelMode === 'degrees' ? ' selected' : ''}>Grados</option></select></label><hr><strong>Indicador de grados del heading</strong><label class="wind-rose-toggle">Mostrar grados<input type="checkbox" data-heading-degrees-enabled${headingDegreesEnabled ? ' checked' : ''}></label><label>Tamaño de letra (px)<input type="number" min="6" max="40" step="1" value="${headingDegreesFontSize}" data-heading-degrees-setting="font-size"></label><label>Ancho (px)<input type="number" min="30" max="200" step="1" value="${headingDegreesWidth}" data-heading-degrees-setting="width"></label><label>Alto (px)<input type="number" min="16" max="100" step="1" value="${headingDegreesHeight}" data-heading-degrees-setting="height"></label></div></details>`;
-        const navigationSettings = `<div class="route-forecast-settings"><strong>Ubicación</strong><label>Fuente de ubicación<select aria-label="Fuente de ubicación"><option selected>Automática (alta precisión)</option><option disabled>Solo GPS (solo en la App de celular)</option></select></label><small>La ubicación es proporcionada por el celular o el navegador.</small><strong>En vivo</strong><label>Promedio de velocidad<select data-live-setting="speed">${liveSpeedOptions.map(value => option(value, liveSpeedSeconds)).join('')}</select></label><label>Actualizar pronóstico<select data-live-setting="forecast">${liveForecastOptions.map(value => option(value, liveForecastSeconds)).join('')}</select></label><label>Refrescar waypoints<select data-live-setting="waypoints">${liveWaypointOptions.map(value => option(value, liveWaypointSeconds)).join('')}</select></label><label class="nav-restore-route-setting">Cargar ruta anterior al salir del modo NAV<input type="checkbox" data-nav-restore-previous-route${restorePreviousRouteOnNavExit ? ' checked' : ''}></label><small>Apagado: conserva la ruta que estabas navegando.</small><details class="navigation-visual-aids"${visualAidsOpen ? ' open' : ''}><summary>Ayudas visuales</summary><div class="navigation-visual-aids-list">${commonIndicatorSettings}${windIndicatorSettings}${waveIndicatorSettings}${laylinesSettings}${windRoseSettings}</div></details></div>`;
+        const navigationSettings = `<div class="route-forecast-settings"><strong>Ubicación</strong><label>Fuente de ubicación<select aria-label="Fuente de ubicación"><option selected>Automática (alta precisión)</option><option disabled>Solo GPS (solo en la App de celular)</option></select></label><small>La ubicación es proporcionada por el celular o el navegador.</small><strong>En vivo</strong><label>Promedio de velocidad<select data-live-setting="speed">${liveSpeedOptions.map(value => option(value, liveSpeedSeconds)).join('')}</select></label><label>Actualizar pronóstico<select data-live-setting="forecast">${liveForecastOptions.map(value => option(value, liveForecastSeconds)).join('')}</select></label><label>Refrescar waypoints<select data-live-setting="waypoints">${liveWaypointOptions.map(value => option(value, liveWaypointSeconds)).join('')}</select></label><label class="nav-restore-route-setting">Cargar ruta anterior al salir del modo NAV<input type="checkbox" data-nav-restore-previous-route${restorePreviousRouteOnNavExit ? ' checked' : ''}></label><small>Apagado: conserva la ruta que estabas navegando.</small><details class="navigation-visual-aids"${visualAidsOpen ? ' open' : ''}><summary>Ayudas visuales</summary><div class="navigation-visual-aids-list">${commonIndicatorSettings}${windIndicatorSettings}${waveIndicatorSettings}${laylinesSettings}${sailingRouteSettings}${windRoseSettings}</div></details></div>`;
         const settingsContent = settingsTab === 'forecast'
             ? renderRouteForecastSettingsControls('route-forecast-settings')
             : settingsTab === 'navigation' ? navigationSettings : '<div class="forecast-settings-map-tab"></div>';
@@ -5155,6 +5266,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             if (job === forecastJob) {
                 forecastBusy = false;
                 redrawRoutePointIndicators();
+                redrawSailingRoute();
                 if (!showWeatherSettingsMenu) renderForecastDrawer();
                 // Updating the route forecast invalidates any eligibility run
                 // that was in progress (both jobs share the forecast cache
@@ -5552,6 +5664,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
 
     onDestroy(() => {
+        for (const layer of sailingRouteLayers) layer.removeFrom(map);
+        sailingRouteLayers = [];
         routeFitRequestVersion++;
         hiddenWindyCrosshair?.classList.remove('route-builder-hide-crosshair');
         crosshairStyle?.remove();
