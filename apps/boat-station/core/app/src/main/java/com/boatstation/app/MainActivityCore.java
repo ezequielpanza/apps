@@ -1,6 +1,8 @@
 package com.boatstation.app;
 
 import android.content.Context;
+import android.app.DownloadManager;
+import android.database.Cursor;
 import android.content.Intent;
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -16,6 +18,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.os.Environment;
+import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.Voice;
 import android.util.Base64;
@@ -58,7 +62,11 @@ public class MainActivityCore extends MainActivityV100 {
     private static final String WEB_URL = WEB_ORIGIN + "/assets/index.html?mode=station";
     private static final int REQ_EXPORT_GPX = 3101;
     private static final int REQ_IMPORT_GPX = 3102;
+    private static final int REQ_INSTALL_UNKNOWN_APPS = 3103;
     private static final long SENSOR_PUSH_MS = 250;
+    private static final String APK_UPDATE_PREFS = "boat_station_apk_update";
+    private static final String APK_DOWNLOAD_ID = "download_id";
+    private static final String APK_DOWNLOAD_VERSION = "download_version";
 
     private WebView coreWebView;
     private TextToSpeech tts;
@@ -124,6 +132,32 @@ public class MainActivityCore extends MainActivityV100 {
     private void pushSensorFrame(boolean force){if(coreWebView==null)return;long now=SystemClock.elapsedRealtime();if(!force&&now-lastSensorPush<SENSOR_PUSH_MS)return;if(!haveHeading&&!haveMotion&&!haveAttitude)return;lastSensorPush=now;String heading=haveHeading?String.format(Locale.US,"%.1f",latestHeading):"null",motion=haveMotion?String.format(Locale.US,"%.3f",latestMotion):"null",roll=haveAttitude?String.format(Locale.US,"%.2f",latestRoll):"null",pitch=haveAttitude?String.format(Locale.US,"%.2f",latestPitch):"null";StringBuilder matrix=new StringBuilder("[");for(int i=0;i<9;i++){if(i>0)matrix.append(',');matrix.append(String.format(Locale.US,"%.8f",latestRotationMatrix[i]));}matrix.append(']');String js="(function(){var b=window.BoatStation;if(!b)return;if("+heading+"!==null&&b.updateCompass)b.updateCompass("+heading+");if("+roll+"!==null&&"+pitch+"!==null&&b.updateAttitude)b.updateAttitude({roll:"+roll+",pitch:"+pitch+",matrix:"+matrix+"});if("+motion+"!==null&&b.updateMotion)b.updateMotion("+motion+");window.__bsLastNativeSensor=Date.now();})();";WebView target=coreWebView;if(target!=null)target.post(()->{try{if(coreWebView==target)target.evaluateJavascript(js,null);}catch(Exception ignored){}});}
     private void announceCore(WebView view){view.evaluateJavascript("window.BoatStationCore={mode:'station',coreVersion:'"+CORE_VERSION+"',apkVersion:'"+BuildConfig.VERSION_NAME+"'};window.dispatchEvent(new CustomEvent('boatstation-core-ready',{detail:window.BoatStationCore}));",null);}
     private void showOfflineShell(WebView view){String html="<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><style>body{margin:0;background:#061522;color:#f4f8fb;font-family:system-ui;display:grid;place-items:center;min-height:100vh}.c{max-width:360px;text-align:center;padding:24px}.b{border:1px solid #24516a;background:#102f45;color:white;border-radius:12px;padding:12px 18px;font-size:16px}</style></head><body><div class='c'><h2>Boat Station</h2><p>No se pudo cargar Boat Station ni una copia en caché.</p><button class='b' onclick=\"CoreBridge.reloadWeb()\">Reintentar</button></div></body></html>";view.loadDataWithBaseURL(WEB_ORIGIN+"/assets/",html,"text/html","UTF-8",null);}
+    private android.content.SharedPreferences apkUpdatePreferences(){return getSharedPreferences(APK_UPDATE_PREFS,MODE_PRIVATE);}
+    private boolean versionAtLeast(String current,String expected){if(expected==null||expected.trim().isEmpty())return false;String[] a=String.valueOf(current).split("\\."),b=expected.trim().split("\\.");for(int i=0;i<Math.max(a.length,b.length);i++){int x=i<a.length?parseVersionPart(a[i]):0,y=i<b.length?parseVersionPart(b[i]):0;if(x!=y)return x>y;}return true;}
+    private int parseVersionPart(String part){String digits=part.replaceAll("[^0-9].*$","");try{return Integer.parseInt(digits);}catch(Exception ignored){return 0;}}
+    private void clearApkDownload(){apkUpdatePreferences().edit().remove(APK_DOWNLOAD_ID).remove(APK_DOWNLOAD_VERSION).apply();}
+    private String getApkDownloadState(){android.content.SharedPreferences prefs=apkUpdatePreferences();long id=prefs.getLong(APK_DOWNLOAD_ID,-1L);if(id<=0)return "none";String version=prefs.getString(APK_DOWNLOAD_VERSION,"");if(versionAtLeast(BuildConfig.VERSION_NAME,version)){clearApkDownload();return "none";}DownloadManager manager=getSystemService(DownloadManager.class);if(manager==null)return "failed";try(Cursor cursor=manager.query(new DownloadManager.Query().setFilterById(id))){if(cursor==null||!cursor.moveToFirst())return "failed";int column=cursor.getColumnIndex(DownloadManager.COLUMN_STATUS);if(column<0)return "failed";int status=cursor.getInt(column);if(status==DownloadManager.STATUS_SUCCESSFUL)return "ready";if(status==DownloadManager.STATUS_FAILED)return "failed";return "downloading";}catch(Exception ignored){return "failed";}}
+    private String getApkDownloadVersion(){return apkUpdatePreferences().getString(APK_DOWNLOAD_VERSION,"");}
+    private boolean startApkDownload(String url,String version){try{Uri uri=Uri.parse(url==null?"":url.trim());if(!"https".equalsIgnoreCase(uri.getScheme())||!"boat-station.pages.dev".equalsIgnoreCase(uri.getHost()))return false;DownloadManager manager=getSystemService(DownloadManager.class);if(manager==null)return false;String target=version==null?"":version.trim();String savedVersion=getApkDownloadVersion();String state=getApkDownloadState();if(("downloading".equals(state)||"ready".equals(state))&&target.equals(savedVersion))return true;long previous=apkUpdatePreferences().getLong(APK_DOWNLOAD_ID,-1L);if(previous>0)try{manager.remove(previous);}catch(Exception ignored){}String safe=target.isEmpty()?"latest":target.replaceAll("[^A-Za-z0-9._-]","_");DownloadManager.Request request=new DownloadManager.Request(uri).setTitle("Boat Station "+(target.isEmpty()?"APK":target)).setDescription("Descargando la actualización de Boat Station").setMimeType("application/vnd.android.package-archive").setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);request.setDestinationInExternalFilesDir(this,Environment.DIRECTORY_DOWNLOADS,"BoatStation-"+safe+"-"+System.currentTimeMillis()+".apk");long id=manager.enqueue(request);if(id<=0)return false;apkUpdatePreferences().edit().putLong(APK_DOWNLOAD_ID,id).putString(APK_DOWNLOAD_VERSION,target).apply();return true;}catch(Exception ignored){return false;}}
+    private void dispatchApkInstallError(){WebView target=coreWebView;if(target!=null)target.post(()->target.evaluateJavascript("window.dispatchEvent(new Event('boatstation-apk-install-error'));",null));}
+    private void openDownloadedApk(){
+        try{
+            long id=apkUpdatePreferences().getLong(APK_DOWNLOAD_ID,-1L);
+            DownloadManager manager=getSystemService(DownloadManager.class);
+            if(id<=0||manager==null){dispatchApkInstallError();return;}
+            Uri uri=manager.getUriForDownloadedFile(id);
+            if(uri==null){dispatchApkInstallError();return;}
+            if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O&&!getPackageManager().canRequestPackageInstalls()){
+                Intent settings=new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+getPackageName()));
+                startActivityForResult(settings,REQ_INSTALL_UNKNOWN_APPS);
+                return;
+            }
+            Intent install=new Intent(Intent.ACTION_VIEW);
+            install.setDataAndType(uri,"application/vnd.android.package-archive");
+            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(install);
+        }catch(Exception ignored){dispatchApkInstallError();}
+    }
     private void initTts(){tts=new TextToSpeech(this,status->{if(status==TextToSpeech.SUCCESS&&tts!=null){int result=tts.setLanguage(new Locale("es","AR"));if(result==TextToSpeech.LANG_MISSING_DATA||result==TextToSpeech.LANG_NOT_SUPPORTED)tts.setLanguage(Locale.getDefault());ttsReady=true;applyTtsSettings();WebView target=coreWebView;if(target!=null)target.post(()->target.evaluateJavascript("window.dispatchEvent(new Event('boatstation-tts-voices'));",null));}});}
     private void applyTtsSettings(){if(tts==null)return;try{android.content.SharedPreferences prefs=getSharedPreferences("boat_station_core",MODE_PRIVATE);String selected=prefs.getString("ttsVoice","");float rate=Math.max(.5f,Math.min(2f,prefs.getFloat("ttsRate",1f)));tts.setSpeechRate(rate);if(!selected.isEmpty()&&tts.getVoices()!=null){for(Voice voice:tts.getVoices())if(selected.equals(voice.getName())){tts.setVoice(voice);return;}}tts.setLanguage(new Locale("es","AR"));}catch(Exception ignored){}}
     private String getTtsVoiceList(){JSONArray list=new JSONArray();try{if(tts!=null&&tts.getVoices()!=null)for(Voice voice:tts.getVoices()){if(voice.getLocale()==null||!"es".equalsIgnoreCase(voice.getLocale().getLanguage()))continue;JSONObject item=new JSONObject();item.put("id",voice.getName());item.put("name",voice.getName());item.put("language",voice.getLocale().toLanguageTag());list.put(item);}}catch(Exception ignored){}return list.toString();}
@@ -144,6 +178,11 @@ public class MainActivityCore extends MainActivityV100 {
             if(target!=null)target.post(()->target.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-qr-scanned',{detail:{value:"+JSONObject.quote(value)+"}}));",null));
             return;
         }
+        if(requestCode==REQ_INSTALL_UNKNOWN_APPS){
+            if(Build.VERSION.SDK_INT<Build.VERSION_CODES.O||getPackageManager().canRequestPackageInstalls())openDownloadedApk();
+            else dispatchApkInstallError();
+            return;
+        }
         if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;
         Uri uri=data.getData();
         if(requestCode==REQ_EXPORT_GPX){boolean ok=write(uri,pendingGpx);pendingGpx="";if(coreWebView!=null)coreWebView.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-gpx-exported',{detail:{ok:"+ok+"}}));",null);}
@@ -155,6 +194,10 @@ public class MainActivityCore extends MainActivityV100 {
         @JavascriptInterface public String getApkVersion(){return BuildConfig.VERSION_NAME;}
         @JavascriptInterface public String getMode(){return"station";}
         @JavascriptInterface public void downloadApk(final String url){if(url==null||url.trim().isEmpty())return;runOnUiThread(()->{try{Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse(url));i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(i);}catch(Exception ignored){}});}
+        @JavascriptInterface public boolean startApkDownload(final String url,final String version){return MainActivityCore.this.startApkDownload(url,version);}
+        @JavascriptInterface public String getApkDownloadState(){return MainActivityCore.this.getApkDownloadState();}
+        @JavascriptInterface public String getApkDownloadVersion(){return MainActivityCore.this.getApkDownloadVersion();}
+        @JavascriptInterface public boolean installDownloadedApk(){runOnUiThread(MainActivityCore.this::openDownloadedApk);return true;}
         @JavascriptInterface public String getCapabilities(){try{JSONObject o=new JSONObject();o.put("location",true);o.put("bluetooth",true);o.put("sensors",true);o.put("storage",true);o.put("camera",true);o.put("microphone",true);o.put("notifications",true);o.put("wifi",true);o.put("usb",true);o.put("nfc",true);o.put("tts",true);o.put("wakeLock",true);o.put("background",true);o.put("qr",true);o.put("gpx",true);return o.toString();}catch(Exception e){return"{}";}}
         @JavascriptInterface public void shareText(final String subject,final String text){runOnUiThread(()->{try{Intent send=new Intent(Intent.ACTION_SEND);send.setType("text/plain");send.putExtra(Intent.EXTRA_SUBJECT,subject==null?"Boat Station":subject);send.putExtra(Intent.EXTRA_TEXT,text==null?"":text);startActivity(Intent.createChooser(send,"Compartir Boat Station"));}catch(Exception ignored){}});}
         @JavascriptInterface public boolean isTtsReady(){return ttsReady;}
