@@ -38,3 +38,10 @@ html.bs-dashboard-expanded.bs-dashboard-three #cards>.card{display:block;align-s
 .gps-map-data{width:min(260px,calc(100% - 70px));right:auto}
 .gps-anchor-controls{left:auto;right:8px;bottom:8px}
 .gps-map-attribution{left:8px;right:auto;max-width:calc(100% - 130px)}
+
+.notification-module{padding:14px;background:#0b2b40;border:1px solid #17445f;border-radius:14px}
+.notification-preview{margin:12px 0 8px}
+.notification-preview strong{font-size:15px}
+.notification-test{width:100%;justify-content:center}
+.notification-module>.subtle{padding:4px 0}
+
