@@ -3,7 +3,7 @@ const addSheet=document.getElementById('addSheet');
 
 function readJson(key,fallback){try{const value=JSON.parse(localStorage.getItem(key)||'null');return value??fallback}catch{return fallback}}
 function activeStationId(){return localStorage.getItem('bs.remote.activeStation')||'default'}
-function activeStationName(){const id=activeStationId(),list=readJson('bs.remote.stations',[]);const station=Array.isArray(list)?list.find(x=>x?.stationId===id):null;return String(station?.name||'Estación').trim()||'Estación'}
+function activeStationName(){const id=activeStationId(),list=readJson('bs.remote.stations',[]);const station=Array.isArray(list)?list.find(x=>x?.stationId===id):null;return String(station?.name||'Chez').trim()||'Chez'}
 function availableModules(){const id=activeStationId();return id?readJson('bs.remote.availableModules.'+id,[]):[]}
 
 function filterAddSheet(){
@@ -19,11 +19,12 @@ const freshness=document.createElement('div');
 freshness.id='remoteFreshness';freshness.className='remote-freshness waiting';
 freshness.innerHTML='<span class="remote-connection-dot" aria-hidden="true"></span><span class="remote-connection-text">Sin conexión</span><span class="remote-connection-detail">· esperando al Core</span>';
 if(cards?.parentNode)cards.parentNode.insertBefore(freshness,cards);
-let lastSnapshotAt=0,interactionDepth=0,pendingData=null,pendingApply=null,interactionReleaseTimer=0;
+let lastSnapshotAt=0,interactionDepth=0,pendingData=null,pendingApply=null,interactionReleaseTimer=0,lastConnectivity=null,lastConnectivityName='';
 const CONNECTED_MAX_AGE_MS=30000;
 function elapsedLabel(ms){const seconds=Math.max(0,Math.floor(ms/1000));if(seconds<60)return `hace ${seconds} s`;const minutes=Math.floor(seconds/60);if(minutes<60)return `hace ${minutes} min`;const hours=Math.floor(minutes/60);if(hours<24)return `hace ${hours} h`;return `hace ${Math.floor(hours/24)} d`}
 function markUpdated(time){const remoteTime=Number(time);lastSnapshotAt=Number.isFinite(remoteTime)&&remoteTime>0?Math.min(Date.now(),remoteTime):Date.now();renderFreshness()}
-function renderFreshness(){const text=freshness.querySelector('.remote-connection-text'),detail=freshness.querySelector('.remote-connection-detail');if(!lastSnapshotAt){freshness.classList.remove('connected','disconnected');freshness.classList.add('waiting');if(text)text.textContent='Sin conexión';if(detail)detail.textContent='· esperando al Core';return}const age=Math.max(0,Date.now()-lastSnapshotAt),connected=age<=CONNECTED_MAX_AGE_MS;freshness.classList.toggle('connected',connected);freshness.classList.toggle('disconnected',!connected);freshness.classList.remove('waiting');if(text)text.textContent=connected?`Conectado a ${activeStationName()}`:'Sin conexión';if(detail)detail.textContent=connected?'':`· última conexión ${elapsedLabel(age)}`}
+function publishConnectivity(connected){const stationName=activeStationName();if(lastConnectivity===connected&&lastConnectivityName===stationName)return;if(lastConnectivity===null&&!connected)return;lastConnectivity=connected;lastConnectivityName=stationName;window.dispatchEvent(new CustomEvent('boatstation-remote-connection',{detail:{connected,stationName}}))}
+function renderFreshness(){const text=freshness.querySelector('.remote-connection-text'),detail=freshness.querySelector('.remote-connection-detail');if(!lastSnapshotAt){freshness.classList.remove('connected','disconnected');freshness.classList.add('waiting');if(text)text.textContent='Sin conexión';if(detail)detail.textContent='· esperando al Core';return}const age=Math.max(0,Date.now()-lastSnapshotAt),connected=age<=CONNECTED_MAX_AGE_MS;freshness.classList.toggle('connected',connected);freshness.classList.toggle('disconnected',!connected);freshness.classList.remove('waiting');if(text)text.textContent=connected?`Conectado a ${activeStationName()}`:'Sin conexión';if(detail)detail.textContent=connected?'':`· última conexión ${elapsedLabel(age)}`;publishConnectivity(connected)}
 setInterval(renderFreshness,1000);
 
 function beginInteraction(){clearTimeout(interactionReleaseTimer);interactionReleaseTimer=0;interactionDepth++}

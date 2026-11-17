@@ -26,6 +26,8 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.SystemClock;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.Voice;
 import android.util.Log;
 
 import org.json.JSONObject;
@@ -37,6 +39,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -105,6 +108,8 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private double gpsAnchorRadius = 30d;
     private String gpsAnchorRadiusUnit = "m";
     private boolean gpsAnchorTripped;
+    private TextToSpeech anchorTts;
+    private volatile boolean anchorTtsReady;
     private long lastGpsSampleElapsedRealtime;
     private long lastGpsHistoryPruneElapsedRealtime;
     private long startedAtElapsedRealtime;
@@ -133,6 +138,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
         latestStationSnapshot = pendingStationSnapshot;
         syncHandler = new Handler(getMainLooper());
         syncExecutor = Executors.newSingleThreadExecutor(r -> new Thread(r, "BoatStationSync"));
+        initAnchorTts();
         createNotificationChannel();
         acquireWakeLock();
         registerNetworkCallback();
@@ -274,15 +280,49 @@ public class BoatStationCoreService extends Service implements LocationListener 
         Location.distanceBetween(gpsAnchorLat, gpsAnchorLon, location.getLatitude(), location.getLongitude(), result);
         float accuracy = location.hasAccuracy() ? Math.max(0f, location.getAccuracy()) : 0f;
         float distance = result[0];
-        if (!gpsAnchorTripped && distance - accuracy > gpsAnchorRadius && canPostNotifications()) {
+        if (!gpsAnchorTripped && distance - accuracy > gpsAnchorRadius) {
             gpsAnchorTripped = true;
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(PREF_GPS_ANCHOR_TRIPPED, true).apply();
+            speakAnchorAlarm();
             postAnchorAlarm();
         } else if (gpsAnchorTripped && distance < Math.max(3f, gpsAnchorRadius * 0.5f)) {
             gpsAnchorTripped = false;
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(PREF_GPS_ANCHOR_TRIPPED, false).apply();
             cancelAnchorAlarm();
         }
+    }
+
+    private void initAnchorTts() {
+        anchorTts = new TextToSpeech(getApplicationContext(), status -> {
+            if (status != TextToSpeech.SUCCESS || anchorTts == null) return;
+            try { anchorTts.setLanguage(new Locale("es", "AR")); } catch (Exception ignored) {}
+            anchorTtsReady = true;
+            applyAnchorTtsSettings();
+        });
+    }
+
+    private void applyAnchorTtsSettings() {
+        if (anchorTts == null) return;
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+            String selected = prefs.getString("ttsVoice", "");
+            float rate = Math.max(0.5f, Math.min(2f, prefs.getFloat("ttsRate", 1f)));
+            anchorTts.setSpeechRate(rate);
+            if (!selected.isEmpty() && anchorTts.getVoices() != null) {
+                for (Voice voice : anchorTts.getVoices()) {
+                    if (selected.equals(voice.getName())) { anchorTts.setVoice(voice); return; }
+                }
+            }
+            anchorTts.setLanguage(new Locale("es", "AR"));
+        } catch (Exception ignored) {}
+    }
+
+    private void speakAnchorAlarm() {
+        if (anchorTts == null || !anchorTtsReady) return;
+        try {
+            applyAnchorTtsSettings();
+            anchorTts.speak("Atención, Chez se está alejando del ancla.", TextToSpeech.QUEUE_FLUSH, null, "boat-station-anchor-alarm");
+        } catch (Exception ignored) {}
     }
 
     private boolean canPostNotifications() {
@@ -300,7 +340,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
                 ? new Notification.Builder(this, ANCHOR_CHANNEL_ID) : new Notification.Builder(this);
         builder.setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Alarma de fondeo")
-                .setContentText("La embarcación salió del radio de fondeo de " + anchorRadiusLabel() + ".")
+                .setContentText("Atención, Chez se está alejando del ancla.")
                 .setContentIntent(open)
                 .setCategory(Notification.CATEGORY_ALARM)
                 .setPriority(Notification.PRIORITY_HIGH)
@@ -659,6 +699,9 @@ public class BoatStationCoreService extends Service implements LocationListener 
             if (connectivityManager != null && networkCallback != null) connectivityManager.unregisterNetworkCallback(networkCallback);
         } catch (Exception ignored) {}
         if (syncExecutor != null) syncExecutor.shutdownNow();
+        try { if (anchorTts != null) { anchorTts.stop(); anchorTts.shutdown(); } } catch (Exception ignored) {}
+        anchorTts = null;
+        anchorTtsReady = false;
         try { if (wakeLock != null && wakeLock.isHeld()) wakeLock.release(); } catch (Exception ignored) {}
         if (activeService == this) activeService = null;
         wakeLock = null;
