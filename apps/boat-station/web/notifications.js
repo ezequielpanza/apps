@@ -37,7 +37,18 @@ function readSettings(){
     };
   }catch{return JSON.parse(JSON.stringify(DEFAULTS))}
 }
-function writeSettings(settings){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(settings))}catch{}}
+function activeBackgroundStationName(){
+  try{
+    const id=localStorage.getItem('bs.remote.activeStation')||'',stations=JSON.parse(localStorage.getItem('bs.remote.stations')||'[]');
+    const station=Array.isArray(stations)?stations.find(item=>item?.stationId===id):null;
+    const name=String(station?.name||'').trim();if(name)return name;
+  }catch{}
+  return String(localStorage.getItem('bs.stationName')||'Chez').trim()||'Chez';
+}
+function syncBackgroundSettings(settings){
+  try{window.CoreRuntimeBridge?.configureBackgroundNotifications?.(JSON.stringify({...settings,stationName:activeBackgroundStationName()}))}catch{}
+}
+function writeSettings(settings){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(settings))}catch{}syncBackgroundSettings(settings)}
 function dayKey(date=new Date()){return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
 
 export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet,closeSheet,getBatteryStats,getLocation,getLocationAlarmEnabled,setLocationAlarmEnabled,onBatteryBack}){
@@ -46,6 +57,7 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
   let remoteConnection=null,remoteEverConnected=false,remoteLossAnnounced=false,remoteStationName='Chez';
   let solarDay='',solarSamples=[],solarPeak=0,solarSession=false,solarLowSince=0,solarRecoverySince=0,solarPeakSavedAt=0,solarState='unknown';
   window.BoatStationSolarStatus={state:solarState};
+  syncBackgroundSettings(settings);
 
   function ttsVoices(){
     let hasNativeVoiceList=false;
@@ -73,6 +85,8 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
   function say(text){
     try{
       applyTtsSettings();
+      const background=window.CoreRuntimeBridge;
+      if(typeof background?.speakBackgroundAlarm==='function'&&background.speakBackgroundAlarm(text)!==false)return true;
       const core=window.CoreBridge;
       if(typeof core?.isTtsReady==='function'&&core.isTtsReady()&&typeof core.alarm==='function'){core.alarm(text);return true}
       const native=window.NativeBridge;
@@ -100,6 +114,7 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
   }
   function connectionLostMessage(){return formatNotificationMessage(settings.messages.connectionLost,{barco:remoteStationName||'Chez'})}
   function connectionEstablishedMessage(){return formatNotificationMessage(settings.messages.connectionEstablished,{barco:remoteStationName||'Chez'})}
+  function hasBackgroundConnectionAlarms(){return typeof window.CoreRuntimeBridge?.configureBackgroundNotifications==='function'}
   function notificationMessagePreview(id){
     if(id==='batteryCritical')return batteryMessage();
     if(id==='connectionLost')return connectionLostMessage();
@@ -160,6 +175,7 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
   }
   function speakConnectionLost(){
     if(remoteConnection!==false||!remoteEverConnected||remoteLossAnnounced||!settings.general.connectionLost)return false;
+    if(hasBackgroundConnectionAlarms())return false;
     const spoken=say(connectionLostMessage());
     if(spoken)remoteLossAnnounced=true;
     return spoken;
@@ -386,15 +402,15 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
   window.addEventListener('boatstation-battery-state',event=>updateBatteryState(event.detail));
   try{window.speechSynthesis?.addEventListener?.('voiceschanged',refreshTtsVoiceOptions)}catch{}
   window.addEventListener('boatstation-tts-voices',refreshTtsVoiceOptions);
-  window.addEventListener('boatstation-anchor-alarm',()=>{if(getLocationAlarmEnabled?.())say(settings.messages.anchorLost)});
+  window.addEventListener('boatstation-anchor-alarm',()=>{if(getLocationAlarmEnabled?.()&&!hasBackgroundConnectionAlarms())say(settings.messages.anchorLost)});
   window.addEventListener('boatstation-remote-connection',event=>{
     const detail=event.detail||{},previousConnection=remoteConnection;
     remoteConnection=detail.connected===true;
-    if(detail.stationName)remoteStationName=String(detail.stationName).trim()||'Chez';
+    if(detail.stationName){remoteStationName=String(detail.stationName).trim()||'Chez';syncBackgroundSettings(settings)}
     if(remoteConnection){
       const established=!remoteEverConnected||previousConnection===false;
       remoteEverConnected=true;remoteLossAnnounced=false;
-      if(established&&settings.general.connectionEstablished)say(connectionEstablishedMessage());
+      if(established&&settings.general.connectionEstablished&&!hasBackgroundConnectionAlarms())say(connectionEstablishedMessage());
     }else speakConnectionLost();
     updateNotificationMessagePreview('connectionLost');
     updateNotificationMessagePreview('connectionEstablished');
