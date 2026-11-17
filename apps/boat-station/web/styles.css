@@ -63,10 +63,12 @@ html.bs-dashboard-expanded.bs-dashboard-three #cards>.card{display:block;align-s
 .battery-solar-indicator{display:inline-flex;vertical-align:middle;margin-left:7px;width:28px;height:28px;align-items:center;justify-content:center;color:#8da7b5;animation:solar-indicator-in .2s ease-out}
 .battery-solar-indicator svg{width:28px;height:28px;overflow:visible;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .battery-solar-indicator.charging{color:#a4e65b;filter:drop-shadow(0 0 4px #8bd33266)}
-.battery-solar-indicator.charging .solar-sun{fill:#ffe27a;stroke:#ffe27a;transform-box:fill-box;transform-origin:center;animation:solar-sun-pulse 1.8s ease-in-out infinite}
-.battery-solar-indicator.charging .solar-sun-rays{animation:solar-rays 1.8s ease-in-out infinite}
+.battery-solar-indicator.charging svg{animation:solar-charging-heartbeat 2s ease-in-out infinite}
+.battery-solar-indicator.charging .solar-sun{fill:currentColor;stroke:currentColor}
+
 .battery-solar-indicator .solar-panel{fill:#0e3443}
-.battery-solar-indicator.charging .solar-charge-flow{stroke:#a4e65b;stroke-width:2.5;stroke-dasharray:8;animation:solar-flow 1s linear infinite}
+.battery-solar-indicator.charging .solar-panel{fill:#a4e65b22}
+.battery-solar-indicator.charging .solar-charge-flow{stroke:currentColor;stroke-width:2.5}
 .battery-solar-indicator.daylight,.battery-solar-indicator.cloudy{color:#91a6b3}
 .battery-solar-indicator.cloudy .solar-cloud{fill:#8da7b5;stroke:#8da7b5}
 .battery-solar-indicator.cloudy .solar-sun-rays{opacity:.3}
@@ -74,9 +76,9 @@ html.bs-dashboard-expanded.bs-dashboard-three #cards>.card{display:block;align-s
 .battery-solar-indicator.night .solar-moon-shape{fill:#dce6ff;stroke:#dce6ff}
 .battery-solar-indicator.night .solar-star{stroke:#ffe28a;stroke-width:1.3;animation:solar-star-pulse 2s ease-in-out infinite}
 @keyframes solar-indicator-in{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
-@keyframes solar-sun-pulse{0%,100%{transform:scale(.88);opacity:.78}50%{transform:scale(1.1);opacity:1}}
-@keyframes solar-rays{0%,100%{opacity:.55}50%{opacity:1}}
-@keyframes solar-flow{to{stroke-dashoffset:-16}}
+@keyframes solar-charging-heartbeat{0%,100%{opacity:.55}12%{opacity:1}24%{opacity:.55}32%{opacity:.55}44%{opacity:1}56%{opacity:.55}}
+
+
 @keyframes solar-star-pulse{0%,100%{opacity:.5}50%{opacity:1}}
 @media(prefers-reduced-motion:reduce){.battery-solar-indicator,.battery-solar-indicator *{animation:none!important}}
 
