@@ -57,7 +57,7 @@ test('Ubicación exposes the requested map and recording controls without a rout
   const gps = fs.readFileSync(new URL('../modules/gps-stable.js', import.meta.url), 'utf8');
   const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
   assert.match(gps, /name:'Ubicación'/);
-  assert.match(gps, /data-gps-action='map-type'/);
+  assert.match(app, /data-gps-map-type/);
   assert.doesNotMatch(gps, /gps-map-record|gps-route-new/);
   assert.match(app, /data-gps-retention/);
   assert.match(gps, /2 minutos 30 segundos/);
@@ -117,7 +117,7 @@ test('map anchor center is draggable and map telemetry is compact', () => {
   const gps = fs.readFileSync(new URL('../modules/gps-stable.js', import.meta.url), 'utf8');
   const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
   assert.match(gps, /draggable:true/);
-  assert.match(gps, /gpsAnchorMarker\.on\('dragend',event=>\{const point=event\.target\.getLatLng\(\);setAnchorPoint\(point\.lat,point\.lng\)\}\)/);
+  assert.match(gps, /gpsAnchorMarker\.on\('dragend',event=>\{(?:gpsAnchorDragging=false;)?const point=event\.target\.getLatLng\(\);setAnchorPoint\(point\.lat,point\.lng\)\}\)/);
   assert.match(app, /data-gps-anchor-unit/);
   assert.match(app, /Pies \(ft\)/);
   assert.match(gps, /gps-map-speed-icon/);

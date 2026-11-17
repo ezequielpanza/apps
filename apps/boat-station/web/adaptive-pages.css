@@ -31,6 +31,33 @@
 
 /* Battery overview and lists distribute only the page-content space. */
 .page-content>.battery-overview{flex:1 1 auto}
+.battery-overview{grid-template-columns:minmax(50px,.42fr) minmax(88px,.95fr) minmax(108px,1.15fr);gap:clamp(4px,1.2cqw,7px);align-items:stretch;min-width:0}
+.battery-charge-panel{display:flex;align-items:center;justify-content:center;min-width:0;padding:3px;border:1px solid var(--line);border-radius:13px;background:#071b29}
+.battery-charge-panel .battery-ring{width:min(100%,64px);height:auto;aspect-ratio:1;margin:0;flex:none}
+.battery-charge-panel .battery-ring:after{inset:5px}
+.battery-charge-panel .battery-ring strong{font-size:clamp(13px,4.2cqw,20px)}
+.battery-charge-panel .battery-ring span{font-size:8px}
+.battery-overview>.battery-bank-panel{display:flex;flex-direction:column;justify-content:center;gap:clamp(3px,1cqh,7px);padding:5px;min-width:0}
+.battery-overview .battery-bank-name{text-align:center;font-size:clamp(10px,3cqw,14px);line-height:1.1;overflow-wrap:anywhere}
+.battery-overview .battery-bank-name .battery-solar-indicator{width:20px;height:20px;margin-left:3px}
+.battery-overview .battery-bank-name .battery-solar-indicator svg{width:20px;height:20px}
+.battery-overview .battery-bank-details{flex-direction:column;align-items:center;gap:2px;text-align:center}
+.battery-overview .battery-bank-details .battery-ah{font-size:clamp(8px,2.5cqw,11px);font-weight:750;white-space:nowrap;color:#dceaf2}
+.battery-overview .battery-autonomy{font-size:clamp(7px,2.2cqw,9px);white-space:normal;line-height:1.15}
+.battery-overview .battery-autonomy b{font-size:inherit}
+.battery-overview .compact-bank-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;margin-top:2px}
+.battery-overview .compact-bank-metrics .metric{padding:4px 2px;min-height:0}
+.battery-overview .compact-bank-metrics .metric .value{font-size:clamp(7px,2.35cqw,10px);line-height:1.05}
+.battery-overview .compact-bank-metrics .metric .label{font-size:clamp(6px,1.9cqw,8px);margin-top:2px;white-space:nowrap}
+.battery-overview .battery-mini-column{grid-template-rows:repeat(2,minmax(0,1fr));min-height:0}
+.battery-overview .battery-mini{min-height:0;padding:4px}
+.battery-overview .battery-mini-body{grid-template-columns:clamp(30px,10cqw,38px) minmax(0,1fr);gap:3px}
+.battery-overview .battery-mini-ring{width:clamp(30px,10cqw,38px);height:clamp(30px,10cqw,38px)}
+.battery-overview .battery-mini-ring span{font-size:clamp(8px,2.2cqw,10px)}
+.battery-overview .battery-mini-top{gap:2px}
+.battery-overview .battery-mini-top b,.battery-overview .battery-mini-estimated b{font-size:clamp(7px,2cqw,9px)}
+.battery-overview .battery-mini-top small,.battery-overview .battery-mini-estimated small,.battery-overview .battery-mini-charge small{font-size:clamp(6px,1.65cqw,7px)}
+.battery-overview .battery-mini-charge span{font-size:clamp(7px,1.9cqw,8.5px)}
 .battery-bank-panel{padding-block:clamp(4px,2.5cqh,10px)}
 .battery-hero{padding-bottom:clamp(3px,2cqh,8px)}
 .battery-bank-panel .battery-ring{width:clamp(68px,43cqh,142px);height:clamp(68px,43cqh,142px);margin-bottom:clamp(3px,1.8cqh,9px)}
@@ -94,6 +121,8 @@
   .compact-bank-metrics .metric .label{display:none}
   .compact-bank-metrics .metric{padding-block:3px}
   .battery-mini-top small,.battery-mini-charge small{display:none}
+  .card[data-id="batteries"] .compact-bank-metrics .metric .label{display:block}
+  .card[data-id="batteries"] .battery-mini-top small,.card[data-id="batteries"] .battery-mini-estimated small,.card[data-id="batteries"] .battery-mini-charge small{display:block}
 }
 @container pagecontent (max-height:210px){
   .metric,.gps-coord{padding-block:3px}
@@ -118,3 +147,15 @@
 @container pagecontent (max-height:330px){.page-content>.sea-attitude{grid-template-rows:minmax(76px,.7fr) auto 0}.sea-attitude-stage{min-height:76px}}
 @container pagecontent (max-width:340px){.page-content>.sea-attitude{grid-template-columns:minmax(0,1fr) 82px}.sea-attitude-boat{width:78px;margin-left:-39px}}
 
+
+@container pagecontent (max-width:340px){
+  .battery-overview{grid-template-columns:minmax(45px,.4fr) minmax(78px,.92fr) minmax(96px,1.14fr);gap:3px}
+  .battery-charge-panel{padding:2px}
+  .battery-overview>.battery-bank-panel{padding:3px}
+  .battery-overview .battery-mini-column{gap:3px}
+  .battery-overview .battery-mini{padding:3px}
+  .battery-overview .battery-mini-body{grid-template-columns:28px minmax(0,1fr);gap:2px}
+  .battery-overview .battery-mini-ring{width:28px;height:28px}
+  .battery-overview .battery-mini-ring span{font-size:7px}
+  .battery-overview .battery-mini-top b,.battery-overview .battery-mini-estimated b{font-size:7px}
+}

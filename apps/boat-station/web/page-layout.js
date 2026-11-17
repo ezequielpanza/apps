@@ -42,7 +42,32 @@ export function createPageLayoutEngine(cards){
   function defaultContentHeight(content,force=false){return Math.ceil(minimumContentHeight(content,force)*DEFAULT_HEIGHT_FACTOR)}
   function pageHeightValue(card,page){const pageEl=pageElement(card,page);if(!pageEl)return null;const value=parseFloat(pageEl.style.getPropertyValue('--page-content-height'));return Number.isFinite(value)?value:null}
   function syncViewportHeight(card,page=currentPage(card),animate=false){const pageEl=pageElement(card,page),viewport=card?.querySelector('.viewport');if(!pageEl||!viewport)return;const height=Math.ceil(pageEl.getBoundingClientRect().height);if(!height)return;viewport.style.transition=animate?`height ${PAGE_TRANSITION_MS}ms ease`:'none';viewport.style.height=`${height}px`;if(animate)setTimeout(()=>{if(viewport.isConnected)viewport.style.transition='none'},PAGE_TRANSITION_MS+30)}
-  function applyContentHeight(card,page=currentPage(card),height=null,{syncViewport=false,animateViewport=false,measure=false}={}){const pageEl=pageElement(card,page),content=contentElement(card,page);if(!pageEl||!content)return null;const id=card.dataset.id;let target=height;if(!Number.isFinite(target))target=savedContentHeight(id,page);if(!Number.isFinite(target))target=defaultContentHeight(content,true);if(measure)target=Math.max(minimumContentHeight(content,true),Math.round(target));else target=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.round(target));pageEl.style.setProperty('--page-content-height',`${target}px`);if(savedContentHeight(id,page)!==target)saveContentHeight(id,page,target);if(syncViewport)syncViewportHeight(card,page,animateViewport);return target}
+  function applyContentHeight(card,page=currentPage(card),height=null,{syncViewport=false,animateViewport=false,measure=false}={}){
+    const pageEl=pageElement(card,page),content=contentElement(card,page);
+    if(!pageEl||!content)return null;
+    const id=card.dataset.id;
+    let target=height;
+    if(!Number.isFinite(target)){
+      const saved=savedContentHeight(id,page);
+      if(id==='batteries'&&page===0){
+        const compactKey=`${storageBase()}.batteryOverviewLayout.v1`;
+        let migrated=false;
+        try{migrated=localStorage.getItem(compactKey)==='1'}catch{}
+        if(!migrated){
+          const compactHeight=defaultContentHeight(content,true);
+          target=Number.isFinite(saved)?Math.min(saved,compactHeight):compactHeight;
+          try{localStorage.setItem(compactKey,'1')}catch{}
+        }else target=saved;
+      }else target=saved;
+      if(!Number.isFinite(target))target=defaultContentHeight(content,true);
+    }
+    if(measure)target=Math.max(minimumContentHeight(content,true),Math.round(target));
+    else target=Math.max(DEFAULT_MIN_CONTENT_HEIGHT,Math.round(target));
+    pageEl.style.setProperty('--page-content-height',`${target}px`);
+    if(savedContentHeight(id,page)!==target)saveContentHeight(id,page,target);
+    if(syncViewport)syncViewportHeight(card,page,animateViewport);
+    return target;
+  }
   function initializePageHeights(card){if(!card)return;for(const pageEl of card.querySelectorAll('.page[data-page]')){const page=Number(pageEl.dataset.page);if(Number.isFinite(page))applyContentHeight(card,page)}}
   function resetModule(card){if(!card?.dataset?.id)return false;const id=card.dataset.id,pages=[...card.querySelectorAll('.page[data-page]')];ensureScope();state.contentHeights[id]={};for(const pageEl of pages){const page=Number(pageEl.dataset.page),content=pageEl.querySelector(':scope > .page-content');if(!Number.isFinite(page)||!content)continue;pageEl.style.removeProperty('--page-content-height');minimumCache.delete(content);const height=defaultContentHeight(content,true);state.contentHeights[id][page]=height;pageEl.style.setProperty('--page-content-height',`${height}px`)}persist();syncViewportHeight(card,currentPage(card),false);window.dispatchEvent(new CustomEvent('boatstation-module-size-reset',{detail:{id,card}}));return true}
   function updatePager(card,page=currentPage(card)){card?.querySelectorAll('.pager').forEach(pager=>pager.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('on',i===page)))}

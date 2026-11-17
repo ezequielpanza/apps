@@ -1,13 +1,13 @@
 const STORAGE_KEY='bs.notifications.v1';
 const DEFAULTS={
   battery:{moduleEnabled:true,critical:{enabled:false,threshold:10,repeatMinutes:0},solarStart:{enabled:false,minCurrent:3,riseCurrent:2,lastAlarmDay:'',lastDetectedDay:'',peakCurrent:0},solarLoss:{enabled:false,minCurrent:1.5,dropPercent:70,holdMinutes:5}},
-  general:{connectionLost:false,connectionRestored:false,ttsVoice:'',ttsRate:1},
+  general:{connectionLost:true,connectionEstablished:true,connectionAlarmDefaultsVersion:1,ttsVoice:'',ttsRate:1},
   messages:{
     batteryCritical:'Batería crítica, llegamos al {porcentaje} por ciento.',
     solarStart:'Paneles solares cargando.',
     solarLoss:'Paneles solares no están cargando.',
     connectionLost:'Conexión con {barco} perdida.',
-    connectionRestored:'Conexión con {barco} recuperada.',
+    connectionEstablished:'Conexión con {barco} establecida.',
     anchorLost:'Atención, Chez se está alejando del ancla.'
   }
 };
@@ -25,13 +25,13 @@ function readSettings(){
         solarStart:{enabled:!!solarStart.enabled,minCurrent:clamp(Number(solarStart.minCurrent),0.5,100,3),riseCurrent:clamp(Number(solarStart.riseCurrent),0.5,50,2),lastAlarmDay:String(solarStart.lastAlarmDay||''),lastDetectedDay:String(solarStart.lastDetectedDay||''),peakCurrent:clamp(Number(solarStart.peakCurrent),0,100,0)},
         solarLoss:{enabled:!!solarLoss.enabled,minCurrent:clamp(Number(solarLoss.minCurrent),0.1,100,1.5),dropPercent:clamp(Number(solarLoss.dropPercent),10,95,70),holdMinutes:[1,3,5,10,15].includes(Number(solarLoss.holdMinutes))?Number(solarLoss.holdMinutes):5}
       },
-      general:{connectionLost:!!saved.general?.connectionLost,connectionRestored:!!saved.general?.connectionRestored,ttsVoice:String(saved.general?.ttsVoice||''),ttsRate:[0.75,0.9,1,1.15,1.3,1.5].includes(Number(saved.general?.ttsRate))?Number(saved.general.ttsRate):1},
+      general:{connectionLost:Number(saved.general?.connectionAlarmDefaultsVersion)===1?saved.general?.connectionLost!==false:true,connectionEstablished:Number(saved.general?.connectionAlarmDefaultsVersion)===1?saved.general?.connectionEstablished!==false:true,connectionAlarmDefaultsVersion:1,ttsVoice:String(saved.general?.ttsVoice||''),ttsRate:[0.75,0.9,1,1.15,1.3,1.5].includes(Number(saved.general?.ttsRate))?Number(saved.general.ttsRate):1},
       messages:{
         batteryCritical:cleanMessage(messages.batteryCritical,DEFAULTS.messages.batteryCritical),
         solarStart:cleanMessage(messages.solarStart,DEFAULTS.messages.solarStart),
         solarLoss:cleanMessage(messages.solarLoss,DEFAULTS.messages.solarLoss),
         connectionLost:cleanMessage(messages.connectionLost,DEFAULTS.messages.connectionLost),
-        connectionRestored:cleanMessage(messages.connectionRestored,DEFAULTS.messages.connectionRestored),
+        connectionEstablished:cleanMessage(messages.connectionEstablished,DEFAULTS.messages.connectionEstablished),
         anchorLost:cleanMessage(messages.anchorLost,DEFAULTS.messages.anchorLost)
       }
     };
@@ -99,11 +99,11 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
     return formatNotificationMessage(settings.messages.batteryCritical,{porcentaje:value});
   }
   function connectionLostMessage(){return formatNotificationMessage(settings.messages.connectionLost,{barco:remoteStationName||'Chez'})}
-  function connectionRestoredMessage(){return formatNotificationMessage(settings.messages.connectionRestored,{barco:remoteStationName||'Chez'})}
+  function connectionEstablishedMessage(){return formatNotificationMessage(settings.messages.connectionEstablished,{barco:remoteStationName||'Chez'})}
   function notificationMessagePreview(id){
     if(id==='batteryCritical')return batteryMessage();
     if(id==='connectionLost')return connectionLostMessage();
-    if(id==='connectionRestored')return connectionRestoredMessage();
+    if(id==='connectionEstablished')return connectionEstablishedMessage();
     return String(settings.messages[id]||'');
   }
   function messageEditorMarkup(id,label,preview,hint=''){
@@ -243,7 +243,7 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
   }
   function setBatteryModuleEnabled(enabled){settings.battery.moduleEnabled=!!enabled;writeSettings(settings);syncBatteryControls();if(lastStats)updateBatteryState(lastStats)}
   function renderGeneral(){
-    const batteryOn=settings.battery.moduleEnabled,locationOn=!!getLocationAlarmEnabled?.(),connectionOn=settings.general.connectionLost,connectionRestoredOn=settings.general.connectionRestored;
+    const batteryOn=settings.battery.moduleEnabled,locationOn=!!getLocationAlarmEnabled?.(),connectionOn=settings.general.connectionLost,connectionEstablishedOn=settings.general.connectionEstablished;
     sheet.innerHTML=`<div class="sheet-inner fullscreen-inner">
       <div class="fullscreen-head"><button class="fullscreen-back" type="button" data-notifications-back>‹</button><h3>Notificaciones</h3><span></span></div>
       <p class="subtle">Activá o desactivá las alarmas desde acá. Los ajustes propios se configuran en cada módulo.</p>
@@ -257,9 +257,9 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
         <label class="gps-menu-toggle"><span><strong>Conexión perdida</strong><small>Avisa cuando deja de llegar información de la estación.</small></span><input type="checkbox" data-general-alarm="connection-lost" ${connectionOn?'checked':''}></label>
         <div class="notification-message-caption">Mensaje hablado</div>
         ${messageEditorMarkup('connectionLost','conexión perdida',connectionLostMessage(),'Podés usar {barco} para insertar el nombre de la estación.')}
-        <label class="gps-menu-toggle"><span><strong>Conexión recuperada</strong><small>Avisa cuando vuelve a llegar información de la estación.</small></span><input type="checkbox" data-general-alarm="connection-restored" ${connectionRestoredOn?'checked':''}></label>
+        <label class="gps-menu-toggle"><span><strong>Conexión con el barco establecida</strong><small>Anuncia cada vez que se conecta a la estación.</small></span><input type="checkbox" data-general-alarm="connection-established" ${connectionEstablishedOn?'checked':''}></label>
         <div class="notification-message-caption">Mensaje hablado</div>
-        ${messageEditorMarkup('connectionRestored','conexión recuperada',connectionRestoredMessage(),'Podés usar {barco} para insertar el nombre de la estación.')}
+        ${messageEditorMarkup('connectionEstablished','conexión establecida',connectionEstablishedMessage(),'Podés usar {barco} para insertar el nombre de la estación.')}
       </section>
       <section class="full-section notification-module">
         <div class="full-section-title">Voz</div>
@@ -364,7 +364,7 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
       if(!ok){target.checked=!!getLocationAlarmEnabled?.();const status=sheet.querySelector('[data-notification-status]');if(status)status.textContent=result?.hasPoint?'Concedé los permisos de ubicación y notificaciones para activar la alarma.':'Primero definí el punto de fondeo en el módulo Ubicación.'}
       else{const status=sheet.querySelector('[data-notification-status]');if(status)status.textContent=''}
     }else if(target.matches('[data-general-alarm="connection-lost"]')){settings.general.connectionLost=target.checked;writeSettings(settings);if(target.checked)speakConnectionLost()}
-    else if(target.matches('[data-general-alarm="connection-restored"]')){settings.general.connectionRestored=target.checked;writeSettings(settings)}
+    else if(target.matches('[data-general-alarm="connection-established"]')){settings.general.connectionEstablished=target.checked;writeSettings(settings)}
     else if(target.matches('[data-tts-voice]')){settings.general.ttsVoice=String(target.value||'');writeSettings(settings);applyTtsSettings()}
     else if(target.matches('[data-tts-rate]')){settings.general.ttsRate=[0.75,0.9,1,1.15,1.3,1.5].includes(Number(target.value))?Number(target.value):1;writeSettings(settings);applyTtsSettings()}
   });
@@ -392,12 +392,12 @@ export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet
     remoteConnection=detail.connected===true;
     if(detail.stationName)remoteStationName=String(detail.stationName).trim()||'Chez';
     if(remoteConnection){
-      const recovered=remoteEverConnected&&previousConnection===false;
+      const established=!remoteEverConnected||previousConnection===false;
       remoteEverConnected=true;remoteLossAnnounced=false;
-      if(recovered&&settings.general.connectionRestored)say(connectionRestoredMessage());
+      if(established&&settings.general.connectionEstablished)say(connectionEstablishedMessage());
     }else speakConnectionLost();
     updateNotificationMessagePreview('connectionLost');
-    updateNotificationMessagePreview('connectionRestored');
+    updateNotificationMessagePreview('connectionEstablished');
   });
 
   return{
