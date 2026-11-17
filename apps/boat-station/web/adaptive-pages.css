@@ -38,8 +38,8 @@
 .battery-meter-label{color:var(--muted);font-size:clamp(6px,1.9cqw,8px);line-height:1.1;white-space:nowrap}
 .battery-charge-track{position:relative;display:flex;flex:1 1 auto;align-items:flex-end;justify-content:center;width:min(100%,30px);min-height:36px;box-sizing:border-box;overflow:hidden;border:1px solid #17445f;border-radius:999px;padding:2px;background:#0b2b40}
 .battery-charge-fill{display:block;width:100%;border-radius:inherit;background:var(--accent);transition:height .35s ease}
-.battery-charge-value{position:absolute;z-index:1;top:50%;left:50%;transform:translate(-50%,-50%);font-size:clamp(7px,2.1cqw,10px);font-weight:900;line-height:1;color:#fff;text-shadow:0 1px 3px #000,0 0 4px #000;white-space:nowrap;pointer-events:none}
-.battery-current-value{max-width:100%;font-size:clamp(6px,1.8cqw,8px);font-weight:850;line-height:1;color:#dceaf2;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}
+.battery-charge-value{position:absolute;z-index:2;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-90deg);font-size:clamp(10px,2.8cqw,13px);font-weight:950;line-height:1;color:#fff;text-shadow:0 1px 3px #000,0 0 4px #000;white-space:nowrap;pointer-events:none}
+.battery-current-value{position:absolute;z-index:2;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-90deg);max-width:none;padding:2px 4px;border-radius:9px;background:#071b29e8;font-size:clamp(9px,2.65cqw,12px);font-weight:950;line-height:1;color:#dceaf2;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px #000;pointer-events:none}
 .battery-current-meter.charging .battery-current-value{color:#a4e65b}
 .battery-current-meter.discharging .battery-current-value{color:#ff8b8b}
 .battery-current-track{position:relative;display:block;flex:1 1 auto;width:min(100%,28px);min-height:36px;box-sizing:border-box;overflow:hidden;border:1px solid #17445f;border-radius:999px;background:#0b2b40}
