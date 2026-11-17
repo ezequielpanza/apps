@@ -50,6 +50,8 @@ public class BoatStationCoreService extends Service implements LocationListener 
     public static final String ACTION_CONFIGURE_CLIENT = "com.boatstation.app.action.CONFIGURE_CLIENT";
     public static final String ACTION_CLEAR_REMOTE_SYNC = "com.boatstation.app.action.CLEAR_REMOTE_SYNC";
     public static final String ACTION_CONFIGURE_GPS_HISTORY = "com.boatstation.app.action.CONFIGURE_GPS_HISTORY";
+    public static final String ACTION_CONFIGURE_NOTIFICATIONS = "com.boatstation.app.action.CONFIGURE_NOTIFICATIONS";
+    public static final String ACTION_SPEAK_ALARM = "com.boatstation.app.action.SPEAK_ALARM";
     public static final String EXTRA_GPS_HISTORY_ENABLED = "gpsHistoryEnabled";
     public static final String EXTRA_GPS_HISTORY_HOURS = "gpsHistoryHours";
     public static final String EXTRA_GPS_HISTORY_FREQUENCY = "gpsHistoryFrequency";
@@ -64,11 +66,15 @@ public class BoatStationCoreService extends Service implements LocationListener 
     public static final String EXTRA_BACKEND = "backend";
     public static final String EXTRA_STATION_NAME = "stationName";
     public static final String EXTRA_CLIENT_ID = "clientId";
+    public static final String EXTRA_NOTIFICATION_SETTINGS = "notificationSettings";
+    public static final String EXTRA_ALARM_TEXT = "alarmText";
 
     private static final String CHANNEL_ID = "boat_station_core";
     private static final String ANCHOR_CHANNEL_ID = "boat_station_anchor_alarm";
+    private static final String ALARM_CHANNEL_ID = "boat_station_background_alarm";
     private static final int NOTIFICATION_ID = 4101;
     private static final int ANCHOR_NOTIFICATION_ID = 4102;
+    private static final int BACKGROUND_ALARM_NOTIFICATION_ID = 4103;
     private static final String PREFS = "boat_station_core";
     private static final String PREF_SYNC_MODE = "syncMode";
     private static final String MODE_SERVER = "server";
@@ -78,6 +84,11 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private static final String PREF_CLIENT_BACKEND = "clientBackend";
     private static final String PREF_CLIENT_NAME = "clientName";
     private static final String PREF_CLIENT_ID = "clientId";
+    private static final String PREF_NOTIFICATION_SETTINGS = "notificationSettings";
+    private static final String PREF_CONNECTION_INITIALIZED = "connectionAlarmInitialized";
+    private static final String PREF_CONNECTION_CONNECTED = "connectionAlarmConnected";
+    private static final String PREF_CONNECTION_STATION_ID = "connectionAlarmStationId";
+    private static final String PREF_LAST_REMOTE_TELEMETRY_TIME = "lastRemoteTelemetryTime";
     private static final String PREF_GPS_HISTORY_ENABLED = "gpsHistoryEnabled";
     private static final String PREF_GPS_HISTORY_HOURS = "gpsHistoryHours";
     private static final String PREF_GPS_HISTORY_FREQUENCY = "gpsHistoryFrequency";
@@ -110,6 +121,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private boolean gpsAnchorTripped;
     private TextToSpeech anchorTts;
     private volatile boolean anchorTtsReady;
+    private volatile String pendingAlarmText = "";
     private long lastGpsSampleElapsedRealtime;
     private long lastGpsHistoryPruneElapsedRealtime;
     private long startedAtElapsedRealtime;
@@ -122,6 +134,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private volatile String latestRemoteState = "";
     private boolean syncInFlight;
     private boolean syncPending;
+    private boolean hasCompletedClientPoll;
     private int consecutiveSyncFailures;
     private final Runnable syncRunnable = this::runSyncCycle;
 
@@ -155,6 +168,11 @@ public class BoatStationCoreService extends Service implements LocationListener 
         if (intent != null && ACTION_CONFIGURE_REMOTE.equals(intent.getAction())) persistRemoteConfig(intent);
         else if (intent != null && ACTION_CONFIGURE_CLIENT.equals(intent.getAction())) persistRemoteClientConfig(intent);
         else if (intent != null && ACTION_CLEAR_REMOTE_SYNC.equals(intent.getAction())) clearRemoteSync();
+        else if (intent != null && ACTION_CONFIGURE_NOTIFICATIONS.equals(intent.getAction())) persistNotificationSettings(intent);
+        else if (intent != null && ACTION_SPEAK_ALARM.equals(intent.getAction())) {
+            String text = intent.getStringExtra(EXTRA_ALARM_TEXT);
+            if (text != null && !text.trim().isEmpty()) announceBackgroundAlarm(text.trim(), "Boat Station");
+        }
         else if (intent != null && ACTION_CONFIGURE_GPS_HISTORY.equals(intent.getAction())) {
             persistGpsHistorySettings(intent);
             persistGpsAnchorSettings(intent);
@@ -175,6 +193,27 @@ public class BoatStationCoreService extends Service implements LocationListener 
     }
 
     public static boolean isRunning() { return activeService != null; }
+
+    private void persistNotificationSettings(Intent intent) {
+        String raw = intent.getStringExtra(EXTRA_NOTIFICATION_SETTINGS);
+        if (raw == null || raw.trim().isEmpty()) return;
+        try {
+            JSONObject settings = new JSONObject(raw);
+            JSONObject general = settings.optJSONObject("general");
+            String voice = general == null ? "" : general.optString("ttsVoice", "");
+            float rate = general == null ? 1f : (float) general.optDouble("ttsRate", 1d);
+            rate = Math.max(0.5f, Math.min(2f, rate));
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString(PREF_NOTIFICATION_SETTINGS, settings.toString())
+                    .putString("ttsVoice", voice)
+                    .putFloat("ttsRate", rate)
+                    .apply();
+            applyAnchorTtsSettings();
+            evaluateRemoteConnectionState();
+        } catch (Exception e) {
+            Log.w(TAG, "Could not save background notification settings", e);
+        }
+    }
 
     private void persistGpsHistorySettings(Intent intent) {
         int hours = validHours(intent.getIntExtra(EXTRA_GPS_HISTORY_HOURS, 6));
@@ -298,6 +337,9 @@ public class BoatStationCoreService extends Service implements LocationListener 
             try { anchorTts.setLanguage(new Locale("es", "AR")); } catch (Exception ignored) {}
             anchorTtsReady = true;
             applyAnchorTtsSettings();
+            String pending = pendingAlarmText;
+            pendingAlarmText = "";
+            if (!pending.isEmpty()) speakAlarmText(pending);
         });
     }
 
@@ -318,11 +360,29 @@ public class BoatStationCoreService extends Service implements LocationListener 
     }
 
     private void speakAnchorAlarm() {
-        if (anchorTts == null || !anchorTtsReady) return;
+        speakAlarmText(notificationMessage("anchorLost", "Atención, Chez se está alejando del ancla."));
+    }
+
+    private String notificationMessage(String key, String fallback) {
+        JSONObject messages = notificationSettings(getSharedPreferences(PREFS, MODE_PRIVATE)).optJSONObject("messages");
+        return messages == null ? fallback : messages.optString(key, fallback);
+    }
+
+    private void speakAlarmText(String text) {
+        if (text == null || text.trim().isEmpty()) return;
+        if (anchorTts == null || !anchorTtsReady) {
+            pendingAlarmText = text.trim();
+            return;
+        }
         try {
             applyAnchorTtsSettings();
-            anchorTts.speak("Atención, Chez se está alejando del ancla.", TextToSpeech.QUEUE_FLUSH, null, "boat-station-anchor-alarm");
+            anchorTts.speak(text.trim(), TextToSpeech.QUEUE_ADD, null, "boat-station-alarm-" + System.currentTimeMillis());
         } catch (Exception ignored) {}
+    }
+
+    private void announceBackgroundAlarm(String text, String title) {
+        speakAlarmText(text);
+        postBackgroundAlarm(text, title);
     }
 
     private boolean canPostNotifications() {
@@ -340,7 +400,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
                 ? new Notification.Builder(this, ANCHOR_CHANNEL_ID) : new Notification.Builder(this);
         builder.setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Alarma de fondeo")
-                .setContentText("Atención, Chez se está alejando del ancla.")
+                .setContentText(notificationMessage("anchorLost", "Atención, Chez se está alejando del ancla."))
                 .setContentIntent(open)
                 .setCategory(Notification.CATEGORY_ALARM)
                 .setPriority(Notification.PRIORITY_HIGH)
@@ -353,6 +413,26 @@ public class BoatStationCoreService extends Service implements LocationListener 
         }
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null && canPostNotifications()) manager.notify(ANCHOR_NOTIFICATION_ID, builder.build());
+    }
+
+    private void postBackgroundAlarm(String text, String title) {
+        Intent openIntent = new Intent(this, BoatStationActivity.class);
+        openIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent open = PendingIntent.getActivity(this, 2, openIntent, flags);
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, ALARM_CHANNEL_ID) : new Notification.Builder(this);
+        builder.setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(title == null || title.trim().isEmpty() ? "Boat Station" : title.trim())
+                .setContentText(text)
+                .setContentIntent(open)
+                .setCategory(Notification.CATEGORY_ALARM)
+                .setPriority(Notification.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true);
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager != null && canPostNotifications()) manager.notify(BACKGROUND_ALARM_NOTIFICATION_ID, builder.build());
     }
 
     private void cancelAnchorAlarm() {
@@ -386,6 +466,14 @@ public class BoatStationCoreService extends Service implements LocationListener 
     public static String getLatestRemoteState() {
         BoatStationCoreService service = activeService;
         return service == null ? "" : service.latestRemoteState;
+    }
+
+    public static boolean announceAlarmFromApp(String text) {
+        BoatStationCoreService service = activeService;
+        if (service == null || service.syncHandler == null || text == null || text.trim().isEmpty()) return false;
+        String message = text.trim();
+        service.syncHandler.post(() -> service.announceBackgroundAlarm(message, "Boat Station"));
+        return true;
     }
 
     private void acquireWakeLock() {
@@ -442,7 +530,14 @@ public class BoatStationCoreService extends Service implements LocationListener 
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         String sid = stationId.trim();
         String previousId = prefs.getString(PREF_CLIENT_STATION_ID, "");
-        if (!sid.equals(previousId)) latestRemoteState = "";
+        if (!sid.equals(previousId)) {
+            latestRemoteState = "";
+            hasCompletedClientPoll = false;
+            prefs.edit().putBoolean(PREF_CONNECTION_INITIALIZED, false)
+                    .putBoolean(PREF_CONNECTION_CONNECTED, false)
+                    .putString(PREF_CONNECTION_STATION_ID, sid)
+                    .putLong(PREF_LAST_REMOTE_TELEMETRY_TIME, 0L).apply();
+        }
         prefs.edit()
                 .putString(PREF_SYNC_MODE, MODE_CLIENT)
                 .putString(PREF_CLIENT_STATION_ID, sid)
@@ -462,8 +557,13 @@ public class BoatStationCoreService extends Service implements LocationListener 
                 .remove(PREF_CLIENT_BACKEND)
                 .remove(PREF_CLIENT_NAME)
                 .remove(PREF_CLIENT_ID)
+                .remove(PREF_CONNECTION_INITIALIZED)
+                .remove(PREF_CONNECTION_CONNECTED)
+                .remove(PREF_CONNECTION_STATION_ID)
+                .remove(PREF_LAST_REMOTE_TELEMETRY_TIME)
                 .apply();
         latestRemoteState = "";
+        hasCompletedClientPoll = false;
         consecutiveSyncFailures = 0;
         syncHandler.removeCallbacks(syncRunnable);
     }
@@ -471,6 +571,96 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private boolean hasSyncMode() {
         String mode = getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_SYNC_MODE, "");
         return MODE_SERVER.equals(mode) || MODE_CLIENT.equals(mode);
+    }
+
+    private void evaluateRemoteConnectionState() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (!MODE_CLIENT.equals(prefs.getString(PREF_SYNC_MODE, ""))) return;
+        String settingsRaw = prefs.getString(PREF_NOTIFICATION_SETTINGS, "");
+        if (settingsRaw.isEmpty()) return;
+
+        String stationId = prefs.getString(PREF_CLIENT_STATION_ID, "");
+        if (stationId.isEmpty()) return;
+        if (latestRemoteState.isEmpty() && !hasCompletedClientPoll && networkAvailable()) return;
+        boolean connected = hasFreshRemoteSnapshot(latestRemoteState, System.currentTimeMillis(), prefs);
+        String previousStation = prefs.getString(PREF_CONNECTION_STATION_ID, "");
+        boolean initialized = prefs.getBoolean(PREF_CONNECTION_INITIALIZED, false)
+                && stationId.equals(previousStation);
+        boolean wasConnected = prefs.getBoolean(PREF_CONNECTION_CONNECTED, false);
+        if (!initialized) {
+            prefs.edit().putBoolean(PREF_CONNECTION_INITIALIZED, true)
+                    .putBoolean(PREF_CONNECTION_CONNECTED, connected)
+                    .putString(PREF_CONNECTION_STATION_ID, stationId).apply();
+            if (connected) announceConnectionEstablished(settingsRaw, remoteStationName(latestRemoteState, prefs));
+            return;
+        }
+        if (connected == wasConnected) return;
+        prefs.edit().putBoolean(PREF_CONNECTION_CONNECTED, connected).apply();
+        String name = remoteStationName(latestRemoteState, prefs);
+        if (connected) announceConnectionEstablished(settingsRaw, name);
+        else announceConnectionLost(settingsRaw, name);
+    }
+
+    private boolean hasFreshRemoteSnapshot(String raw, long now, SharedPreferences prefs) {
+        long time = 0L;
+        try {
+            JSONObject root = new JSONObject(raw == null ? "{}" : raw);
+            JSONObject snapshot = root.optJSONObject("snapshot");
+            JSONObject telemetry = snapshot == null ? null : snapshot.optJSONObject("telemetry");
+            if (telemetry != null) time = telemetry.optLong("time", 0L);
+        } catch (Exception ignored) {
+        }
+        if (time <= 0L) time = prefs.getLong(PREF_LAST_REMOTE_TELEMETRY_TIME, 0L);
+        if (time <= 0L) return false;
+        long effectiveTime = Math.min(now, time);
+        return now - effectiveTime <= 30000L;
+    }
+
+    private String remoteStationName(String raw, SharedPreferences prefs) {
+        try {
+            JSONObject root = new JSONObject(raw == null ? "{}" : raw);
+            JSONObject snapshot = root.optJSONObject("snapshot");
+            JSONObject telemetry = snapshot == null ? null : snapshot.optJSONObject("telemetry");
+            String name = snapshot == null ? "" : snapshot.optString("boatName", "");
+            if (name.trim().isEmpty() && telemetry != null) name = telemetry.optString("stationName", "");
+            if (name.trim().isEmpty()) name = root.optString("boatName", "");
+            if (!name.trim().isEmpty()) return name.trim();
+        } catch (Exception ignored) {}
+        return prefs.getString(PREF_NOTIFICATION_SETTINGS, "").isEmpty() ? "Chez"
+                : notificationSettings(prefs).optString("stationName", "Chez");
+    }
+
+    private JSONObject notificationSettings(SharedPreferences prefs) {
+        try { return new JSONObject(prefs.getString(PREF_NOTIFICATION_SETTINGS, "{}")); }
+        catch (Exception ignored) { return new JSONObject(); }
+    }
+
+    private void announceConnectionEstablished(String rawSettings, String stationName) {
+        try {
+            JSONObject settings = new JSONObject(rawSettings);
+            JSONObject general = settings.optJSONObject("general");
+            if (general == null || !general.optBoolean("connectionEstablished", true)) return;
+            JSONObject messages = settings.optJSONObject("messages");
+            String template = messages == null
+                    ? general.optString("connectionEstablishedMessage", "Conexión con {barco} establecida.")
+                    : messages.optString("connectionEstablished", "Conexión con {barco} establecida.");
+            String name = stationName == null || stationName.trim().isEmpty() ? "Chez" : stationName.trim();
+            String message = template.replace("{barco}", name).replace("{Barco}", name).replace("{BARCO}", name);
+            announceBackgroundAlarm(message, "Conexión establecida");
+        } catch (Exception ignored) {}
+    }
+
+    private void announceConnectionLost(String rawSettings, String stationName) {
+        try {
+            JSONObject settings = new JSONObject(rawSettings);
+            JSONObject general = settings.optJSONObject("general");
+            if (general == null || !general.optBoolean("connectionLost", false)) return;
+            String name = stationName == null || stationName.trim().isEmpty() ? "Chez" : stationName.trim();
+            JSONObject messages = settings.optJSONObject("messages");
+            String template = messages == null ? "Conexión con {barco} perdida." : messages.optString("connectionLost", "Conexión con {barco} perdida.");
+            String message = template.replace("{barco}", name).replace("{Barco}", name).replace("{BARCO}", name);
+            announceBackgroundAlarm(message, "Conexión perdida");
+        } catch (Exception ignored) {}
     }
 
     private void scheduleSync(long delayMs) {
@@ -487,6 +677,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
         if (syncInFlight || !hasSyncMode()) return;
         if (!networkAvailable()) {
             consecutiveSyncFailures = Math.min(consecutiveSyncFailures + 1, 8);
+            evaluateRemoteConnectionState();
             scheduleSync(nextSyncDelay());
             return;
         }
@@ -506,6 +697,8 @@ public class BoatStationCoreService extends Service implements LocationListener 
                 Handler handler = syncHandler;
                 if (handler != null) handler.post(() -> {
                     syncInFlight = false;
+                    if (MODE_CLIENT.equals(getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_SYNC_MODE, ""))) hasCompletedClientPoll = true;
+                    evaluateRemoteConnectionState();
                     if (result == null) consecutiveSyncFailures = 0;
                     else {
                         consecutiveSyncFailures = Math.min(consecutiveSyncFailures + 1, 8);
@@ -603,7 +796,12 @@ public class BoatStationCoreService extends Service implements LocationListener 
                 + "/state?clientId=" + Uri.encode(clientId)
                 + "&clientName=" + Uri.encode(clientName);
         String response = request(url, "GET", token, null);
-        new JSONObject(response);
+        JSONObject parsed = new JSONObject(response);
+        JSONObject snapshot = parsed.optJSONObject("snapshot");
+        JSONObject telemetry = snapshot == null ? null : snapshot.optJSONObject("telemetry");
+        long telemetryTime = telemetry == null ? 0L : telemetry.optLong("time", 0L);
+        if (telemetryTime > 0L) getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putLong(PREF_LAST_REMOTE_TELEMETRY_TIME, telemetryTime).apply();
         latestRemoteState = response;
     }
 
@@ -667,6 +865,11 @@ public class BoatStationCoreService extends Service implements LocationListener 
         alarm.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
                 new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
         manager.createNotificationChannel(alarm);
+        NotificationChannel backgroundAlarm = new NotificationChannel(ALARM_CHANNEL_ID, "Alarmas de Boat Station", NotificationManager.IMPORTANCE_HIGH);
+        backgroundAlarm.setDescription("Avisos de Boat Station que también se anuncian con la app en segundo plano");
+        backgroundAlarm.setSound(null, null);
+        backgroundAlarm.setShowBadge(false);
+        manager.createNotificationChannel(backgroundAlarm);
     }
 
     private Notification buildNotification() {
