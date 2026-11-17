@@ -1,7 +1,7 @@
 const STORAGE_KEY='bs.notifications.v1';
 const DEFAULTS={
   battery:{moduleEnabled:true,critical:{enabled:false,threshold:10,repeatMinutes:0},solarStart:{enabled:false,minCurrent:3,riseCurrent:2,lastAlarmDay:'',lastDetectedDay:'',peakCurrent:0},solarLoss:{enabled:false,minCurrent:1.5,dropPercent:70,holdMinutes:5}},
-  general:{connectionLost:false,connectionEstablished:true,ttsVoice:'',ttsRate:1},
+  general:{connectionLost:true,connectionEstablished:true,connectionAlarmDefaultsVersion:1,ttsVoice:'',ttsRate:1},
   messages:{
     batteryCritical:'Batería crítica, llegamos al {porcentaje} por ciento.',
     solarStart:'Paneles solares cargando.',
@@ -25,7 +25,7 @@ function readSettings(){
         solarStart:{enabled:!!solarStart.enabled,minCurrent:clamp(Number(solarStart.minCurrent),0.5,100,3),riseCurrent:clamp(Number(solarStart.riseCurrent),0.5,50,2),lastAlarmDay:String(solarStart.lastAlarmDay||''),lastDetectedDay:String(solarStart.lastDetectedDay||''),peakCurrent:clamp(Number(solarStart.peakCurrent),0,100,0)},
         solarLoss:{enabled:!!solarLoss.enabled,minCurrent:clamp(Number(solarLoss.minCurrent),0.1,100,1.5),dropPercent:clamp(Number(solarLoss.dropPercent),10,95,70),holdMinutes:[1,3,5,10,15].includes(Number(solarLoss.holdMinutes))?Number(solarLoss.holdMinutes):5}
       },
-      general:{connectionLost:!!saved.general?.connectionLost,connectionEstablished:saved.general?.connectionEstablished!==false,ttsVoice:String(saved.general?.ttsVoice||''),ttsRate:[0.75,0.9,1,1.15,1.3,1.5].includes(Number(saved.general?.ttsRate))?Number(saved.general.ttsRate):1},
+      general:{connectionLost:Number(saved.general?.connectionAlarmDefaultsVersion)===1?saved.general?.connectionLost!==false:true,connectionEstablished:Number(saved.general?.connectionAlarmDefaultsVersion)===1?saved.general?.connectionEstablished!==false:true,connectionAlarmDefaultsVersion:1,ttsVoice:String(saved.general?.ttsVoice||''),ttsRate:[0.75,0.9,1,1.15,1.3,1.5].includes(Number(saved.general?.ttsRate))?Number(saved.general.ttsRate):1},
       messages:{
         batteryCritical:cleanMessage(messages.batteryCritical,DEFAULTS.messages.batteryCritical),
         solarStart:cleanMessage(messages.solarStart,DEFAULTS.messages.solarStart),
