@@ -1,14 +1,23 @@
 const STORAGE_KEY='bs.notifications.v1';
 const DEFAULTS={
   battery:{moduleEnabled:true,critical:{enabled:false,threshold:10,repeatMinutes:0},solarStart:{enabled:false,minCurrent:3,riseCurrent:2,lastAlarmDay:'',lastDetectedDay:'',peakCurrent:0},solarLoss:{enabled:false,minCurrent:1.5,dropPercent:70,holdMinutes:5}},
-  general:{connectionLost:false,ttsVoice:'',ttsRate:1}
+  general:{connectionLost:false,connectionRestored:false,ttsVoice:'',ttsRate:1},
+  messages:{
+    batteryCritical:'Batería crítica, llegamos al {porcentaje} por ciento.',
+    solarStart:'Paneles solares cargando.',
+    solarLoss:'Paneles solares no están cargando.',
+    connectionLost:'Conexión con {barco} perdida.',
+    connectionRestored:'Conexión con {barco} recuperada.',
+    anchorLost:'Atención, Chez se está alejando del ancla.'
+  }
 };
 
 function clamp(value,min,max,fallback){return Number.isFinite(value)?Math.max(min,Math.min(max,value)):fallback}
+function cleanMessage(value,fallback){const message=String(value??'').trim().slice(0,180);return message||fallback}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]))}
 function readSettings(){
   try{
-    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null')||{},battery=saved.battery||{},critical=battery.critical||{},solarStart=battery.solarStart||{},solarLoss=battery.solarLoss||{};
+    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null')||{},battery=saved.battery||{},critical=battery.critical||{},solarStart=battery.solarStart||{},solarLoss=battery.solarLoss||{},messages=saved.messages||{};
     return{
       battery:{
         moduleEnabled:battery.moduleEnabled!==false,
@@ -16,14 +25,22 @@ function readSettings(){
         solarStart:{enabled:!!solarStart.enabled,minCurrent:clamp(Number(solarStart.minCurrent),0.5,100,3),riseCurrent:clamp(Number(solarStart.riseCurrent),0.5,50,2),lastAlarmDay:String(solarStart.lastAlarmDay||''),lastDetectedDay:String(solarStart.lastDetectedDay||''),peakCurrent:clamp(Number(solarStart.peakCurrent),0,100,0)},
         solarLoss:{enabled:!!solarLoss.enabled,minCurrent:clamp(Number(solarLoss.minCurrent),0.1,100,1.5),dropPercent:clamp(Number(solarLoss.dropPercent),10,95,70),holdMinutes:[1,3,5,10,15].includes(Number(solarLoss.holdMinutes))?Number(solarLoss.holdMinutes):5}
       },
-      general:{connectionLost:!!saved.general?.connectionLost,ttsVoice:String(saved.general?.ttsVoice||''),ttsRate:[0.75,0.9,1,1.15,1.3,1.5].includes(Number(saved.general?.ttsRate))?Number(saved.general.ttsRate):1}
+      general:{connectionLost:!!saved.general?.connectionLost,connectionRestored:!!saved.general?.connectionRestored,ttsVoice:String(saved.general?.ttsVoice||''),ttsRate:[0.75,0.9,1,1.15,1.3,1.5].includes(Number(saved.general?.ttsRate))?Number(saved.general.ttsRate):1},
+      messages:{
+        batteryCritical:cleanMessage(messages.batteryCritical,DEFAULTS.messages.batteryCritical),
+        solarStart:cleanMessage(messages.solarStart,DEFAULTS.messages.solarStart),
+        solarLoss:cleanMessage(messages.solarLoss,DEFAULTS.messages.solarLoss),
+        connectionLost:cleanMessage(messages.connectionLost,DEFAULTS.messages.connectionLost),
+        connectionRestored:cleanMessage(messages.connectionRestored,DEFAULTS.messages.connectionRestored),
+        anchorLost:cleanMessage(messages.anchorLost,DEFAULTS.messages.anchorLost)
+      }
     };
   }catch{return JSON.parse(JSON.stringify(DEFAULTS))}
 }
 function writeSettings(settings){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(settings))}catch{}}
 function dayKey(date=new Date()){return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
 
-export function createNotificationsMenu({sheet,batterySheet,openSheet,closeSheet,getBatteryStats,getLocation,getLocationAlarmEnabled,setLocationAlarmEnabled,onBatteryBack}){
+export function createNotificationsMenu({sheet,batterySheet,moduleMenu,openSheet,closeSheet,getBatteryStats,getLocation,getLocationAlarmEnabled,setLocationAlarmEnabled,onBatteryBack}){
   const settings=readSettings();
   let lastStats=null,lastSoc=null,lastCurrent=null,batteryCritical=false,lastSpokenAt=0;
   let remoteConnection=null,remoteEverConnected=false,remoteLossAnnounced=false,remoteStationName='Chez';
@@ -74,8 +91,79 @@ export function createNotificationsMenu({sheet,batterySheet,openSheet,closeSheet
     return false;
   }
 
-  function batteryMessage(soc=null){const value=soc===null?settings.battery.critical.threshold:Math.round(Number(soc));return`Batería crítica, llegamos al ${value} por ciento.`}
-  function speakConnectionLost(){if(remoteConnection!==false||!remoteEverConnected||remoteLossAnnounced||!settings.general.connectionLost)return false;const spoken=say(`Conexión con ${remoteStationName||'Chez'} perdida.`);if(spoken)remoteLossAnnounced=true;return spoken}
+  function formatNotificationMessage(template,values={}){
+    return String(template||'').replace(/\{(porcentaje|barco)\}/gi,(match,key)=>String(values[key.toLowerCase()]??match));
+  }
+  function batteryMessage(soc=null){
+    const value=soc===null?settings.battery.critical.threshold:Math.round(Number(soc));
+    return formatNotificationMessage(settings.messages.batteryCritical,{porcentaje:value});
+  }
+  function connectionLostMessage(){return formatNotificationMessage(settings.messages.connectionLost,{barco:remoteStationName||'Chez'})}
+  function connectionRestoredMessage(){return formatNotificationMessage(settings.messages.connectionRestored,{barco:remoteStationName||'Chez'})}
+  function notificationMessagePreview(id){
+    if(id==='batteryCritical')return batteryMessage();
+    if(id==='connectionLost')return connectionLostMessage();
+    if(id==='connectionRestored')return connectionRestoredMessage();
+    return String(settings.messages[id]||'');
+  }
+  function messageEditorMarkup(id,label,preview,hint=''){
+    const inputId='notificationMessage-'+id,extra=id==='batteryCritical'?' data-battery-alarm-preview':'';
+    return '<div class="notification-message-editor">'+
+      '<div class="notification-message-view" data-notification-message-view="'+id+'">'+
+        '<span class="notification-message-copy" data-notification-message-preview="'+id+'"'+extra+'>'+escapeHtml(preview)+'</span>'+
+        '<button type="button" class="notification-edit-button" data-notification-message-edit="'+id+'" aria-label="Editar mensaje de '+escapeHtml(label)+'" title="Editar mensaje">'+
+          '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"></path></svg>'+
+        '</button>'+
+      '</div>'+
+      '<div class="notification-message-form" data-notification-message-form="'+id+'" hidden>'+
+        '<textarea rows="2" maxlength="180" id="'+inputId+'" data-notification-message-input="'+id+'" aria-label="Texto del mensaje de '+escapeHtml(label)+'">'+escapeHtml(settings.messages[id])+'</textarea>'+
+        (hint?'<small class="notification-message-hint">'+escapeHtml(hint)+'</small>':'')+
+        '<div class="notification-message-actions"><button type="button" class="btn" data-notification-message-save="'+id+'">Guardar</button><button type="button" class="btn notification-message-cancel" data-notification-message-cancel="'+id+'">Cancelar</button></div>'+
+        '<small class="notification-message-error" data-notification-message-error="'+id+'" role="alert"></small>'+
+      '</div>'+
+    '</div>';
+  }
+  function updateNotificationMessagePreview(id){
+    const preview=notificationMessagePreview(id);
+    for(const node of document.querySelectorAll('[data-notification-message-preview="'+id+'"]'))node.textContent=preview;
+  }
+  function handleMessageEditorClick(root,event){
+    const button=event.target.closest('[data-notification-message-edit],[data-notification-message-save],[data-notification-message-cancel]');
+    if(!button||!root.contains(button))return false;
+    const id=button.getAttribute('data-notification-message-edit')||button.getAttribute('data-notification-message-save')||button.getAttribute('data-notification-message-cancel');
+    const editor=button.closest('.notification-message-editor');
+    const view=editor?.querySelector('[data-notification-message-view]');
+    const form=editor?.querySelector('[data-notification-message-form]');
+    const input=editor?.querySelector('[data-notification-message-input]');
+    const error=editor?.querySelector('[data-notification-message-error]');
+    if(!id||!editor||!view||!form||!input)return true;
+    if(button.hasAttribute('data-notification-message-edit')){
+      input.value=settings.messages[id]||'';
+      if(error)error.textContent='';
+      view.hidden=true;form.hidden=false;input.focus();
+      return true;
+    }
+    if(button.hasAttribute('data-notification-message-cancel')){
+      input.value=settings.messages[id]||'';
+      if(error)error.textContent='';
+      view.hidden=false;form.hidden=true;
+      return true;
+    }
+    const value=String(input.value||'').trim();
+    if(!value){if(error)error.textContent='Escribí un mensaje antes de guardarlo.';input.focus();return true}
+    settings.messages[id]=value.slice(0,180);
+    writeSettings(settings);
+    updateNotificationMessagePreview(id);
+    if(error)error.textContent='';
+    view.hidden=false;form.hidden=true;
+    return true;
+  }
+  function speakConnectionLost(){
+    if(remoteConnection!==false||!remoteEverConnected||remoteLossAnnounced||!settings.general.connectionLost)return false;
+    const spoken=say(connectionLostMessage());
+    if(spoken)remoteLossAnnounced=true;
+    return spoken;
+  }
   function solarNight(date){
     const position=getLocation?.(),lat=Number(position?.lat),lon=Number(position?.lon);
     if(!Number.isFinite(lat)||!Number.isFinite(lon))return date.getHours()<6||date.getHours()>=18;
@@ -92,8 +180,8 @@ export function createNotificationsMenu({sheet,batterySheet,openSheet,closeSheet
     const previous=solarState;solarState=next;window.BoatStationSolarStatus={state:next};
     window.dispatchEvent(new CustomEvent('boatstation-solar-status',{detail:{state:next,current:lastCurrent,peakCurrent:solarPeak}}));
     if(silent||!settings.battery.moduleEnabled)return;
-    if(next==='charging'&&previous!=='unknown'&&settings.battery.solarStart.enabled)say('Paneles solares cargando');
-    else if((next==='cloudy'||next==='night')&&previous==='charging'&&settings.battery.solarLoss.enabled)say('Paneles solares no están cargando');
+    if(next==='charging'&&previous!=='unknown'&&settings.battery.solarStart.enabled)say(settings.messages.solarStart);
+    else if((next==='cloudy'||next==='night')&&previous==='charging'&&settings.battery.solarLoss.enabled)say(settings.messages.solarLoss);
   }
   function updateSolar(current){
     const solarStart=settings.battery.solarStart,solarLoss=settings.battery.solarLoss,now=new Date(),today=dayKey(now),hour=now.getHours(),timestamp=Date.now(),night=solarNight(now);
@@ -155,7 +243,7 @@ export function createNotificationsMenu({sheet,batterySheet,openSheet,closeSheet
   }
   function setBatteryModuleEnabled(enabled){settings.battery.moduleEnabled=!!enabled;writeSettings(settings);syncBatteryControls();if(lastStats)updateBatteryState(lastStats)}
   function renderGeneral(){
-    const batteryOn=settings.battery.moduleEnabled,locationOn=!!getLocationAlarmEnabled?.(),connectionOn=settings.general.connectionLost;
+    const batteryOn=settings.battery.moduleEnabled,locationOn=!!getLocationAlarmEnabled?.(),connectionOn=settings.general.connectionLost,connectionRestoredOn=settings.general.connectionRestored;
     sheet.innerHTML=`<div class="sheet-inner fullscreen-inner">
       <div class="fullscreen-head"><button class="fullscreen-back" type="button" data-notifications-back>‹</button><h3>Notificaciones</h3><span></span></div>
       <p class="subtle">Activá o desactivá las alarmas desde acá. Los ajustes propios se configuran en cada módulo.</p>
@@ -166,7 +254,12 @@ export function createNotificationsMenu({sheet,batterySheet,openSheet,closeSheet
       </section>
       <section class="full-section notification-module">
         <div class="full-section-title">Alarmas generales</div>
-        <label class="gps-menu-toggle"><span><strong>Conexión con Chez perdida</strong><small>Avisa cuando deja de llegar información de la estación.</small></span><input type="checkbox" data-general-alarm="connection-lost" ${connectionOn?'checked':''}></label>
+        <label class="gps-menu-toggle"><span><strong>Conexión perdida</strong><small>Avisa cuando deja de llegar información de la estación.</small></span><input type="checkbox" data-general-alarm="connection-lost" ${connectionOn?'checked':''}></label>
+        <div class="notification-message-caption">Mensaje hablado</div>
+        ${messageEditorMarkup('connectionLost','conexión perdida',connectionLostMessage(),'Podés usar {barco} para insertar el nombre de la estación.')}
+        <label class="gps-menu-toggle"><span><strong>Conexión recuperada</strong><small>Avisa cuando vuelve a llegar información de la estación.</small></span><input type="checkbox" data-general-alarm="connection-restored" ${connectionRestoredOn?'checked':''}></label>
+        <div class="notification-message-caption">Mensaje hablado</div>
+        ${messageEditorMarkup('connectionRestored','conexión recuperada',connectionRestoredMessage(),'Podés usar {barco} para insertar el nombre de la estación.')}
       </section>
       <section class="full-section notification-module">
         <div class="full-section-title">Voz</div>
@@ -206,13 +299,14 @@ export function createNotificationsMenu({sheet,batterySheet,openSheet,closeSheet
           <option value="10" ${critical.repeatMinutes===10?'selected':''}>Cada 10 minutos</option>
           <option value="30" ${critical.repeatMinutes===30?'selected':''}>Cada 30 minutos</option>
         </select>
-        <div class="full-readonly notification-preview"><small>Frase al llegar al umbral</small><strong data-battery-alarm-preview>${batteryMessage()}</strong></div>
+        <div class="full-readonly notification-preview"><small>Mensaje hablado al llegar al umbral</small>${messageEditorMarkup('batteryCritical','batería crítica',batteryMessage(),'Usá {porcentaje} para insertar el nivel de carga.')}</div>
         <button class="gps-action notification-test" type="button" data-battery-alarm-test>Probar esta alarma</button>
         <p class="subtle">Se anuncia una vez al cruzar el umbral y vuelve a habilitarse cuando la carga se recupera 2 puntos.</p>
       </section>
       <section class="full-section notification-module">
         <div class="full-section-title">Inicio de carga solar</div>
-        <label class="gps-menu-toggle"><span><strong>Avisar cuando comienza</strong><small>Dice “Paneles solares cargando”.</small></span><input type="checkbox" data-solar-start-enabled ${solarStart.enabled?'checked':''}></label>
+        <label class="gps-menu-toggle"><span><strong>Avisar cuando comienza</strong><small>Se activa al detectar una subida progresiva de la corriente.</small></span><input type="checkbox" data-solar-start-enabled ${solarStart.enabled?'checked':''}></label>
+        <div class="notification-preview"><small>Mensaje hablado</small>${messageEditorMarkup('solarStart','inicio de carga solar',settings.messages.solarStart)}</div>
         <label class="full-label" for="solarStartMinCurrent">Corriente mínima de carga (A)</label>
         <input class="full-input" id="solarStartMinCurrent" type="number" min="0.5" max="100" step="0.5" inputmode="decimal" data-solar-start-min value="${solarStart.minCurrent}">
         <label class="full-label" for="solarStartRiseCurrent">Aumento progresivo necesario (A)</label>
@@ -231,14 +325,14 @@ export function createNotificationsMenu({sheet,batterySheet,openSheet,closeSheet
         <select class="full-input" id="solarLossHold" data-solar-loss-hold>
           <option value="1" ${solarLoss.holdMinutes===1?'selected':''}>1 minuto</option><option value="3" ${solarLoss.holdMinutes===3?'selected':''}>3 minutos</option><option value="5" ${solarLoss.holdMinutes===5?'selected':''}>5 minutos</option><option value="10" ${solarLoss.holdMinutes===10?'selected':''}>10 minutos</option><option value="15" ${solarLoss.holdMinutes===15?'selected':''}>15 minutos</option>
         </select>
-        <div class="full-readonly notification-preview"><small>Frase del aviso</small><strong>Paneles solares no están cargando.</strong></div>
+        <div class="full-readonly notification-preview"><small>Mensaje hablado</small>${messageEditorMarkup('solarLoss','paneles solares sin carga',settings.messages.solarLoss)}</div>
         <p class="subtle">Se activa cuando la corriente cae por debajo del umbral configurado y permanece baja. El aviso se rearma cuando la carga se recupera.</p>
         <button class="gps-action notification-test" type="button" data-solar-loss-test>Probar esta alarma</button>
       </section>
       <div class="subtle" data-notification-status role="status" aria-live="polite"></div>
     </div>`;
   }
-  function saveBattery(){writeSettings(settings);syncBatteryControls();for(const preview of document.querySelectorAll('[data-battery-alarm-preview]'))preview.textContent=batteryMessage()}
+  function saveBattery(){writeSettings(settings);syncBatteryControls();updateNotificationMessagePreview('batteryCritical')}
   function updateBatterySetting(target){
     const battery=settings.battery;
     if(target.matches('[data-battery-alarm-enabled]'))battery.critical.enabled=target.checked;
@@ -258,6 +352,7 @@ export function createNotificationsMenu({sheet,batterySheet,openSheet,closeSheet
   function testVoice(text,root){const ready=say(text),status=root.querySelector('[data-notification-status]');if(status)status.textContent=ready?'':'No hay un motor de voz disponible en este dispositivo.'}
 
   sheet.addEventListener('click',event=>{
+    if(handleMessageEditorClick(sheet,event))return;
     if(event.target.closest('[data-notifications-back]')){closeSheet(sheet);return}
     if(event.target.closest('[data-notification-test]'))testVoice('Prueba de alarma hablada de Boat Station.',sheet);
   });
@@ -269,37 +364,47 @@ export function createNotificationsMenu({sheet,batterySheet,openSheet,closeSheet
       if(!ok){target.checked=!!getLocationAlarmEnabled?.();const status=sheet.querySelector('[data-notification-status]');if(status)status.textContent=result?.hasPoint?'Concedé los permisos de ubicación y notificaciones para activar la alarma.':'Primero definí el punto de fondeo en el módulo Ubicación.'}
       else{const status=sheet.querySelector('[data-notification-status]');if(status)status.textContent=''}
     }else if(target.matches('[data-general-alarm="connection-lost"]')){settings.general.connectionLost=target.checked;writeSettings(settings);if(target.checked)speakConnectionLost()}
+    else if(target.matches('[data-general-alarm="connection-restored"]')){settings.general.connectionRestored=target.checked;writeSettings(settings)}
     else if(target.matches('[data-tts-voice]')){settings.general.ttsVoice=String(target.value||'');writeSettings(settings);applyTtsSettings()}
     else if(target.matches('[data-tts-rate]')){settings.general.ttsRate=[0.75,0.9,1,1.15,1.3,1.5].includes(Number(target.value))?Number(target.value):1;writeSettings(settings);applyTtsSettings()}
   });
   batterySheet.addEventListener('click',event=>{
+    if(handleMessageEditorClick(batterySheet,event))return;
     if(event.target.closest('[data-battery-notification-back]')){closeSheet(batterySheet);onBatteryBack?.();return}
     if(event.target.closest('[data-battery-alarm-test]'))testVoice(batteryMessage(),batterySheet);
-    else if(event.target.closest('[data-solar-start-test]'))testVoice('Paneles solares cargando',batterySheet);
-    else if(event.target.closest('[data-solar-loss-test]'))testVoice('Paneles solares no están cargando',batterySheet);
+    else if(event.target.closest('[data-solar-start-test]'))testVoice(settings.messages.solarStart,batterySheet);
+    else if(event.target.closest('[data-solar-loss-test]'))testVoice(settings.messages.solarLoss,batterySheet);
   });
+  moduleMenu?.addEventListener('click',event=>{if(handleMessageEditorClick(moduleMenu,event)){event.preventDefault();event.stopImmediatePropagation()}});
   batterySheet.addEventListener('change',event=>updateBatterySetting(event.target));
   batterySheet.addEventListener('input',event=>{
     const target=event.target;
     if(!target.matches('[data-battery-alarm-threshold]'))return;
     const value=Math.round(clamp(Number(target.value),1,100,10)),preview=batterySheet.querySelector('[data-battery-alarm-preview]');
-    if(preview)preview.textContent=`Batería crítica, llegamos al ${value} por ciento.`;
+    if(preview)preview.textContent=batteryMessage(value);
   });
   window.addEventListener('boatstation-battery-state',event=>updateBatteryState(event.detail));
   try{window.speechSynthesis?.addEventListener?.('voiceschanged',refreshTtsVoiceOptions)}catch{}
   window.addEventListener('boatstation-tts-voices',refreshTtsVoiceOptions);
-  window.addEventListener('boatstation-anchor-alarm',()=>{if(getLocationAlarmEnabled?.())say('Atención, Chez se está alejando del ancla.')});
+  window.addEventListener('boatstation-anchor-alarm',()=>{if(getLocationAlarmEnabled?.())say(settings.messages.anchorLost)});
   window.addEventListener('boatstation-remote-connection',event=>{
-    const detail=event.detail||{};
+    const detail=event.detail||{},previousConnection=remoteConnection;
     remoteConnection=detail.connected===true;
     if(detail.stationName)remoteStationName=String(detail.stationName).trim()||'Chez';
-    if(remoteConnection){remoteEverConnected=true;remoteLossAnnounced=false}else speakConnectionLost();
+    if(remoteConnection){
+      const recovered=remoteEverConnected&&previousConnection===false;
+      remoteEverConnected=true;remoteLossAnnounced=false;
+      if(recovered&&settings.general.connectionRestored)say(connectionRestoredMessage());
+    }else speakConnectionLost();
+    updateNotificationMessagePreview('connectionLost');
+    updateNotificationMessagePreview('connectionRestored');
   });
 
   return{
     open(){renderGeneral();openSheet(sheet);if(lastStats===null){const stats=getBatteryStats?.();if(stats)updateBatteryState(stats)}},
     openBatterySettings(){renderBattery();openSheet(batterySheet);if(lastStats===null){const stats=getBatteryStats?.();if(stats)updateBatteryState(stats)}},
     refreshBattery(){const stats=getBatteryStats?.();if(stats)updateBatteryState(stats)},
-    getSettings:()=>JSON.parse(JSON.stringify(settings))
+    getSettings:()=>JSON.parse(JSON.stringify(settings)),
+    getMessageEditorMarkup(id){const labels={anchorLost:'alarma de fondeo'};return messageEditorMarkup(id,labels[id]||'notificación',notificationMessagePreview(id))}
   };
 }

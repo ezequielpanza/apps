@@ -40,6 +40,22 @@ html.bs-dashboard-expanded.bs-dashboard-three #cards>.card{display:block;align-s
 .gps-map-attribution{left:8px;right:auto;max-width:calc(100% - 130px)}
 
 .notification-module{padding:14px;background:#0b2b40;border:1px solid #17445f;border-radius:14px}
+.notification-message-caption{margin:10px 0 4px;color:var(--muted);font-size:12px}
+.notification-message-editor{margin:5px 0 10px;min-width:0}
+.notification-message-view{display:flex;align-items:center;gap:8px;min-width:0}
+.notification-message-copy{flex:1;min-width:0;color:#f4f8fb;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.notification-edit-button{appearance:none;display:inline-flex;flex:0 0 36px;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid #24516a;border-radius:10px;background:#102f45;color:var(--accent);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:transform .12s ease,filter .12s ease}
+.notification-edit-button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.notification-edit-button:hover{filter:brightness(1.15)}
+.notification-edit-button:active{transform:scale(.95)}
+.notification-edit-button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.notification-message-form[hidden],.notification-message-view[hidden]{display:none!important}
+.notification-message-form textarea{box-sizing:border-box;display:block;width:100%;min-height:64px;margin-top:6px;padding:10px;border:1px solid #24516a;border-radius:10px;background:#061522;color:#f4f8fb;font:inherit;line-height:1.4;resize:vertical}
+.notification-message-hint{display:block;margin-top:5px;color:var(--muted);font-size:12px}
+.notification-message-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.notification-message-actions .btn{min-width:82px}
+.notification-message-cancel{background:transparent}
+.notification-message-error{display:block;min-height:1.2em;margin-top:4px;color:#ff9b9b;font-size:12px}
 .notification-preview{margin:12px 0 8px}
 .notification-preview strong{font-size:15px}
 .notification-test{width:100%;justify-content:center}
