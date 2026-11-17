@@ -31,12 +31,22 @@
 
 /* Battery overview and lists distribute only the page-content space. */
 .page-content>.battery-overview{flex:1 1 auto}
-.battery-overview{grid-template-columns:minmax(50px,.42fr) minmax(88px,.95fr) minmax(108px,1.15fr);gap:clamp(4px,1.2cqw,7px);align-items:stretch;min-width:0}
-.battery-charge-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-width:0;min-height:0;padding:3px;border:1px solid var(--line);border-radius:13px;background:#071b29}
-.battery-charge-value{font-size:clamp(11px,3.4cqw,16px);font-weight:900;line-height:1;color:#f4f8fb;white-space:nowrap}
-.battery-charge-label{color:var(--muted);font-size:clamp(6px,1.9cqw,8px);line-height:1.1}
-.battery-charge-track{display:flex;flex:1 1 auto;align-items:flex-end;width:min(100%,30px);min-height:36px;margin-top:3px;box-sizing:border-box;overflow:hidden;border:1px solid #17445f;border-radius:999px;padding:2px;background:#0b2b40}
+.battery-overview{grid-template-columns:minmax(78px,.7fr) minmax(78px,.84fr) minmax(100px,1.16fr);gap:clamp(4px,1.2cqw,7px);align-items:stretch;min-width:0}
+.battery-charge-panel{display:flex;align-items:stretch;justify-content:center;min-width:0;min-height:0;height:100%;box-sizing:border-box;padding:4px 3px;border:1px solid var(--line);border-radius:13px;background:#071b29}
+.battery-meter-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(2px,.8cqw,5px);width:100%;height:100%;min-height:0}
+.battery-meter{display:flex;flex-direction:column;align-items:center;gap:clamp(2px,.5cqh,4px);min-width:0;min-height:0}
+.battery-meter-label{color:var(--muted);font-size:clamp(6px,1.9cqw,8px);line-height:1.1;white-space:nowrap}
+.battery-charge-track{position:relative;display:flex;flex:1 1 auto;align-items:flex-end;justify-content:center;width:min(100%,30px);min-height:36px;box-sizing:border-box;overflow:hidden;border:1px solid #17445f;border-radius:999px;padding:2px;background:#0b2b40}
 .battery-charge-fill{display:block;width:100%;border-radius:inherit;background:var(--accent);transition:height .35s ease}
+.battery-charge-value{position:absolute;z-index:1;top:50%;left:50%;transform:translate(-50%,-50%);font-size:clamp(7px,2.1cqw,10px);font-weight:900;line-height:1;color:#fff;text-shadow:0 1px 3px #000,0 0 4px #000;white-space:nowrap;pointer-events:none}
+.battery-current-value{max-width:100%;font-size:clamp(6px,1.8cqw,8px);font-weight:850;line-height:1;color:#dceaf2;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}
+.battery-current-meter.charging .battery-current-value{color:#a4e65b}
+.battery-current-meter.discharging .battery-current-value{color:#ff8b8b}
+.battery-current-track{position:relative;display:block;flex:1 1 auto;width:min(100%,28px);min-height:36px;box-sizing:border-box;overflow:hidden;border:1px solid #17445f;border-radius:999px;background:#0b2b40}
+.battery-current-zero{position:absolute;z-index:1;top:50%;left:2px;right:2px;height:1px;background:#8da7b5;opacity:.85}
+.battery-current-fill{position:absolute;left:3px;right:3px;display:block;border-radius:999px;transition:height .35s ease}
+.battery-current-fill.charge{bottom:50%;background:#8bd332}
+.battery-current-fill.discharge{top:50%;background:#ff6e6e}
 .battery-overview>.battery-bank-panel{display:flex;flex-direction:column;justify-content:center;gap:clamp(3px,1cqh,7px);padding:5px;min-width:0}
 .battery-overview .battery-bank-name{text-align:center;font-size:clamp(10px,3cqw,14px);line-height:1.1;overflow-wrap:anywhere}
 .battery-overview .battery-bank-name .battery-solar-indicator{width:20px;height:20px;margin-left:3px}
@@ -149,7 +159,7 @@
 
 
 @container pagecontent (max-width:340px){
-  .battery-overview{grid-template-columns:minmax(45px,.4fr) minmax(78px,.92fr) minmax(96px,1.14fr);gap:3px}
+  .battery-overview{grid-template-columns:minmax(70px,.62fr) minmax(70px,.8fr) minmax(92px,1.05fr);gap:3px}
   .battery-charge-panel{padding:2px}
   .battery-overview>.battery-bank-panel{padding:3px}
   .battery-overview .battery-mini-column{gap:3px}
