@@ -696,6 +696,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let passiveFix: { lat: number; lon: number; speed: number | null; heading: number | null; timestamp: number; accuracy: number } | null = null;
     let passivePositionRequestPending = false;
     const gpsPositionDotHtml = '<span class="gps-position-halo"></span><span class="gps-position-dot"></span>';
+    const boatMarkerIconSignatures = new WeakMap<L.Marker, string>();
     let hasInitiallyCentered = false;
     let localForecast: RouteForecastSample | null = null;
     let localForecastPending = false;
@@ -705,7 +706,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         return navigationActive && navigationFix && Date.now() - navigationFix.timestamp <= 30000 ? navigationFix : passiveFix;
     }
 
-    type MapFollowMode = 'center' | 'route' | 'north' | 'off';
+    type MapFollowMode = 'center' | 'route' | 'heading' | 'north' | 'off';
     type ActiveMapFollowMode = Exclude<MapFollowMode, 'off'>;
     let navigationActive = false;
     let mapFollowMode: MapFollowMode = 'off';
@@ -2774,11 +2775,9 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         passiveFix = { lat: latitude, lon: longitude, accuracy, speed: typeof speed === 'number' && Number.isFinite(speed) && speed >= 0 ? speed * 1.943844 : null, heading: course, timestamp: position.timestamp };
         const icon = L.divIcon({ className: 'route-builder-gps-position-icon', html: gpsPositionDotHtml, iconSize: [34, 34], iconAnchor: [17, 17] });
         if (!passivePositionMarker) passivePositionMarker = L.marker([latitude, longitude], { icon, interactive: false, zIndexOffset: 10000 }).addTo(map);
-        else {
-            passivePositionMarker.setLatLng([latitude, longitude]);
-            passivePositionMarker.setIcon(icon);
-        }
+        else passivePositionMarker.setLatLng([latitude, longitude]);
         passivePositionMarker.setZIndexOffset(10000);
+        updateBoatPositionMarker(passivePositionMarker, latitude, longitude, passiveFix.heading, passiveFix.timestamp);
         passivePositionMarker.setOpacity(navigationActive ? 0 : 1);
         if (!hasInitiallyCentered) {
             hasInitiallyCentered = true;
@@ -2820,6 +2819,27 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         requestPassiveLocation();
     }
 
+    function updateBoatPositionMarker(marker: L.Marker, latitude: number, longitude: number, heading: number | null, timestamp: number): void {
+        marker.setLatLng([latitude, longitude]);
+        const freshHeading = Date.now() - timestamp <= 30000 && typeof heading === 'number' && Number.isFinite(heading);
+        const mapBearing = typeof (map as any).getBearing === 'function' ? (map as any).getBearing() : 0;
+        const screenHeading = freshHeading ? ((heading! + mapBearing) % 360 + 360) % 360 : null;
+        const signature = screenHeading === null ? 'dot' : `heading:${screenHeading.toFixed(1)}`;
+        if (boatMarkerIconSignatures.get(marker) === signature) return;
+        const html = screenHeading === null ? gpsPositionDotHtml
+            : `<svg viewBox="0 0 24 24" width="30" height="30" style="transform:rotate(${screenHeading}deg);transform-origin:50% 50%" aria-label="Rumbo GPS ${Math.round(heading!)}°"><path d="M12 2 L21 21 L12 17 L3 21 Z" fill="#087bd1" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>`;
+        marker.setIcon(L.divIcon({ className: 'route-builder-gps-position-icon', html, iconSize: [34, 34], iconAnchor: [17, 17] }));
+        boatMarkerIconSignatures.set(marker, signature);
+    }
+
+    function redrawBoatPositionMarker(): void {
+        if (navigationActive && gpsPositionMarker && navigationFix) {
+            updateBoatPositionMarker(gpsPositionMarker, navigationFix.lat, navigationFix.lon, navigationFix.heading, navigationFix.timestamp);
+        } else if (!navigationActive && passivePositionMarker && passiveFix) {
+            updateBoatPositionMarker(passivePositionMarker, passiveFix.lat, passiveFix.lon, passiveFix.heading, passiveFix.timestamp);
+        }
+    }
+
     function redrawMapOverlays(): void {
         redrawDistanceLabels(liveDisplayPoints ?? points);
         redrawGpsCourseLine();
@@ -2830,6 +2850,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         redrawWindRose();
         redrawRoutePointIndicators();
         applyMapFollowOrientation();
+        redrawBoatPositionMarker();
     }
 
     function indicatorValue(field: string, values?: Record<string, number | null>): number | null {
@@ -3295,10 +3316,11 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     const mapFollowModeLabels: Record<MapFollowMode, string> = {
         center: 'Centrar',
         route: 'Orientar a la Ruta',
+        heading: 'Centrar al rumbo del barco',
         north: 'Orientar al Norte',
         off: 'Desactivar',
     };
-    const mapFollowModeBadges: Record<MapFollowMode, string> = { center: 'C', route: 'R', north: 'N', off: '×' };
+    const mapFollowModeBadges: Record<MapFollowMode, string> = { center: 'C', route: 'R', heading: 'B', north: 'N', off: '×' };
 
     function updateCenterButtonState(): void {
         if (!centerButton) return;
@@ -3360,11 +3382,15 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         } else if (mapFollowMode === 'route') {
             const heading = routeBearingForMapOrientation();
             if (heading !== null && Number.isFinite(heading)) applyMapBearing(-heading);
+        } else if (mapFollowMode === 'heading') {
+            const fix = navigationActive ? navigationFix : passiveFix;
+            const heading = fix && Date.now() - fix.timestamp <= 30000 ? fix.heading : null;
+            if (heading !== null && typeof heading === 'number' && Number.isFinite(heading)) applyMapBearing(-heading);
         }
     }
 
     function cycleCenterMode(): void {
-        const order: MapFollowMode[] = ['center', 'route', 'north', 'off'];
+        const order: MapFollowMode[] = ['center', 'route', 'heading', 'north', 'off'];
         const next = mapFollowPausedByDrag
             ? lastActiveMapFollowMode
             : order[(order.indexOf(mapFollowMode) + 1) % order.length];
@@ -3916,11 +3942,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                         updateNavigationPanel(true);
                         if (liveRouteActive && navigationTargetId !== previousTargetId) refreshLiveRoute();
                         tryStartAutomaticLive();
-                        const markerHtml = hasCourse
-                            ? `<svg viewBox="0 0 24 24" width="30" height="30" style="transform:rotate(${heading}deg)" aria-label="Rumbo GPS"><path d="M12 2 L21 21 L12 17 L3 21 Z" fill="#087bd1" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>`
-                            : gpsPositionDotHtml;
-                        gpsPositionMarker.setLatLng([latitude, longitude]);
-                        gpsPositionMarker.setIcon(L.divIcon({ className: 'route-builder-gps-position-icon', html: markerHtml, iconSize: [34, 34], iconAnchor: [17, 17] }));
+                        updateBoatPositionMarker(gpsPositionMarker, latitude, longitude, hasCourse ? heading : null, update.timestamp);
                         gpsPositionMarker.setZIndexOffset(10000);
                         if (followBoat) centerBoatInVisibleMap();
                     }, () => {
