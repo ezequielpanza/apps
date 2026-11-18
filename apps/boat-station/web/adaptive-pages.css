@@ -175,13 +175,20 @@
   .battery-overview .battery-mini-top b,.battery-overview .battery-mini-estimated b{font-size:7px}
 }
 
-/* Boat Station 1.2.99: SOC circular junto a corriente instantánea vertical. */
+/* Boat Station 1.2.100: indicadores circulares apilados en baterías. */
 .battery-overview{grid-template-columns:minmax(96px,.9fr) minmax(78px,.84fr) minmax(100px,1.16fr)}
-.battery-meter-pair{grid-template-columns:minmax(0,1.45fr) minmax(24px,.65fr);align-items:stretch}
-.battery-soc-meter{justify-content:center}
-.battery-charge-panel .battery-ring{width:min(100%,64px);height:auto;aspect-ratio:1;margin:0;flex:none}
+.battery-meter-pair{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(3px,.9cqh,7px);width:100%;height:100%;min-height:0}
+.battery-soc-meter{flex:0 0 auto;justify-content:center}
+.battery-current-meter{flex:0 0 auto;justify-content:center}
+.battery-charge-panel .battery-ring{width:min(100%,60px);height:auto;aspect-ratio:1;margin:0;flex:none}
 .battery-charge-panel .battery-ring:after{inset:5px}
 .battery-charge-panel .battery-ring>div{align-items:center;text-align:center}
-.battery-charge-panel .battery-ring strong{font-size:clamp(13px,4.2cqw,20px)}
+.battery-charge-panel .battery-ring strong{font-size:clamp(13px,4.2cqw,18px)}
 .battery-charge-panel .battery-ring span{font-size:8px}
+.battery-current-dial{--current-progress:0%;--current-color:#8faabb;position:relative;display:grid;place-items:center;width:min(100%,60px);aspect-ratio:1;flex:none;border-radius:50%;background:conic-gradient(from 0deg,var(--current-color) 0 var(--current-progress),#17394f var(--current-progress) 100%)}
+.battery-current-meter.charging{--current-color:#8bd332}
+.battery-current-meter.discharging{--current-color:#ff6e6e}
+.battery-current-dial:before{content:"";position:absolute;z-index:1;inset:0;border-radius:50%;background:repeating-conic-gradient(from -1deg,#071b29 0deg 2deg,transparent 2deg 60deg);mask:radial-gradient(transparent 0 75%,#000 77% 100%);pointer-events:none}
+.battery-current-dial:after{content:"";position:absolute;z-index:1;inset:6px;border-radius:50%;background:#071b29}
+.battery-current-value{position:relative;z-index:2;top:auto;left:auto;transform:none;max-width:100%;padding:0 1px;border-radius:0;background:transparent;font-size:clamp(10px,3.1cqw,12px);font-weight:950;line-height:1;color:#dceaf2;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;text-shadow:none;pointer-events:none}
 @container pagecontent (max-width:340px){.battery-overview{grid-template-columns:minmax(94px,.9fr) minmax(70px,.8fr) minmax(92px,1.05fr)}}
