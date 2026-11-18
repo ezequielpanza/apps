@@ -233,3 +233,12 @@
   .battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring{width:min(100%,76px)}
   .battery-overview[data-layout="columns"] .battery-current-dial{width:min(100%,54px)}
 }
+
+
+/* Boat Station 1.2.106: margen interior exacto para el círculo SOC. */
+.battery-overview[data-layout="columns"] .battery-charge-panel{padding-left:5px;padding-right:5px}
+.battery-overview[data-layout="columns"] .battery-meter-pair .battery-soc-meter{width:100%;display:flex;justify-content:center;flex:0 0 auto}
+.battery-overview[data-layout="columns"] .battery-meter-pair .battery-soc-meter .battery-ring{width:100%;max-width:none}
+@container pagecontent (max-width:340px){
+  .battery-overview[data-layout="columns"] .battery-meter-pair .battery-soc-meter .battery-ring{width:100%}
+}
