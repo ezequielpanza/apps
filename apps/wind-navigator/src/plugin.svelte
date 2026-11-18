@@ -1131,7 +1131,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         let preservedPoints: Waypoint[] | null = null;
         if (!restorePreviousRoute && liveRouteActive) {
             preservedPoints = points.length
-                ? buildLiveRoutePoints(livePastWaypoints, points, navigationTargetId, points[0])
+                ? buildLiveRoutePoints(livePastWaypoints, points, navigationTargetId, points[0], false)
                 : [];
             if (!preservedPoints) {
                 updateForecastStatus('No se pudo conservar la ruta actual. Comprueba que tenga un próximo waypoint válido.');
@@ -1204,7 +1204,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const destinationId = points[targetIndex].id;
         liveOriginalWaypointNumbers = new Map(points.map((point, index) => [point.id, index + 1]));
         livePastWaypoints = points.slice(0, targetIndex).map((point, index) => ({ point: { ...point }, number: index + 1 }));
-        points = [{ id: nextPointId++, lat: fix.lat, lon: fix.lon }, ...points.slice(targetIndex).map(point => ({ ...point }))];
+        points = [{ id: 0, lat: fix.lat, lon: fix.lon }, ...points.slice(targetIndex).map(point => ({ ...point }))];
         speedKnots = currentSpeed;
         departureDateTime = toLocalDateTimeInput(new Date(now));
         restoredDepartureTimestamp = new Date(departureDateTime).getTime();
