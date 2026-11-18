@@ -177,7 +177,7 @@
 
 /* Boat Station 1.2.99: SOC circular junto a corriente instantánea vertical. */
 .battery-overview{grid-template-columns:minmax(96px,.9fr) minmax(78px,.84fr) minmax(100px,1.16fr)}
-.battery-meter-pair{grid-template-columns:minmax(0,1.45fr) minmax(24px,.65fr);align-items:center}
+.battery-meter-pair{grid-template-columns:minmax(0,1.45fr) minmax(24px,.65fr);align-items:stretch}
 .battery-soc-meter{justify-content:center}
 .battery-charge-panel .battery-ring{width:min(100%,64px);height:auto;aspect-ratio:1;margin:0;flex:none}
 .battery-charge-panel .battery-ring:after{inset:5px}
