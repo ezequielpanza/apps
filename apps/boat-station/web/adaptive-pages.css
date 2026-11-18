@@ -174,3 +174,14 @@
   .battery-overview .battery-mini-ring span{font-size:7px}
   .battery-overview .battery-mini-top b,.battery-overview .battery-mini-estimated b{font-size:7px}
 }
+
+/* Boat Station 1.2.99: SOC circular junto a corriente instantánea vertical. */
+.battery-overview{grid-template-columns:minmax(96px,.9fr) minmax(78px,.84fr) minmax(100px,1.16fr)}
+.battery-meter-pair{grid-template-columns:minmax(0,1.45fr) minmax(24px,.65fr);align-items:center}
+.battery-soc-meter{justify-content:center}
+.battery-charge-panel .battery-ring{width:min(100%,64px);height:auto;aspect-ratio:1;margin:0;flex:none}
+.battery-charge-panel .battery-ring:after{inset:5px}
+.battery-charge-panel .battery-ring>div{align-items:center;text-align:center}
+.battery-charge-panel .battery-ring strong{font-size:clamp(13px,4.2cqw,20px)}
+.battery-charge-panel .battery-ring span{font-size:8px}
+@container pagecontent (max-width:340px){.battery-overview{grid-template-columns:minmax(94px,.9fr) minmax(70px,.8fr) minmax(92px,1.05fr)}}
