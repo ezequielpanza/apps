@@ -3856,9 +3856,14 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             button.setAttribute('aria-label', label);
             button.addEventListener('click', event => {
                 event.stopPropagation();
-                if (delta > 0) map.zoomIn(1, { animate: false });
-                else map.zoomOut(1, { animate: false });
-                scheduleCenterForLayoutChange();
+                const fix = followBoat ? visualFix() : null;
+                if (fix && Date.now() - fix.timestamp <= 30000) {
+                    map.setZoomAround([fix.lat, fix.lon], map.getZoom() + delta, { animate: false });
+                } else if (delta > 0) {
+                    map.zoomIn(1, { animate: false });
+                } else {
+                    map.zoomOut(1, { animate: false });
+                }
             });
             return button;
         };
