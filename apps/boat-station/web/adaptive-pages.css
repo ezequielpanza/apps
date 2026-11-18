@@ -175,8 +175,11 @@
   .battery-overview .battery-mini-top b,.battery-overview .battery-mini-estimated b{font-size:7px}
 }
 
-/* Boat Station 1.2.100: indicadores circulares apilados en baterías. */
-.battery-overview{grid-template-columns:minmax(96px,.9fr) minmax(78px,.84fr) minmax(100px,1.16fr)}
+/* Boat Station 1.2.101: tres columnas explícitas para el módulo de baterías. */
+.battery-overview{grid-template-columns:minmax(76px,.8fr) minmax(94px,1fr) minmax(88px,1.05fr);grid-template-areas:"indicators stats batteries"}
+.battery-overview>.battery-indicators-column{grid-area:indicators}
+.battery-overview>.battery-stats-column{grid-area:stats}
+.battery-overview>.battery-info-column{grid-area:batteries}
 .battery-meter-pair{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(3px,.9cqh,7px);width:100%;height:100%;min-height:0}
 .battery-soc-meter{flex:0 0 auto;justify-content:center}
 .battery-current-meter{flex:0 0 auto;justify-content:center}
@@ -191,4 +194,4 @@
 .battery-current-dial:before{content:"";position:absolute;z-index:1;inset:0;border-radius:50%;background:repeating-conic-gradient(from -1deg,#071b29 0deg 2deg,transparent 2deg 60deg);mask:radial-gradient(transparent 0 75%,#000 77% 100%);pointer-events:none}
 .battery-current-dial:after{content:"";position:absolute;z-index:1;inset:6px;border-radius:50%;background:#071b29}
 .battery-current-value{position:relative;z-index:2;top:auto;left:auto;transform:none;max-width:100%;padding:0 1px;border-radius:0;background:transparent;font-size:clamp(10px,3.1cqw,12px);font-weight:950;line-height:1;color:#dceaf2;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;text-shadow:none;pointer-events:none}
-@container pagecontent (max-width:340px){.battery-overview{grid-template-columns:minmax(94px,.9fr) minmax(70px,.8fr) minmax(92px,1.05fr)}}
+@container pagecontent (max-width:340px){.battery-overview{grid-template-columns:minmax(72px,.8fr) minmax(92px,1.05fr) minmax(82px,1fr);grid-template-areas:"indicators stats batteries";gap:3px}}
