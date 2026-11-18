@@ -3133,8 +3133,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             showDownwind = !showUpwind;
         }
         const drawPair = (angle: number, layers: L.Polyline[]) => {
-            // Colors are relative to the selected wind axis: babor green, estribor red.
-            for (const [bearing, color] of [[windFrom - angle, portWindLaylineColor], [windFrom + angle, starboardWindLaylineColor]] as const) {
+            // Relative to the wind-from axis, the minus branch is Starboard Tack and the plus branch is Port Tack.
+            for (const [bearing, color] of [[windFrom - angle, starboardWindLaylineColor], [windFrom + angle, portWindLaylineColor]] as const) {
                 const end = destinationAtBearing(fix, (bearing + 360) % 360, 600);
                 layers.push(L.polyline([[fix.lat, fix.lon], [end.lat, end.lon]], { color, weight: 2, opacity: 0.95, interactive: false }).addTo(map));
             }
