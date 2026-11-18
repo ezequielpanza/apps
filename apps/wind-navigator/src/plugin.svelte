@@ -3187,6 +3187,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             map.getContainer().appendChild(gpsCourseOverlay);
         }
         gpsCourseOverlay.hidden = false;
+        const mapBearing = typeof (map as any).getBearing === 'function' ? (map as any).getBearing() : 0;
+        const screenHeading = ((fix.heading + mapBearing) % 360 + 360) % 360;
         const origin = map.latLngToContainerPoint([fix.lat, fix.lon]);
         const size = map.getSize();
         const length = Math.hypot(size.x, size.y) + Math.hypot(origin.x, origin.y) + 2;
@@ -3194,7 +3196,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             gpsCourseLine.style.left = `${origin.x}px`;
             gpsCourseLine.style.top = `${origin.y - 1}px`;
             gpsCourseLine.style.width = `${length}px`;
-            gpsCourseLine.style.transform = `rotate(${fix.heading - 90}deg)`;
+            gpsCourseLine.style.transform = `rotate(${screenHeading - 90}deg)`;
         }
     }
 
@@ -3327,7 +3329,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const label = mapFollowModeLabels[mapFollowMode];
         const nextMode: MapFollowMode = mapFollowMode === 'off' ? 'center'
             : mapFollowMode === 'center' ? 'route'
-            : mapFollowMode === 'route' ? 'north' : 'off';
+            : mapFollowMode === 'route' ? 'heading'
+            : mapFollowMode === 'heading' ? 'north' : 'off';
         const description = mapFollowPausedByDrag
             ? `Seguimiento pausado al mover el mapa. Toca para volver a ${mapFollowModeLabels[lastActiveMapFollowMode]}.`
             : mapFollowMode === 'off'
@@ -3401,6 +3404,12 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             updateForecastStatus('Esperando una posición GPS reciente para seguir el barco.');
             requestPassiveLocation();
             return;
+        }
+        if (next === 'heading') {
+            const headingFix = navigationActive ? navigationFix : passiveFix;
+            if (!headingFix || Date.now() - headingFix.timestamp > 30000 || headingFix.heading === null) {
+                updateForecastStatus('Esperando un rumbo GPS válido para orientar el mapa.');
+            }
         }
         centerBoatInVisibleMap();
     }
