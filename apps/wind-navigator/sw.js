@@ -1,3 +1,4 @@
+// Update the shell cache whenever app assets change so installed clients refresh.
 const CACHE='wind-navigator-shell-v39';
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(['./','./index.html','./src/style.css','./dist/app.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png']))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('wind-navigator-shell-')&&key!==CACHE).map(key=>caches.delete(key))))));
