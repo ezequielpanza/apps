@@ -14,13 +14,14 @@ export function prepareLiveRefresh(position, points, targetId, now) {
     return { points: [{ ...points[0], lat: position.lat, lon: position.lon }, ...points.slice(targetIndex)], speed };
 }
 
-// Reconstruct a complete route from the hidden live start, its passed points,
-// and the remaining route. The boat position can be the last live fix when
-// leaving live mode, or a newly validated fix when saving a slot.
-export function buildLiveRoutePoints(pastWaypoints, points, targetId, boatPosition = points?.[0]) {
-    if (!Array.isArray(pastWaypoints) || !Array.isArray(points) || !boatPosition ||
+// Rebuild the route from passed waypoints and the remaining route. A caller
+// may include a current boat position for an explicit saved snapshot; normal
+// navigation exit omits the moving origin so it never becomes a route waypoint.
+export function buildLiveRoutePoints(pastWaypoints, points, targetId, boatPosition = points?.[0], includeBoatPosition = true) {
+    if (!Array.isArray(pastWaypoints) || !Array.isArray(points)) return null;
+    if (includeBoatPosition && (!boatPosition ||
         !Number.isFinite(boatPosition.lat) || Math.abs(boatPosition.lat) > 90 ||
-        !Number.isFinite(boatPosition.lon) || Math.abs(boatPosition.lon) > 180) return null;
+        !Number.isFinite(boatPosition.lon) || Math.abs(boatPosition.lon) > 180)) return null;
     const targetIndex = points.findIndex(point => point.id === targetId);
     if (targetIndex < 1) return null;
     const passed = [...pastWaypoints.map(entry => entry.point), ...points.slice(1, targetIndex)];
@@ -30,8 +31,17 @@ export function buildLiveRoutePoints(pastWaypoints, points, targetId, boatPositi
         seen.add(point.id);
         return true;
     });
-    const snapshotPoints = [...uniquePassed, { ...points[0], lat: boatPosition.lat, lon: boatPosition.lon }, ...points.slice(targetIndex)]
-        .map(point => ({ id: point.id, lat: point.lat, lon: point.lon }));
+    const remaining = points.slice(targetIndex);
+    let snapshot = [...uniquePassed, ...remaining];
+    if (includeBoatPosition) {
+        const usedIds = new Set(snapshot.map(point => point.id));
+        const existingBoatId = points[0]?.id;
+        const boatId = Number.isSafeInteger(existingBoatId) && existingBoatId > 0 && !usedIds.has(existingBoatId)
+            ? existingBoatId
+            : Math.max(0, ...snapshot.map(point => Number.isSafeInteger(point.id) && point.id > 0 ? point.id : 0)) + 1;
+        snapshot = [...uniquePassed, { ...points[0], id: boatId, lat: boatPosition.lat, lon: boatPosition.lon }, ...remaining];
+    }
+    const snapshotPoints = snapshot.map(point => ({ id: point.id, lat: point.lat, lon: point.lon }));
     const ids = snapshotPoints.map(point => point.id);
     if (ids.some(id => !Number.isSafeInteger(id) || id <= 0) || new Set(ids).size !== ids.length ||
         snapshotPoints.some(point => !Number.isFinite(point.lat) || Math.abs(point.lat) > 90 || !Number.isFinite(point.lon) || Math.abs(point.lon) > 180)) return null;
