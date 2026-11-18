@@ -175,27 +175,46 @@
   .battery-overview .battery-mini-top b,.battery-overview .battery-mini-estimated b{font-size:7px}
 }
 
-/* Boat Station 1.2.102: tres columnas horizontales y estadísticas en filas. */
-.battery-overview{display:grid;grid-auto-flow:column;grid-template-columns:minmax(76px,.8fr) minmax(94px,1fr) minmax(88px,1.05fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"indicators stats batteries"}
-.battery-overview>.battery-indicators-column{grid-area:indicators;grid-column:1;grid-row:1}
-.battery-overview>.battery-stats-column{grid-area:stats;grid-column:2;grid-row:1}
-.battery-overview>.battery-info-column{grid-area:batteries;grid-column:3;grid-row:1}
-.battery-meter-pair{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(3px,.9cqh,7px);width:100%;height:100%;min-height:0}
-.battery-soc-meter{flex:0 0 auto;justify-content:center}
-.battery-current-meter{flex:0 0 auto;justify-content:center}
-.battery-charge-panel .battery-ring{width:min(100%,60px);height:auto;aspect-ratio:1;margin:0;flex:none}
-.battery-charge-panel .battery-ring:after{inset:5px}
-.battery-charge-panel .battery-ring>div{align-items:center;text-align:center}
-.battery-charge-panel .battery-ring strong{font-size:clamp(13px,4.2cqw,18px)}
-.battery-charge-panel .battery-ring span{font-size:8px}
-.battery-current-dial{--current-progress:0%;--current-color:#8faabb;position:relative;display:grid;place-items:center;width:min(100%,60px);aspect-ratio:1;flex:none;border-radius:50%;background:conic-gradient(from 0deg,var(--current-color) 0 var(--current-progress),#17394f var(--current-progress) 100%)}
-.battery-current-meter.charging{--current-color:#8bd332}
-.battery-current-meter.discharging{--current-color:#ff6e6e}
-.battery-current-dial:before{content:"";position:absolute;z-index:1;inset:0;border-radius:50%;background:repeating-conic-gradient(from -1deg,#071b29 0deg 2deg,transparent 2deg 60deg);mask:radial-gradient(transparent 0 75%,#000 77% 100%);pointer-events:none}
-.battery-current-dial:after{content:"";position:absolute;z-index:1;inset:6px;border-radius:50%;background:#071b29}
-.battery-current-value{position:relative;z-index:2;top:auto;left:auto;transform:none;max-width:100%;padding:0 1px;border-radius:0;background:transparent;font-size:clamp(10px,3.1cqw,12px);font-weight:950;line-height:1;color:#dceaf2;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;text-shadow:none;pointer-events:none}
-.battery-overview .compact-bank-metrics{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,auto);gap:clamp(2px,.6cqh,4px);margin-top:2px}
-.battery-overview .compact-bank-metrics .metric{display:flex;flex-direction:row;align-items:center;justify-content:space-between;min-height:0;padding:3px 5px;text-align:left}
-.battery-overview .compact-bank-metrics .metric .value{width:auto;flex:0 0 auto;font-size:clamp(8px,2.3cqw,10px);line-height:1.05}
-.battery-overview .compact-bank-metrics .metric .label{display:block;width:auto;margin-top:0;font-size:clamp(7px,1.9cqw,8px);white-space:nowrap}
-@container pagecontent (max-width:340px){.battery-overview{grid-template-columns:minmax(72px,.8fr) minmax(92px,1.05fr) minmax(82px,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"indicators stats batteries";grid-auto-flow:column;gap:3px}}
+/* Boat Station 1.2.103: tres columnas forzadas y métricas en filas. */
+.battery-overview[data-layout="columns"]{display:grid!important;grid-template-columns:minmax(66px,.75fr) minmax(92px,1fr) minmax(116px,1.38fr)!important;grid-template-rows:minmax(0,1fr)!important;grid-auto-flow:row!important;grid-auto-columns:auto!important;gap:clamp(3px,1cqw,6px);align-items:stretch;align-content:stretch;width:100%;height:100%;min-width:0;min-height:0}
+.battery-overview[data-layout="columns"]>.battery-indicators-column{grid-column:1!important;grid-row:1!important;min-width:0;min-height:0;height:100%}
+.battery-overview[data-layout="columns"]>.battery-stats-column{grid-column:2!important;grid-row:1!important;min-width:0;min-height:0;height:100%}
+.battery-overview[data-layout="columns"]>.battery-info-column{grid-column:3!important;grid-row:1!important;min-width:0;min-height:0;height:100%}
+.battery-overview[data-layout="columns"] .battery-meter-pair{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(4px,1.2cqh,9px);width:100%;height:100%;min-height:0}
+.battery-overview[data-layout="columns"] .battery-charge-panel{padding:4px 2px}
+.battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring{width:min(100%,64px);height:auto;aspect-ratio:1;margin:0;flex:none}
+.battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring:after{inset:5px}
+.battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring>div{align-items:center;text-align:center}
+.battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring strong{font-size:clamp(14px,4.4cqw,18px)}
+.battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring span{font-size:8px}
+.battery-overview[data-layout="columns"] .battery-current-dial{--current-progress:0%;--current-color:#8faabb;position:relative;display:grid;place-items:center;width:min(100%,64px);aspect-ratio:1;flex:none;border-radius:50%;background:conic-gradient(from 0deg,var(--current-color) 0 var(--current-progress),#17394f var(--current-progress) 100%)}
+.battery-overview[data-layout="columns"] .battery-current-meter.charging{--current-color:#8bd332}
+.battery-overview[data-layout="columns"] .battery-current-meter.discharging{--current-color:#ff6e6e}
+.battery-overview[data-layout="columns"] .battery-current-dial:before{content:"";position:absolute;z-index:1;inset:0;border-radius:50%;background:repeating-conic-gradient(from -1deg,#071b29 0deg 2deg,transparent 2deg 22.5deg);mask:radial-gradient(transparent 0 75%,#000 77% 100%);pointer-events:none}
+.battery-overview[data-layout="columns"] .battery-current-dial:after{content:"";position:absolute;z-index:1;inset:6px;border-radius:50%;background:#071b29}
+.battery-overview[data-layout="columns"] .battery-current-value{position:relative;z-index:2;top:auto;left:auto;transform:none;max-width:100%;padding:0 1px;border-radius:0;background:transparent;font-size:clamp(14px,4.2cqw,17px);font-weight:950;line-height:1;color:#dceaf2;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;text-shadow:none;pointer-events:none}
+.battery-overview[data-layout="columns"] .battery-meter-label{font-size:8px}
+.battery-overview[data-layout="columns"]>.battery-stats-column{display:flex;flex-direction:column;justify-content:center;gap:clamp(4px,1.2cqh,8px);padding:5px}
+.battery-overview[data-layout="columns"] .battery-bank-name{text-align:center;font-size:clamp(10px,3cqw,14px);line-height:1.1;overflow-wrap:anywhere}
+.battery-overview[data-layout="columns"] .battery-bank-name .battery-solar-indicator{width:22px;height:22px;margin-left:2px}
+.battery-overview[data-layout="columns"] .battery-bank-name .battery-solar-indicator svg{width:22px;height:22px}
+.battery-overview[data-layout="columns"] .battery-bank-details{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
+.battery-overview[data-layout="columns"] .battery-bank-details .battery-ah{font-size:clamp(8px,2.5cqw,11px);font-weight:750;white-space:nowrap;color:#dceaf2}
+.battery-overview[data-layout="columns"] .battery-autonomy{font-size:clamp(7px,2.3cqw,9px);white-space:normal;line-height:1.15}
+.battery-overview[data-layout="columns"] .battery-autonomy b{font-size:inherit}
+.battery-overview[data-layout="columns"] .compact-bank-metrics{display:grid;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:repeat(3,auto)!important;gap:clamp(3px,.7cqh,5px);margin-top:2px}
+.battery-overview[data-layout="columns"] .compact-bank-metrics .metric{display:flex!important;flex-direction:row!important;align-items:center;justify-content:space-between;min-height:0;padding:4px 5px;text-align:left}
+.battery-overview[data-layout="columns"] .compact-bank-metrics .metric .value{width:auto;flex:0 0 auto;font-size:clamp(10px,2.7cqw,12px);line-height:1.05;white-space:nowrap}
+.battery-overview[data-layout="columns"] .compact-bank-metrics .metric .label{display:block;width:auto;margin-top:0;font-size:clamp(7px,1.95cqw,8px);white-space:nowrap;text-align:right}
+.battery-overview[data-layout="columns"] .battery-mini-column{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr));gap:clamp(3px,1cqh,6px);min-width:0;min-height:0}
+.battery-overview[data-layout="columns"] .battery-mini{min-height:0;padding:4px}
+.battery-overview[data-layout="columns"] .battery-mini-head{gap:2px;margin-bottom:3px}
+.battery-overview[data-layout="columns"] .battery-mini-head strong{font-size:clamp(8px,2.2cqw,10px)}
+.battery-overview[data-layout="columns"] .battery-mini-body{grid-template-columns:clamp(30px,10cqw,38px) minmax(0,1fr);gap:3px}
+.battery-overview[data-layout="columns"] .battery-mini-ring{width:clamp(30px,10cqw,38px);height:clamp(30px,10cqw,38px)}
+.battery-overview[data-layout="columns"] .battery-mini-ring span{font-size:clamp(8px,2.2cqw,10px)}
+.battery-overview[data-layout="columns"] .battery-mini-top{gap:2px}
+.battery-overview[data-layout="columns"] .battery-mini-top b,.battery-overview[data-layout="columns"] .battery-mini-estimated b{font-size:clamp(7px,2cqw,9px)}
+.battery-overview[data-layout="columns"] .battery-mini-top small,.battery-overview[data-layout="columns"] .battery-mini-estimated small,.battery-overview[data-layout="columns"] .battery-mini-charge small{font-size:clamp(6px,1.65cqw,7px)}
+.battery-overview[data-layout="columns"] .battery-mini-charge span{font-size:clamp(7px,1.9cqw,9px)}
+@container pagecontent (max-width:340px){.battery-overview[data-layout="columns"]{grid-template-columns:minmax(62px,.72fr) minmax(86px,1fr) minmax(108px,1.32fr)!important;grid-template-rows:minmax(0,1fr)!important;gap:3px}}
