@@ -1,4 +1,4 @@
-export const map = L.map('map', { zoomControl:false }).setView([18.1, -66.5], 6);
+export const map = L.map('map', { zoomControl:false, rotate:true, dragRotate:false, shiftKeyRotate:false, touchRotate:false }).setView([18.1, -66.5], 6);
 const osmCredit = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>';
 const baseMaps = {
   standard: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:osmCredit}),
