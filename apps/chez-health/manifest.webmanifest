@@ -1,0 +1,24 @@
+{
+  "name": "Chez Health",
+  "short_name": "Chez Health",
+  "description": "Un recordatorio semanal para sumar variedad de alimentos a tus comidas.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f8f5",
+  "theme_color": "#0b3538",
+  "icons": [
+    {
+      "src": "./icon-192.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}
