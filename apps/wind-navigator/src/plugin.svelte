@@ -7,7 +7,7 @@
     import colors from './adapters/colors.js';
     import { getGPSlocation } from './adapters/geolocation.js';
     import { pickerDot } from './adapters/picker.js';
-import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes, routeProgress, averageRouteSpeed, visibleMapCenter, destinationAtBearing } from './navigation.js';
+import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes, routeProgress, averageRouteSpeed, visibleMapCenter, destinationAtBearing, bearingTrue } from './navigation.js';
     import { earliestDeparture, coveredForecastIndex, restoredDeparture, nearestHourlyDeparture } from './departure-timeline.js';
     import { interpolateForecastDirection } from './forecast-time.js';
     import { saveTemporaryPlan, loadTemporaryPlan, clearTemporaryPlan, currentRouteSpeed, prepareLiveRefresh, liveAverageSpeed, buildLiveRoutePoints, buildLiveRouteSnapshot } from './live-route.js';
@@ -671,6 +671,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let gpsButton: HTMLButtonElement | null = null;
     let liveButton: HTMLButtonElement | null = null;
     let centerButton: HTMLButtonElement | null = null;
+    let centerModeBadge: HTMLSpanElement | null = null;
     let mapTypeControl: HTMLDivElement | null = null;
     let zoomInButton: HTMLButtonElement | null = null;
     let zoomOutButton: HTMLButtonElement | null = null;
@@ -704,7 +705,12 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         return navigationActive && navigationFix && Date.now() - navigationFix.timestamp <= 30000 ? navigationFix : passiveFix;
     }
 
+    type MapFollowMode = 'center' | 'route' | 'north' | 'off';
+    type ActiveMapFollowMode = Exclude<MapFollowMode, 'off'>;
     let navigationActive = false;
+    let mapFollowMode: MapFollowMode = 'off';
+    let lastActiveMapFollowMode: ActiveMapFollowMode = 'center';
+    let mapFollowPausedByDrag = false;
     let followBoat = false;
     let liveRouteActive = false;
     let navigationPlanBackupActive = false;
@@ -1467,6 +1473,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         for (const [key, value] of Object.entries(data)) { const element = navigationPanel.querySelector<HTMLElement>(`[data-nav-value="${key}"]`); if (element) element.textContent = value; }
         updateBoatTrackMarker();
         redrawWindIndicator();
+        applyMapFollowOrientation();
     }
 
     function updateBoatTrackMarker(): void {
@@ -2822,6 +2829,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         redrawSailingRoute(liveDisplayPoints ?? points);
         redrawWindRose();
         redrawRoutePointIndicators();
+        applyMapFollowOrientation();
     }
 
     function indicatorValue(field: string, values?: Record<string, number | null>): number | null {
@@ -3171,6 +3179,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
 
     function centerBoatInVisibleMap(): void {
         const requestVersion = ++centerRequestVersion;
+        applyMapFollowOrientation();
         const fix = visualFix();
         if (!fix || Date.now() - fix.timestamp > 30000) {
             updateForecastStatus('No hay una posición GPS reciente para centrar el mapa.');
@@ -3283,18 +3292,95 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         });
     }
 
+    const mapFollowModeLabels: Record<MapFollowMode, string> = {
+        center: 'Centrar',
+        route: 'Orientar a la Ruta',
+        north: 'Orientar al Norte',
+        off: 'Desactivar',
+    };
+    const mapFollowModeBadges: Record<MapFollowMode, string> = { center: 'C', route: 'R', north: 'N', off: '×' };
+
+    function updateCenterButtonState(): void {
+        if (!centerButton) return;
+        const label = mapFollowModeLabels[mapFollowMode];
+        const nextMode: MapFollowMode = mapFollowMode === 'off' ? 'center'
+            : mapFollowMode === 'center' ? 'route'
+            : mapFollowMode === 'route' ? 'north' : 'off';
+        const description = mapFollowPausedByDrag
+            ? `Seguimiento pausado al mover el mapa. Toca para volver a ${mapFollowModeLabels[lastActiveMapFollowMode]}.`
+            : mapFollowMode === 'off'
+                ? 'Desactivado. Toca para Centrar.'
+                : `Modo: ${label}. Toca para ${mapFollowModeLabels[nextMode]}.`;
+        centerButton.dataset.followMode = mapFollowMode;
+        centerButton.setAttribute('aria-pressed', String(mapFollowMode !== 'off'));
+        centerButton.title = description;
+        centerButton.setAttribute('aria-label', description);
+        if (centerModeBadge) centerModeBadge.textContent = mapFollowPausedByDrag ? '×' : mapFollowModeBadges[mapFollowMode];
+    }
+
+    function setMapFollowMode(mode: MapFollowMode, pausedByDrag = false): void {
+        if (mode === 'off' && mapFollowMode !== 'off') lastActiveMapFollowMode = mapFollowMode;
+        mapFollowMode = mode;
+        mapFollowPausedByDrag = mode === 'off' && pausedByDrag;
+        followBoat = mode !== 'off';
+        if (!followBoat) centerRequestVersion++;
+        updateCenterButtonState();
+        applyMapFollowOrientation();
+    }
+
     function setFollowBoat(enabled: boolean): void {
-        followBoat = enabled;
-        if (!enabled) centerRequestVersion++;
-        centerButton?.setAttribute('aria-pressed', String(enabled));
-        if (centerButton) {
-            centerButton.title = enabled ? 'Desactivar seguimiento GPS' : 'Centrar y seguir la ubicación GPS';
-            centerButton.setAttribute('aria-label', centerButton.title);
+        setMapFollowMode(enabled ? 'center' : 'off');
+    }
+
+    function routeBearingForMapOrientation(): number | null {
+        const fix = visualFix();
+        if (navigationActive && points.length >= 2) {
+            let targetIndex = points.findIndex(point => point.id === navigationTargetId);
+            if (targetIndex < 1) targetIndex = 1;
+            const target = points[targetIndex];
+            if (target) return bearingTrue(fix ?? points[0], target);
+        }
+        const route = liveDisplayPoints && liveDisplayPoints.length >= 2 ? liveDisplayPoints : points;
+        if (route.length < 2) return null;
+        return bearingTrue(route[0], route[1]);
+    }
+
+    function applyMapBearing(degrees: number): void {
+        const rotatableMap = map as any;
+        if (typeof rotatableMap.setBearing !== 'function' || !Number.isFinite(degrees)) return;
+        const target = (degrees % 360 + 360) % 360;
+        const current = typeof rotatableMap.getBearing === 'function' ? rotatableMap.getBearing() : NaN;
+        const difference = Number.isFinite(current) ? Math.abs(((target - current + 540) % 360) - 180) : Infinity;
+        if (difference > 0.75) rotatableMap.setBearing(target);
+    }
+
+    function applyMapFollowOrientation(): void {
+        if (mapFollowMode === 'north') {
+            applyMapBearing(0);
+        } else if (mapFollowMode === 'route') {
+            const heading = routeBearingForMapOrientation();
+            if (heading !== null && Number.isFinite(heading)) applyMapBearing(-heading);
         }
     }
 
+    function cycleCenterMode(): void {
+        const order: MapFollowMode[] = ['center', 'route', 'north', 'off'];
+        const next = mapFollowPausedByDrag
+            ? lastActiveMapFollowMode
+            : order[(order.indexOf(mapFollowMode) + 1) % order.length];
+        setMapFollowMode(next);
+        if (next === 'off') return;
+        const fix = visualFix();
+        if (!fix || Date.now() - fix.timestamp > 30000) {
+            updateForecastStatus('Esperando una posición GPS reciente para seguir el barco.');
+            requestPassiveLocation();
+            return;
+        }
+        centerBoatInVisibleMap();
+    }
+
     function stopFollowingOnMapDrag(): void {
-        if (followBoat) setFollowBoat(false);
+        if (mapFollowMode !== 'off') setMapFollowMode('off', true);
     }
 
     function scheduleCenterForLayoutChange(): void {
@@ -3697,22 +3783,13 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         centerButton = document.createElement('button');
         centerButton.type = 'button';
         centerButton.className = 'route-builder-gps-label-button route-builder-center-button';
-        centerButton.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
-        centerButton.title = 'Centrar el barco en el mapa visible';
-        centerButton.setAttribute('aria-label', 'Centrar el barco en el mapa visible');
-        centerButton.setAttribute('aria-pressed', 'false');
+        centerButton.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="route-builder-center-mode-badge" aria-hidden="true">×</span>';
+        centerModeBadge = centerButton.querySelector<HTMLSpanElement>('.route-builder-center-mode-badge');
         centerButton.hidden = false;
+        updateCenterButtonState();
         centerButton.addEventListener('click', event => {
             event.stopPropagation();
-            if (followBoat) { setFollowBoat(false); return; }
-            setFollowBoat(true);
-            const fix = visualFix();
-            if (!fix || Date.now() - fix.timestamp > 30000) {
-                updateForecastStatus('Esperando una posición GPS reciente para centrar y seguir.');
-                requestPassiveLocation();
-                return;
-            }
-            centerBoatInVisibleMap();
+            cycleCenterMode();
         });
         mapTypeControl = document.createElement('div');
         mapTypeControl.className = 'route-builder-map-type';
@@ -4844,6 +4921,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         map.on('resize', scheduleCenterForLayoutChange);
         map.on('resize', redrawGpsCourseLine);
         map.on('move zoomend', redrawMapOverlays);
+        map.on('rotate', redrawMapOverlays);
         map.on('dragstart', stopFollowingOnMapDrag);
         window.addEventListener('mousedown', onMapMouseDown, true);
         window.addEventListener('mousemove', onMapMouseMove, true);
@@ -5715,6 +5793,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         pastWaypointLayer?.removeFrom(map);
         pastRouteLine?.removeFrom(map);
         map.off('move zoomend', redrawMapOverlays);
+        map.off('rotate', redrawMapOverlays);
         map.off('dragstart', stopFollowingOnMapDrag);
         map.off('resize', positionForecastDrawer);
         map.off('resize', scheduleCenterForLayoutChange);
@@ -5729,6 +5808,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         gpsButton?.remove();
         liveButton?.remove();
         centerButton?.remove();
+        centerModeBadge = null;
         mapTypeControl?.remove();
         zoomInButton?.remove();
         zoomOutButton?.remove();
