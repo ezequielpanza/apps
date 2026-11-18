@@ -218,3 +218,18 @@
 .battery-overview[data-layout="columns"] .battery-mini-top small,.battery-overview[data-layout="columns"] .battery-mini-estimated small,.battery-overview[data-layout="columns"] .battery-mini-charge small{font-size:clamp(6px,1.65cqw,7px)}
 .battery-overview[data-layout="columns"] .battery-mini-charge span{font-size:clamp(7px,1.9cqw,9px)}
 @container pagecontent (max-width:340px){.battery-overview[data-layout="columns"]{grid-template-columns:minmax(62px,.72fr) minmax(86px,1fr) minmax(108px,1.32fr)!important;grid-template-rows:minmax(0,1fr)!important;gap:3px}}
+
+/* Boat Station 1.2.105: más espacio para SOC y corriente, tarjetas individuales compactas. */
+.battery-overview[data-layout="columns"]{grid-template-columns:minmax(86px,1.18fr) minmax(94px,1.15fr) minmax(110px,1.05fr)!important}
+.battery-overview[data-layout="columns"] .battery-meter-pair{gap:clamp(4px,1cqh,7px)}
+.battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring{width:min(100%,84px);height:auto;aspect-ratio:1;margin:0;flex:none}
+.battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring strong{font-size:clamp(19px,5.8cqw,23px)}
+.battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring span{font-size:9px}
+.battery-overview[data-layout="columns"] .battery-current-dial{width:min(100%,58px)}
+.battery-overview[data-layout="columns"] .battery-mini-top small{display:none}
+.battery-overview[data-layout="columns"] .battery-mini-estimated small,.battery-overview[data-layout="columns"] .battery-mini-charge small{font-size:clamp(6px,1.6cqw,7px)}
+@container pagecontent (max-width:340px){
+  .battery-overview[data-layout="columns"]{grid-template-columns:minmax(78px,1.15fr) minmax(90px,1.12fr) minmax(104px,1fr)!important;gap:3px}
+  .battery-overview[data-layout="columns"] .battery-charge-panel .battery-ring{width:min(100%,76px)}
+  .battery-overview[data-layout="columns"] .battery-current-dial{width:min(100%,54px)}
+}
