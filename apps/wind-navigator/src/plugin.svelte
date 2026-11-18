@@ -6398,6 +6398,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     :global(.route-builder-live-button[hidden]) { display: none; }
     :global(.route-builder-center-button) { top: -100px; width: 42px; min-width: 42px; padding: 0; display: grid; place-items: center; }
     :global(.route-builder-center-button[hidden]) { display: none; }
+    :global(.route-builder-center-mode-badge) { position: absolute; right: -3px; bottom: -3px; min-width: 15px; height: 15px; padding: 0 2px; box-sizing: border-box; border: 1px solid #fff; border-radius: 10px; background: #43545b; color: #fff; font: 700 10px/13px Arial,sans-serif; text-align: center; pointer-events: none; }
+    :global(.route-builder-center-button[aria-pressed="true"] .route-builder-center-mode-badge) { background: #188b67; }
     :global(.route-builder-zoom-button) { font-size: 27px; font-weight: 400; }
     :global(.route-builder-map-type) { position: absolute; z-index: 2147483646; top: -152px; right: 8px; width: 42px; height: 42px; pointer-events: auto; touch-action: manipulation; }
     :global(.route-builder-map-type-button) { position: static; display: grid; place-items: center; }
