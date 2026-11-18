@@ -1439,7 +1439,6 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     function updateNavigationPanel(freshFix = false): void {
         if (!navigationPanel) return;
         redrawGpsCourseLine();
-        redrawWindIndicator();
         const fix = navigationFix && Date.now() - navigationFix.timestamp <= 30000 ? navigationFix : null;
         let index = points.findIndex(point => point.id === navigationTargetId);
         if (fix && index < 0 && points.length) {
@@ -1474,6 +1473,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         for (const [key, value] of Object.entries(data)) { const element = navigationPanel.querySelector<HTMLElement>(`[data-nav-value="${key}"]`); if (element) element.textContent = value; }
         updateBoatTrackMarker();
         redrawWindIndicator();
+        redrawWaveIndicator();
         applyMapFollowOrientation();
     }
 
@@ -2819,11 +2819,18 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         requestPassiveLocation();
     }
 
+    function mapBearingForIndicators(): number {
+        const mapLibreBearing = map.maplibreMap?.getBearing?.();
+        if (typeof mapLibreBearing === 'number' && Number.isFinite(mapLibreBearing)) return mapLibreBearing;
+        const leafletBearing = typeof (map as any).getBearing === 'function' ? (map as any).getBearing() : 0;
+        return Number.isFinite(leafletBearing) ? -leafletBearing : 0;
+    }
+
     function updateBoatPositionMarker(marker: L.Marker, latitude: number, longitude: number, heading: number | null, timestamp: number): void {
         marker.setLatLng([latitude, longitude]);
         const freshHeading = Date.now() - timestamp <= 30000 && typeof heading === 'number' && Number.isFinite(heading);
-        const mapBearing = typeof (map as any).getBearing === 'function' ? (map as any).getBearing() : 0;
-        const screenHeading = freshHeading ? ((heading! + mapBearing) % 360 + 360) % 360 : null;
+        const mapBearing = mapBearingForIndicators();
+        const screenHeading = freshHeading ? ((heading! - mapBearing) % 360 + 360) % 360 : null;
         const signature = screenHeading === null ? 'dot' : `heading:${screenHeading.toFixed(1)}`;
         if (boatMarkerIconSignatures.get(marker) === signature) return;
         const html = screenHeading === null ? gpsPositionDotHtml
@@ -2965,7 +2972,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 { kind: 'wind' as const, enabled: routeWindIndicatorsEnabled, field: windIndicatorField, distance: indicatorAppearance.pointDistance, size: indicatorAppearance.size, textSize: indicatorAppearance.textSize, degreesEnabled: indicatorAppearance.showDirection, fill: indicatorAppearance.windColor, letter: indicatorAppearance.windLetter },
                 { kind: 'wave' as const, enabled: routeWaveIndicatorsEnabled, field: waveIndicatorField, distance: indicatorAppearance.pointDistance, size: indicatorAppearance.size, textSize: indicatorAppearance.textSize, degreesEnabled: indicatorAppearance.showDirection, fill: indicatorAppearance.waveColor, letter: indicatorAppearance.waveLetter },
             ];
-            const bearing = map.maplibreMap?.getBearing?.() ?? 0;
+            const bearing = mapBearingForIndicators();
             points.forEach((point, index) => {
                 if (liveRouteActive && index === 0) return;
                 for (const config of configs) {
@@ -3034,7 +3041,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const distance = indicatorAppearance.distance;
         const totalLength = indicatorAppearance.tipHeight + indicatorAppearance.dataLength + (indicatorAppearance.showName ? indicatorAppearance.nameLength : 0);
         const origin = map.latLngToContainerPoint([fix.lat, fix.lon]);
-        const bearing = map.maplibreMap?.getBearing?.() ?? 0;
+        const bearing = mapBearingForIndicators();
         const layout = directionalIndicatorLayout(origin, direction, bearing, distance, indicatorAppearance.barWidth, totalLength);
         overlay.style.left = `${layout.x}px`;
         overlay.style.top = `${layout.y}px`;
@@ -3084,7 +3091,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             ? ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO']
             : Array.from({ length: 12 }, (_, index) => String(index * 30).padStart(3, '0'));
         const labelStepDegrees = windRoseLabelMode === 'cardinal' ? 22.5 : 30;
-        const bearing = map.maplibreMap?.getBearing?.() ?? 0;
+        const bearing = mapBearingForIndicators();
         const signature = `${radius}|${windRoseLineWidth}|${windRoseFontSize}|${windRoseTransparency}|${windRoseLabelMode}`;
         if (windRoseEnabled && windRoseOverlay && signature !== windRoseSignature) {
             const tickLength = Math.max(4, Math.min(9, windRoseFontSize * 0.9));
@@ -3187,8 +3194,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             map.getContainer().appendChild(gpsCourseOverlay);
         }
         gpsCourseOverlay.hidden = false;
-        const mapBearing = typeof (map as any).getBearing === 'function' ? (map as any).getBearing() : 0;
-        const screenHeading = ((fix.heading + mapBearing) % 360 + 360) % 360;
+        const mapBearing = mapBearingForIndicators();
+        const screenHeading = ((fix.heading - mapBearing) % 360 + 360) % 360;
         const origin = map.latLngToContainerPoint([fix.lat, fix.lon]);
         const size = map.getSize();
         const length = Math.hypot(size.x, size.y) + Math.hypot(origin.x, origin.y) + 2;
