@@ -18,8 +18,8 @@ android {
         applicationId 'com.boatstation.app'
         minSdk 26
         targetSdk 35
-        versionCode 10298
-        versionName '1.2.98'
+        versionCode 10299
+        versionName '1.2.99'
     }
 
     signingConfigs {
