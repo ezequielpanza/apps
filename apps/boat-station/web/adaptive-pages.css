@@ -257,7 +257,7 @@
 .battery-dial-current-charge{stroke:#8bd332}
 .battery-dial-tick{stroke:#b7c8d1;stroke-width:1.2;opacity:.8}
 .battery-dial-scale{fill:#dceaf2;font-family:system-ui,sans-serif;font-size:10px;font-weight:700;letter-spacing:-.25px}
-.battery-dial-current-marker{fill:#f4f8fb;stroke:#0b2335;stroke-width:1.5}
+.battery-dial-current-marker{fill:#ffe04b;stroke:#071b29;stroke-width:2.2}
 .battery-dial-soc-value,.battery-dial-current-value{fill:#f4f8fb;font-family:system-ui,sans-serif;font-size:22px;font-weight:850;letter-spacing:-.6px}
 .battery-dial-voltage,.battery-dial-power{fill:#dceaf2;font-family:system-ui,sans-serif;font-size:13px;font-weight:750;letter-spacing:-.25px}
 .battery-bank-estimate{display:flex;flex:0 0 auto;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;padding:1px 0 3px;text-align:center;line-height:1.15}
