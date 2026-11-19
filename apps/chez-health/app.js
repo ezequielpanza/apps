@@ -3,7 +3,8 @@ const STORAGE_KEY = 'chez-health-weekly-checks-v2';
 const FOOD_SECTIONS = [
   { id: 'produce', title: 'Frutas y vegetales' },
   { id: 'everyday', title: 'Alimentos para sumar durante la semana' },
-  { id: 'proteins', title: 'Fuentes de proteína' }
+  { id: 'proteins', title: 'Fuentes de proteína' },
+  { id: 'extras', title: 'Aceite y condimentos' }
 ];
 
 const FOOD_GROUPS = [
@@ -48,7 +49,7 @@ const FOOD_GROUPS = [
     section: 'everyday',
     icon: '🥜',
     title: 'Frutos secos y semillas',
-    examples: 'Nueces, almendras, maní, chía, linaza',
+    examples: 'Nueces, almendras, chía, linaza',
     target: 7,
     frequency: '1 ingesta por día'
   },
@@ -105,6 +106,51 @@ const FOOD_GROUPS = [
     examples: 'Como opción de proteína junto con otros alimentos',
     target: 3,
     frequency: '3 ingestas por semana'
+  },
+  {
+    id: 'olive-oil',
+    section: 'extras',
+    icon: '🫒',
+    title: 'Aceite de oliva',
+    examples: 'Para cocinar o condimentar',
+    target: 7,
+    frequency: '1 ingesta por día'
+  },
+  {
+    id: 'turmeric',
+    section: 'extras',
+    icon: '🟠',
+    title: 'Cúrcuma',
+    examples: 'Fresca o en polvo',
+    target: 2,
+    frequency: '2 ingestas por semana'
+  },
+  {
+    id: 'ginger',
+    section: 'extras',
+    icon: '🫚',
+    title: 'Jengibre',
+    examples: 'Fresco o en polvo',
+    target: 2,
+    frequency: '2 ingestas por semana'
+  },
+  {
+    id: 'lemon',
+    section: 'extras',
+    icon: '🍋',
+    title: 'Limón',
+    examples: 'En comidas o bebidas',
+    target: 2,
+    frequency: '2 ingestas por semana'
+  },
+  {
+    id: 'cinnamon',
+    section: 'extras',
+    icon: '🤎',
+    title: 'Canela',
+    examples: 'En preparaciones dulces o saladas',
+    target: 2,
+    frequency: '2 ingestas por semana'
   }
 ];
 
