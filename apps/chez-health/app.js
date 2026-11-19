@@ -1,64 +1,149 @@
-const TIME_ZONE = 'America/Santo_Domingo';
-const STORAGE_KEY = 'chez-health-weekly-checks-v1';
+const STORAGE_KEY = 'chez-health-weekly-checks-v2';
+
+const FOOD_SECTIONS = [
+  { id: 'produce', title: 'Frutas y vegetales' },
+  { id: 'everyday', title: 'Alimentos para sumar durante la semana' },
+  { id: 'proteins', title: 'Fuentes de proteína' }
+];
 
 const FOOD_GROUPS = [
-  { id: 'leafy-greens', icon: '🥬', title: 'Hojas verdes', examples: 'Espinaca, acelga, kale, rúcula' },
-  { id: 'red-orange-vegetables', icon: '🥕', title: 'Vegetales rojos o anaranjados', examples: 'Tomate, zanahoria, calabaza, pimientos' },
-  { id: 'other-vegetables', icon: '🥦', title: 'Otras verduras', examples: 'Brócoli, coliflor, repollo, berenjena' },
-  { id: 'fruits', icon: '🍊', title: 'Frutas variadas', examples: 'Cítricos, papaya, guayaba, frutos rojos' },
-  { id: 'legumes', icon: '🫘', title: 'Legumbres', examples: 'Habichuelas, frijoles, lentejas, garbanzos' },
-  { id: 'whole-grains', icon: '🌾', title: 'Cereales integrales', examples: 'Avena, arroz integral, maíz, quinoa' },
-  { id: 'nuts-seeds', icon: '🥜', title: 'Frutos secos y semillas', examples: 'Nueces, almendras, chía, linaza' },
-  { id: 'omega-3', icon: '🐟', title: 'Pescado o alternativa con omega-3', examples: 'Sardinas, salmón, chía, linaza' },
-  { id: 'protein-variety', icon: '🍳', title: 'Proteínas variadas', examples: 'Huevos, tofu, aves, pescado' },
-  { id: 'calcium', icon: '🥛', title: 'Fuentes de calcio', examples: 'Yogur, leche o bebida de soya fortificada' }
+  {
+    id: 'vegetables',
+    section: 'produce',
+    icon: '🥦',
+    title: 'Vegetales variados',
+    examples: 'Hojas verdes, brócoli, tomate, zanahoria, calabaza',
+    target: 14,
+    frequency: '2 ingestas por día'
+  },
+  {
+    id: 'fruits',
+    section: 'produce',
+    icon: '🍊',
+    title: 'Frutas variadas',
+    examples: 'Cítricos, papaya, guayaba, frutos rojos',
+    target: 7,
+    frequency: '1 ingesta por día'
+  },
+  {
+    id: 'whole-grains',
+    section: 'everyday',
+    icon: '🌾',
+    title: 'Cereales integrales',
+    examples: 'Avena, arroz integral, maíz, quinoa, pan integral',
+    target: 7,
+    frequency: '1 ingesta por día'
+  },
+  {
+    id: 'legumes',
+    section: 'everyday',
+    icon: '🫘',
+    title: 'Legumbres',
+    examples: 'Habichuelas, frijoles, lentejas, garbanzos, arvejas',
+    target: 3,
+    frequency: '3 ingestas por semana'
+  },
+  {
+    id: 'nuts-seeds',
+    section: 'everyday',
+    icon: '🥜',
+    title: 'Frutos secos y semillas',
+    examples: 'Nueces, almendras, maní, chía, linaza',
+    target: 7,
+    frequency: '1 ingesta por día'
+  },
+  {
+    id: 'calcium',
+    section: 'everyday',
+    icon: '🥛',
+    title: 'Fuentes de calcio',
+    examples: 'Yogur, leche o bebida de soya fortificada',
+    target: 7,
+    frequency: '1 ingesta por día'
+  },
+  {
+    id: 'fish',
+    section: 'proteins',
+    icon: '🐟',
+    title: 'Pescado',
+    examples: 'Sardina, salmón, trucha, atún u otros pescados',
+    target: 2,
+    frequency: '2 ingestas por semana'
+  },
+  {
+    id: 'poultry',
+    section: 'proteins',
+    icon: '🍗',
+    title: 'Pollo o pavo',
+    examples: 'Preferiblemente sin piel y poco procesados',
+    target: 2,
+    frequency: '2 ingestas por semana'
+  },
+  {
+    id: 'beef',
+    section: 'proteins',
+    icon: '🥩',
+    title: 'Carne vacuna magra',
+    examples: 'Cortes magros, en porciones moderadas',
+    target: 1,
+    frequency: '1 ingesta por semana'
+  },
+  {
+    id: 'pork',
+    section: 'proteins',
+    icon: '🍖',
+    title: 'Cerdo magro',
+    examples: 'Lomo o cortes magros, poco procesados',
+    target: 1,
+    frequency: '1 ingesta por semana'
+  },
+  {
+    id: 'eggs',
+    section: 'proteins',
+    icon: '🥚',
+    title: 'Huevos',
+    examples: 'Como opción de proteína junto con otros alimentos',
+    target: 3,
+    frequency: '3 ingestas por semana'
+  }
 ];
 
 const $ = function (id) { return document.getElementById(id); };
 let savedState = loadState();
 let deferredInstallPrompt = null;
 
-function datePartsInZone(date) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(date);
-  return Object.fromEntries(parts.filter(function (part) {
-    return part.type !== 'literal';
-  }).map(function (part) {
-    return [part.type, part.value];
-  }));
-}
-
-function isoFromUtcDate(date) {
-  return date.getUTCFullYear() + '-' +
-    String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
-    String(date.getUTCDate()).padStart(2, '0');
+function localDateString(date) {
+  return date.getFullYear() + '-' +
+    String(date.getMonth() + 1).padStart(2, '0') + '-' +
+    String(date.getDate()).padStart(2, '0');
 }
 
 function currentWeekStart() {
-  const parts = datePartsInZone(new Date());
-  const date = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
-  const daysSinceMonday = (date.getUTCDay() + 6) % 7;
-  date.setUTCDate(date.getUTCDate() - daysSinceMonday);
-  return isoFromUtcDate(date);
+  const today = new Date();
+  const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12);
+  const daysSinceMonday = (monday.getDay() + 6) % 7;
+  monday.setDate(monday.getDate() - daysSinceMonday);
+  return localDateString(monday);
 }
 
 function loadState() {
   const week = currentWeekStart();
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (stored && stored.week === week && Array.isArray(stored.checked)) {
-      return { week: week, checked: stored.checked.filter(function (id) {
-        return FOOD_GROUPS.some(function (group) { return group.id === id; });
-      }) };
+    if (stored && stored.week === week && stored.checked && typeof stored.checked === 'object') {
+      const checked = {};
+      FOOD_GROUPS.forEach(function (food) {
+        const marks = Array.isArray(stored.checked[food.id]) ? stored.checked[food.id] : [];
+        checked[food.id] = Array.from(new Set(marks.filter(function (mark) {
+          return Number.isInteger(mark) && mark >= 0 && mark < food.target;
+        })));
+      });
+      return { week: week, checked: checked };
     }
   } catch (error) {
-    // Keep the app usable even when storage is unavailable or malformed.
+    // La lista sigue disponible aunque el almacenamiento local no responda.
   }
-  return { week: week, checked: [] };
+  return { week: week, checked: {} };
 }
 
 function saveState() {
@@ -70,45 +155,77 @@ function saveState() {
   }
 }
 
-function dateFromIso(iso) {
-  const parts = iso.split('-').map(Number);
-  return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+function dateFromLocalString(value) {
+  const parts = value.split('-').map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2], 12);
 }
 
 function formatShortDate(date) {
-  return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date);
+  return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' }).format(date);
 }
 
 function weekLabel(week) {
-  const start = dateFromIso(week);
+  const start = dateFromLocalString(week);
   const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 6);
-  const sameMonth = start.getUTCMonth() === end.getUTCMonth();
-  if (sameMonth) {
-    const month = new Intl.DateTimeFormat('es', { month: 'short', timeZone: 'UTC' }).format(end);
-    return start.getUTCDate() + '–' + end.getUTCDate() + ' ' + month;
+  end.setDate(end.getDate() + 6);
+  if (start.getFullYear() !== end.getFullYear()) {
+    return formatShortDate(start) + ' – ' + formatShortDate(end) + ' ' + end.getFullYear();
+  }
+  if (start.getMonth() === end.getMonth()) {
+    const month = new Intl.DateTimeFormat('es', { month: 'short' }).format(end);
+    return start.getDate() + '–' + end.getDate() + ' ' + month;
   }
   return formatShortDate(start) + ' – ' + formatShortDate(end);
 }
 
+function checkedCount(food) {
+  return (savedState.checked[food.id] || []).length;
+}
+
 function renderFoodList() {
-  $('foodList').innerHTML = FOOD_GROUPS.map(function (group) {
-    const checked = savedState.checked.includes(group.id);
-    return '<label class="food-item' + (checked ? ' is-checked' : '') + '">' +
-      '<input class="food-checkbox" type="checkbox" data-food-id="' + group.id + '"' + (checked ? ' checked' : '') + '>' +
-      '<span class="food-checkmark" aria-hidden="true">✓</span>' +
-      '<span class="food-content">' +
-        '<span class="food-title">' + group.icon + ' ' + group.title + '</span>' +
-        '<span class="food-examples">' + group.examples + '</span>' +
-      '</span>' +
-    '</label>';
+  $('foodList').innerHTML = FOOD_SECTIONS.map(function (section) {
+    const rows = FOOD_GROUPS.filter(function (food) {
+      return food.section === section.id;
+    }).map(function (food) {
+      const marks = savedState.checked[food.id] || [];
+      const columns = Math.min(food.target, 7);
+      const checkboxes = Array.from({ length: food.target }, function (_, index) {
+        const checked = marks.includes(index);
+        return '<label class="check-slot">' +
+          '<input class="food-checkbox" type="checkbox" data-food-id="' + food.id + '" data-mark="' + index + '"' +
+          (checked ? ' checked' : '') +
+          ' aria-label="' + food.title + ', ingesta ' + (index + 1) + ' de ' + food.target + '">' +
+          '<span aria-hidden="true">✓</span>' +
+        '</label>';
+      }).join('');
+
+      return '<article class="food-item' + (marks.length ? ' has-checks' : '') + '">' +
+        '<div class="food-content">' +
+          '<h3 class="food-title"><span aria-hidden="true">' + food.icon + '</span> ' + food.title + '</h3>' +
+          '<p class="food-examples">' + food.examples + '</p>' +
+          '<p class="food-frequency">' + food.frequency + '</p>' +
+        '</div>' +
+        '<div class="food-tracker">' +
+          '<span class="food-count">' + marks.length + '/' + food.target + '</span>' +
+          '<div class="food-checks" style="--columns:' + columns + '">' + checkboxes + '</div>' +
+        '</div>' +
+      '</article>';
+    }).join('');
+
+    return '<section class="food-section" aria-labelledby="section-' + section.id + '">' +
+      '<h3 id="section-' + section.id + '" class="food-section-title">' + section.title + '</h3>' +
+      '<div class="food-list">' + rows + '</div>' +
+    '</section>';
   }).join('');
 
   document.querySelectorAll('.food-checkbox').forEach(function (checkbox) {
     checkbox.addEventListener('change', function () {
       const id = checkbox.dataset.foodId;
-      if (checkbox.checked && !savedState.checked.includes(id)) savedState.checked.push(id);
-      if (!checkbox.checked) savedState.checked = savedState.checked.filter(function (item) { return item !== id; });
+      const mark = Number(checkbox.dataset.mark);
+      const marks = savedState.checked[id] || [];
+      savedState.checked[id] = checkbox.checked
+        ? Array.from(new Set(marks.concat(mark)))
+        : marks.filter(function (item) { return item !== mark; });
       saveState();
       render();
     });
@@ -116,20 +233,20 @@ function renderFoodList() {
 }
 
 function renderProgress() {
-  const count = savedState.checked.length;
-  const total = FOOD_GROUPS.length;
+  const total = FOOD_GROUPS.reduce(function (sum, food) { return sum + food.target; }, 0);
+  const count = FOOD_GROUPS.reduce(function (sum, food) { return sum + checkedCount(food); }, 0);
   const percent = Math.round(count / total * 100);
-  $('progressValue').textContent = count + ' de ' + total;
+  $('progressValue').textContent = count + ' de ' + total + ' ingestas';
   $('progressFill').style.width = percent + '%';
   $('progressTrack').setAttribute('aria-valuemax', String(total));
   $('progressTrack').setAttribute('aria-valuenow', String(count));
 
   if (count === total) {
-    $('progressMessage').textContent = '¡Lista completa! Sumaste todos los grupos de esta guía esta semana.';
+    $('progressMessage').textContent = 'Completaste todas las frecuencias de referencia de esta semana.';
   } else if (count === 0) {
-    $('progressMessage').textContent = 'Marca un grupo cuando lo hayas incluido esta semana.';
+    $('progressMessage').textContent = 'Marca una casilla cada vez que incluyas el alimento en una comida.';
   } else {
-    $('progressMessage').textContent = 'Vas sumando variedad. Marca otro grupo cuando lo incluyas en tus comidas.';
+    $('progressMessage').textContent = 'Cada marca cuenta una ingesta. Puedes completar las casillas en cualquier orden.';
   }
 }
 
@@ -142,7 +259,7 @@ function render() {
 function refreshWeekIfNeeded() {
   const week = currentWeekStart();
   if (week !== savedState.week) {
-    savedState = { week: week, checked: [] };
+    savedState = { week: week, checked: {} };
     saveState();
     render();
   }

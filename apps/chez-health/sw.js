@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chez-health-v1';
+const CACHE_NAME = 'chez-health-v2';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -13,8 +13,9 @@ const CORE_ASSETS = [
 self.addEventListener('install', function (event) {
   event.waitUntil(caches.open(CACHE_NAME).then(function (cache) {
     return cache.addAll(CORE_ASSETS);
+  }).then(function () {
+    return self.skipWaiting();
   }));
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', function (event) {
