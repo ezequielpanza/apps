@@ -136,7 +136,7 @@ cards?.addEventListener('pointerdown',event=>{
     try{resizeHandle.setPointerCapture(event.pointerId)}catch{}
     return;
   }
-  if(event.target.closest('.drag-handle,button,input,textarea,select,a'))return;
+  if(event.target.closest('.drag-handle,.gps-map-shell,.gps-map,button,input,textarea,select,a'))return;
   if(event.target.closest('.card-head'))return;
   const card=event.target.closest('.card');if(!card||pageCount(card)<2)return;
   event.stopImmediatePropagation();

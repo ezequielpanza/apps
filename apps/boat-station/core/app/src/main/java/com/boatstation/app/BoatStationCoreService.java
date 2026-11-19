@@ -238,16 +238,22 @@ public class BoatStationCoreService extends Service implements LocationListener 
         SharedPreferences settings = getSharedPreferences(PREFS, MODE_PRIVATE);
         double oldLat = readDouble(settings, PREF_GPS_ANCHOR_LAT, Double.NaN);
         double oldLon = readDouble(settings, PREF_GPS_ANCHOR_LON, Double.NaN);
-        boolean changed = !Double.isFinite(oldLat) || !Double.isFinite(oldLon)
-                || Math.abs(lat - oldLat) > 0.000001d || Math.abs(lon - oldLon) > 0.000001d
+        boolean oldValidPoint = Double.isFinite(oldLat) && oldLat >= -90d && oldLat <= 90d
+                && Double.isFinite(oldLon) && oldLon >= -180d && oldLon <= 180d;
+        boolean changed = oldValidPoint != validPoint
+                || (validPoint && (Math.abs(lat - oldLat) > 0.000001d || Math.abs(lon - oldLon) > 0.000001d))
                 || Math.abs(radius - readDouble(settings, PREF_GPS_ANCHOR_RADIUS_METERS, settings.getInt(PREF_GPS_ANCHOR_RADIUS, 30))) > 0.001d;
         SharedPreferences.Editor editor = settings.edit()
                 .putBoolean(PREF_GPS_ANCHOR_ENABLED, enabled && validPoint)
-                .putString(PREF_GPS_ANCHOR_LAT, Double.toString(lat))
-                .putString(PREF_GPS_ANCHOR_LON, Double.toString(lon))
                 .putInt(PREF_GPS_ANCHOR_RADIUS, Math.round((float) radius))
                 .putString(PREF_GPS_ANCHOR_RADIUS_METERS, Double.toString(radius))
                 .putString(PREF_GPS_ANCHOR_RADIUS_UNIT, radiusUnit);
+        if (validPoint) {
+            editor.putString(PREF_GPS_ANCHOR_LAT, Double.toString(lat))
+                    .putString(PREF_GPS_ANCHOR_LON, Double.toString(lon));
+        } else {
+            editor.remove(PREF_GPS_ANCHOR_LAT).remove(PREF_GPS_ANCHOR_LON);
+        }
         if (changed || !enabled || !validPoint) editor.putBoolean(PREF_GPS_ANCHOR_TRIPPED, false);
         editor.apply();
         if (changed || !enabled || !validPoint) cancelAnchorAlarm();

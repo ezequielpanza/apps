@@ -26,7 +26,8 @@ export function normalizeVesselConfig(value = {}) {
 export function normalizeAnchorSettings(value = {}) {
   const lat = value.lat === null || value.lat === undefined ? NaN : Number(value.lat), lon = value.lon === null || value.lon === undefined ? NaN : Number(value.lon);
   const hasPoint = Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lon) && lon >= -180 && lon <= 180;
-  return { enabled: Boolean(value.enabled) && hasPoint, hasPoint, lat: hasPoint ? lat : null, lon: hasPoint ? lon : null,
+  const alarmEnabled = value.alarmEnabled === undefined ? Boolean(value.enabled) : Boolean(value.alarmEnabled);
+  return { alarmEnabled, enabled: alarmEnabled && hasPoint, hasPoint, lat: hasPoint ? lat : null, lon: hasPoint ? lon : null,
     radius: Math.min(5000, Math.max(5, finite(value.radius, 30))), radiusUnit: value.radiusUnit === 'ft' ? 'ft' : 'm' };
 }
 export function distanceMeters(a, b) {

@@ -164,9 +164,12 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
             if(enabled&&!validPoint)return false;
             double safeRadius=Math.min(5000d,Math.max(5d,radiusMeters));
             SharedPreferences settings=prefs();
-            settings.edit().putBoolean("gps_anchor_enabled",enabled).putString("gps_anchor_lat",Double.toString(lat)).putString("gps_anchor_lon",Double.toString(lon)).putString("gps_anchor_radius_meters",Double.toString(safeRadius)).putInt("gps_anchor_radius",Math.round((float)safeRadius)).apply();
-            runOnUiThread(()->applyGpsHistoryServiceSettings(enabled));
-            return !enabled||(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED));
+            SharedPreferences.Editor editor=settings.edit().putBoolean("gps_anchor_enabled",enabled&&validPoint).putString("gps_anchor_radius_meters",Double.toString(safeRadius)).putInt("gps_anchor_radius",Math.round((float)safeRadius));
+            if(validPoint)editor.putString("gps_anchor_lat",Double.toString(lat)).putString("gps_anchor_lon",Double.toString(lon));
+            else editor.remove("gps_anchor_lat").remove("gps_anchor_lon");
+            editor.apply();
+            runOnUiThread(()->applyGpsHistoryServiceSettings(enabled&&validPoint));
+            return !enabled||!validPoint||(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED));
         }
         @JavascriptInterface public boolean setGpsAnchorRadiusUnit(String unit){
             String safeUnit="ft".equals(unit)?"ft":"m";
