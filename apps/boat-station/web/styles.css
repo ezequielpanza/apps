@@ -81,3 +81,17 @@ html.bs-dashboard-expanded.bs-dashboard-three #cards>.card{display:block;align-s
 @keyframes solar-star-pulse{0%,100%{opacity:.5}50%{opacity:1}}
 @media(prefers-reduced-motion:reduce){.battery-solar-indicator,.battery-solar-indicator *{animation:none!important}}
 
+
+
+/* Keep the location status at two rows so it cannot resize the map. */
+.gps-status{box-sizing:border-box;height:2.6em;min-height:2.6em;max-height:2.6em;line-height:1.3;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;text-overflow:ellipsis}
+
+/* Fondeo: upright two-line link label, radius value outside the ring, draggable radius handle. */
+.gps-anchor-link-label{background:transparent!important;border:0!important;pointer-events:none}
+.gps-anchor-link-content{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;white-space:nowrap;color:#fff;background:#071b27e8;border:1px solid #88aabd88;border-radius:6px;padding:4px 7px;font-size:10px;font-weight:750;line-height:1.2;text-shadow:0 1px 2px #000;pointer-events:none}
+.gps-anchor-link-content span{position:static;left:auto;top:auto;transform:none;white-space:nowrap;color:inherit;background:transparent;border:0;border-radius:0;padding:0;font:inherit;text-shadow:inherit}
+.gps-anchor-radius-label{background:transparent!important;border:0!important;pointer-events:none}
+.gps-anchor-radius-label span{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;color:#fff;background:#071b27e8;border:1px solid #ffb15c99;border-radius:6px;padding:3px 6px;font-size:10px;font-weight:750;text-shadow:0 1px 2px #000}
+.gps-anchor-radius-handle-icon{display:grid!important;place-items:center;background:transparent!important;border:0!important;cursor:move!important;touch-action:none!important}
+.gps-anchor-radius-handle-icon span{display:block;width:17px;height:17px;border:2px solid #fff;border-radius:50%;background:#ffb15c;box-shadow:0 1px 6px #000c;position:relative}
+.gps-anchor-radius-handle-icon span:after{content:"";position:absolute;inset:4px;border-radius:50%;background:#fff}

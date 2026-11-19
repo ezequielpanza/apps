@@ -5,6 +5,7 @@
       qrDataUrl:payload=>NativeToolsBridge.qrDataUrl(payload),
       appVersion:()=>NativeToolsBridge.appVersion?.()||'',
       exportGpx:gpx=>NativeToolsBridge.exportGpx(gpx),
+      exportBatteryDiagnosticsCsv:filename=>NativeToolsBridge.exportBatteryDiagnosticsCsv?.(filename),
       importGpx:()=>NativeToolsBridge.importGpx()
     };
   }

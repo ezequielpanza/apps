@@ -61,3 +61,21 @@
   .battery-history-extreme-value{gap:2px;font-size:9px}
   .battery-history-extreme-value b{font-size:10px}
 }
+
+/* Compact battery history controls and four bank-level extrema fields. */
+.battery-history-head>div:first-child{min-width:0}
+.battery-history-export{flex:0 0 auto;min-width:44px;height:32px;padding:0 7px;border:1px solid #24516a;border-radius:8px;background:#10344a;color:#d9f6fb;font-size:10px;font-weight:750;white-space:nowrap;cursor:pointer}
+.battery-history-export:disabled{opacity:.4;cursor:default}
+.battery-history-extreme-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.battery-history-extreme-field{display:flex;flex-direction:column;justify-content:space-between;gap:5px;min-width:0;min-height:50px;padding:7px 5px;border:1px solid #17445f;border-radius:9px;background:#0b2b40}
+.battery-history-extreme-field strong{color:#cbdde6;font-size:clamp(8px,2.4vw,10px);line-height:1.15;white-space:nowrap}
+.battery-history-extreme-field b{font-size:clamp(9px,2.8vw,12px);line-height:1.1;white-space:nowrap}
+.battery-history-extreme-field.is-max b{color:#7fe083}
+.battery-history-extreme-field.is-min b{color:#ff777d}
+@media(max-width:430px){
+  .battery-history-extreme-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+  .battery-history-extremes{padding:7px}
+  .battery-history-extreme-field{min-height:46px;padding:6px 4px}
+  .battery-history-extreme-field strong{font-size:8px}
+  .battery-history-extreme-field b{font-size:10px}
+}

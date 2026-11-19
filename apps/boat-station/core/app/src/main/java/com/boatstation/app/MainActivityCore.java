@@ -61,6 +61,7 @@ public class MainActivityCore extends MainActivityV100 {
     private static final String WEB_ORIGIN = "https://appassets.androidplatform.net";
     private static final String WEB_URL = WEB_ORIGIN + "/assets/index.html?mode=station";
     private static final int REQ_EXPORT_GPX = 3101;
+    private static final int REQ_EXPORT_DIAGNOSTICS_CSV = 3105;
     private static final int REQ_IMPORT_GPX = 3102;
     private static final int REQ_INSTALL_UNKNOWN_APPS = 3103;
     private static final long SENSOR_PUSH_MS = 250;
@@ -72,6 +73,7 @@ public class MainActivityCore extends MainActivityV100 {
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
     private String pendingGpx = "";
+    private String pendingDiagnosticsCsvName = "BoatStation-diagnostico-baterias.csv";
     private PermissionRequest pendingCameraRequest;
     private SensorManager coreSensorManager;
     private Sensor coreRotationSensor;
@@ -166,8 +168,10 @@ public class MainActivityCore extends MainActivityV100 {
     private WebView findWebView(View view){if(view instanceof WebView)return(WebView)view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){WebView found=findWebView(group.getChildAt(i));if(found!=null)return found;}}return null;}
     private byte[] readBytes(InputStream in)throws Exception{ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[16384];int n;while((n=in.read(b))>0)out.write(b,0,n);return out.toByteArray();}
     private void chooseGpxExport(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/gpx+xml");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,"BoatStation-route.gpx");startActivityForResult(i,REQ_EXPORT_GPX);}
+    private void chooseDiagnosticsCsvExport(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("text/csv");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,pendingDiagnosticsCsvName);startActivityForResult(i,REQ_EXPORT_DIAGNOSTICS_CSV);}
     private void chooseGpxImport(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,REQ_IMPORT_GPX);}
     private boolean write(Uri uri,String text){try(OutputStream o=getContentResolver().openOutputStream(uri,"wt")){if(o==null)return false;o.write((text==null?"":text).getBytes(StandardCharsets.UTF_8));o.flush();return true;}catch(Exception e){return false;}}
+    private void exportDiagnosticsCsv(Uri uri){new Thread(()->{boolean ok=false;try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){if(output!=null){BatteryDiagnosticsStore.get(getApplicationContext()).exportCsv(output);output.flush();ok=true;}}catch(Exception ignored){}final boolean success=ok;runOnUiThread(()->{if(coreWebView!=null)coreWebView.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-csv-exported',{detail:{ok:"+success+"}}));",null);});},"battery-diagnostics-csv-export").start();}
     private String read(Uri uri){try(InputStream in=getContentResolver().openInputStream(uri)){return in==null?"":new String(readBytes(in),StandardCharsets.UTF_8);}catch(Exception e){return"";}}
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
         super.onActivityResult(requestCode,resultCode,data);
@@ -183,9 +187,11 @@ public class MainActivityCore extends MainActivityV100 {
             else dispatchApkInstallError();
             return;
         }
+        if(requestCode==REQ_EXPORT_DIAGNOSTICS_CSV&&(resultCode!=RESULT_OK||data==null||data.getData()==null)){pendingDiagnosticsCsvName="BoatStation-diagnostico-baterias.csv";return;}
         if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;
         Uri uri=data.getData();
-        if(requestCode==REQ_EXPORT_GPX){boolean ok=write(uri,pendingGpx);pendingGpx="";if(coreWebView!=null)coreWebView.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-gpx-exported',{detail:{ok:"+ok+"}}));",null);}
+        if(requestCode==REQ_EXPORT_DIAGNOSTICS_CSV){exportDiagnosticsCsv(uri);pendingDiagnosticsCsvName="BoatStation-diagnostico-baterias.csv";}
+        else if(requestCode==REQ_EXPORT_GPX){boolean ok=write(uri,pendingGpx);pendingGpx="";if(coreWebView!=null)coreWebView.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-gpx-exported',{detail:{ok:"+ok+"}}));",null);}
         else if(requestCode==REQ_IMPORT_GPX){String raw=read(uri);if(coreWebView!=null)coreWebView.evaluateJavascript("window.dispatchEvent(new CustomEvent('boatstation-gpx-imported',{detail:{gpx:"+JSONObject.quote(raw)+"}}));",null);}
     }
 
@@ -214,6 +220,7 @@ public class MainActivityCore extends MainActivityV100 {
         @JavascriptInterface public String appVersion(){return BuildConfig.VERSION_NAME;}
         @JavascriptInterface public void scanQr(){runOnUiThread(()->{try{IntentIntegrator scanner=new IntentIntegrator(MainActivityCore.this);scanner.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);scanner.setPrompt("Escaneá el QR de Boat Station");scanner.setBeepEnabled(false);scanner.setOrientationLocked(true);scanner.initiateScan();}catch(Exception ignored){}});}
         @JavascriptInterface public void exportGpx(String gpx){pendingGpx=gpx==null?"":gpx;runOnUiThread(MainActivityCore.this::chooseGpxExport);}
+        @JavascriptInterface public void exportBatteryDiagnosticsCsv(String filename){String name=filename==null?"BoatStation-diagnostico-baterias.csv":filename.trim().replaceAll("[^A-Za-z0-9._-]","_");pendingDiagnosticsCsvName=name.toLowerCase(java.util.Locale.ROOT).endsWith(".csv")?name:name+".csv";runOnUiThread(MainActivityCore.this::chooseDiagnosticsCsvExport);}
         @JavascriptInterface public void importGpx(){runOnUiThread(MainActivityCore.this::chooseGpxImport);}
     }
     @Override protected void onDestroy(){if(coreSensorManager!=null)coreSensorManager.unregisterListener(this);if(tts!=null){tts.stop();tts.shutdown();}coreWebView=null;super.onDestroy();}
