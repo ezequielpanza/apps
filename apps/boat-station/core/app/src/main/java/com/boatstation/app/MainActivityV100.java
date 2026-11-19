@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.DocumentsContract;
+import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -18,10 +19,14 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -42,6 +47,10 @@ public class MainActivityV100 extends MainActivity {
     private static final String BACKUP_NAME = "boat-station-config.json";
     private WebView appWebView;
     private String pendingExportJson = "";
+    private final Object remoteBatteryCsvLock = new Object();
+    private File remoteBatteryCsvFile;
+    private String remoteBatteryCsvId = "";
+    private boolean remoteBatteryCsvRunning = false;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -70,6 +79,71 @@ public class MainActivityV100 extends MainActivity {
             for(int i=0;i<g.getChildCount();i++){WebView w=findWebView(g.getChildAt(i));if(w!=null)return w;}
         }
         return null;
+    }
+
+    private boolean startRemoteBatteryDiagnosticsExport(String requestId) {
+        String id = requestId == null ? "" : requestId.trim();
+        if (!id.matches("[A-Za-z0-9-]{16,64}")) return false;
+        synchronized (remoteBatteryCsvLock) {
+            if (remoteBatteryCsvRunning) return false;
+            if (remoteBatteryCsvFile != null) try { remoteBatteryCsvFile.delete(); } catch (Exception ignored) {}
+            remoteBatteryCsvFile = null;
+            remoteBatteryCsvId = id;
+            remoteBatteryCsvRunning = true;
+        }
+        Thread worker = new Thread(() -> {
+            File file = new File(getCacheDir(), "boat-station-battery-diagnostics-" + id + ".csv");
+            boolean ok = false;
+            long size = 0;
+            try (OutputStream output = new BufferedOutputStream(new FileOutputStream(file))) {
+                BatteryDiagnosticsStore.get(MainActivityV100.this).exportCsv(output);
+                output.flush();
+                size = file.length();
+                ok = true;
+            } catch (Exception ignored) {
+                try { file.delete(); } catch (Exception ignoredAgain) {}
+            }
+            synchronized (remoteBatteryCsvLock) {
+                remoteBatteryCsvRunning = false;
+                remoteBatteryCsvFile = ok ? file : null;
+            }
+            final boolean success = ok;
+            final long fileSize = size;
+            eval("window.BoatStationDiagnostics&&window.BoatStationDiagnostics.onRemoteExportReady&&window.BoatStationDiagnostics.onRemoteExportReady(" + JSONObject.quote(id) + "," + fileSize + "," + success + ")");
+        }, "BoatStation-RemoteBatteryCsv");
+        worker.start();
+        return true;
+    }
+
+    private String readRemoteBatteryDiagnosticsCsvChunk(String requestId, long offset, int requestedBytes) {
+        synchronized (remoteBatteryCsvLock) {
+            if (remoteBatteryCsvRunning || remoteBatteryCsvFile == null || !remoteBatteryCsvFile.isFile()
+                    || !remoteBatteryCsvId.equals(requestId) || offset < 0 || offset >= remoteBatteryCsvFile.length()) return "";
+            int length = (int) Math.max(1, Math.min(65536, Math.min(requestedBytes, remoteBatteryCsvFile.length() - offset)));
+            byte[] bytes = new byte[length];
+            try (RandomAccessFile input = new RandomAccessFile(remoteBatteryCsvFile, "r")) {
+                input.seek(offset);
+                int count = input.read(bytes);
+                if (count <= 0) return "";
+                if (count != bytes.length) {
+                    byte[] exact = new byte[count];
+                    System.arraycopy(bytes, 0, exact, 0, count);
+                    bytes = exact;
+                }
+                return Base64.encodeToString(bytes, Base64.NO_WRAP);
+            } catch (Exception ignored) { return ""; }
+        }
+    }
+
+    private boolean finishRemoteBatteryDiagnosticsExport(String requestId) {
+        synchronized (remoteBatteryCsvLock) {
+            if (!remoteBatteryCsvId.equals(requestId)) return false;
+            if (remoteBatteryCsvFile != null) try { remoteBatteryCsvFile.delete(); } catch (Exception ignored) {}
+            remoteBatteryCsvFile = null;
+            remoteBatteryCsvId = "";
+            remoteBatteryCsvRunning = false;
+            return true;
+        }
     }
 
     private void chooseFolder() {
@@ -157,6 +231,9 @@ public class MainActivityV100 extends MainActivity {
         @JavascriptInterface public String loadBackup(){Uri tree=folderUri();if(tree==null)return "";Uri file=findFile(treeDoc(tree),BACKUP_NAME);return file==null?"":readText(file);}
         @JavascriptInterface public void exportZip(String json){pendingExportJson=json==null?"":json;runOnUiThread(MainActivityV100.this::chooseExportZip);}
         @JavascriptInterface public void exportBatteryDiagnosticsCsv(){runOnUiThread(MainActivityV100.this::chooseBatteryDiagnosticsExport);}
+        @JavascriptInterface public boolean startRemoteBatteryDiagnosticsExport(String requestId){return MainActivityV100.this.startRemoteBatteryDiagnosticsExport(requestId);}
+        @JavascriptInterface public String readRemoteBatteryDiagnosticsCsvChunk(String requestId,long offset,int maxBytes){return MainActivityV100.this.readRemoteBatteryDiagnosticsCsvChunk(requestId,offset,maxBytes);}
+        @JavascriptInterface public boolean finishRemoteBatteryDiagnosticsExport(String requestId){return MainActivityV100.this.finishRemoteBatteryDiagnosticsExport(requestId);}
         @JavascriptInterface public void importZip(){runOnUiThread(MainActivityV100.this::chooseImportZip);}
         @JavascriptInterface public void restoreNativeConfig(String banks,String batteries){try{new JSONArray(banks);new JSONArray(batteries);getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("battery_banks_v1",banks).putString("battery_configs_v2",batteries).apply();}catch(Exception ignored){}}
         @JavascriptInterface public void restartApp(){runOnUiThread(()->{Intent i=getIntent();finish();startActivity(i);});}

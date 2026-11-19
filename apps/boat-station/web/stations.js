@@ -22,8 +22,54 @@ function render(){const b=$('#smBody');if(isLocal){const id=identity();const pay
 window.addEventListener('boatstation-qr-scanned',event=>{const status=$('#smStatus');if(!status||!panel.classList.contains('open'))return;try{addPair(event.detail?.value||'');render();const next=$('#smStatus');if(next)next.textContent='Estación vinculada. Conectando…';requestImmediateSync()}catch(error){status.textContent=error.message||'No se pudo leer el QR'}});
 async function loadClients(){const w=$('#smClients');if(!w)return;const id=identity();try{const r=await fetchTimed(`${backend}/api/station/${encodeURIComponent(id.stationId)}/clients`,{headers:{Authorization:'Bearer '+id.token},cache:'no-store'});const d=await r.json();w.innerHTML=d.clients?.length?d.clients.map((c,i)=>'<div class="sm-row"><div class="sm-main"><div class="sm-name">'+esc(c.name||('Cliente '+(i+1)))+'</div><div class="sm-sub">Conectado ahora</div></div></div>').join(''):'Ningún cliente conectado ahora'}catch{w.textContent='Sin conexión con el servidor'}}
 async function sendRemoteCommand(command,payload=null){if(isLocal)return false;const a=active();if(!a)return false;try{const r=await fetchTimed(`${backend}/api/station/${encodeURIComponent(a.stationId)}/commands`,{method:'POST',headers:{Authorization:'Bearer '+a.token,'content-type':'application/json'},body:JSON.stringify({command,payload}),cache:'no-store'},7000);if(r.ok){requestImmediateSync();return true}}catch(e){console.warn('Boat Station command',e)}return false}window.BoatStationRemoteCommand={send:sendRemoteCommand};
-function dispatchCoreCommand(command,payload){if(window.BoatStationSystem?.executeRemoteCommand?.(command,payload))return true;window.BoatStationGpsState?.executeRemoteCommand?.(command,payload);window.BoatStationBatteryState?.executeRemoteCommand?.(command,payload);return false}
-async function consumeCommands(){const id=identity();try{const r=await fetchTimed(`${backend}/api/station/${encodeURIComponent(id.stationId)}/commands`,{headers:{Authorization:'Bearer '+id.token},cache:'no-store'},7000);if(!r.ok)return;const d=await r.json();const items=d.commands||[];for(const item of items)dispatchCoreCommand(item.command,item.payload);return items.length}catch(e){if(e?.name!=='AbortError')console.warn('Boat Station command poll',e);return 0}}
+function dispatchCoreCommand(command,payload){if(window.BoatStationDiagnostics?.executeRemoteCommand?.(command,payload))return true;if(window.BoatStationSystem?.executeRemoteCommand?.(command,payload))return true;window.BoatStationGpsState?.executeRemoteCommand?.(command,payload);window.BoatStationBatteryState?.executeRemoteCommand?.(command,payload);return false}
+async function reportBatteryCsvExportError(requestId,message){
+  try{
+    const id=identity(),url=`${backend}/api/station/${encodeURIComponent(id.stationId)}/exports/${encodeURIComponent(requestId)}/error`;
+    await fetchTimed(url,{method:'POST',headers:{Authorization:'Bearer '+id.token,'content-type':'application/json'},body:JSON.stringify({message}),cache:'no-store'},10000)
+  }catch(error){console.warn('Boat Station battery export error report',error)}
+}
+async function uploadBatteryDiagnosticsCsv(detail){
+  const requestId=String(detail?.requestId||'');
+  if(!/^[A-Za-z0-9-]{16,64}$/.test(requestId))return;
+  const id=identity(),root=`${backend}/api/station/${encodeURIComponent(id.stationId)}/exports/${encodeURIComponent(requestId)}`;
+  try{
+    if(!detail.ok)throw new Error('El teléfono no pudo generar el CSV.');
+    const size=Math.max(0,Number(detail.size)||0),chunkSize=48*1024;
+    let offset=0,index=0;
+    while(offset<size){
+      const encoded=window.StorageBridge?.readRemoteBatteryDiagnosticsCsvChunk?.(requestId,offset,chunkSize);
+      if(!encoded)throw new Error('No se pudo leer un bloque del archivo en el teléfono.');
+      const binary=atob(encoded),bytes=new Uint8Array(binary.length);
+      for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      const response=await fetchTimed(root+`/chunks/${index}`,{method:'POST',headers:{Authorization:'Bearer '+id.token,'content-type':'application/octet-stream'},body:bytes,cache:'no-store'},30000);
+      if(!response.ok)throw new Error('El servidor rechazó el bloque '+(index+1)+'.');
+      offset+=bytes.length;index++;
+      window.dispatchEvent(new CustomEvent('boatstation-diagnostics-csv-progress',{detail:{requestId,uploaded:offset,total:size}}));
+    }
+    const response=await fetchTimed(root+'/complete',{method:'POST',headers:{Authorization:'Bearer '+id.token,'content-type':'application/json'},body:JSON.stringify({chunkCount:index,size}),cache:'no-store'},15000);
+    if(!response.ok)throw new Error('No se pudo confirmar el archivo en el Dashboard.');
+  }catch(error){
+    console.warn('Boat Station battery CSV upload',error);
+    await reportBatteryCsvExportError(requestId,error?.message||'Falló la transferencia del CSV.');
+  }finally{
+    window.StorageBridge?.finishRemoteBatteryDiagnosticsExport?.(requestId);
+  }
+}
+window.addEventListener('boatstation-diagnostics-csv-ready',event=>{uploadBatteryDiagnosticsCsv(event.detail)});
+async function consumeCommands(){
+  const id=identity();
+  try{
+    const r=await fetchTimed(`${backend}/api/station/${encodeURIComponent(id.stationId)}/commands`,{headers:{Authorization:'Bearer '+id.token},cache:'no-store'},7000);
+    if(!r.ok)return;
+    const d=await r.json(),items=d.commands||[];
+    for(const item of items){
+      const handled=dispatchCoreCommand(item.command,item.payload);
+      if(item.command==='battery.diagnostics.exportCsv'&&!handled)await reportBatteryCsvExportError(item.payload?.requestId,'La estación no tiene disponible el registro diagnóstico de batería.');
+    }
+    return items.length;
+  }catch(e){if(e?.name!=='AbortError')console.warn('Boat Station command poll',e);return 0}
+}
 let syncTimer=0,syncRunning=false,syncRequested=false,paused=false,syncFailures=0;
 async function publishOnce(){const id=identity();const telemetry=window.BoatStationDataSync?.exportSnapshot?.()||null;if(typeof window.CoreRuntimeBridge?.publishStationSnapshot==='function'){window.CoreRuntimeBridge.publishStationSnapshot(JSON.stringify(telemetry));const count=await consumeCommands();if(count){window.CoreRuntimeBridge.publishStationSnapshot(JSON.stringify(window.BoatStationDataSync?.exportSnapshot?.()||null));requestImmediateSync()}return}const r=await fetchTimed(`${backend}/api/station/${encodeURIComponent(id.stationId)}/state`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:id.token,boatName:name(),snapshot:{telemetry,boatName:name()}})},7000);if(!r.ok)throw new Error(`HTTP ${r.status}`);if(await consumeCommands())requestImmediateSync()}
 async function pollOnce(){const a=active();if(!a){window.CoreRuntimeBridge?.clearRemoteClient?.();return}let clientId=localStorage.getItem('bs.remote.clientId');if(!clientId){clientId='web-'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('bs.remote.clientId',clientId)}if(typeof window.CoreRuntimeBridge?.configureRemoteClient==='function'&&typeof window.CoreRuntimeBridge?.getLatestRemoteState==='function'){window.CoreRuntimeBridge.configureRemoteClient(a.stationId,a.token,backend,name(),clientId);const raw=window.CoreRuntimeBridge.getLatestRemoteState();if(raw){const d=JSON.parse(raw);if(d.snapshot?.telemetry){window.BoatStationDataSync?.applySnapshot?.(d.snapshot.telemetry);window.BoatStationRemoteUI?.markUpdated?.(d.snapshot.telemetry.time);document.documentElement.classList.remove('bs-remote');$('#remoteLanding')?.remove()}}return}const r=await fetchTimed(`${backend}/api/station/${encodeURIComponent(a.stationId)}/state?clientId=${encodeURIComponent(clientId)}&clientName=${encodeURIComponent(name())}`,{headers:{Authorization:'Bearer '+a.token},cache:'no-store'},7000);if(!r.ok)throw new Error(`HTTP ${r.status}`);const d=await r.json();if(d.snapshot?.telemetry){window.BoatStationDataSync?.applySnapshot?.(d.snapshot.telemetry);window.BoatStationRemoteUI?.markUpdated?.(d.snapshot.telemetry.time);document.documentElement.classList.remove('bs-remote');$('#remoteLanding')?.remove()}}

@@ -92,6 +92,52 @@ function renderMap(rows){
   if(fitPending&&points.length){map.fitBounds(L.latLngBounds(points),{padding:[70,80],maxZoom:boatCount===1&&points.length===1?19:16});fitPending=false}
 }
 async function fetchState(row){const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);try{const query=new URLSearchParams({clientId,clientName:'BoatStation Dashboard'}),response=await fetch(backend+'/api/station/'+encodeURIComponent(row.stationId)+'/state?'+query,{headers:{Authorization:'Bearer '+row.token},cache:'no-store',signal:controller.signal});if(!response.ok)throw new Error(response.status===401?'Código no autorizado':'Error del servidor ('+response.status+')');const data=await response.json(),telemetry=data.snapshot?.telemetry;if(!telemetry||typeof telemetry!=='object')throw new Error('La estación aún no publicó datos');return {updatedAt:data.updatedAt,telemetry,error:null}}finally{clearTimeout(timeout)}}
+const batteryExportButton=$('downloadBatteryDiagnostics'),batteryExportStatus=$('batteryExportStatus');let batteryExportRunning=false;
+const exportStatus=(message,state='')=>{batteryExportStatus.textContent=message;batteryExportStatus.dataset.state=state};
+const exportUrl=(row,requestId,suffix='')=>backend+'/api/station/'+encodeURIComponent(row.stationId)+'/exports/'+encodeURIComponent(requestId)+suffix;
+async function exportFetch(row,url,options={}){
+  const headers={Authorization:'Bearer '+row.token,...(options.headers||{})};
+  return fetch(url,{...options,headers,cache:'no-store'});
+}
+const waitMs=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function readableSize(bytes){const size=Number(bytes)||0;if(size<1024)return size+' B';if(size<1048576)return(size/1024).toFixed(1)+' KB';return(size/1048576).toFixed(1)+' MB'}
+async function downloadBatteryDiagnostics(){
+  if(batteryExportRunning)return;
+  const row=stations().find(item=>item.stationId===selected);
+  if(!row){exportStatus('Vinculá y seleccioná una estación primero.','error');return}
+  const requestId=crypto.randomUUID(),safeBoatName=String(row.name||'BoatStation').replace(/[^A-Za-z0-9._-]/g,'_'),filename='BoatStation-diagnostico-baterias-'+safeBoatName+'-'+new Date().toISOString().slice(0,10)+'.csv',root=exportUrl(row,requestId);
+  batteryExportRunning=true;batteryExportButton.disabled=true;exportStatus('Solicitando el registro al barco…');
+  let created=false;
+  try{
+    let response=await exportFetch(row,root,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'create',filename})});
+    if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error||'No se pudo iniciar la exportación.');
+    created=true;
+    response=await exportFetch(row,backend+'/api/station/'+encodeURIComponent(row.stationId)+'/commands',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({command:'battery.diagnostics.exportCsv',payload:{requestId}})});
+    if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error||'No se pudo enviar el pedido al barco.');
+    const deadline=Date.now()+10*60*1000;let meta=null;
+    while(Date.now()<deadline){
+      await waitMs(1600);
+      response=await exportFetch(row,root);
+      if(!response.ok)throw new Error('Se perdió la conexión con la estación durante la exportación.');
+      meta=await response.json();
+      if(meta.status==='ready')break;
+      if(meta.status==='error')throw new Error(meta.message||'La estación no pudo generar el CSV.');
+      exportStatus(meta.chunkCount?('Recibiendo datos… '+readableSize(meta.size)):'Esperando al teléfono para preparar el CSV…');
+    }
+    if(meta?.status!=='ready')throw new Error('La exportación sigue en curso. Dejá el Dashboard abierto y reintentá en un momento.');
+    exportStatus('Descargando '+readableSize(meta.size)+'…');
+    response=await exportFetch(row,root+'/file');
+    if(!response.ok)throw new Error('El archivo está listo, pero no se pudo descargar.');
+    const blob=await response.blob(),objectUrl=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=objectUrl;link.download=meta.filename||filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),60000);
+    exportStatus('CSV descargado · '+readableSize(meta.size),'ready');
+  }catch(error){exportStatus(error.message||'No se pudo completar la exportación.','error')}
+  finally{
+    if(created)exportFetch(row,root,{method:'DELETE'}).catch(()=>{});
+    batteryExportRunning=false;batteryExportButton.disabled=false;
+  }
+}
+batteryExportButton.addEventListener('click',downloadBatteryDiagnostics);
 async function cycle(){if(document.hidden)return;if(running){pending=true;return}clearTimeout(timer);running=true;$('refresh').disabled=true;try{const rows=stations();for(let i=0;i<rows.length;i+=4){await Promise.all(rows.slice(i,i+4).map(async row=>{try{const record=await fetchState(row);if(stations().some(s=>s.stationId===row.stationId&&s.token===row.token))records.set(row.stationId,record)}catch(error){records.set(row.stationId,{...records.get(row.stationId),error:error.name==='AbortError'?'Sin respuesta':error.message})}}));render()}}finally{running=false;$('refresh').disabled=false;render();if(!document.hidden)timer=setTimeout(cycle,pending?0:5000);pending=false}}
 $('refresh').onclick=cycle;$('fit').onclick=()=>{fitPending=true;render()};$('routes').onchange=render;
 $('pairOpen').onclick=()=>$('pairDialog').showModal();$('pairClose').onclick=()=>$('pairDialog').close();

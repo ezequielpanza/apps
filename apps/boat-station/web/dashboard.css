@@ -25,3 +25,5 @@ main.sensors-maximized{height:calc(100dvh - 52px)}
 main.sensors-maximized.sidebar-closed{grid-template-columns:0 minmax(0,1fr)}
 @media(max-width:650px){main .fleet{max-height:70dvh;overflow-y:auto;transition:max-height .25s ease,opacity .2s ease,visibility 0s linear 0s,padding .25s ease}main.sidebar-closed .fleet,main.sensors-maximized.sidebar-closed .fleet{display:block;flex:0 0 auto;min-height:0;height:auto;max-height:0;padding:0;overflow:hidden;transition:max-height .25s ease,opacity .18s ease,visibility 0s linear .25s,padding .25s ease}main.sensors-maximized{height:calc(100dvh - 52px)}}
 @media(prefers-reduced-motion:reduce){main,main .fleet,main.sidebar-closed .fleet{transition:none}}
+
+#batteryExportStatus{font-size:11px;color:#91aebc;line-height:1.4;overflow-wrap:anywhere}#batteryExportStatus[data-state=error]{color:#f1b0a8}#batteryExportStatus[data-state=ready]{color:#b8e696}
