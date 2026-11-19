@@ -48,3 +48,16 @@
 }
 
 .battery-history-extremes-note{display:block;margin:-5px 0 8px;color:var(--muted);font-size:10px;line-height:1.3}
+
+
+/* Keep all four extrema summaries on one row and confine period guides to the plot. */
+.battery-history-extreme-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.battery-history-extreme-card>strong{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.2}
+@media(max-width:430px){
+  .battery-history-extreme-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+  .battery-history-extremes{padding:7px}
+  .battery-history-extreme-card{padding:6px 4px}
+  .battery-history-extreme-card>strong{font-size:9px;min-height:2.4em}
+  .battery-history-extreme-value{gap:2px;font-size:9px}
+  .battery-history-extreme-value b{font-size:10px}
+}

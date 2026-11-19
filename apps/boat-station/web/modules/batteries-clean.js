@@ -25,7 +25,7 @@ export function createBatteriesModule(requestRender,openManager){
   let historyColors=read(COLORS_KEY,{});if(!historyColors||typeof historyColors!=='object'||Array.isArray(historyColors))historyColors={};
   let hiddenSeries=read(VISIBILITY_KEY,{});if(!hiddenSeries||typeof hiddenSeries!=='object'||Array.isArray(hiddenSeries))hiddenSeries={};
   const oldZoomIndices=[1,3,5,6,7,8,9,10,11],oldZoom=Math.max(0,Math.min(oldZoomIndices.length-1,Number(read(OLD_ZOOM_KEY,0))||0)),storedZoom=read(ZOOM_KEY,null);
-  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedCanvas=null,historyOffset=0;
+  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedCanvas=null,historyOffset=0,historyActivePointers=new Set(),historyRangeFocused=false;
   const saveCurrent=(immediate=false)=>{const save=()=>{saveTimer=0;write(CURRENT_KEY,{bankName:state.bankName,bankHistoryColor:state.bankHistoryColor,batteries:state.batteries})};if(immediate){clearTimeout(saveTimer);save()}else if(!saveTimer)saveTimer=setTimeout(save,SAVE_MS)};
   function integrateCurrentPair(before,after,elapsedMs){
     if(!Number.isFinite(before)||!Number.isFinite(after)||elapsedMs<=0||elapsedMs>MAX_AH_GAP_MS)return null;
@@ -234,39 +234,63 @@ export function createBatteriesModule(requestRender,openManager){
     if(newer)newer.disabled=historyOffset<=0;
   }
   function refreshHistoryView(root=state.historyRoot||state.root){syncHistoryControls(root);renderHistoryExtremes(root);queueDraw(root)}
+  function historyNavigationActive(){return historyActivePointers.size>0||historyRangeFocused}
+  function notifyHistoryInteractionEnd(){if(!historyNavigationActive())window.dispatchEvent(new Event('boatstation-battery-history-interaction-end'))}
+  function isHistoryInteracting(){return historyNavigationActive()}
   function bindHistoryNavigation(root){
     const chart=root.querySelector('.battery-history-chart');if(!chart||chart.dataset.historyGesturesBound==='1')return;
     chart.dataset.historyGesturesBound='1';const points=new Map();let gesture=null;
     const pointList=()=>[...points.values()];
     chart.addEventListener('pointerdown',event=>{
       if(event.pointerType==='mouse'&&event.button!==0)return;
-      points.set(event.pointerId,{x:event.clientX,y:event.clientY});
+      points.set(event.pointerId,{x:event.clientX,y:event.clientY});historyActivePointers.add(event.pointerId);
       try{chart.setPointerCapture(event.pointerId)}catch{}
-      if(points.size===1)gesture={type:'pan',startX:event.clientX,startY:event.clientY,width:root.querySelector('[data-battery-history-chart]')?.getBoundingClientRect().width||chart.clientWidth};
+      if(points.size===1)gesture={type:'pan',startX:event.clientX,startY:event.clientY,startOffset:historyOffset,width:root.querySelector('[data-battery-history-chart]')?.getBoundingClientRect().width||chart.clientWidth,horizontal:false};
       else if(points.size===2){
         const pair=pointList(),rect=root.querySelector('[data-battery-history-chart]')?.getBoundingClientRect()||chart.getBoundingClientRect(),data=chartData();
         const distance=Math.hypot(pair[0].x-pair[1].x,pair[0].y-pair[1].y),center=(pair[0].x+pair[1].x)/2,fraction=Math.max(0,Math.min(1,(center-rect.left)/Math.max(1,rect.width)));
         gesture={type:'pinch',distance,zoom,anchorFraction:fraction,anchorTime:data.start+fraction*BARS*data.ms};
       }
     });
-    chart.addEventListener('pointermove',event=>{if(!points.has(event.pointerId))return;points.set(event.pointerId,{x:event.clientX,y:event.clientY});if(points.size===2&&gesture?.type==='pinch'&&event.cancelable)event.preventDefault()});
+    chart.addEventListener('pointermove',event=>{
+      if(!points.has(event.pointerId))return;
+      points.set(event.pointerId,{x:event.clientX,y:event.clientY});
+      if(points.size===2&&gesture?.type==='pinch'){if(event.cancelable)event.preventDefault();return}
+      if(points.size!==1||gesture?.type!=='pan')return;
+      const dx=event.clientX-gesture.startX,dy=event.clientY-gesture.startY;
+      if(!gesture.horizontal){
+        if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
+        if(Math.abs(dy)>Math.abs(dx)*1.15){gesture.type='vertical';return}
+        if(Math.abs(dx)<=Math.abs(dy)*1.15)return;
+        gesture.horizontal=true;
+      }
+      if(event.cancelable)event.preventDefault();
+      const barWidth=Math.max(1,gesture.width/BARS),barsMoved=Math.trunc(-dx/barWidth),ms=ZOOMS[zoom][1];
+      const next=clampHistoryOffset(gesture.startOffset+barsMoved,ms);
+      if(next!==historyOffset){historyOffset=next;refreshHistoryView(root)}
+    });
     const finish=event=>{
-      const active=points.get(event.pointerId);if(!active)return;
-      if(points.size===2&&gesture?.type==='pinch'){
+      if(!points.has(event.pointerId))return;
+      const pinch=points.size===2&&gesture?.type==='pinch';
+      if(pinch){
         const pair=pointList(),distance=Math.hypot(pair[0].x-pair[1].x,pair[0].y-pair[1].y),ratio=distance/Math.max(1,gesture.distance),steps=Math.round(Math.log(ratio)/Math.log(1.35));
         const next=Math.max(0,Math.min(ZOOMS.length-1,gesture.zoom-steps)),anchorTime=gesture.anchorTime,anchorFraction=gesture.anchorFraction;
-        points.delete(event.pointerId);gesture=null;if(next!==zoom)changeHistoryZoom(next,anchorTime,anchorFraction);return;
+        points.delete(event.pointerId);historyActivePointers.delete(event.pointerId);gesture=null;
+        if(next!==zoom)changeHistoryZoom(next,anchorTime,anchorFraction);
+        notifyHistoryInteractionEnd();return;
       }
-      if(points.size===1&&gesture?.type==='pan'){
-        const dx=event.clientX-gesture.startX,dy=event.clientY-gesture.startY,width=Math.max(1,gesture.width);
-        points.delete(event.pointerId);gesture=null;
-        if(Math.abs(dx)>34&&Math.abs(dx)>Math.abs(dy)*1.25){const bars=Math.max(1,Math.round(Math.abs(dx)/(width/BARS))),ms=ZOOMS[zoom][1],direction=dx<0?1:-1;historyOffset=clampHistoryOffset(historyOffset+direction*bars,ms);refreshHistoryView(root)}
-        return;
-      }
-      points.delete(event.pointerId);gesture=null;
+      points.delete(event.pointerId);historyActivePointers.delete(event.pointerId);
+      if(points.size===0)gesture=null;
+      notifyHistoryInteractionEnd();
     };
-    chart.addEventListener('pointerup',finish);chart.addEventListener('pointercancel',finish);
-    root.querySelector('[data-battery-history-scroll]')?.addEventListener('input',event=>{
+    chart.addEventListener('pointerup',finish);chart.addEventListener('pointercancel',finish);chart.addEventListener('lostpointercapture',finish);
+    const slider=root.querySelector('[data-battery-history-scroll]');
+    slider?.addEventListener('focus',()=>{historyRangeFocused=true});
+    slider?.addEventListener('blur',()=>{historyRangeFocused=false;notifyHistoryInteractionEnd()});
+    slider?.addEventListener('pointerdown',event=>{historyActivePointers.add(event.pointerId);try{slider.setPointerCapture(event.pointerId)}catch{}});
+    const finishSliderPointer=event=>{if(!historyActivePointers.delete(event.pointerId))return;notifyHistoryInteractionEnd()};
+    slider?.addEventListener('pointerup',finishSliderPointer);slider?.addEventListener('pointercancel',finishSliderPointer);slider?.addEventListener('lostpointercapture',finishSliderPointer);
+    slider?.addEventListener('input',event=>{
       const max=Number(event.currentTarget.max)||0;historyOffset=clampHistoryOffset(max-Number(event.currentTarget.value),ZOOMS[zoom][1]);refreshHistoryView(root);
     });
     root.querySelectorAll('[data-history-pan]').forEach(button=>button.addEventListener('click',()=>{
@@ -447,8 +471,8 @@ export function createBatteriesModule(requestRender,openManager){
     c.strokeStyle='#28516a';c.lineWidth=1;
     for(let i=0;i<=4;i++){const y=Math.round(i*plotH/4)+.5;c.beginPath();c.moveTo(0,y);c.lineTo(r.width,y);c.stroke()}
     const groups=historyPeriodGroups(data.start,data.ms,BARS);
-    c.save();c.strokeStyle='#1b435a';c.lineWidth=1;
-    for(const group of groups){if(group.startIndex===0)continue;const x=Math.round(group.startIndex*slot)+.5;c.beginPath();c.moveTo(x,0);c.lineTo(x,plotH+axisH-2);c.stroke()}
+    c.save();c.beginPath();c.rect(0,0,r.width,plotH);c.clip();c.strokeStyle='#1b435a';c.lineWidth=1;
+    for(const group of groups){if(group.startIndex===0)continue;const x=Math.round(group.startIndex*slot)+.5;c.beginPath();c.moveTo(x,0);c.lineTo(x,plotH);c.stroke()}
     c.restore();
     const paletteIds=historyBatteries().map(b=>b.id).sort();
     bars.forEach((bar,index)=>{
@@ -489,7 +513,7 @@ export function createBatteriesModule(requestRender,openManager){
       }
     }
     const mark=(x,y,color)=>{
-      c.save();c.fillStyle='#071b29';c.strokeStyle=color;c.lineWidth=1.8;c.beginPath();c.arc(x,y,3.5,0,Math.PI*2);c.fill();c.stroke();c.restore()
+      c.save();c.globalAlpha=.78;c.fillStyle='#071b29';c.strokeStyle=color;c.lineWidth=1.2;c.beginPath();c.arc(x,y,2.5,0,Math.PI*2);c.fill();c.stroke();c.restore()
     };
     for(const [id,entry] of extremes.batteries){
       for(const kind of ['max','min']){
@@ -568,6 +592,6 @@ export function createBatteriesModule(requestRender,openManager){
   function executeRemoteCommand(command,payload){if(command==='battery.edit'&&payload?.voltageAutoAction&&typeof payload.voltageAutoAction.active==='boolean')setVoltageAutoCalibration(payload?.id,payload.voltageAutoAction.active,payload.voltageAutoAction.actionId);else if(command==='battery.edit'&&Array.isArray(payload?.voltageCalibrationPoints))setVoltageCalibrationPoints(payload?.id,payload.voltageCalibrationPoints);else if(command==='battery.chargeCalculation')setChargeCalculation(payload?.id,payload?.config);else if(command==='battery.currentHistoryColor')setCurrentHistoryColor(payload?.id,payload?.color);else if(command==='battery.bankHistoryColor')setBankHistoryColor(payload?.color);else if(command==='battery.add')addBattery(payload?.device||payload);else if(command==='battery.remove')removeBattery(payload?.id);else if(command==='battery.renameBank')renameBank(payload?.name);else if(command==='battery.scan')try{window.BoatStationCore?.openBluetoothScanner?.()||window.NativeBridge?.startBatteryScan?.()}catch{}}
   window.addEventListener('resize',()=>queueDraw());
   window.BoatStationBatteryState={exportRemoteState,applyRemoteState,executeRemoteCommand,setScanDevices,isRemote:()=>state.remoteAuthoritative};
-  return{id:'batteries',name:'Baterías',pages:4,summary,page,afterRender,state,updateBattery,addBattery,removeBattery,renameBank,setChargeCalculation,setVoltageCalibrationPoints,setVoltageAutoCalibration,estimatedVoltage,setBankHistoryColor,setCurrentHistoryColor,getCurrentHistoryColor,historyBatteries,getHistorySeriesColor,setHistorySeriesColor,isHistorySeriesVisible,setHistorySeriesVisible,stats,exportRemoteState,applyRemoteState};
+  return{id:'batteries',name:'Baterías',pages:4,summary,page,afterRender,state,isHistoryInteracting,updateBattery,addBattery,removeBattery,renameBank,setChargeCalculation,setVoltageCalibrationPoints,setVoltageAutoCalibration,estimatedVoltage,setBankHistoryColor,setCurrentHistoryColor,getCurrentHistoryColor,historyBatteries,getHistorySeriesColor,setHistorySeriesColor,isHistorySeriesVisible,setHistorySeriesVisible,stats,exportRemoteState,applyRemoteState};
 }
 

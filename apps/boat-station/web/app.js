@@ -71,7 +71,25 @@ new MutationObserver(queueMasonry).observe(document.documentElement,{attributes:
 window.addEventListener('resize',queueMasonry);
 window.addEventListener('boatstation-page-resize-end',queueMasonry);
 queueMasonry();
-function renderPageContent(card,id,page){const module=modules[id],content=card?.querySelector(`.page[data-page="${page}"] > .page-content`);if(!module||!content)return;content.innerHTML=module.page(page);module.afterRender?.(card);layout.refreshPage(card,page)}
+let deferredBatteryHistoryRender=null;
+function renderPageContent(card,id,page){
+  const module=modules[id],content=card?.querySelector(`.page[data-page="${page}"] > .page-content`);
+  if(!module||!content)return;
+  if(id==='batteryHistory'&&batteriesCore.isHistoryInteracting?.()){
+    deferredBatteryHistoryRender={id,page};return;
+  }
+  if(id==='batteryHistory')deferredBatteryHistoryRender=null;
+  content.innerHTML=module.page(page);module.afterRender?.(card);layout.refreshPage(card,page);
+}
+window.addEventListener('boatstation-battery-history-interaction-end',()=>{
+  const pending=deferredBatteryHistoryRender;if(!pending)return;
+  requestAnimationFrame(()=>{
+    if(batteriesCore.isHistoryInteracting?.())return;
+    deferredBatteryHistoryRender=null;
+    const card=cards.querySelector(`.card[data-id="${pending.id}"]`);
+    if(card)renderPageContent(card,pending.id,pending.page);
+  });
+});
 function renderModule(id,preserveLayout=false){
   const card=cards.querySelector(`.card[data-id="${id}"]`);if(!card)return;
   const module=modules[id],page=layout.currentPage(card),summary=card.querySelector('.summary');if(summary)summary.textContent=module.summary();
