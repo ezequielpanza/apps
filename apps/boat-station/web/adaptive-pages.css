@@ -244,8 +244,8 @@
 }
 
 
-/* Boat Station 1.2.107: dial combinado y tarjetas de batería reordenadas. */
-.battery-overview[data-layout="dial-cards"]{display:grid;grid-template-columns:minmax(72px,1.08fr) minmax(0,1.92fr);grid-template-rows:minmax(0,1fr);grid-template-areas:none;grid-auto-flow:row;gap:clamp(4px,1.2cqw,8px);align-items:stretch;width:100%;height:100%;min-width:0;min-height:0}
+/* Boat Station 1.2.109: indicadores distribuidos en dos columnas iguales. */
+.battery-overview[data-layout="dial-cards"]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,1fr);grid-template-areas:none;grid-auto-flow:row;gap:clamp(4px,1.2cqw,8px);align-items:stretch;width:100%;height:100%;min-width:0;min-height:0}
 .page-content>.battery-overview[data-layout="dial-cards"]{flex:1 1 auto;min-height:0}
 .battery-overview[data-layout="dial-cards"]>.battery-indicators-panel{grid-column:1;grid-row:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:4px;min-width:0;min-height:0;padding:4px;border:1px solid var(--line);border-radius:13px;background:#071b29}
 .battery-combined-dial{display:block;flex:1 1 auto;width:calc(100% - 4px);height:auto;max-width:220px;max-height:calc(100% - 28px);min-height:0;aspect-ratio:1;overflow:visible}
@@ -292,7 +292,7 @@
 .battery-overview[data-layout="dial-cards"] .battery-mini-estimated{display:none}
 .battery-overview[data-layout="dial-cards"] .battery-mini-empty{grid-column:1/-1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center}
 @container pagecontent (max-width:340px){
-  .battery-overview[data-layout="dial-cards"]{grid-template-columns:minmax(60px,1.08fr) minmax(0,1.92fr);gap:3px}
+  .battery-overview[data-layout="dial-cards"]{grid-template-columns:repeat(2,minmax(0,1fr));gap:3px}
   .battery-overview[data-layout="dial-cards"]>.battery-indicators-panel{padding:3px 2px}
   .battery-overview[data-layout="dial-cards"] .battery-combined-dial{width:calc(100% - 2px);max-height:calc(100% - 25px)}
   .battery-overview[data-layout="dial-cards"] .battery-mini-column{gap:3px}
@@ -302,7 +302,7 @@
   .battery-overview[data-layout="dial-cards"] .battery-mini-charge span{font-size:clamp(7px,2.1cqw,9px)}
 }
 @container pagecontent (max-width:280px){
-  .battery-overview[data-layout="dial-cards"]{grid-template-columns:minmax(52px,.9fr) minmax(0,1.6fr)}
+  .battery-overview[data-layout="dial-cards"]{grid-template-columns:repeat(2,minmax(0,1fr))}
   .battery-overview[data-layout="dial-cards"] .battery-mini-column{grid-template-columns:minmax(0,1fr);grid-template-rows:none;grid-auto-rows:minmax(0,1fr)}
   .battery-overview[data-layout="dial-cards"] .battery-mini-column.single>.battery-mini{grid-column:1}
   .battery-overview[data-layout="dial-cards"] .battery-mini-body{grid-template-columns:clamp(28px,25%,36px) minmax(0,1fr)}
