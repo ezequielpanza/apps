@@ -714,6 +714,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     let mapFollowPausedByDrag = false;
     let followBoat = false;
     let liveRouteActive = false;
+    let livePointForecastPosition: { lat: number; lon: number; timestamp: number } | null = null;
+    let livePointForecastActive = false;
     let navigationPlanBackupActive = false;
     let autoLivePending = false;
     let liveRefreshTimer: number | null = null;
@@ -1174,7 +1176,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         liveRefreshTimer = null;
         if (liveWaypointTimer !== null) window.clearInterval(liveWaypointTimer);
         liveWaypointTimer = null;
-        liveButton?.setAttribute('aria-pressed', 'false');
+        syncLiveButtonState();
         recalculate(true);
         if (clearNavigationBackup) {
             clearTemporaryPlan(localStorage);
@@ -1184,23 +1186,122 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         return true;
     }
 
-    function enterLiveRoute(): void {
+    function isPointForecastMode(): boolean {
+        return !!livePointForecastPosition && !liveRouteActive;
+    }
+
+    function getFreshNavigationFix(now = Date.now()) {
         const fix = navigationFix;
+        return fix && fix.timestamp <= now && now - fix.timestamp <= 30000 && hasValidCoordinates(fix.lat, fix.lon) ? fix : null;
+    }
+
+    function syncLiveButtonState(): void {
+        liveButton?.setAttribute('aria-pressed', String(liveRouteActive || livePointForecastActive));
+    }
+
+    function openForecastDrawer(): void {
+        if (!forecastDrawer) return;
+        if (forecastDrawerMaxHeightPercent < 20) {
+            forecastDrawerMaxHeightPercent = 50;
+            try { localStorage.setItem('route-builder-drawer-max-height-percent', '50'); } catch { /* Keep the current height for this session. */ }
+        }
+        forecastDrawer.classList.add('is-open');
+        forecastDrawer.hidden = false;
+        if (forecastReopenButton) forecastReopenButton.hidden = true;
+        applyForecastDrawerHeightLimit();
+        renderForecastDrawer();
+        requestAnimationFrame(() => positionForecastDrawer());
+    }
+
+    function startLivePointForecast(fix: { lat: number; lon: number; timestamp: number }): void {
         const now = Date.now();
-        const targetIndex = points.findIndex(point => point.id === navigationTargetId);
-        if (!fix || now - fix.timestamp > 30000 || fix.timestamp > now || targetIndex < 0 || points.length < 2) {
-            updateForecastStatus('Se necesita una posición GPS reciente y una ruta con próximo waypoint.');
+        const currentFix = getFreshNavigationFix(now);
+        if (!currentFix || !hasValidCoordinates(fix.lat, fix.lon)) {
+            openForecastDrawer();
+            updateForecastStatus('EN VIVO necesita una posición GPS reciente para consultar el punto actual.');
             return;
         }
-        const currentSpeed = currentRouteSpeed(liveAverageSpeed(recentGpsSpeeds, now, liveSpeedSeconds * 1000));
-        if (currentSpeed === null) {
-            updateForecastStatus('Se necesita una velocidad GPS reciente de al menos 0,1 kt para activar EN VIVO.');
+        livePointForecastPosition = { lat: currentFix.lat, lon: currentFix.lon, timestamp: now };
+        livePointForecastActive = true;
+        syncLiveButtonState();
+        invalidateForecast();
+        openForecastDrawer();
+        forecastDataCache.clear();
+        void calculateRouteForecast();
+        restartLiveTimers();
+    }
+
+    function stopLivePointForecast(): void {
+        livePointForecastActive = false;
+        if (liveRefreshTimer !== null && !liveRouteActive) window.clearInterval(liveRefreshTimer);
+        if (!liveRouteActive) liveRefreshTimer = null;
+        syncLiveButtonState();
+    }
+
+    function refreshLivePointForecast(): void {
+        if (!livePointForecastActive || !navigationActive || forecastBusy) return;
+        const now = Date.now();
+        const fix = getFreshNavigationFix(now);
+        if (!fix) {
+            updateForecastStatus('EN VIVO espera una posición GPS reciente para actualizar el punto.');
             return;
+        }
+        livePointForecastPosition = { lat: fix.lat, lon: fix.lon, timestamp: now };
+        forecastDataCache.clear();
+        void calculateRouteForecast();
+    }
+
+    function startLiveWeather(): void {
+        autoLivePending = false;
+        if (!navigationActive) {
+            openForecastDrawer();
+            updateForecastStatus('Activa el modo Navegación para consultar el pronóstico EN VIVO.');
+            return;
+        }
+        const now = Date.now();
+        const fix = getFreshNavigationFix(now);
+        if (!fix) {
+            openForecastDrawer();
+            updateForecastStatus('EN VIVO necesita una posición GPS reciente. Comprueba que el modo Navegación tenga señal.');
+            return;
+        }
+        if (points.length >= 2) {
+            updateNavigationPanel();
+            let targetIndex = points.findIndex(point => point.id === navigationTargetId);
+            if (targetIndex < 0) {
+                const selectedIndex = chooseNextWaypoint(fix, points);
+                if (selectedIndex >= 0) navigationTargetId = points[selectedIndex]?.id ?? null;
+                targetIndex = points.findIndex(point => point.id === navigationTargetId);
+            }
+            if (targetIndex >= 0) {
+                enterLiveRoute();
+                return;
+            }
+        }
+        startLivePointForecast(fix);
+    }
+
+    function enterLiveRoute(): boolean {
+        const fix = getFreshNavigationFix();
+        const now = Date.now();
+        const targetIndex = points.findIndex(point => point.id === navigationTargetId);
+        if (!fix || targetIndex < 0 || points.length < 2) {
+            openForecastDrawer();
+            updateForecastStatus('EN VIVO necesita una posición GPS reciente y un próximo waypoint.');
+            return false;
+        }
+        const measuredSpeed = currentRouteSpeed(liveAverageSpeed(recentGpsSpeeds, now, liveSpeedSeconds * 1000));
+        const currentSpeed = measuredSpeed ?? currentRouteSpeed(speedKnots);
+        if (currentSpeed === null) {
+            openForecastDrawer();
+            updateForecastStatus('EN VIVO necesita una velocidad GPS o una velocidad planificada mayor que 0,1 kt.');
+            return false;
         }
         if (!navigationPlanBackupActive) {
             if (!saveTemporaryPlan(localStorage, { points, nextPointId, departureDateTime, speedKnots })) {
+                openForecastDrawer();
                 updateForecastStatus('No se pudo guardar la ruta anterior; EN VIVO no se activó.');
-                return;
+                return false;
             }
             navigationPlanBackupActive = true;
         }
@@ -1212,6 +1313,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         liveOriginalWaypointNumbers = new Map(points.map((point, index) => [point.id, index + 1]));
         livePastWaypoints = points.slice(0, targetIndex).map((point, index) => ({ point: { ...point }, number: index + 1 }));
         points = [{ id: 0, lat: fix.lat, lon: fix.lon }, ...points.slice(targetIndex).map(point => ({ ...point }))];
+        livePointForecastPosition = null;
+        livePointForecastActive = false;
         speedKnots = currentSpeed;
         departureDateTime = toLocalDateTimeInput(new Date(now));
         restoredDepartureTimestamp = new Date(departureDateTime).getTime();
@@ -1220,17 +1323,26 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         waypointArrivalConfirmations = 0;
         liveRouteActive = true;
         liveRouteUpdatedAt = now;
-        liveButton?.setAttribute('aria-pressed', 'true');
+        syncLiveButtonState();
+        openForecastDrawer();
+        forecastDataCache.clear();
         recalculate(true);
         restartLiveTimers();
+        return true;
     }
 
     function tryStartAutomaticLive(): void {
-        if (!autoLivePending || !navigationActive || liveRouteActive || !navigationFix || points.length < 2) return;
+        if (!navigationActive || liveRouteActive || !navigationFix || points.length < 2) return;
         const now = Date.now();
-        if (navigationFix.timestamp > now || now - navigationFix.timestamp > 30000 ||
-            points.findIndex(point => point.id === navigationTargetId) < 0 ||
-            currentRouteSpeed(liveAverageSpeed(recentGpsSpeeds, now, liveSpeedSeconds * 1000)) === null) return;
+        const fix = getFreshNavigationFix(now);
+        const targetIndex = points.findIndex(point => point.id === navigationTargetId);
+        if (!fix || targetIndex < 0) return;
+        if (livePointForecastActive) {
+            stopLivePointForecast();
+            enterLiveRoute();
+            return;
+        }
+        if (!autoLivePending) return;
         autoLivePending = false;
         enterLiveRoute();
     }
@@ -1240,9 +1352,13 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         if (liveWaypointTimer !== null) window.clearInterval(liveWaypointTimer);
         liveRefreshTimer = null;
         liveWaypointTimer = null;
-        if (!liveRouteActive) return;
-        liveRefreshTimer = window.setInterval(refreshLiveRoute, liveForecastSeconds * 1000);
-        liveWaypointTimer = window.setInterval(refreshLiveWaypoints, liveWaypointSeconds * 1000);
+        if (!navigationActive) return;
+        if (liveRouteActive) {
+            liveRefreshTimer = window.setInterval(refreshLiveRoute, liveForecastSeconds * 1000);
+            liveWaypointTimer = window.setInterval(refreshLiveWaypoints, liveWaypointSeconds * 1000);
+        } else if (livePointForecastActive) {
+            liveRefreshTimer = window.setInterval(refreshLivePointForecast, liveForecastSeconds * 1000);
+        }
     }
 
     function refreshLiveWaypoints(): void {
@@ -1259,10 +1375,12 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     function refreshLiveRoute(updateForecast = true): void {
         if (!liveRouteActive || !navigationActive || forecastBusy) return;
         const now = Date.now();
-        const averageSpeed = liveAverageSpeed(recentGpsSpeeds, now, liveSpeedSeconds * 1000);
-        const next = prepareLiveRefresh(navigationFix ? { ...navigationFix, speed: averageSpeed } : null, points, navigationTargetId, now);
+        const fix = getFreshNavigationFix(now);
+        const measuredSpeed = currentRouteSpeed(liveAverageSpeed(recentGpsSpeeds, now, liveSpeedSeconds * 1000));
+        const effectiveSpeed = measuredSpeed ?? currentRouteSpeed(speedKnots);
+        const next = prepareLiveRefresh(fix ? { ...fix, speed: effectiveSpeed } : null, points, navigationTargetId, now);
         if (!next) {
-            updateForecastStatus('EN VIVO sin actualizar: espera una posición y velocidad GPS válidas.');
+            updateForecastStatus('EN VIVO sin actualizar: espera una posición GPS reciente y una velocidad GPS o planificada válida.');
             return;
         }
         const targetIndex = points.findIndex(point => point.id === navigationTargetId);
@@ -1337,10 +1455,18 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         invalidateForecast(preserveForecastPrefix);
         redrawMap();
         saveRoute();
-        if (refreshForecast && points.length >= 2) {
+        if (points.length >= 2 && livePointForecastPosition && (!navigationActive || points.some(point => point.id === navigationTargetId))) {
+            livePointForecastPosition = null;
+            livePointForecastActive = false;
+            syncLiveButtonState();
+            restartLiveTimers();
+        }
+        if (refreshForecast && (points.length >= 2 || isPointForecastMode())) {
             void calculateRouteForecast();
         } else if (points.length < 2 && forecastDrawer?.classList.contains('is-open')) {
-            forecastMessage = 'Agrega al menos dos Waypoints para consultar el pronóstico.';
+            forecastMessage = isPointForecastMode()
+                ? 'Pronóstico del punto actual listo para consultar.'
+                : 'Agrega al menos dos Waypoints o activa EN VIVO para consultar el punto actual.';
             renderForecastDrawer();
         }
     }
@@ -1531,7 +1657,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const pickerScroll = forecastDrawer.querySelector<HTMLElement>('.forecast-field-picker')?.scrollTop || 0;
         const previousTimebar = forecastDrawer.querySelector<HTMLElement>('.departure-timebar-scroll');
         const existingTimebarScroll = previousTimebar?.scrollLeft ?? departureTimelineScrollLeft;
-        const routeDurationHours = points.slice(1).reduce((hours, point, index) => hours + haversineNm(points[index], point) / Math.max(0.1, speedKnots), 0);
+        const pointForecastMode = isPointForecastMode();
+        const routeDurationHours = pointForecastMode
+            ? Math.max(1, Number(weatherSearchDays) || 7) * 24
+            : points.slice(1).reduce((hours, point, index) => hours + haversineNm(points[index], point) / Math.max(0.1, speedKnots), 0);
         const departureSlots = candidateDepartureTimes().map(departure => departure.getTime());
         const firstSlot = departureSlots[0] ?? Math.floor(Date.now() / 60000) * 60000;
         const minDeparture = earliestDeparture(new Date(), restoredDepartureTimestamp);
@@ -1684,7 +1813,13 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             const arrow = bearing === null || bearing === undefined ? '' : `<span class="forecast-arrow" style="transform:rotate(${bearing + 90}deg)">➤</span>`;
             return `${arrow}${Number(value).toFixed(decimals)}`;
         };
-        const departureStats = routeForecast.length ? statCell('Inicio', formatTimelineDateTime(routeForecast[0].eta.getTime()), '', 0, 1) + statCell('Fin', formatTimelineDateTime(arrivalTimestamp), '', 0, 2) + statCell('Duración', formatDuration(routeDurationHours), '', 0, 3) : statCell('Inicio', null, '', 0, 1) + statCell('Fin', null, '', 0, 2) + statCell('Duración', null, '', 0, 3);
+        const pointForecastStart = routeForecast[0]?.eta.getTime() ?? Date.now();
+        const pointForecastEnd = routeForecast[routeForecast.length - 1]?.eta.getTime() ?? pointForecastStart;
+        const departureStats = routeForecast.length
+            ? pointForecastMode
+                ? statCell('Desde', formatTimelineDateTime(pointForecastStart), '', 0, 1) + statCell('Hasta', formatTimelineDateTime(pointForecastEnd), '', 0, 2) + statCell('Ventana', Math.max(1, Number(weatherSearchDays) || 7) + ' días', '', 0, 3)
+                : statCell('Inicio', formatTimelineDateTime(routeForecast[0].eta.getTime()), '', 0, 1) + statCell('Fin', formatTimelineDateTime(arrivalTimestamp), '', 0, 2) + statCell('Duración', formatDuration(routeDurationHours), '', 0, 3)
+            : statCell(pointForecastMode ? 'Desde' : 'Inicio', null, '', 0, 1) + statCell(pointForecastMode ? 'Hasta' : 'Fin', null, '', 0, 2) + statCell(pointForecastMode ? 'Ventana' : 'Duración', null, '', 0, 3);
         const routeFieldAddControl = renderRouteFieldAddControl();
         const routeRows: Record<WindowConditionKey, string> = {
             gfsDew: row('Punto de rocío', sample => forecastValue(sample, 'gfsDew', 1), undefined, statistics('gfsDew', ' °C', 1), 'gfsDew'),
@@ -1811,14 +1946,20 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             const name = index === 0 ? 'Inicio' : index === points.length - 1 ? 'Destino' : `Intermedio ${index}`;
             return `<span class="route-waypoint-dot ${markerType}" style="left:${left}%" title="P${waypointNumber(index)} · ${name}">${waypointNumber(index)}</span>`;
         }).join('');
-        const routeWaypointRow = routeForecast.length ? `<tr class="route-waypoint-row"><th class="route-waypoint-label" colspan="4" data-column-index="0" data-column-span="4">Waypoints</th><td class="route-waypoint-track" colspan="${routeForecast.length}">${waypointTrackMarkers}<span class="route-waypoint-boat" hidden title="Posición GPS aproximada en la ruta" aria-label="Posición GPS aproximada en la ruta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4 L21 12 L3 20 L7 12 Z" fill="#087bd1" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg></span></td></tr>` : '';
+        let routeWaypointRow = routeForecast.length ? `<tr class="route-waypoint-row"><th class="route-waypoint-label" colspan="4" data-column-index="0" data-column-span="4">Waypoints</th><td class="route-waypoint-track" colspan="${routeForecast.length}">${waypointTrackMarkers}<span class="route-waypoint-boat" hidden title="Posición GPS aproximada en la ruta" aria-label="Posición GPS aproximada en la ruta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4 L21 12 L3 20 L7 12 Z" fill="#087bd1" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg></span></td></tr>` : '';
+        if (pointForecastMode && routeWaypointRow) {
+            const location = livePointForecastPosition;
+            const coordinates = location ? location.lat.toFixed(5) + '°, ' + location.lon.toFixed(5) + '°' : 'Ubicación GPS pendiente';
+            const pointSummary = coordinates + ' · próximos ' + Math.max(1, Number(weatherSearchDays) || 7) + ' días';
+            routeWaypointRow = routeWaypointRow.replace('Waypoints', 'Punto actual').replace(/<td class="route-waypoint-track" colspan="[^"]*">[\s\S]*?<\/td>/, '<td class="route-point-location" colspan="' + routeForecast.length + '" style="text-align:center;background:#e8f0f2;color:#263238;font-weight:600">' + pointSummary + '</td>');
+        }
         const distanceNm = points.slice(1).reduce((distance, point, index) => distance + haversineNm(points[index], point), 0);
         const distanceLabel = distanceUnit === 'km' ? `${(distanceNm * 1.852).toFixed(1)} km` : `${distanceNm.toFixed(1)} Nm`;
         const passingDepartureTimes = liveRouteActive ? [] : departureEvaluations.filter(item => item.hasConstraints && item.passes === true).map(item => item.departure.getTime()).filter(Number.isFinite).sort((a, b) => a - b);
         const previousValidDeparture = passingDepartureTimes.some(time => time < selectedDeparture);
         const nextValidDeparture = passingDepartureTimes.some(time => time > selectedDeparture);
         const validDepartureButton = (direction: 'previous' | 'next', enabled: boolean) => `<button type="button" class="departure-valid-arrow" data-valid-departure="${direction}" aria-label="${direction === 'previous' ? 'Partida válida anterior' : 'Partida válida siguiente'}" title="${direction === 'previous' ? 'Partida válida anterior' : 'Partida válida siguiente'}"${enabled ? '' : ' disabled'}>${direction === 'previous' ? '‹' : '›'}</button>`;
-        const routeDepartureFooter = `<div class="forecast-departure-control${liveRouteActive ? ' is-live' : ''}"><div class="departure-timebar-frame"><div class="departure-timebar-scroll" data-timeline-start="${timelineStart}" data-pixels-per-hour="${pixelsPerHour}" data-timebar-left-pad="${timelinePadding}" data-min-departure="${minDeparture}" data-max-departure="${maxDeparture}" data-departure-interval-hours="${departureIntervalHours}" aria-label="${liveRouteActive ? 'Hora de salida bloqueada en modo EN VIVO' : 'Desplazar los días para elegir la hora de salida'}"><div class="departure-timebar" style="width:${timebarWidth}px"><div class="departure-timebar-days">${dayBands.join('')}</div><div class="departure-timebar-hours">${hourTicks.join('')}</div><div class="route-analysis-track" style="width:${timebarWidth}px">${departurePassSegments}</div></div></div><div class="departure-timebar-indicator"><span class="departure-timebar-cursor"></span><span class="departure-timebar-callout-group">${passingDepartureTimes.length ? validDepartureButton('previous', previousValidDeparture) : ''}<span class="departure-timebar-callout"><span>Inicio ${formatTimelineDateTime(selectedDeparture)} → Llega ${formatTimelineDateTime(arrivalTimestamp)}</span><small>Duración: ${formatDuration(routeDurationHours)} · ${distanceLabel}</small></span>${passingDepartureTimes.length ? validDepartureButton('next', nextValidDeparture) : ''}</span><span class="departure-timebar-callout-tail"></span></div></div></div>`;
+        const routeDepartureFooter = pointForecastMode ? '' : `<div class="forecast-departure-control${liveRouteActive ? ' is-live' : ''}"><div class="departure-timebar-frame"><div class="departure-timebar-scroll" data-timeline-start="${timelineStart}" data-pixels-per-hour="${pixelsPerHour}" data-timebar-left-pad="${timelinePadding}" data-min-departure="${minDeparture}" data-max-departure="${maxDeparture}" data-departure-interval-hours="${departureIntervalHours}" aria-label="${liveRouteActive ? 'Hora de salida bloqueada en modo EN VIVO' : 'Desplazar los días para elegir la hora de salida'}"><div class="departure-timebar" style="width:${timebarWidth}px"><div class="departure-timebar-days">${dayBands.join('')}</div><div class="departure-timebar-hours">${hourTicks.join('')}</div><div class="route-analysis-track" style="width:${timebarWidth}px">${departurePassSegments}</div></div></div><div class="departure-timebar-indicator"><span class="departure-timebar-cursor"></span><span class="departure-timebar-callout-group">${passingDepartureTimes.length ? validDepartureButton('previous', previousValidDeparture) : ''}<span class="departure-timebar-callout"><span>Inicio ${formatTimelineDateTime(selectedDeparture)} → Llega ${formatTimelineDateTime(arrivalTimestamp)}</span><small>Duración: ${formatDuration(routeDurationHours)} · ${distanceLabel}</small></span>${passingDepartureTimes.length ? validDepartureButton('next', nextValidDeparture) : ''}</span><span class="departure-timebar-callout-tail"></span></div></div></div>`;
         const routeColumnCount = routeForecast.length + 4;
         const routeColgroup = `<colgroup>${Array.from({ length: routeColumnCount }, (_, index) => `<col data-forecast-col="${index}">`).join('')}</colgroup>`;
         const routeTable = `${routeDepartureFooter}<div class="forecast-table-scroll"><table class="forecast-table">${routeColgroup}<thead>${routeWaypointRow}</thead><tbody>${visibleRouteRows}</tbody></table></div>`;
@@ -3451,7 +3592,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         invalidateForecast();
         redrawMap();
         saveRoute();
-        forecastMessage = 'Agrega al menos dos Waypoints para consultar el pronóstico.';
+        if (isPointForecastMode()) void calculateRouteForecast();
+        else forecastMessage = 'Agrega al menos dos Waypoints o activa EN VIVO para consultar el punto actual.';
         renderForecastDrawer();
     }
 
@@ -3474,7 +3616,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             if (forecastReopenButton) forecastReopenButton.hidden = true;
             if (points.length >= 2) void calculateRouteForecast();
             else {
-                forecastMessage = 'Agrega al menos dos Waypoints para consultar el pronóstico.';
+                forecastMessage = 'Agrega al menos dos Waypoints o activa EN VIVO para consultar el punto actual.';
                 renderForecastDrawer();
             }
         }
@@ -3820,7 +3962,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         liveButton.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M19.07 4.93l-1.42 1.42M6.35 17.65l-1.42 1.42"/></svg>';
         liveButton.setAttribute('aria-label', 'Pronóstico en vivo');
         liveButton.setAttribute('aria-pressed', 'false');
-        liveButton.title = 'Cargar ruta desde la posición GPS';
+        liveButton.title = 'Mostrar el pronóstico EN VIVO para la ruta o el punto actual';
         liveButton.hidden = true;
         centerButton = document.createElement('button');
         centerButton.type = 'button';
@@ -3871,13 +4013,16 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         zoomOutButton = makeZoomButton('Alejar mapa', '−', 'route-builder-zoom-out', -1);
         liveButton.addEventListener('click', event => {
             event.stopPropagation();
-            if (autoLivePending) {
-                autoLivePending = false;
-                updateForecastStatus('Activación automática de EN VIVO cancelada.');
+            if (liveRouteActive) {
+                leaveLiveRoute(false, false);
                 return;
             }
-            if (liveRouteActive) leaveLiveRoute(false, false);
-            else enterLiveRoute();
+            if (livePointForecastActive) {
+                stopLivePointForecast();
+                updateForecastStatus('Pronóstico EN VIVO pausado; se conserva la última consulta.');
+                return;
+            }
+            startLiveWeather();
         });
         gpsButton.addEventListener('click', async event => {
             event.stopPropagation();
@@ -3887,6 +4032,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 navigationActive = false;
                 passivePositionMarker?.setOpacity(1);
                 autoLivePending = false;
+                stopLivePointForecast();
                 if (liveButton) liveButton.hidden = true;
                 if (centerButton) centerButton.hidden = false;
                 gpsRequestGeneration++;
@@ -3937,7 +4083,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 map.setView([lat, lon], Math.max(map.getZoom(), 8));
                 setFollowBoat(true);
                 centerBoatInVisibleMap();
-                updateForecastStatus('Posición GPS actualizada. EN VIVO espera una ruta y velocidad GPS válidas.');
+                updateForecastStatus('Posición GPS actualizada. Toca EN VIVO para consultar la ruta navegada o el punto actual.');
                 if (gpsWatchId === null && navigator.geolocation) {
                     gpsWatchId = navigator.geolocation.watchPosition(update => {
                         if (!navigationActive || requestGeneration !== gpsRequestGeneration) return;
@@ -4937,8 +5083,8 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         forecastReopenButton = document.createElement('button');
         forecastReopenButton.type = 'button';
         forecastReopenButton.className = 'route-builder-reopen-button';
-        forecastReopenButton.textContent = 'Pronóstico de la ruta';
-        forecastReopenButton.setAttribute('aria-label', 'Abrir pronóstico de la ruta');
+        forecastReopenButton.textContent = isPointForecastMode() ? 'Pronóstico del punto actual' : 'Pronóstico de la ruta';
+        forecastReopenButton.setAttribute('aria-label', 'Abrir ' + (isPointForecastMode() ? 'pronóstico del punto actual' : 'pronóstico de la ruta'));
         forecastReopenButton.hidden = true;
         forecastReopenButton.addEventListener('click', () => {
             if (!forecastDrawer) return;
@@ -4952,7 +5098,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             applyForecastDrawerHeightLimit();
             renderForecastDrawer();
             positionForecastDrawer();
-            if (!forecastBusy && points.length >= 2) void calculateRouteForecast();
+            if (!forecastBusy && (points.length >= 2 || isPointForecastMode())) void calculateRouteForecast();
         });
         document.body.appendChild(forecastReopenButton);
         applyForecastDrawerHeightLimit();
@@ -4981,7 +5127,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         });
         if (points.length >= 2) void calculateRouteForecast();
         else {
-            forecastMessage = 'Agrega al menos dos Waypoints para consultar el pronóstico.';
+            forecastMessage = 'Agrega al menos dos Waypoints o activa EN VIVO para consultar el punto actual.';
             renderForecastDrawer();
         }
         startPassiveLocation();
@@ -5039,9 +5185,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         forecastDrawer.style.setProperty('--route-drawer-max-height-vh', `${height}vh`);
         forecastDrawer.style.setProperty('--route-drawer-max-height-dvh', `${height}dvh`);
         if (forecastReopenButton && !forecastDrawer.hidden) {
+            const forecastTitle = isPointForecastMode() ? 'Pronóstico del punto actual' : 'Pronóstico de la ruta';
             forecastReopenButton.hidden = height >= 20;
-            forecastReopenButton.textContent = height < 20 ? 'Restablecer panel' : 'Pronóstico de la ruta';
-            forecastReopenButton.setAttribute('aria-label', height < 20 ? 'Restablecer panel' : 'Abrir pronóstico de la ruta');
+            forecastReopenButton.textContent = height < 20 ? 'Restablecer panel' : forecastTitle;
+            forecastReopenButton.setAttribute('aria-label', height < 20 ? 'Restablecer panel' : 'Abrir ' + forecastTitle.toLowerCase());
         }
     }
 
@@ -5115,6 +5262,25 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             return {
                 lat: position.lat, lon: position.lon, distanceNm,
                 eta: new Date(departure.getTime() + distanceNm / speed * 3600000),
+            };
+        });
+    }
+
+    function buildPointForecastSamples(): RouteForecastSample[] {
+        const anchor = livePointForecastPosition;
+        if (!anchor || !hasValidCoordinates(anchor.lat, anchor.lon)) return [];
+        const days = Math.max(1, Math.min(15, Math.floor(Number(weatherSearchDays) || 7)));
+        const horizonHours = days * 24;
+        const intervalHours = Math.max(1, Number(routeSampleIntervalHours) || 3);
+        const effectiveInterval = Math.max(intervalHours, horizonHours / 119);
+        const intervalCount = Math.max(1, Math.min(119, Math.ceil(horizonHours / effectiveInterval)));
+        return Array.from({ length: intervalCount + 1 }, (_, index) => {
+            const elapsedHours = index === intervalCount ? horizonHours : Math.min(horizonHours, index * effectiveInterval);
+            return {
+                lat: anchor.lat,
+                lon: anchor.lon,
+                distanceNm: 0,
+                eta: new Date(anchor.timestamp + elapsedHours * 3600000),
             };
         });
     }
@@ -5259,9 +5425,10 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     }
 
     async function calculateRouteForecast(): Promise<void> {
-        if (points.length < 2) {
+        const pointMode = isPointForecastMode();
+        if (points.length < 2 && !pointMode) {
             invalidateForecast();
-            forecastMessage = 'Agrega al menos dos Waypoints para consultar el pronóstico.';
+            forecastMessage = 'Agrega al menos dos Waypoints o activa EN VIVO para consultar el punto actual.';
             if (forecastDrawer) {
                 forecastDrawer.classList.add('is-open');
                 if (forecastReopenButton) forecastReopenButton.hidden = true;
@@ -5276,7 +5443,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         const previousSamples = new Map(routeForecast
             .filter(sample => sample.forecastCachedAt && !sample.error && !sample.seaError && !sample.diagnostic && Date.now() - sample.forecastCachedAt < 30 * 60 * 1000)
             .map(sample => [routeForecastSampleKey(sample), sample] as const));
-        const samples = buildRouteForecastSamples();
+        const samples = pointMode ? buildPointForecastSamples() : buildRouteForecastSamples();
         const pendingSamples: RouteForecastSample[] = [];
         const pendingRouteIndexes: number[] = [];
         samples.forEach((sample, index) => {
@@ -5294,11 +5461,15 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
         });
         routeForecast = samples;
         if (forecastDrawer?.classList.contains('is-open')) positionForecastDrawer();
-        if (samples.length === 0) { forecastMessage = 'Agrega al menos dos Waypoints para consultar el pronóstico.'; return; }
+        if (samples.length === 0) { forecastMessage = pointMode ? 'No se pudo preparar el pronóstico del punto actual.' : 'Agrega al menos dos Waypoints o activa EN VIVO para consultar el punto actual.'; return; }
         const reusedCount = samples.length - pendingSamples.length;
         forecastMessage = pendingSamples.length
-            ? `Actualizando ${pendingSamples.length} puntos del pronóstico; se reutilizan ${reusedCount} resultados compatibles…`
-            : `Reutilizando los ${reusedCount} pronósticos de la ruta; actualizando sus horas de paso…`;
+            ? pointMode
+                ? `Actualizando ${pendingSamples.length} horarios del punto actual para los próximos ${weatherSearchDays} días…`
+                : `Actualizando ${pendingSamples.length} puntos del pronóstico; se reutilizan ${reusedCount} resultados compatibles…`
+            : pointMode
+                ? `Reutilizando ${reusedCount} horarios del punto actual…`
+                : `Reutilizando los ${reusedCount} pronósticos de la ruta; actualizando sus horas de paso…`;
         forecastBusy = true;
         if (!showWeatherSettingsMenu) renderForecastDrawer();
         requestAnimationFrame(() => positionForecastDrawer());
@@ -5393,11 +5564,13 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
             const unavailableArome = samples.filter(sample => !Number.isFinite(sample.values?.aromeWind)).length;
             const unavailableCurrents = samples.filter(sample => !Number.isFinite(sample.values?.current)).length;
             const forecastHorizonEnd = Date.now() + Math.max(1, Number(weatherSearchDays) || 7) * 86400000;
-            const arrivalOutsideForecast = (samples[samples.length - 1]?.eta.getTime() ?? 0) > forecastHorizonEnd;
+            const arrivalOutsideForecast = !pointMode && (samples[samples.length - 1]?.eta.getTime() ?? 0) > forecastHorizonEnd;
             const horizonNote = arrivalOutsideForecast
                 ? ` La llegada queda fuera de los ${weatherSearchDays} días seleccionados, así que ese tramo puede no tener pronóstico.`
                 : '';
-            forecastMessage = `${samples.length - unavailable} de ${samples.length} ubicaciones con datos GFS; ${unavailable} sin dato para su hora. Viento ECMWF disponible en ${samples.length - unavailableEcmwfWind}/${samples.length}; olas ECMWF en ${samples.length - unavailableEcmwfWaves}/${samples.length}; mBlue AI ${samples.length - unavailableMblue}/${samples.length}, ICON ${samples.length - unavailableIcon}/${samples.length}, AROME Antillas ${samples.length - unavailableArome}/${samples.length} y corrientes CMEMS ${samples.length - unavailableCurrents}/${samples.length}.${unavailableWaves ? ` Olas sin dato en ${unavailableWaves} ubicaciones.` : ' Olas GFS Waves consultadas.'}${horizonNote}`;
+            const coverageLabel = pointMode ? 'horarios del punto actual' : 'ubicaciones de la ruta';
+            const unavailableLabel = pointMode ? 'horarios sin dato' : 'ubicaciones sin dato';
+            forecastMessage = `${samples.length - unavailable} de ${samples.length} ${coverageLabel} con datos GFS; ${unavailable} ${unavailableLabel}. Viento ECMWF disponible en ${samples.length - unavailableEcmwfWind}/${samples.length}; olas ECMWF en ${samples.length - unavailableEcmwfWaves}/${samples.length}; mBlue AI ${samples.length - unavailableMblue}/${samples.length}, ICON ${samples.length - unavailableIcon}/${samples.length}, AROME Antillas ${samples.length - unavailableArome}/${samples.length} y corrientes CMEMS ${samples.length - unavailableCurrents}/${samples.length}.${unavailableWaves ? ` Olas sin dato en ${unavailableWaves} horarios.` : ' Olas GFS Waves consultadas.'}${horizonNote}`;
         } finally {
             if (job === forecastJob) {
                 forecastBusy = false;
@@ -5408,7 +5581,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
                 // that was in progress (both jobs share the forecast cache
                 // generation). Re-evaluate the departure slots after the route
                 // data is complete so the timeline cannot be left without dots.
-                if (!liveRouteActive && points.length >= 2 && (hasConfiguredWindowConditions() || departureEligibilityDirty || windowConditionsDirty)) {
+                if (!liveRouteActive && !pointMode && points.length >= 2 && (hasConfiguredWindowConditions() || departureEligibilityDirty || windowConditionsDirty)) {
                     void calculateDepartureEligibility();
                 }
             }
@@ -5867,7 +6040,7 @@ import { chooseNextWaypoint, navigationMetrics, advanceWaypoint, courseFromFixes
     <div class="plugin__title plugin__title--chevron-back">{pluginTitle}</div>
     <div class="panel-kicker"><span class="status-dot"></span><span>PLANIFICADOR DE RUTA</span></div>
     <div class="forecast-launcher">
-        <button class="forecast-button" on:click={calculateRouteForecast} disabled={forecastBusy || points.length < 2}>{forecastBusy ? 'Calculando…' : 'Pronóstico de la ruta'}</button>
+        <button class="forecast-button" on:click={calculateRouteForecast} disabled={forecastBusy || (points.length < 2 && !isPointForecastMode())}>{forecastBusy ? 'Calculando…' : isPointForecastMode() ? 'Pronóstico del punto actual' : 'Pronóstico de la ruta'}</button>
     </div>
     {#if forecastMessage}<p class="forecast-message" aria-live="polite">{forecastMessage}</p>{/if}
 
