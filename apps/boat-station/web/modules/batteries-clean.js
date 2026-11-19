@@ -25,7 +25,7 @@ export function createBatteriesModule(requestRender,openManager){
   let historyColors=read(COLORS_KEY,{});if(!historyColors||typeof historyColors!=='object'||Array.isArray(historyColors))historyColors={};
   let hiddenSeries=read(VISIBILITY_KEY,{});if(!hiddenSeries||typeof hiddenSeries!=='object'||Array.isArray(hiddenSeries))hiddenSeries={};
   const oldZoomIndices=[1,3,5,6,7,8,9,10,11],oldZoom=Math.max(0,Math.min(oldZoomIndices.length-1,Number(read(OLD_ZOOM_KEY,0))||0)),storedZoom=read(ZOOM_KEY,null);
-  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedCanvas=null;
+  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedCanvas=null,historyOffset=0;
   const saveCurrent=(immediate=false)=>{const save=()=>{saveTimer=0;write(CURRENT_KEY,{bankName:state.bankName,bankHistoryColor:state.bankHistoryColor,batteries:state.batteries})};if(immediate){clearTimeout(saveTimer);save()}else if(!saveTimer)saveTimer=setTimeout(save,SAVE_MS)};
   function integrateCurrentPair(before,after,elapsedMs){
     if(!Number.isFinite(before)||!Number.isFinite(after)||elapsedMs<=0||elapsedMs>MAX_AH_GAP_MS)return null;
@@ -160,7 +160,149 @@ export function createBatteriesModule(requestRender,openManager){
     const s=stats(),batteryCount=state.batteries.length,minis=batteryCount?state.batteries.map(mini).join(""):'<div class="battery-mini-empty">Sin baterías vinculadas</div>',single=batteryCount===1?" single":"",cardRows=Math.max(1,Math.ceil(batteryCount/2));
     return '<div class="battery-overview" data-layout="dial-cards"><div class="battery-indicators-panel">'+batteryDial(s)+bankEstimate(s)+'</div><div class="battery-bank-panel"><div class="battery-bank-heading"><div class="battery-bank-name">'+esc(state.bankName)+solarIndicatorMarkup()+'</div><div class="battery-ah">'+(s.rem===null?"—":Math.round(s.rem))+' / '+Math.round(s.cap)+' Ah</div></div><div class="battery-mini-column'+single+'" style="--battery-card-rows:'+cardRows+'">'+minis+'</div></div></div>';
   }
-  function historyPage(){const [label,ms]=ZOOMS[zoom],total=ms*BARS,span=total>=86400000?`${Math.round(total/86400000)} días`:total<3600000?`${Math.round(total/60000)} min`:`${Number((total/3600000).toFixed(1)).toLocaleString('es')} h`;return `<div class="battery-history-page"><div class="battery-history-head"><div><strong>Histórico de carga</strong><small>30 intervalos · ${label} por intervalo · ${span}</small></div><div class="battery-history-zoom"><button type="button" data-battery-history-zoom="out" ${zoom===0?'disabled':''}>−</button><b>${label}</b><button type="button" data-battery-history-zoom="in" ${zoom===ZOOMS.length-1?'disabled':''}>+</button></div></div><div class="battery-history-chart"><div class="battery-history-y"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><canvas data-battery-history-chart></canvas><div class="battery-history-y battery-history-y-ah"><span data-ah-label="top">+— Ah</span><span data-ah-label="upper">+— Ah</span><span data-ah-label="zero">0 Ah</span><span data-ah-label="lower">−— Ah</span><span data-ah-label="bottom">−— Ah</span></div><div class="battery-history-y battery-history-y-current"><span data-current-label="top">+— A</span><span data-current-label="upper">+— A</span><span data-current-label="zero">0 A</span><span data-current-label="lower">−— A</span><span data-current-label="bottom">−— A</span></div></div><div class="battery-history-legend" data-battery-history-legend></div><small class="battery-history-foot">Los intervalos cerrados muestran promedios. En el intervalo abierto, las barras y la corriente muestran la última lectura; los Ah muestran una proyección basada en la corriente promedio hasta ahora. La barra tenue marca el intervalo abierto.</small></div>`}
+
+
+  function historyOffsetRange(ms){
+    let oldest=Infinity;
+    for(const point of state.history){const time=Number(point?.time);if(Number.isFinite(time))oldest=Math.min(oldest,time)}
+    if(!Number.isFinite(oldest))return 0;
+    const alignedEnd=Math.floor(Date.now()/ms)*ms+ms;
+    return Math.max(0,Math.floor((alignedEnd-oldest)/ms)-BARS);
+  }
+  function clampHistoryOffset(value,ms){return Math.max(0,Math.min(historyOffsetRange(ms),Math.round(Number(value)||0)))}
+  function changeHistoryZoom(next,anchorTime=null,anchorFraction=.5){
+    next=Math.max(0,Math.min(ZOOMS.length-1,Number(next)||0));if(next===zoom)return;
+    const now=Date.now(),oldMs=ZOOMS[zoom][1],oldEnd=Math.floor(now/oldMs)*oldMs+oldMs-historyOffset*oldMs,oldStart=oldEnd-BARS*oldMs;
+    anchorFraction=Math.max(0,Math.min(1,Number(anchorFraction)||0));
+    if(!Number.isFinite(anchorTime))anchorTime=oldStart+anchorFraction*BARS*oldMs;
+    zoom=next;const ms=ZOOMS[zoom][1],alignedEnd=Math.floor(now/ms)*ms+ms,desiredEnd=anchorTime+(1-anchorFraction)*BARS*ms;
+    historyOffset=clampHistoryOffset(Math.round((alignedEnd-desiredEnd)/ms),ms);write(ZOOM_KEY,zoom);requestRender('batteries');
+  }
+  function historyExtremePair(){return{max:null,min:null}}
+  function addHistoryExtreme(pair,value,index,time){
+    if(!Number.isFinite(value))return;
+    const point={value,index,time};
+    if(!pair.max||value>pair.max.value)pair.max=point;
+    if(!pair.min||value<pair.min.value)pair.min=point;
+  }
+  function historyExtremeData(data){
+    const batteries=new Map(historyBatteries().map(b=>[b.id,{name:b.name,pair:historyExtremePair()}]));
+    const bankSoc=historyExtremePair(),bankCurrent=historyExtremePair();
+    data.bars.forEach((bar,index)=>{
+      const time=data.start+index*data.ms;
+      for(const part of bar.parts){
+        const id=String(part.id||part.name||'battery');
+        if(!batteries.has(id))batteries.set(id,{name:part.name||'Batería',pair:historyExtremePair()});
+        addHistoryExtreme(batteries.get(id).pair,num(part.value),index,time);
+      }
+      const summed=bar.parts.reduce((sum,part)=>sum+(num(part.value)||0),0);
+      addHistoryExtreme(bankSoc,num(bar.soc)??(bar.parts.length?summed:null),index,time);
+      const bank=bar.currents.find(item=>String(item.id)==='bank');
+      addHistoryExtreme(bankCurrent,num(bank?.value??bar.current),index,time);
+    });
+    return{batteries,bankSoc,bankCurrent};
+  }
+  function historyExtremeTitle(point){
+    return point?esc(new Date(point.time).toLocaleString('es',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})):'';
+  }
+  function historyExtremeValue(point,unit){
+    if(!point)return'—';
+    if(unit==='%')return Math.round(point.value)+'%';
+    const value=Number(point.value),sign=value>0?'+':value<0?'−':'';
+    return sign+Math.abs(value).toFixed(1)+' A';
+  }
+  function historyExtremeCard(name,pair,unit){
+    const max=pair?.max||null,min=pair?.min||null;
+    return'<article class="battery-history-extreme-card"><strong>'+esc(name)+'</strong>'+
+      '<div class="battery-history-extreme-value is-max"><span>Máx.</span><b title="'+historyExtremeTitle(max)+'">'+historyExtremeValue(max,unit)+'</b></div>'+
+      '<div class="battery-history-extreme-value is-min"><span>Mín.</span><b title="'+historyExtremeTitle(min)+'">'+historyExtremeValue(min,unit)+'</b></div></article>';
+  }
+  function renderHistoryExtremes(root=state.historyRoot||state.root){
+    const host=root?.querySelector('[data-battery-history-extremes]');if(!host)return;
+    const extremes=historyExtremeData(chartData()),cards=[];
+    for(const battery of historyBatteries()){const entry=extremes.batteries.get(battery.id);cards.push(historyExtremeCard(battery.name,entry?.pair,'%'))}
+    cards.push(historyExtremeCard(state.bankName||'Banco',extremes.bankSoc,'%'));
+    cards.push(historyExtremeCard('Corriente del banco',extremes.bankCurrent,'A'));
+    host.innerHTML='<h4>Máximos y mínimos del período visible</h4><small class="battery-history-extremes-note">Aporte de cada batería al banco · carga del banco · corriente</small><div class="battery-history-extreme-grid">'+cards.join('')+'</div>';
+  }
+  function syncHistoryControls(root=state.historyRoot||state.root){
+    const [label,ms]=ZOOMS[zoom],max=historyOffsetRange(ms);historyOffset=Math.max(0,Math.min(max,historyOffset));
+    const slider=root?.querySelector('[data-battery-history-scroll]');
+    if(slider){slider.min='0';slider.max=String(max);slider.value=String(max-historyOffset);slider.disabled=max===0}
+    const older=root?.querySelector('[data-history-pan="older"]'),newer=root?.querySelector('[data-history-pan="newer"]');
+    if(older)older.disabled=historyOffset>=max;
+    if(newer)newer.disabled=historyOffset<=0;
+  }
+  function refreshHistoryView(root=state.historyRoot||state.root){syncHistoryControls(root);renderHistoryExtremes(root);queueDraw(root)}
+  function bindHistoryNavigation(root){
+    const chart=root.querySelector('.battery-history-chart');if(!chart||chart.dataset.historyGesturesBound==='1')return;
+    chart.dataset.historyGesturesBound='1';const points=new Map();let gesture=null;
+    const pointList=()=>[...points.values()];
+    chart.addEventListener('pointerdown',event=>{
+      if(event.pointerType==='mouse'&&event.button!==0)return;
+      points.set(event.pointerId,{x:event.clientX,y:event.clientY});
+      try{chart.setPointerCapture(event.pointerId)}catch{}
+      if(points.size===1)gesture={type:'pan',startX:event.clientX,startY:event.clientY,width:root.querySelector('[data-battery-history-chart]')?.getBoundingClientRect().width||chart.clientWidth};
+      else if(points.size===2){
+        const pair=pointList(),rect=root.querySelector('[data-battery-history-chart]')?.getBoundingClientRect()||chart.getBoundingClientRect(),data=chartData();
+        const distance=Math.hypot(pair[0].x-pair[1].x,pair[0].y-pair[1].y),center=(pair[0].x+pair[1].x)/2,fraction=Math.max(0,Math.min(1,(center-rect.left)/Math.max(1,rect.width)));
+        gesture={type:'pinch',distance,zoom,anchorFraction:fraction,anchorTime:data.start+fraction*BARS*data.ms};
+      }
+    });
+    chart.addEventListener('pointermove',event=>{if(!points.has(event.pointerId))return;points.set(event.pointerId,{x:event.clientX,y:event.clientY});if(points.size===2&&gesture?.type==='pinch'&&event.cancelable)event.preventDefault()});
+    const finish=event=>{
+      const active=points.get(event.pointerId);if(!active)return;
+      if(points.size===2&&gesture?.type==='pinch'){
+        const pair=pointList(),distance=Math.hypot(pair[0].x-pair[1].x,pair[0].y-pair[1].y),ratio=distance/Math.max(1,gesture.distance),steps=Math.round(Math.log(ratio)/Math.log(1.35));
+        const next=Math.max(0,Math.min(ZOOMS.length-1,gesture.zoom-steps)),anchorTime=gesture.anchorTime,anchorFraction=gesture.anchorFraction;
+        points.delete(event.pointerId);gesture=null;if(next!==zoom)changeHistoryZoom(next,anchorTime,anchorFraction);return;
+      }
+      if(points.size===1&&gesture?.type==='pan'){
+        const dx=event.clientX-gesture.startX,dy=event.clientY-gesture.startY,width=Math.max(1,gesture.width);
+        points.delete(event.pointerId);gesture=null;
+        if(Math.abs(dx)>34&&Math.abs(dx)>Math.abs(dy)*1.25){const bars=Math.max(1,Math.round(Math.abs(dx)/(width/BARS))),ms=ZOOMS[zoom][1],direction=dx<0?1:-1;historyOffset=clampHistoryOffset(historyOffset+direction*bars,ms);refreshHistoryView(root)}
+        return;
+      }
+      points.delete(event.pointerId);gesture=null;
+    };
+    chart.addEventListener('pointerup',finish);chart.addEventListener('pointercancel',finish);
+    root.querySelector('[data-battery-history-scroll]')?.addEventListener('input',event=>{
+      const max=Number(event.currentTarget.max)||0;historyOffset=clampHistoryOffset(max-Number(event.currentTarget.value),ZOOMS[zoom][1]);refreshHistoryView(root);
+    });
+    root.querySelectorAll('[data-history-pan]').forEach(button=>button.addEventListener('click',()=>{
+      const step=Math.max(1,Math.round(BARS/4)),direction=button.dataset.historyPan==='older'?1:-1;
+      historyOffset=clampHistoryOffset(historyOffset+direction*step,ZOOMS[zoom][1]);refreshHistoryView(root);
+    }));
+  }
+  function historyPeriodKey(time,ms){
+    const date=new Date(time),year=date.getFullYear(),month=date.getMonth()+1,day=date.getDate();
+    if(ms<86400000)return'D:'+year+'-'+month+'-'+day;
+    if(ms<7*86400000){const monday=new Date(year,date.getMonth(),day);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));return'W:'+monday.getFullYear()+'-'+(monday.getMonth()+1)+'-'+monday.getDate()}
+    if(ms<28*86400000)return'M:'+year+'-'+month;
+    return'Q:'+year+'-'+(Math.floor(date.getMonth()/3)+1);
+  }
+  function historyPeriodLabel(time,ms){
+    const date=new Date(time),compact=value=>value.replace(/\.$/,'');
+    if(ms<86400000)return compact(date.toLocaleDateString('es',{day:'2-digit',month:'short'}));
+    if(ms<7*86400000){const monday=new Date(date.getFullYear(),date.getMonth(),date.getDate());monday.setDate(monday.getDate()-((monday.getDay()+6)%7));return compact(monday.toLocaleDateString('es',{day:'2-digit',month:'short'}))}
+    if(ms<28*86400000)return compact(date.toLocaleDateString('es',{month:'short',year:'numeric'}));
+    return'T'+(Math.floor(date.getMonth()/3)+1)+' '+date.getFullYear();
+  }
+  function historyPeriodGroups(start,ms,count){
+    const groups=[];let current=null;
+    for(let index=0;index<count;index++){const time=start+index*ms,key=historyPeriodKey(time,ms);if(!current||current.key!==key){if(current)current.endIndex=index;current={key,startIndex:index,endIndex:count,time};groups.push(current)}}
+    return groups;
+  }
+  function historyPage(){
+    const [label,ms]=ZOOMS[zoom],total=ms*BARS,span=total>=86400000?Math.round(total/86400000)+' días':total<3600000?Math.round(total/60000)+' min':Number((total/3600000).toFixed(1)).toLocaleString('es')+' h';
+    const maxOffset=historyOffsetRange(ms);historyOffset=Math.max(0,Math.min(maxOffset,historyOffset));
+    return'<div class="battery-history-page"><div class="battery-history-head"><div><strong>Histórico de carga</strong><small>30 intervalos · '+label+' por intervalo · '+span+'</small></div><div class="battery-history-zoom"><button type="button" data-battery-history-zoom="out" '+(zoom===ZOOMS.length-1?'disabled':'')+'>−</button><b>'+label+'</b><button type="button" data-battery-history-zoom="in" '+(zoom===0?'disabled':'')+'>+</button></div></div>'+
+      '<div class="battery-history-chart"><div class="battery-history-y"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><canvas data-battery-history-chart aria-label="Histórico de carga, desliza para recorrer y pellizca para cambiar el intervalo"></canvas><div class="battery-history-y battery-history-y-ah"><span data-ah-label="top">+— Ah</span><span data-ah-label="upper">+— Ah</span><span data-ah-label="zero">0 Ah</span><span data-ah-label="lower">−— Ah</span><span data-ah-label="bottom">−— Ah</span></div><div class="battery-history-y battery-history-y-current"><span data-current-label="top">+— A</span><span data-current-label="upper">+— A</span><span data-current-label="zero">0 A</span><span data-current-label="lower">−— A</span><span data-current-label="bottom">−— A</span></div></div>'+
+      '<div class="battery-history-scroll-controls" aria-label="Navegación temporal"><button type="button" data-history-pan="older" aria-label="Ver intervalos anteriores" '+(maxOffset===0?'disabled':'')+'>‹</button><input type="range" data-battery-history-scroll min="0" max="'+maxOffset+'" value="'+(maxOffset-historyOffset)+'" step="1" aria-label="Desplazar el período visible"><button type="button" data-history-pan="newer" aria-label="Ver intervalos recientes" '+(historyOffset===0?'disabled':'')+'>›</button></div>'+
+      '<div class="battery-history-legend" data-battery-history-legend></div><section class="battery-history-extremes" data-battery-history-extremes aria-live="polite"></section>'+
+      '<small class="battery-history-gesture">Desliza horizontalmente para recorrer · Pellizca para cambiar el intervalo por barra</small>'+
+      '<small class="battery-history-foot">Los intervalos cerrados muestran promedios. El intervalo actual muestra la última lectura y una proyección de Ah. Los máximos y mínimos corresponden al período visible.</small></div>';
+  }
   function statPage(){const s=stats();return `<div class="battery-list battery-stats-list">${row('Carga actual',s.soc===null?'—':Math.round(s.soc)+'%',`${s.rem===null?'—':Math.round(s.rem)} / ${Math.round(s.cap)} Ah`)}${row('Potencia actual',s.power===null?'—':Math.round(s.power)+' W',s.current===null?'Sin datos de corriente':s.current>=0?'Cargando':'Descargando')}</div>`}
   const row=(name,value,detail)=>`<div class="battery-item"><div class="battery-item-top"><span class="battery-name">${name}</span><span class="battery-soc">${value}</span></div><div class="battery-item-sub"><span>${detail}</span></div></div>`;
   function listPage(){if(!state.batteries.length)return `<div class="battery-empty"><div>No hay baterías vinculadas</div><button class="gps-action primary" type="button" data-battery-manage>Administrar Banco de Baterías</button></div>`;return `<div class="battery-list">${state.batteries.map(b=>row(esc(b.name||b.deviceName||'Batería'),charge(b).soc===null?'—':Math.round(charge(b).soc)+'%',`${num(b.capacityAh)||0} Ah · ${b.connected===false?'Offline':'Conectada'}`)).join('')}</div>`}
@@ -177,14 +319,14 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function chartData(){
     ensureHistoryAh();
-    const now=Date.now(),[_,ms]=ZOOMS[zoom],end=Math.floor(now/ms)*ms+ms,start=end-ms*BARS,openIndex=BARS-1,openStart=start+openIndex*ms;
+    const now=Date.now(),[_,ms]=ZOOMS[zoom],alignedEnd=Math.floor(now/ms)*ms+ms;historyOffset=clampHistoryOffset(historyOffset,ms);const end=alignedEnd-historyOffset*ms,start=end-ms*BARS,openIndex=historyOffset===0?BARS-1:-1,openStart=openIndex>=0?start+openIndex*ms:Infinity;
     const bars=Array.from({length:BARS},()=>({parts:new Map(),current:0,currentN:0,currentLast:null,currentLastTime:-Infinity,soc:0,socN:0,socLast:null,socLastTime:-Infinity,ah:new Map(),currents:new Map()}));
     let previousTime=null,latestBeforeOpen=null;
     for(const p of state.history){
       const time=Number(p?.time);
       if(!Number.isFinite(time)||time>now)continue;
       const i=Math.floor((time-start)/ms),coverage=previousTime!==null&&time>previousTime&&time-previousTime<=MAX_AH_GAP_MS?time-previousTime:0;
-      if(time<openStart)latestBeforeOpen=p;
+      if(openIndex>=0&&time<openStart)latestBeforeOpen=p;
       if(i>=0&&i<BARS){
         const b=bars[i],current=num(p.current),soc=num(p.soc);
         if(current!==null){b.current+=current;b.currentN++}
@@ -213,8 +355,8 @@ export function createBatteriesModule(requestRender,openManager){
       }
       previousTime=time;
     }
-    const open=bars[openIndex];
-    if(latestBeforeOpen&&now-Number(latestBeforeOpen.time)>=0&&now-Number(latestBeforeOpen.time)<=MAX_AH_GAP_MS){
+    const open=openIndex>=0?bars[openIndex]:null;
+    if(openIndex>=0&&latestBeforeOpen&&now-Number(latestBeforeOpen.time)>=0&&now-Number(latestBeforeOpen.time)<=MAX_AH_GAP_MS){
       const time=Number(latestBeforeOpen.time);
       if(open.socLastTime===-Infinity)open.socLast=num(latestBeforeOpen.soc);
       for(const part of latestBeforeOpen.batteries||[]){
@@ -268,28 +410,124 @@ export function createBatteriesModule(requestRender,openManager){
   function getCurrentHistoryColor(id,lineIds=null){if(String(id)==='bank')return validColor(state.bankHistoryColor,'#20d7e5');const battery=state.batteries.find(item=>String(item.id)===String(id)),configured=validColor(battery?.historyCurrentColor,'');if(configured)return configured;const ids=lineIds||[...new Set(chartData().bars.flatMap(bar=>bar.ah.map(x=>x.id)))].sort();if(!ids.includes(String(id)))ids.push(String(id)),ids.sort();return CURRENT_LINE_COLORS[Math.max(0,ids.indexOf(String(id)))%CURRENT_LINE_COLORS.length]}
   function fillHistoryGaps(bars){const previous=Array(bars.length).fill(-1),next=Array(bars.length).fill(-1);let last=-1;for(let i=0;i<bars.length;i++){previous[i]=last;if(bars[i].parts.length)last=i}last=-1;for(let i=bars.length-1;i>=0;i--){next[i]=last;if(bars[i].parts.length)last=i}for(let i=0;i<bars.length;i++){if(bars[i].parts.length||previous[i]<0||next[i]<0)continue;const leftIndex=previous[i],rightIndex=next[i],left=bars[leftIndex],right=bars[rightIndex],fraction=(i-leftIndex)/(rightIndex-leftIndex),leftParts=new Map(left.parts.map(p=>[p.id,p])),rightParts=new Map(right.parts.map(p=>[p.id,p])),ids=new Set([...leftParts.keys(),...rightParts.keys()]);bars[i].parts=[...ids].map(id=>{const a=leftParts.get(id),b=rightParts.get(id),start=a?.value||0,end=b?.value||0;return{id,name:a?.name||b?.name||'Batería',value:start+(end-start)*fraction}}).filter(p=>p.value>0);const a=num(left.soc),b=num(right.soc);if(bars[i].soc===null&&a!==null&&b!==null)bars[i].soc=a+(b-a)*fraction}return bars}
   function historyDirections(bars){let last=null;const dirs=bars.map((b,i)=>{let dir=null;if(b.current!==null&&b.current!==0)dir=b.current>0?1:-1;else if(i>0&&b.soc!==null&&bars[i-1].soc!==null){const delta=b.soc-bars[i-1].soc;if(delta>0)dir=1;else if(delta<0)dir=-1}if(dir!==null)last=dir;return dir??last});let next=null;for(let i=dirs.length-1;i>=0;i--){if(dirs[i]!==null)next=dirs[i];else if(next!==null)dirs[i]=next}return dirs}
-  function axisLabel(time,ms){const d=new Date(time),hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'),month=String(d.getMonth()+1).padStart(2,'0'),year=String(d.getFullYear()).slice(-2);if(ms<86400000)return`${hh}:${mm}`;if(ms<7*86400000)return`${day}/${month}`;return`${day}/${month}/${year}`}
+  function axisLabel(time,ms){
+    const date=new Date(time),hh=String(date.getHours()).padStart(2,'0'),mm=String(date.getMinutes()).padStart(2,'0'),day=String(date.getDate()).padStart(2,'0'),month=String(date.getMonth()+1).padStart(2,'0');
+    if(ms<86400000)return hh+':'+mm;
+    if(ms<7*86400000)return day+'/'+month;
+    if(ms<28*86400000)return date.toLocaleDateString('es',{day:'2-digit',month:'short'}).replace(/\.$/,'');
+    return date.toLocaleDateString('es',{month:'short',year:'2-digit'}).replace(/\.$/,'');
+  }
   function niceAhScale(values){const maximum=Math.max(0,...values.map(Math.abs));if(!maximum)return 1;if(maximum<.1)return .1;const power=10**Math.floor(Math.log10(maximum)),fraction=maximum/power,nice=fraction<=1?1:fraction<=2?2:fraction<=5?5:10;return nice*power}
+
   function draw(root){
-    const canvas=root?.querySelector('[data-battery-history-chart]');if(!canvas)return false;const r=canvas.getBoundingClientRect();if(r.width<10||r.height<10)return false;
-    const dpr=devicePixelRatio||1,w=Math.round(r.width*dpr),h=Math.round(r.height*dpr);if(canvas.width!==w)canvas.width=w;if(canvas.height!==h)canvas.height=h;
-    const c=canvas.getContext('2d');if(!c)return false;const data=chartData(),bars=fillHistoryGaps(data.bars),directions=historyDirections(bars),slot=r.width/BARS,bw=Math.max(2,slot*.72),legend=new Map(),axisH=Math.min(54,Math.max(38,r.height*.2)),plotH=Math.max(30,r.height-axisH),ahValues=bars.flatMap(b=>b.ah.filter(x=>!hiddenSeries[`ah:${x.id}`]).map(x=>x.value)),ahScale=niceAhScale(ahValues),currentValues=bars.flatMap(b=>b.currents.filter(x=>!hiddenSeries[`current:${x.id}`]).map(x=>x.value)),currentScale=niceAhScale(currentValues);
-    for(const axis of root.querySelectorAll('.battery-history-y')){axis.style.height=`${plotH}px`;axis.style.alignSelf='start'}
-    const ahLabels={'top':`+${formatAhTick(ahScale)} Ah`,'upper':`+${formatAhTick(ahScale/2)} Ah`,'zero':'0 Ah','lower':`−${formatAhTick(ahScale/2)} Ah`,'bottom':`−${formatAhTick(ahScale)} Ah`};for(const [position,label] of Object.entries(ahLabels)){const node=root.querySelector(`[data-ah-label="${position}"]`);if(node)node.textContent=label}
-    const currentLabels={'top':`+${formatAhTick(currentScale)} A`,'upper':`+${formatAhTick(currentScale/2)} A`,'zero':'0 A','lower':`−${formatAhTick(currentScale/2)} A`,'bottom':`−${formatAhTick(currentScale)} A`};for(const [position,label] of Object.entries(currentLabels)){const node=root.querySelector(`[data-current-label="${position}"]`);if(node)node.textContent=label}for(const [selector,shown] of [['.battery-history-y-ah',ahValues.length],['.battery-history-y-current',currentValues.length]]){const axis=root.querySelector(selector);if(axis)axis.hidden=!shown}const chart=root.querySelector('.battery-history-chart');if(chart){const changed=chart.classList.contains('hide-ah')===!!ahValues.length||chart.classList.contains('hide-current')===!!currentValues.length;chart.classList.toggle('hide-ah',!ahValues.length);chart.classList.toggle('hide-current',!currentValues.length);if(changed)queueDraw(root)}
-    c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,r.width,r.height);c.strokeStyle='#28516a';c.lineWidth=1;for(let i=0;i<=4;i++){const y=Math.round(i*plotH/4)+.5;c.beginPath();c.moveTo(0,y);c.lineTo(r.width,y);c.stroke()}
+    const canvas=root?.querySelector('[data-battery-history-chart]');if(!canvas)return false;
+    const r=canvas.getBoundingClientRect();if(r.width<10||r.height<10)return false;
+    const dpr=devicePixelRatio||1,w=Math.round(r.width*dpr),h=Math.round(r.height*dpr);
+    if(canvas.width!==w)canvas.width=w;if(canvas.height!==h)canvas.height=h;
+    const c=canvas.getContext('2d');if(!c)return false;
+    const data=chartData(),bars=fillHistoryGaps(data.bars),directions=historyDirections(bars),extremes=historyExtremeData(data);
+    const slot=r.width/BARS,bw=Math.max(2,slot*.72),legend=new Map(),axisH=Math.min(68,Math.max(58,r.height<245?58:66)),plotH=Math.max(30,r.height-axisH);
+    const ahValues=bars.flatMap(b=>b.ah.filter(x=>!hiddenSeries['ah:'+x.id]).map(x=>x.value)),ahScale=niceAhScale(ahValues);
+    const currentValues=bars.flatMap(b=>b.currents.filter(x=>!hiddenSeries['current:'+x.id]).map(x=>x.value)),currentScale=niceAhScale(currentValues);
+    for(const axis of root.querySelectorAll('.battery-history-y')){axis.style.height=plotH+'px';axis.style.alignSelf='start'}
+    const ahLabels={top:'+'+formatAhTick(ahScale)+' Ah',upper:'+'+formatAhTick(ahScale/2)+' Ah',zero:'0 Ah',lower:'−'+formatAhTick(ahScale/2)+' Ah',bottom:'−'+formatAhTick(ahScale)+' Ah'};
+    for(const [position,label] of Object.entries(ahLabels)){const node=root.querySelector('[data-ah-label="'+position+'"]');if(node)node.textContent=label}
+    const currentLabels={top:'+'+formatAhTick(currentScale)+' A',upper:'+'+formatAhTick(currentScale/2)+' A',zero:'0 A',lower:'−'+formatAhTick(currentScale/2)+' A',bottom:'−'+formatAhTick(currentScale)+' A'};
+    for(const [position,label] of Object.entries(currentLabels)){const node=root.querySelector('[data-current-label="'+position+'"]');if(node)node.textContent=label}
+    for(const [selector,shown] of [['.battery-history-y-ah',ahValues.length],['.battery-history-y-current',currentValues.length]]){
+      const axis=root.querySelector(selector);if(axis)axis.hidden=!shown
+    }
+    const chart=root.querySelector('.battery-history-chart');
+    if(chart){
+      const changed=chart.classList.contains('hide-ah')===!!ahValues.length||chart.classList.contains('hide-current')===!!currentValues.length;
+      chart.classList.toggle('hide-ah',!ahValues.length);chart.classList.toggle('hide-current',!currentValues.length);
+      if(changed)queueDraw(root)
+    }
+    c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,r.width,r.height);
+    c.strokeStyle='#28516a';c.lineWidth=1;
+    for(let i=0;i<=4;i++){const y=Math.round(i*plotH/4)+.5;c.beginPath();c.moveTo(0,y);c.lineTo(r.width,y);c.stroke()}
+    const groups=historyPeriodGroups(data.start,data.ms,BARS);
+    c.save();c.strokeStyle='#1b435a';c.lineWidth=1;
+    for(const group of groups){if(group.startIndex===0)continue;const x=Math.round(group.startIndex*slot)+.5;c.beginPath();c.moveTo(x,0);c.lineTo(x,plotH+axisH-2);c.stroke()}
+    c.restore();
     const paletteIds=historyBatteries().map(b=>b.id).sort();
-    bars.forEach((b,i)=>{if(!b.parts.length||directions[i]===null)return;const direction=directions[i]>0?'charge':'discharge',isOpen=i===data.openIndex;if(isOpen){c.save();c.globalAlpha=.72}let y=plotH;b.parts.sort((a,b)=>a.id.localeCompare(b.id)).forEach((p,n)=>{const ph=Math.max(0,Math.min(100,p.value))/100*plotH;if(!ph)return;y-=ph;const key=`soc:${p.id}`;const color=getHistorySeriesColor('soc-'+direction+':'+p.id,paletteIds);c.fillStyle=color;if(!hiddenSeries[key])c.fillRect(i*slot+(slot-bw)/2,y,bw,Math.max(1,ph));legend.set(key,{name:p.name,color,kind:'bar'})});if(isOpen)c.restore()});
-    const zeroY=plotH/2;c.strokeStyle='#7c9bad';c.lineWidth=1.5;c.beginPath();c.moveTo(0,zeroY+.5);c.lineTo(r.width,zeroY+.5);c.stroke();
-    const lineIds=[...new Set(bars.flatMap(b=>[...b.ah,...b.currents].map(x=>x.id)))].sort();
+    bars.forEach((bar,index)=>{
+      if(!bar.parts.length||directions[index]===null)return;
+      const direction=directions[index]>0?'charge':'discharge',isOpen=index===data.openIndex;
+      if(isOpen){c.save();c.globalAlpha=.72}
+      let y=plotH;
+      bar.parts.slice().sort((a,b)=>a.id.localeCompare(b.id)).forEach(part=>{
+        const height=Math.max(0,Math.min(100,part.value))/100*plotH;if(!height)return;y-=height;
+        const key='soc:'+part.id,color=getHistorySeriesColor('soc-'+direction+':'+part.id,paletteIds);
+        c.fillStyle=color;if(!hiddenSeries[key])c.fillRect(index*slot+(slot-bw)/2,y,bw,Math.max(1,height));
+        legend.set(key,{name:part.name,color,kind:'bar'})
+      });
+      if(isOpen)c.restore()
+    });
+    const zeroY=plotH/2;
+    c.strokeStyle='#7c9bad';c.lineWidth=1.5;c.beginPath();c.moveTo(0,zeroY+.5);c.lineTo(r.width,zeroY+.5);c.stroke();
+    const lineIds=[...new Set(bars.flatMap(bar=>[...bar.ah,...bar.currents].map(item=>item.id)))].sort();
     for(const [field,prefix,scale,kind,unit] of [['ah','ah',ahScale,'line','Ah'],['currents','current',currentScale,'current','A prom.']]){
-      const ids=[...new Set(bars.flatMap(b=>b[field].map(x=>x.id)))].sort();
-      for(const id of ids){const key=`${prefix}:${id}`,color=getHistorySeriesColor(key,paletteIds),sample=bars.flatMap(b=>b[field]).find(x=>x.id===id);if(sample)legend.set(key,{name:`${sample.name} · ${unit}`,color,kind});if(hiddenSeries[key])continue;
-        let open=false;c.save();c.setLineDash(field==='currents'?[5,4]:[]);c.beginPath();bars.forEach((b,i)=>{const value=b[field].find(x=>x.id===id)?.value;if(!Number.isFinite(value)){open=false;return}const x=(i+.5)*slot,y=Math.max(2,Math.min(plotH-2,zeroY-(value/scale)*zeroY));if(!open){c.moveTo(x,y);open=true}else c.lineTo(x,y)});c.strokeStyle=color;c.lineWidth=2;c.lineJoin='round';c.stroke();c.setLineDash([]);bars.forEach((b,i)=>{const value=b[field].find(x=>x.id===id)?.value;if(!Number.isFinite(value))return;const x=(i+.5)*slot,y=Math.max(2,Math.min(plotH-2,zeroY-(value/scale)*zeroY)),radius=Math.max(1.5,Math.min(2.5,slot*.1));c.globalAlpha=i===data.openIndex ? .72 : 1;c.fillStyle=color;c.beginPath();c.arc(x,y,radius,0,Math.PI*2);c.fill();if(i===data.openIndex){c.globalAlpha=1;c.strokeStyle=color;c.lineWidth=1;c.beginPath();c.arc(x,y,radius+1,0,Math.PI*2);c.stroke()}});c.restore();
+      const ids=[...new Set(bars.flatMap(bar=>bar[field].map(item=>item.id)))].sort();
+      for(const id of ids){
+        const key=prefix+':'+id,color=getHistorySeriesColor(key,paletteIds),sample=bars.flatMap(bar=>bar[field]).find(item=>item.id===id);
+        if(sample)legend.set(key,{name:sample.name+' · '+unit,color,kind});if(hiddenSeries[key])continue;
+        let open=false;c.save();c.setLineDash(field==='currents'?[5,4]:[]);c.beginPath();
+        bars.forEach((bar,index)=>{
+          const value=bar[field].find(item=>item.id===id)?.value;if(!Number.isFinite(value)){open=false;return}
+          const x=(index+.5)*slot,y=Math.max(2,Math.min(plotH-2,zeroY-(value/scale)*zeroY));
+          if(!open){c.moveTo(x,y);open=true}else c.lineTo(x,y)
+        });
+        c.strokeStyle=color;c.lineWidth=2;c.lineJoin='round';c.stroke();c.setLineDash([]);
+        bars.forEach((bar,index)=>{
+          const value=bar[field].find(item=>item.id===id)?.value;if(!Number.isFinite(value))return;
+          const x=(index+.5)*slot,y=Math.max(2,Math.min(plotH-2,zeroY-(value/scale)*zeroY)),radius=Math.max(1.5,Math.min(2.5,slot*.1));
+          c.globalAlpha=index===data.openIndex ? .72 : 1;c.fillStyle=color;c.beginPath();c.arc(x,y,radius,0,Math.PI*2);c.fill();
+          if(index===data.openIndex){c.globalAlpha=1;c.strokeStyle=color;c.lineWidth=1;c.beginPath();c.arc(x,y,radius+1,0,Math.PI*2);c.stroke()}
+        });
+        c.restore()
       }
     }
-    c.save();c.strokeStyle='#17394f';c.lineWidth=1;c.beginPath();c.moveTo(0,plotH+.5);c.lineTo(r.width,plotH+.5);c.stroke();c.fillStyle='#7890a1';c.font=`${r.width<520?7:8}px system-ui, sans-serif`;c.textAlign='left';c.textBaseline='middle';for(let i=0;i<BARS;i++){const x=(i+.5)*slot,y=plotH+axisH-3,label=axisLabel(data.start+i*data.ms,data.ms);c.save();c.translate(x,y);c.rotate(-Math.PI/2);c.fillText(label,0,0);c.restore()}c.restore();
-    const host=root.querySelector('[data-battery-history-legend]');if(host)host.innerHTML=[...legend.entries()].filter(([key])=>!hiddenSeries[key]).map(([,x])=>`<span><i class="${x.kind}" style="--series-color:${x.color}"></i>${esc(x.name)}</span>`).join('')||(legend.size?'':'<span class="muted">Se necesitan muestras históricas para mostrar aportes.</span>');return true;
+    const mark=(x,y,color)=>{
+      c.save();c.fillStyle='#071b29';c.strokeStyle=color;c.lineWidth=1.8;c.beginPath();c.arc(x,y,3.5,0,Math.PI*2);c.fill();c.stroke();c.restore()
+    };
+    for(const [id,entry] of extremes.batteries){
+      for(const kind of ['max','min']){
+        const point=entry.pair[kind];if(!point||hiddenSeries['soc:'+id])continue;
+        const bar=bars[point.index],direction=directions[point.index];if(!bar||!bar.parts.length||direction===null)continue;
+        let y=plotH,found=false;
+        for(const part of bar.parts.slice().sort((a,b)=>a.id.localeCompare(b.id))){
+          y-=Math.max(0,Math.min(100,part.value))/100*plotH;
+          if(String(part.id)===String(id)){mark((point.index+.5)*slot,y,kind==='max'?'#8ce478':'#ff757b');found=true;break}
+        }
+        if(found)continue
+      }
+    }
+    for(const kind of ['max','min']){
+      const point=extremes.bankSoc[kind],bar=point?bars[point.index]:null;
+      if(point&&bar?.parts.length){const total=bar.parts.reduce((sum,part)=>sum+(num(part.value)||0),0),y=plotH-Math.max(0,Math.min(100,total))/100*plotH;mark((point.index+.5)*slot,y,kind==='max'?'#20d7e5':'#f5a35b')}
+    }
+    if(!hiddenSeries['current:bank']){
+      for(const kind of ['max','min']){
+        const point=extremes.bankCurrent[kind];if(!point)continue;
+        const y=Math.max(2,Math.min(plotH-2,zeroY-(point.value/currentScale)*zeroY));mark((point.index+.5)*slot,y,kind==='max'?'#ffe500':'#ff8b6f')
+      }
+    }
+    c.save();c.strokeStyle='#17394f';c.lineWidth=1;c.beginPath();c.moveTo(0,plotH+.5);c.lineTo(r.width,plotH+.5);c.stroke();
+    c.fillStyle='#7890a1';c.font=(r.width<520?8:9)+'px system-ui, sans-serif';c.textAlign='center';c.textBaseline='middle';
+    const tickCount=Math.max(2,Math.floor(r.width/58)),step=Math.max(1,Math.ceil(BARS/tickCount));
+    for(let index=0;index<BARS;index+=step){const label=axisLabel(data.start+index*data.ms,data.ms);c.fillText(label,(index+.5)*slot,plotH+11)}
+    if(data.ms<86400000){
+      c.font=(r.width<520?8:9)+'px system-ui, sans-serif';
+      for(const group of groups){
+        const width=(group.endIndex-group.startIndex)*slot;if(width<48)continue;
+        const center=(group.startIndex+group.endIndex)*slot/2;c.fillStyle='#a8bfcb';c.fillText(historyPeriodLabel(group.time,data.ms),center,plotH+axisH-8)
+      }
+    }
+    c.restore();
+    const host=root.querySelector('[data-battery-history-legend]');
+    if(host)host.innerHTML=[...legend.entries()].filter(([key])=>!hiddenSeries[key]).map(([,item])=>'<span><i class="'+item.kind+'" style="--series-color:'+item.color+'"></i>'+esc(item.name)+'</span>').join('')||(legend.size?'':'<span class="muted">Se necesitan muestras históricas para mostrar aportes.</span>');
+    return true
   }
   function formatAhTick(value){const n=Number(value),a=Math.abs(n);return a>=10?String(Math.round(n)):a>=1?n.toFixed(1):a>=.1?n.toFixed(2):n.toFixed(3)}
   function queueDraw(root=state.historyRoot||state.root,retries=0){if(drawPending||!root)return;drawPending=true;requestAnimationFrame(()=>{drawPending=false;if(!draw(root)&&root.querySelector?.('[data-battery-history-chart]')&&retries<6)setTimeout(()=>queueDraw(root,retries+1),80)})}
@@ -299,7 +537,23 @@ export function createBatteriesModule(requestRender,openManager){
   function setHistorySeriesColor(key,value){key=String(key);const color=validColor(value,'');if(!color||!/^(soc-charge|soc-discharge|ah|current):.+/.test(key))return false;historyColors[key]=color;write(COLORS_KEY,historyColors);queueDraw();return true}
   function isHistorySeriesVisible(key){return !hiddenSeries[String(key)]}
   function setHistorySeriesVisible(key,visible){key=String(key);if(!/^(soc|ah|current):.+/.test(key))return;hiddenSeries[key]=!visible;write(VISIBILITY_KEY,hiddenSeries);queueDraw()}
-  function afterRender(root){state.root=root;const canvas=root.querySelector('[data-battery-history-chart]');if(canvas){state.historyRoot=root;if(typeof ResizeObserver==='function'&&canvas!==historyObservedCanvas){historyResizeObserver?.disconnect();historyObservedCanvas=canvas;historyResizeObserver=new ResizeObserver(entries=>{if(entries.some(entry=>entry.contentRect.width>=10&&entry.contentRect.height>=10))queueDraw(root)});historyResizeObserver.observe(canvas)}queueDraw(root)}root.querySelectorAll('[data-battery-manage]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openManager?.()}));root.querySelectorAll('[data-battery-history-zoom]').forEach(b=>b.addEventListener('click',()=>{const d=b.dataset.batteryHistoryZoom==='in'?1:-1,next=Math.max(0,Math.min(ZOOMS.length-1,zoom+d));if(next!==zoom){zoom=next;write(ZOOM_KEY,zoom);requestRender('batteries')}}))}
+
+  function afterRender(root){
+    state.root=root;const canvas=root.querySelector('[data-battery-history-chart]');
+    if(canvas){
+      state.historyRoot=root;
+      if(typeof ResizeObserver==='function'&&canvas!==historyObservedCanvas){
+        historyResizeObserver?.disconnect();historyObservedCanvas=canvas;
+        historyResizeObserver=new ResizeObserver(entries=>{if(entries.some(entry=>entry.contentRect.width>=10&&entry.contentRect.height>=10))queueDraw(root)});
+        historyResizeObserver.observe(canvas)
+      }
+      bindHistoryNavigation(root);syncHistoryControls(root);renderHistoryExtremes(root);queueDraw(root)
+    }
+    root.querySelectorAll('[data-battery-manage]').forEach(button=>button.addEventListener('click',event=>{event.stopPropagation();openManager?.()}));
+    root.querySelectorAll('[data-battery-history-zoom]').forEach(button=>button.addEventListener('click',()=>{
+      const delta=button.dataset.batteryHistoryZoom==='in'?-1:1;changeHistoryZoom(zoom+delta)
+    }))
+  }
   function updateBattery(data){if(!data)return;data=clone(data);stripLegacyVoltageCorrection(data);const now=Date.now(),id=String(data.id||data.address||data.deviceId||data.mac||data.name||'battery');let b=state.batteries.find(x=>String(x.id)===id);if(!b){b={id,name:data.name||data.deviceName||'Batería',capacityAh:num(data.capacityAh)||0,connected:true};state.batteries.push(b)}if(b.connected!==false)rememberCharge(b,now);Object.assign(b,data,{id,connected:data.connected!==false});if(data.connected===false){voltageAutoWindows.delete(id);b.current=null;b.voltage=null;if(b.currentCorrection)b.currentCorrection.lastSample=null}else{learnVoltageCorrection(b,now);rememberCharge(b,now);observeVoltageAuto(b,data,now)}accumulateCurrent(b,num(b.current),now);const s=stats();if(!state.remoteAuthoritative&&(s.soc!==null||s.current!==null))appendHistory(s);saveCurrent();requestRender('batteries');window.dispatchEvent(new CustomEvent('boatstation-battery-state',{detail:s}))}
   function addBattery(device){const id=String(device.id||device.address||device.deviceId||device.mac||device.name||Date.now());if(state.batteries.some(b=>String(b.id)===id))return;state.batteries.push({id,name:device.name||device.deviceName||'Batería',deviceName:device.name||device.deviceName||'',address:device.address||device.mac||'',capacityAh:num(device.capacityAh)||0,connected:false});saveCurrent(true);requestRender('batteries')}
   function setChargeCalculation(id,config){if(state.remoteAuthoritative){window.BoatStationRemoteCommand?.send?.('battery.chargeCalculation',{id,config});return}const b=state.batteries.find(x=>String(x.id)===String(id));if(!b)return;b.chargeCalculation=clone(config);saveCurrent(true);requestRender('batteries')}

@@ -14,3 +14,37 @@
 .voltage-curve-head,.voltage-curve-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto}.voltage-curve-head{font-size:11px}.voltage-curve-row .full-input{width:100%}
 
 .voltage-auto-box{border-top:1px solid var(--line);margin-top:16px;padding-top:14px}.voltage-auto-log{max-height:220px;overflow:auto;margin-top:10px;padding:8px;border-radius:8px;background:#071b29;color:#cadce5;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.voltage-auto-log time{color:var(--muted)}
+
+
+/* Battery history: readable time groups, touch navigation and visible extremes */
+.battery-history-chart{height:260px;touch-action:pan-y;user-select:none;overscroll-behavior-x:contain}
+.battery-history-chart canvas{touch-action:pan-y;cursor:grab}
+.battery-history-chart canvas:active{cursor:grabbing}
+.battery-history-scroll-controls{display:grid;grid-template-columns:28px minmax(0,1fr) 28px;align-items:center;gap:8px;margin-top:-5px}
+.battery-history-scroll-controls button{width:28px;height:25px;border:1px solid #17445f;border-radius:7px;background:#0b2b40;color:#d9edf5;font-size:20px;line-height:1;cursor:pointer}
+.battery-history-scroll-controls button:disabled{opacity:.3;cursor:default}
+.battery-history-scroll-controls input[type=range]{width:100%;margin:0;accent-color:#20d7e5;cursor:pointer}
+.battery-history-extremes{border:1px solid #17445f;border-radius:12px;background:#081f2e;padding:10px}
+.battery-history-extremes h4{margin:0 0 9px;color:#dceaf2;font-size:13px}
+.battery-history-extreme-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:7px}
+.battery-history-extreme-card{min-width:0;padding:8px;border:1px solid #17445f;border-radius:9px;background:#0b2b40}
+.battery-history-extreme-card>strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:5px;color:#dceaf2;font-size:12px}
+.battery-history-extreme-value{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:11px}
+.battery-history-extreme-value span{color:var(--muted)}
+.battery-history-extreme-value b{white-space:nowrap;font-size:13px}
+.battery-history-extreme-value.is-max b{color:#7fe083}
+.battery-history-extreme-value.is-min b{color:#ff777d}
+.battery-history-gesture{display:block;text-align:center;color:#a9c2ce;font-size:10px;line-height:1.4}
+.battery-history-foot{display:block}
+@media(max-width:430px){
+  .battery-history-chart{height:236px}
+  .battery-history-scroll-controls{gap:5px}
+  .battery-history-extremes{padding:8px}
+  .battery-history-extreme-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .battery-history-extreme-card{padding:7px}
+  .battery-history-extreme-card>strong{font-size:11px}
+  .battery-history-extreme-value{font-size:10px}
+  .battery-history-extreme-value b{font-size:12px}
+}
+
+.battery-history-extremes-note{display:block;margin:-5px 0 8px;color:var(--muted);font-size:10px;line-height:1.3}
