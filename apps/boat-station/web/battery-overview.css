@@ -130,3 +130,22 @@
 .battery-history-voltage-estimate-stepper input:focus{outline:2px solid #48d9ef;outline-offset:1px}
 .battery-history-legend i.line.ve{background:repeating-linear-gradient(to right,var(--series-color) 0 5px,transparent 5px 8px)}
 @media(max-width:430px){.battery-history-voltage-estimate-control{font-size:10px}.battery-history-voltage-estimate-stepper{gap:4px}.battery-history-voltage-estimate-stepper input{width:78px}}
+
+.battery-history-soc-curve{flex:0 0 auto;margin-top:10px;border:1px solid #254c63;border-radius:13px;background:#091e2d;color:#dce9ef;overflow:hidden}
+.battery-history-soc-curve>summary{padding:11px 13px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;list-style-position:inside}
+.battery-history-soc-curve[open]>summary{border-bottom:1px solid #254c63}
+.battery-history-soc-curve-content{padding:10px 12px 12px}
+.battery-history-soc-curve-content canvas{display:block;width:100%;height:190px;border:1px solid #1d4055;border-radius:9px;background:#071a27}
+.battery-history-soc-curve-content p{margin:8px 0 10px;color:#9fb4c0;font-size:11px;line-height:1.4}
+.battery-history-soc-curve-rows{display:grid;gap:6px}
+.battery-history-soc-curve-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 32px;align-items:end;gap:7px;padding:7px;border:1px solid #1e4258;border-radius:9px;background:#0c293b}
+.battery-history-soc-curve-row label{display:grid;gap:4px;color:#adc1cc;font-size:10px;font-weight:650}
+.battery-history-soc-curve-row label>div{display:flex;align-items:center;gap:5px;color:#a9c1cc;font-size:10px}
+.battery-history-soc-curve-row input{width:100%;min-width:0;height:31px;padding:0 6px;border:1px solid #28526a;border-radius:7px;background:#071b29;color:#eff8fb;text-align:center;font:600 12px system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.battery-history-soc-curve-row input:focus{outline:2px solid #48d9ef;outline-offset:1px}
+.battery-history-soc-curve-row>button,.battery-history-soc-curve-add{min-height:31px;border:1px solid #28526a;border-radius:7px;background:#10344a;color:#eaf6fb;font-weight:700;touch-action:manipulation}
+.battery-history-soc-curve-row>button{width:32px;font-size:19px}
+.battery-history-soc-curve-row button:disabled,.battery-history-soc-curve-add:disabled{opacity:.45}
+.battery-history-soc-curve-add{margin-top:9px;padding:0 12px;font-size:11px}
+.battery-history-legend i.line.soc-estimate{background:repeating-linear-gradient(to right,var(--series-color) 0 2px,transparent 2px 5px)}
+@media(max-width:430px){.battery-history-soc-curve>summary{font-size:12px}.battery-history-soc-curve-content{padding:8px}.battery-history-soc-curve-content canvas{height:170px}.battery-history-soc-curve-row{gap:5px;padding:6px}}

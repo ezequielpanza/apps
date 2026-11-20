@@ -1,5 +1,6 @@
 import {estimatedSoc} from '../charge-calculation.mjs';
-const CURRENT_KEY='bs.batteries.current.v1',HISTORY_KEY='bs.batteries.history.v1',LEGACY_KEY='bs.batteries.state',ZOOM_KEY='bs.batteries.historyZoom.v3',OLD_ZOOM_KEY='bs.batteries.historyZoom.v2',VISIBILITY_KEY='bs.batteries.historyVisibility.v1',COLORS_KEY='bs.batteries.historyColors.v1',AVERAGE_BARS_KEY='bs.batteries.currentAverageBars.v1',VOLTAGE_ESTIMATE_FACTOR_KEY='bs.batteries.historyVoltageEstimateFactor.v1';
+const CURRENT_KEY='bs.batteries.current.v1',HISTORY_KEY='bs.batteries.history.v1',LEGACY_KEY='bs.batteries.state',ZOOM_KEY='bs.batteries.historyZoom.v3',OLD_ZOOM_KEY='bs.batteries.historyZoom.v2',VISIBILITY_KEY='bs.batteries.historyVisibility.v1',COLORS_KEY='bs.batteries.historyColors.v1',AVERAGE_BARS_KEY='bs.batteries.currentAverageBars.v1',SOC_CURVE_KEY='bs.batteries.historySocCurve.v1',VOLTAGE_ESTIMATE_FACTOR_KEY='bs.batteries.historyVoltageEstimateFactor.v1';
+const DEFAULT_SOC_CURVE=[{voltage:10,soc:0},{voltage:12,soc:5},{voltage:12.8,soc:10},{voltage:13,soc:20},{voltage:13.12,soc:40},{voltage:13.2,soc:60},{voltage:13.28,soc:80},{voltage:13.4,soc:90},{voltage:13.6,soc:100}];
 const SAMPLE_MS=30000,SAVE_MS=2000,MAX_AGE=840*86400000,BARS=30,MAX_AH_GAP_MS=120000,CHARGE_EFFICIENCY=.99;
 const CORRECTION_WINDOW_MIN_MS=5000,CORRECTION_WINDOW_MAX_MS=12000;
 const ZOOMS=[['1 min',60000],['5 min',5*60000],['10 min',10*60000],['15 min',15*60000],['30 min',30*60000],['1 h',3600000],['3 h',3*3600000],['6 h',6*3600000],['12 h',12*3600000],['1 día',86400000],['7 días',7*86400000],['28 días',28*86400000]];
@@ -25,7 +26,7 @@ export function createBatteriesModule(requestRender,openManager){
   let historyColors=read(COLORS_KEY,{});if(!historyColors||typeof historyColors!=='object'||Array.isArray(historyColors))historyColors={};
   let hiddenSeries=read(VISIBILITY_KEY,{});if(!hiddenSeries||typeof hiddenSeries!=='object'||Array.isArray(hiddenSeries))hiddenSeries={};
   const oldZoomIndices=[1,3,5,6,7,8,9,10,11],oldZoom=Math.max(0,Math.min(oldZoomIndices.length-1,Number(read(OLD_ZOOM_KEY,0))||0)),storedZoom=read(ZOOM_KEY,null);
-  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedChart=null,historyOffset=0,historyActivePointers=new Set(),historyControlPointers=new Set(),historyControlProtectionBound=false,historyCurrentAverageBars=Math.max(1,Math.min(BARS,Math.round(Number(read(AVERAGE_BARS_KEY,3))||3))),voltageEstimateFactor=Math.round((num(read(VOLTAGE_ESTIMATE_FACTOR_KEY,0))??0)*1000)/1000;
+  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedChart=null,historyOffset=0,historyActivePointers=new Set(),historyControlPointers=new Set(),historyControlProtectionBound=false,historyCurrentAverageBars=Math.max(1,Math.min(BARS,Math.round(Number(read(AVERAGE_BARS_KEY,3))||3))),voltageEstimateFactor=Math.round((num(read(VOLTAGE_ESTIMATE_FACTOR_KEY,0))??0)*1000)/1000,socCurvePoints=normalizeSocCurve(read(SOC_CURVE_KEY,DEFAULT_SOC_CURVE));
   const saveCurrent=(immediate=false)=>{const save=()=>{saveTimer=0;write(CURRENT_KEY,{bankName:state.bankName,bankHistoryColor:state.bankHistoryColor,batteries:state.batteries})};if(immediate){clearTimeout(saveTimer);save()}else if(!saveTimer)saveTimer=setTimeout(save,SAVE_MS)};
   function integrateCurrentPair(before,after,elapsedMs){
     if(!Number.isFinite(before)||!Number.isFinite(after)||elapsedMs<=0||elapsedMs>MAX_AH_GAP_MS)return null;
@@ -219,7 +220,7 @@ export function createBatteriesModule(requestRender,openManager){
   function syncHistoryControls(){const ms=ZOOMS[zoom][1],max=historyOffsetRange(ms);historyOffset=Math.max(0,Math.min(max,historyOffset))}
   function refreshHistoryView(root=state.historyRoot||state.root){syncHistoryControls(root);queueDraw(root)}
   function historyNavigationActive(){return historyActivePointers.size>0||historyControlPointers.size>0}
-  function bindHistoryControlProtection(){if(historyControlProtectionBound||typeof document==='undefined')return;historyControlProtectionBound=true;document.addEventListener('pointerdown',event=>{if(event.target?.closest?.('.battery-history-average-control,.battery-history-voltage-estimate-control'))historyControlPointers.add(event.pointerId)},true);const finish=event=>{if(!historyControlPointers.delete(event.pointerId))return;notifyHistoryInteractionEnd()};document.addEventListener('pointerup',finish,true);document.addEventListener('pointercancel',finish,true);document.addEventListener('lostpointercapture',finish,true)}
+  function bindHistoryControlProtection(){if(historyControlProtectionBound||typeof document==='undefined')return;historyControlProtectionBound=true;document.addEventListener('pointerdown',event=>{if(event.target?.closest?.('.battery-history-average-control,.battery-history-voltage-estimate-control,.battery-history-soc-curve'))historyControlPointers.add(event.pointerId)},true);const finish=event=>{if(!historyControlPointers.delete(event.pointerId))return;notifyHistoryInteractionEnd()};document.addEventListener('pointerup',finish,true);document.addEventListener('pointercancel',finish,true);document.addEventListener('lostpointercapture',finish,true)}
   function notifyHistoryInteractionEnd(){if(!historyNavigationActive())window.dispatchEvent(new Event('boatstation-battery-history-interaction-end'))}
   function isHistoryInteracting(){return historyNavigationActive()}
   function bindHistoryNavigation(root){
@@ -296,7 +297,7 @@ export function createBatteriesModule(requestRender,openManager){
     return'<div class="battery-history-page"><div class="battery-history-head"><div><strong>Histórico de carga</strong><small>30 intervalos · '+label+' por intervalo · '+span+'</small></div><div class="battery-history-zoom"><button type="button" data-battery-history-zoom="out" '+(zoom===ZOOMS.length-1?'disabled':'')+'>−</button><b>'+label+'</b><button type="button" data-battery-history-zoom="in" '+(zoom===0?'disabled':'')+'>+</button></div><button type="button" class="battery-history-export" data-battery-history-export aria-label="'+exportLabel+'" title="'+exportLabel+'" '+(!state.history.length?'disabled':'')+'>CSV ↓</button></div><div class="battery-history-average-control"><label class="battery-history-average-toggle"><input type="checkbox" data-battery-current-average-visible aria-label="Mostrar promedio móvil de Corriente" '+(averageVisible?'checked':'')+'> Mostrar promedio móvil</label><div class="battery-history-average-stepper" role="group" aria-label="Cantidad de barras para el promedio móvil"><button type="button" data-battery-current-average-step="-1" aria-label="Reducir barras del promedio" '+(historyCurrentAverageBars<=1?'disabled':'')+'>−</button><output data-battery-current-average-value aria-live="polite">'+historyCurrentAverageBars+'</output><button type="button" data-battery-current-average-step="1" aria-label="Aumentar barras del promedio" '+(historyCurrentAverageBars>=BARS?'disabled':'')+'>+</button><span>barras</span></div></div><div class="battery-history-voltage-estimate-control"><span>Factor Ve (Ω)</span><div class="battery-history-voltage-estimate-stepper" role="group" aria-label="Factor del voltaje estimado"><button type="button" data-battery-ve-step="-1" aria-label="Disminuir factor de Ve">−</button><input type="number" inputmode="decimal" step="0.001" value="'+factorValue+'" data-battery-ve-factor aria-label="Factor de Voltaje estimado en ohmios"><button type="button" data-battery-ve-step="1" aria-label="Aumentar factor de Ve">+</button></div></div>'+
       '<div class="battery-history-chart"><div class="battery-history-y"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><canvas data-battery-history-chart aria-label="Histórico de carga, desliza para recorrer y pellizca para cambiar el intervalo"></canvas><div class="battery-history-y battery-history-y-ah"><span data-ah-label="top">+— Ah</span><span data-ah-label="upper">+— Ah</span><span data-ah-label="zero">0 Ah</span><span data-ah-label="lower">−— Ah</span><span data-ah-label="bottom">−— Ah</span></div><div class="battery-history-y battery-history-y-current"><span data-current-label="top">+— A</span><span data-current-label="upper">+— A</span><span data-current-label="zero">0 A</span><span data-current-label="lower">−— A</span><span data-current-label="bottom">−— A</span></div><div class="battery-history-y battery-history-y-voltage"><span data-voltage-label="top">— V</span><span data-voltage-label="upper">— V</span><span data-voltage-label="zero">— V</span><span data-voltage-label="lower">— V</span><span data-voltage-label="bottom">— V</span></div></div>'+
 
-      '<div class="battery-history-legend" data-battery-history-legend></div><section class="battery-history-extremes" data-battery-history-extremes aria-live="polite"></section>'+
+      socCurveEditorMarkup()+'<div class="battery-history-legend" data-battery-history-legend></div><section class="battery-history-extremes" data-battery-history-extremes aria-live="polite"></section>'+
       '</div>';
   }
   function historyCsvCell(value){return'"'+String(value??'').replace(/"/g,'""')+'"'}
@@ -335,6 +336,74 @@ export function createBatteriesModule(requestRender,openManager){
     state.history.push({time:now,soc:s.soc,current:s.current,currentLast:s.current,voltage:s.voltage,...(bankAh||{}),batteries});
     for(const b of state.batteries)b.historyAh={chargeAh:0,dischargeAh:0,storedAh:0,coveredMs:0};
     historyDirty=true;saveHistory();
+  }
+
+  let socCurveEditorOpen=false;
+  if(socCurvePoints.length<2)socCurvePoints=DEFAULT_SOC_CURVE.map(point=>({...point}));
+  write(SOC_CURVE_KEY,socCurvePoints);
+  function normalizeSocCurve(points){
+    if(!Array.isArray(points))return [];
+    const sorted=points.map(point=>({voltage:num(point?.voltage),soc:num(point?.soc)})).filter(point=>point.voltage!==null&&point.soc!==null).map(point=>({voltage:point.voltage,soc:Math.max(0,Math.min(100,point.soc))})).sort((a,b)=>a.voltage-b.voltage);
+    const unique=[];for(const point of sorted){if(unique.length&&Math.abs(unique[unique.length-1].voltage-point.voltage)<.000001)unique[unique.length-1]=point;else unique.push(point)}
+    return unique.length>=2?unique:[]
+  }
+  function interpolateSoc(points,voltage){
+    if(!Number.isFinite(voltage)||points.length<2)return null;
+    if(voltage<=points[0].voltage)return points[0].soc;
+    if(voltage>=points[points.length-1].voltage)return points[points.length-1].soc;
+    for(let index=1;index<points.length;index++){
+      const right=points[index],left=points[index-1];if(voltage>right.voltage)continue;
+      const fraction=(voltage-left.voltage)/(right.voltage-left.voltage);
+      return left.soc+(right.soc-left.soc)*fraction
+    }
+    return null
+  }
+  function estimateSocFromVoltage(voltage){return interpolateSoc(socCurvePoints,voltage)}
+  function renderSocCurveRows(root){
+    const host=root.querySelector('[data-battery-soc-curve-rows]');if(!host)return;
+    host.innerHTML=socCurvePoints.map((point,index)=>'<div class="battery-history-soc-curve-row" data-soc-curve-row><label><span>Voltaje</span><div><input type="number" inputmode="decimal" step="0.001" value="'+point.voltage.toFixed(3)+'" data-soc-curve-voltage aria-label="Voltaje del punto '+(index+1)+'"><span>V</span></div></label><label><span>SOC</span><div><input type="number" inputmode="decimal" min="0" max="100" step="0.1" value="'+point.soc.toFixed(1)+'" data-soc-curve-soc aria-label="SOC del punto '+(index+1)+'"><span>%</span></div></label><button type="button" data-soc-curve-delete="'+index+'" aria-label="Eliminar punto '+(index+1)+'" '+(socCurvePoints.length<=2?'disabled':'')+'>×</button></div>').join('')
+  }
+  function socCurveEditorMarkup(){
+    const points=socCurvePoints.map((point,index)=>'<div class="battery-history-soc-curve-row" data-soc-curve-row><label><span>Voltaje</span><div><input type="number" inputmode="decimal" step="0.001" value="'+point.voltage.toFixed(3)+'" data-soc-curve-voltage aria-label="Voltaje del punto '+(index+1)+'"><span>V</span></div></label><label><span>SOC</span><div><input type="number" inputmode="decimal" min="0" max="100" step="0.1" value="'+point.soc.toFixed(1)+'" data-soc-curve-soc aria-label="SOC del punto '+(index+1)+'"><span>%</span></div></label><button type="button" data-soc-curve-delete="'+index+'" aria-label="Eliminar punto '+(index+1)+'" '+(socCurvePoints.length<=2?'disabled':'')+'>×</button></div>').join('');
+    return '<details class="battery-history-soc-curve" data-battery-soc-curve-details '+(socCurveEditorOpen?'open':'')+'><summary>Curva de correlación Voltaje estimado → SOC estimado</summary><div class="battery-history-soc-curve-content"><canvas data-battery-soc-curve-chart aria-label="Curva editable que relaciona voltaje estimado y SOC"></canvas><p>Entre puntos se calcula por interpolación lineal. Fuera del rango se conserva el SOC del extremo más cercano.</p><div class="battery-history-soc-curve-rows" data-battery-soc-curve-rows>'+points+'</div><button type="button" class="battery-history-soc-curve-add" data-soc-curve-add '+(socCurvePoints.length>=32?'disabled':'')+'>Agregar punto</button></div></details>'
+  }
+
+  function drawSocCurve(root){
+    const details=root?.querySelector('[data-battery-soc-curve-details]'),canvas=root?.querySelector('[data-battery-soc-curve-chart]');
+    if(!details?.open||!canvas||socCurvePoints.length<2)return false;
+    const rect=canvas.getBoundingClientRect();if(rect.width<10||rect.height<30)return false;
+    const dpr=devicePixelRatio||1,width=Math.round(rect.width*dpr),height=Math.round(rect.height*dpr);
+    if(canvas.width!==width)canvas.width=width;if(canvas.height!==height)canvas.height=height;
+    const context=canvas.getContext('2d');if(!context)return false;
+    context.setTransform(dpr,0,0,dpr,0,0);context.clearRect(0,0,rect.width,rect.height);
+    const left=44,right=10,top=10,bottom=25,plotW=Math.max(10,rect.width-left-right),plotH=Math.max(10,rect.height-top-bottom),minV=socCurvePoints[0].voltage,maxV=socCurvePoints[socCurvePoints.length-1].voltage,span=maxV-minV||1,x=value=>left+(value-minV)/span*plotW,y=value=>top+(100-value)/100*plotH;
+    context.font='10px system-ui,sans-serif';context.textAlign='right';context.textBaseline='middle';context.lineWidth=1;context.strokeStyle='#284b60';context.fillStyle='#a9bdc8';
+    for(let soc=0;soc<=100;soc+=25){const py=y(soc);context.beginPath();context.moveTo(left,py);context.lineTo(left+plotW,py);context.stroke();context.fillText(soc+'%',left-7,py)}
+    context.strokeStyle='#7895a5';context.beginPath();context.moveTo(left,top);context.lineTo(left,top+plotH);context.lineTo(left+plotW,top+plotH);context.stroke();
+    context.textAlign='left';context.textBaseline='top';context.fillStyle='#a9bdc8';context.fillText(minV.toFixed(2)+' V',left,top+plotH+5);context.textAlign='right';context.fillText(maxV.toFixed(2)+' V',left+plotW,top+plotH+5);
+    context.save();context.beginPath();context.rect(left,top,plotW,plotH);context.clip();context.beginPath();
+    socCurvePoints.forEach((point,index)=>{const px=x(point.voltage),py=y(point.soc);if(index===0)context.moveTo(px,py);else context.lineTo(px,py)});
+    context.strokeStyle='#6cc6d3';context.lineWidth=3;context.lineJoin='round';context.stroke();context.fillStyle='#6cc6d3';
+    for(const point of socCurvePoints){context.beginPath();context.arc(x(point.voltage),y(point.soc),4,0,Math.PI*2);context.fill()}
+    context.restore();return true
+  }
+  function bindSocCurveEditor(root){
+    const details=root.querySelector('[data-battery-soc-curve-details]');if(!details||details.dataset.socCurveBound==='1')return;
+    details.dataset.socCurveBound='1';
+    details.addEventListener('toggle',()=>{socCurveEditorOpen=details.open;if(details.open)drawSocCurve(root)});
+    const update=()=>{
+      const points=[...details.querySelectorAll('[data-soc-curve-row]')].map(row=>({voltage:num(row.querySelector('[data-soc-curve-voltage]')?.value),soc:num(row.querySelector('[data-soc-curve-soc]')?.value)}));
+      const normalized=normalizeSocCurve(points);if(normalized.length<2)return false;
+      socCurvePoints=normalized;write(SOC_CURVE_KEY,socCurvePoints);return true
+    };
+    details.addEventListener('input',event=>{if(!event.target.matches('[data-soc-curve-voltage],[data-soc-curve-soc]'))return;if(update()){drawSocCurve(root);queueDraw(root)}});
+    details.addEventListener('change',event=>{if(!event.target.matches('[data-soc-curve-voltage],[data-soc-curve-soc]'))return;if(update()){renderSocCurveRows(root);drawSocCurve(root);queueDraw(root)}});
+    details.addEventListener('click',event=>{
+      const remove=event.target.closest('[data-soc-curve-delete]');
+      if(remove){event.preventDefault();event.stopPropagation();update();if(socCurvePoints.length<=2)return;const row=remove.closest('[data-soc-curve-row]'),voltage=num(row?.querySelector('[data-soc-curve-voltage]')?.value),soc=num(row?.querySelector('[data-soc-curve-soc]')?.value),index=socCurvePoints.findIndex(point=>point.voltage===voltage&&point.soc===soc);if(index>=0)socCurvePoints=socCurvePoints.filter((_,i)=>i!==index);renderSocCurveRows(root);write(SOC_CURVE_KEY,socCurvePoints);drawSocCurve(root);queueDraw(root);return}
+      const add=event.target.closest('[data-soc-curve-add]');
+      if(add){event.preventDefault();event.stopPropagation();update();if(socCurvePoints.length<2||socCurvePoints.length>=32)return;let gapIndex=0,gap=-Infinity;for(let i=1;i<socCurvePoints.length;i++){const width=socCurvePoints[i].voltage-socCurvePoints[i-1].voltage;if(width>gap){gap=width;gapIndex=i-1}}const left=socCurvePoints[gapIndex],right=socCurvePoints[gapIndex+1],voltage=(left.voltage+right.voltage)/2,soc=interpolateSoc(socCurvePoints,voltage);socCurvePoints=normalizeSocCurve([...socCurvePoints,{voltage,soc}]);renderSocCurveRows(root);write(SOC_CURVE_KEY,socCurvePoints);drawSocCurve(root);queueDraw(root)}
+    })
   }
   function chartData(){
     ensureHistoryAh();
@@ -429,11 +498,12 @@ export function createBatteriesModule(requestRender,openManager){
           if(bank?.n)ah.set('bank',{id:'bank',name:'Banco',value:bank.value});
         }
         const bankVoltageValue=voltages.find(item=>item.id==='bank')?.value,bankCurrentValue=currents.find(item=>item.id==='bank')?.value;
-        if(Number.isFinite(bankVoltageValue)&&Number.isFinite(bankCurrentValue))voltages.push({id:'bank-estimated',name:'Voltaje estimado (Ve)',value:bankVoltageValue+bankCurrentValue*voltageEstimateFactor});
+        const estimatedVoltage=Number.isFinite(bankVoltageValue)&&Number.isFinite(bankCurrentValue)?bankVoltageValue+bankCurrentValue*voltageEstimateFactor:null;
+        if(Number.isFinite(estimatedVoltage))voltages.push({id:'bank-estimated',name:'Voltaje estimado (Ve)',value:estimatedVoltage});
         return{
           parts:[...b.parts.values()].filter(item=>item.n&&(!isOpen||item.last!==null)).map(item=>({id:item.id,name:item.name,value:isOpen?item.last:item.sum/item.n})),
           current:isOpen?b.currentLast:(b.currentN?b.current/b.currentN:null),
-          soc:b.socLast,
+          soc:b.socLast,estimatedSoc:estimateSocFromVoltage(estimatedVoltage),
           ah:[...ah.values()],currents,voltages,isOpen
         };
       }),
@@ -549,6 +619,15 @@ export function createBatteriesModule(requestRender,openManager){
         c.stroke();c.restore()
       }
     }
+    const estimatedSocKey='soc:bank-estimated',estimatedSocColor=getHistorySeriesColor(estimatedSocKey,paletteIds),estimatedSocValues=bars.map(bar=>bar.estimatedSoc);
+    if(estimatedSocValues.some(Number.isFinite)){
+      legend.set(estimatedSocKey,{name:'SOC estimado (Ve)',color:estimatedSocColor,kind:'line soc-estimate'});
+      if(!hiddenSeries[estimatedSocKey]){
+        c.save();c.strokeStyle=estimatedSocColor;c.lineWidth=2.6;c.lineJoin='round';c.setLineDash([3,4]);c.beginPath();let open=false;
+        estimatedSocValues.forEach((value,index)=>{if(!Number.isFinite(value)){open=false;return}const x=(index+.5)*slot,y=plotH-Math.max(0,Math.min(100,value))/100*plotH;if(!open){c.moveTo(x,y);open=true}else c.lineTo(x,y)});
+        c.stroke();c.setLineDash([]);estimatedSocValues.forEach((value,index)=>{if(!Number.isFinite(value))return;const x=(index+.5)*slot,y=plotH-Math.max(0,Math.min(100,value))/100*plotH;c.globalAlpha=index===data.openIndex ? .72 : 1;c.fillStyle=estimatedSocColor;c.beginPath();c.arc(x,y,Math.max(1.6,Math.min(2.6,slot*.11)),0,Math.PI*2);c.fill()});c.restore()
+      }
+    }
     const mark=(x,y,color)=>{
       c.save();c.globalAlpha=.78;c.fillStyle='#071b29';c.strokeStyle=color;c.lineWidth=1.2;c.beginPath();c.arc(x,y,2.5,0,Math.PI*2);c.fill();c.stroke();c.restore()
     };
@@ -582,7 +661,7 @@ export function createBatteriesModule(requestRender,openManager){
   function queueDraw(root=state.historyRoot||state.root,retries=0){if(drawPending||!root)return;drawPending=true;requestAnimationFrame(()=>{drawPending=false;if(!draw(root)&&root.querySelector?.('[data-battery-history-chart]')&&retries<6)setTimeout(()=>queueDraw(root,retries+1),80)})}
   window.addEventListener('boatstation-page-change',event=>{if(event.detail?.id==='batteryHistory')queueDraw()});
   function historyBatteries(){const items=new Map();for(const b of state.batteries){const id=String(b.id||b.address||'');if(id)items.set(id,{id,name:String(b.name||b.deviceName||'Batería')})}for(const point of state.history)for(const part of point.batteries||[]){const id=String(part.id||part.name||'');if(id&&!items.has(id))items.set(id,{id,name:String(part.name||'Batería')})}return [...items.values()]}
-  function getHistorySeriesColor(key,knownIds=null){key=String(key);const configured=validColor(historyColors[key],'');if(configured)return configured;const split=key.indexOf(':'),kind=key.slice(0,split),id=key.slice(split+1),ids=knownIds||historyBatteries().map(b=>b.id).sort();if(kind==='soc-charge'||kind==='soc-discharge'){const palette=kind==='soc-charge'?['#3fae54','#69c95b','#91db70','#b7ea8b']:['#b94149','#d65b5d','#e57a70','#f09c8b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='voltage'&&id==='bank-estimated')return '#ff9d54';if(kind==='voltage'){const palette=['#f1c75b','#53c8ef','#ad8cff','#ff9878','#74d69b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='ah'||kind==='current'){const lineIds=[...new Set([...ids,'bank'])].sort();return getCurrentHistoryColor(id,lineIds)}return '#20d7e5'}
+  function getHistorySeriesColor(key,knownIds=null){key=String(key);const configured=validColor(historyColors[key],'');if(configured)return configured;const split=key.indexOf(':'),kind=key.slice(0,split),id=key.slice(split+1),ids=knownIds||historyBatteries().map(b=>b.id).sort();if(kind==='soc-charge'||kind==='soc-discharge'){const palette=kind==='soc-charge'?['#3fae54','#69c95b','#91db70','#b7ea8b']:['#b94149','#d65b5d','#e57a70','#f09c8b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='voltage'&&id==='bank-estimated')return '#ff9d54';if(kind==='soc'&&id==='bank-estimated')return '#c5a1ff';if(kind==='voltage'){const palette=['#f1c75b','#53c8ef','#ad8cff','#ff9878','#74d69b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='ah'||kind==='current'){const lineIds=[...new Set([...ids,'bank'])].sort();return getCurrentHistoryColor(id,lineIds)}return '#20d7e5'}
   function setHistorySeriesColor(key,value){key=String(key);const color=validColor(value,'');if(!color||!/^(soc-charge|soc-discharge|ah|current|voltage):.+/.test(key))return false;historyColors[key]=color;write(COLORS_KEY,historyColors);queueDraw();return true}
   function isHistorySeriesVisible(key){return !hiddenSeries[String(key)]}
   function setHistorySeriesVisible(key,visible){key=String(key);if(!/^(soc|ah|current|voltage):.+/.test(key))return;hiddenSeries[key]=!visible;write(VISIBILITY_KEY,hiddenSeries);queueDraw()}
@@ -593,10 +672,10 @@ export function createBatteriesModule(requestRender,openManager){
       state.historyRoot=root;
       if(typeof ResizeObserver==='function'&&chart&&chart!==historyObservedChart){
         historyResizeObserver?.disconnect();historyObservedChart=chart;
-        historyResizeObserver=new ResizeObserver(entries=>{if(entries.some(entry=>entry.contentRect.width>=10&&entry.contentRect.height>=10))queueDraw(root)});
-        historyResizeObserver.observe(chart)
+        historyResizeObserver=new ResizeObserver(entries=>{if(entries.some(entry=>entry.contentRect.width>=10&&entry.contentRect.height>=10)){queueDraw(root);drawSocCurve(root)}});
+        historyResizeObserver.observe(chart);const curveCanvas=root.querySelector('[data-battery-soc-curve-chart]');if(curveCanvas)historyResizeObserver.observe(curveCanvas)
       }
-      bindHistoryNavigation(root);bindHistoryControlProtection();syncHistoryControls(root);renderHistoryExtremes(root);queueDraw(root)
+      bindHistoryNavigation(root);bindHistoryControlProtection();bindSocCurveEditor(root);syncHistoryControls(root);renderHistoryExtremes(root);queueDraw(root);drawSocCurve(root)
     }
     root.querySelectorAll('[data-battery-manage]').forEach(button=>button.addEventListener('click',event=>{event.stopPropagation();openManager?.()}));
     root.querySelector('[data-battery-history-export]')?.addEventListener('click',downloadHistoryCsv);
