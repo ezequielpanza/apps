@@ -13,7 +13,7 @@ const FOOD_GROUPS = [
     section: 'produce',
     icon: '🥦',
     title: 'Vegetales verdes',
-    examples: 'Espinaca, brócoli, lechuga, acelga, kale',
+    examples: 'Apio, espinaca, brócoli, kale, lechuga, rúcula',
     target: 7,
     frequency: '1 ingesta por día'
   },
