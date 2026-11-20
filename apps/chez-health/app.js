@@ -296,6 +296,29 @@ function checkedCount(food) {
   return (savedState.checked[food.id] || []).length;
 }
 
+let checkAudioContext = null;
+function playCheckSound() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    checkAudioContext = checkAudioContext || new AudioContextClass();
+    if (checkAudioContext.state === 'suspended') checkAudioContext.resume().catch(function () {});
+    const now = checkAudioContext.currentTime;
+    const oscillator = checkAudioContext.createOscillator();
+    const gain = checkAudioContext.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(480, now);
+    oscillator.frequency.linearRampToValueAtTime(732, now + 0.14);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.22, now + 0.003);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    oscillator.connect(gain);
+    gain.connect(checkAudioContext.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.15);
+  } catch (_) { /* El registro funciona aunque el sonido no esté disponible. */ }
+}
+
 function renderFoodList() {
   $('foodList').innerHTML = FOOD_SECTIONS.map(function (section) {
     const rows = FOOD_GROUPS.filter(function (food) { return food.section === section.id; }).map(function (food) {
@@ -386,6 +409,7 @@ function renderFoodList() {
       const food = FOOD_GROUPS.find(function (f) { return f.id === id; });
       const marks = savedState.checked[id] || [];
       if (checkbox.checked && marks.length >= food.target) { render(); return; }
+      if (checkbox.checked) playCheckSound();
       savedState.checked[id] = checkbox.checked ? Array.from(new Set(marks.concat(mark))) : marks.filter(function (item) { return item !== mark; });
       saveState(); queueMark(savedState.week, id, mark, checkbox.checked); render();
     });
