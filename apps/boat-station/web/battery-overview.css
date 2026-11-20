@@ -116,6 +116,7 @@
 .battery-history-extreme-field>strong,.battery-history-extreme-field>b{align-self:center;text-align:center}
 
 /* Let the history graph use the resizable card's available height. */
-.battery-history-page{display:flex;flex:1 1 auto;flex-direction:column;height:100%;min-height:0;gap:12px}
-.battery-history-page>.battery-history-head,.battery-history-page>.battery-history-average-control,.battery-history-page>.battery-history-legend,.battery-history-page>.battery-history-extremes,.battery-history-page>.battery-history-gesture,.battery-history-page>.battery-history-foot{flex:0 0 auto}
-.battery-history-chart{flex:1 1 236px;height:auto;min-height:150px}
+.battery-history-page{display:flex;flex:1 1 0;flex-direction:column;height:100%;min-height:0;gap:12px;overflow:hidden}
+.battery-history-page>.battery-history-head,.battery-history-page>.battery-history-average-control,.battery-history-page>.battery-history-legend,.battery-history-page>.battery-history-extremes{flex:0 0 auto}
+.battery-history-chart{display:grid;flex:1 1 0;height:auto;min-height:96px;min-width:0}
+.battery-history-chart canvas{height:100%;min-height:0;align-self:stretch}

@@ -25,7 +25,7 @@ export function createBatteriesModule(requestRender,openManager){
   let historyColors=read(COLORS_KEY,{});if(!historyColors||typeof historyColors!=='object'||Array.isArray(historyColors))historyColors={};
   let hiddenSeries=read(VISIBILITY_KEY,{});if(!hiddenSeries||typeof hiddenSeries!=='object'||Array.isArray(hiddenSeries))hiddenSeries={};
   const oldZoomIndices=[1,3,5,6,7,8,9,10,11],oldZoom=Math.max(0,Math.min(oldZoomIndices.length-1,Number(read(OLD_ZOOM_KEY,0))||0)),storedZoom=read(ZOOM_KEY,null);
-  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedCanvas=null,historyOffset=0,historyActivePointers=new Set(),historyControlPointers=new Set(),historyControlProtectionBound=false,historyCurrentAverageBars=Math.max(1,Math.min(BARS,Math.round(Number(read(AVERAGE_BARS_KEY,3))||3)));
+  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedChart=null,historyOffset=0,historyActivePointers=new Set(),historyControlPointers=new Set(),historyControlProtectionBound=false,historyCurrentAverageBars=Math.max(1,Math.min(BARS,Math.round(Number(read(AVERAGE_BARS_KEY,3))||3)));
   const saveCurrent=(immediate=false)=>{const save=()=>{saveTimer=0;write(CURRENT_KEY,{bankName:state.bankName,bankHistoryColor:state.bankHistoryColor,batteries:state.batteries})};if(immediate){clearTimeout(saveTimer);save()}else if(!saveTimer)saveTimer=setTimeout(save,SAVE_MS)};
   function integrateCurrentPair(before,after,elapsedMs){
     if(!Number.isFinite(before)||!Number.isFinite(after)||elapsedMs<=0||elapsedMs>MAX_AH_GAP_MS)return null;
@@ -297,8 +297,7 @@ export function createBatteriesModule(requestRender,openManager){
       '<div class="battery-history-chart"><div class="battery-history-y"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><canvas data-battery-history-chart aria-label="Histórico de carga, desliza para recorrer y pellizca para cambiar el intervalo"></canvas><div class="battery-history-y battery-history-y-ah"><span data-ah-label="top">+— Ah</span><span data-ah-label="upper">+— Ah</span><span data-ah-label="zero">0 Ah</span><span data-ah-label="lower">−— Ah</span><span data-ah-label="bottom">−— Ah</span></div><div class="battery-history-y battery-history-y-current"><span data-current-label="top">+— A</span><span data-current-label="upper">+— A</span><span data-current-label="zero">0 A</span><span data-current-label="lower">−— A</span><span data-current-label="bottom">−— A</span></div><div class="battery-history-y battery-history-y-voltage"><span data-voltage-label="top">— V</span><span data-voltage-label="upper">— V</span><span data-voltage-label="zero">— V</span><span data-voltage-label="lower">— V</span><span data-voltage-label="bottom">— V</span></div></div>'+
 
       '<div class="battery-history-legend" data-battery-history-legend></div><section class="battery-history-extremes" data-battery-history-extremes aria-live="polite"></section>'+
-      '<small class="battery-history-gesture">Desliza horizontalmente para recorrer · Pellizca para cambiar el intervalo por barra</small>'+
-      '<small class="battery-history-foot">Los intervalos cerrados muestran promedios. El intervalo actual muestra la última lectura y una proyección de Ah. Los máximos y mínimos corresponden al período visible.</small></div>';
+      '</div>';
   }
   function historyCsvCell(value){return'"'+String(value??'').replace(/"/g,'""')+'"'}
   function downloadHistoryCsv(){
@@ -581,13 +580,13 @@ export function createBatteriesModule(requestRender,openManager){
   function setHistorySeriesVisible(key,visible){key=String(key);if(!/^(soc|ah|current|voltage):.+/.test(key))return;hiddenSeries[key]=!visible;write(VISIBILITY_KEY,hiddenSeries);queueDraw()}
 
   function afterRender(root){
-    state.root=root;const canvas=root.querySelector('[data-battery-history-chart]');
+    state.root=root;const canvas=root.querySelector('[data-battery-history-chart]'),chart=root.querySelector('.battery-history-chart');
     if(canvas){
       state.historyRoot=root;
-      if(typeof ResizeObserver==='function'&&canvas!==historyObservedCanvas){
-        historyResizeObserver?.disconnect();historyObservedCanvas=canvas;
+      if(typeof ResizeObserver==='function'&&chart&&chart!==historyObservedChart){
+        historyResizeObserver?.disconnect();historyObservedChart=chart;
         historyResizeObserver=new ResizeObserver(entries=>{if(entries.some(entry=>entry.contentRect.width>=10&&entry.contentRect.height>=10))queueDraw(root)});
-        historyResizeObserver.observe(canvas)
+        historyResizeObserver.observe(chart)
       }
       bindHistoryNavigation(root);bindHistoryControlProtection();syncHistoryControls(root);renderHistoryExtremes(root);queueDraw(root)
     }

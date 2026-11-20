@@ -309,3 +309,28 @@
   .battery-overview[data-layout="dial-cards"] .battery-mini-ring{width:clamp(34px,60%,44px);max-width:44px}
   .battery-overview[data-layout="dial-cards"] .battery-mini-ring span{font-size:clamp(10px,3cqw,12px)}
 }
+
+
+/* Boat Station 1.2.122: compact Boat Status and manual magnetic heading trim. */
+.sea-attitude-data{gap:0}
+.sea-attitude-data small{font-size:9px}
+.sea-attitude-data strong{font-size:clamp(20px,12cqh,28px)}
+.sea-attitude-data b{min-height:10px;font-size:10px}
+.sea-attitude-data i{margin:3px 2px}
+.sea-attitude-data small.sea-heading-stat{font-size:9px;line-height:1.05}
+.sea-heading-adjust{display:grid;grid-template-columns:22px minmax(0,1fr) 22px;align-items:center;gap:2px;width:100%}
+.sea-heading-adjust button{width:22px;height:24px;min-height:24px;padding:0;border:1px solid #24516a;border-radius:7px;background:#10344a;color:#eaf6fb;font:700 16px/1 system-ui,sans-serif;touch-action:manipulation}
+.sea-heading-adjust button:disabled{opacity:.35}
+.sea-heading-adjust strong{font-size:clamp(18px,11cqh,25px)!important}
+@container pagecontent (max-height:280px){
+  .page-content>.sea-attitude{grid-template-rows:minmax(54px,.7fr) auto 0;gap:3px 6px}
+  .sea-attitude-stage{min-height:54px}
+  .sea-attitude-scale,.sea-attitude-note,.sea-heading-stat{display:none}
+  .sea-attitude-data strong{font-size:18px}
+  .sea-attitude-data b{min-height:8px}
+  .sea-attitude-data i{margin:2px}
+  .sea-wave-data{gap:3px}
+  .sea-wave-data>div{padding:3px 2px}
+  .sea-wave-data strong{font-size:13px}
+  .sea-wave-data span{font-size:7px}
+}
