@@ -338,7 +338,7 @@ export function createBatteriesModule(requestRender,openManager){
     historyDirty=true;saveHistory();
   }
 
-  let socCurveEditorOpen=false;
+  let socCurveEditorOpen=false,socCurvePointer=null;
   if(socCurvePoints.length<2)socCurvePoints=DEFAULT_SOC_CURVE.map(point=>({...point}));
   write(SOC_CURVE_KEY,socCurvePoints);
   function normalizeSocCurve(points){
@@ -359,51 +359,81 @@ export function createBatteriesModule(requestRender,openManager){
     return null
   }
   function estimateSocFromVoltage(voltage){return interpolateSoc(socCurvePoints,voltage)}
-  function renderSocCurveRows(root){
-    const host=root.querySelector('[data-battery-soc-curve-rows]');if(!host)return;
-    host.innerHTML=socCurvePoints.map((point,index)=>'<div class="battery-history-soc-curve-row" data-soc-curve-row><label><span>Voltaje</span><div><input type="number" inputmode="decimal" step="0.001" value="'+point.voltage.toFixed(3)+'" data-soc-curve-voltage aria-label="Voltaje del punto '+(index+1)+'"><span>V</span></div></label><label><span>SOC</span><div><input type="number" inputmode="decimal" min="0" max="100" step="0.1" value="'+point.soc.toFixed(1)+'" data-soc-curve-soc aria-label="SOC del punto '+(index+1)+'"><span>%</span></div></label><button type="button" data-soc-curve-delete="'+index+'" aria-label="Eliminar punto '+(index+1)+'" '+(socCurvePoints.length<=2?'disabled':'')+'>×</button></div>').join('')
-  }
   function socCurveEditorMarkup(){
-    const points=socCurvePoints.map((point,index)=>'<div class="battery-history-soc-curve-row" data-soc-curve-row><label><span>Voltaje</span><div><input type="number" inputmode="decimal" step="0.001" value="'+point.voltage.toFixed(3)+'" data-soc-curve-voltage aria-label="Voltaje del punto '+(index+1)+'"><span>V</span></div></label><label><span>SOC</span><div><input type="number" inputmode="decimal" min="0" max="100" step="0.1" value="'+point.soc.toFixed(1)+'" data-soc-curve-soc aria-label="SOC del punto '+(index+1)+'"><span>%</span></div></label><button type="button" data-soc-curve-delete="'+index+'" aria-label="Eliminar punto '+(index+1)+'" '+(socCurvePoints.length<=2?'disabled':'')+'>×</button></div>').join('');
-    return '<details class="battery-history-soc-curve" data-battery-soc-curve-details '+(socCurveEditorOpen?'open':'')+'><summary>Curva de correlación Voltaje estimado → SOC estimado</summary><div class="battery-history-soc-curve-content"><canvas data-battery-soc-curve-chart aria-label="Curva editable que relaciona voltaje estimado y SOC"></canvas><p>Entre puntos se calcula por interpolación lineal. Fuera del rango se conserva el SOC del extremo más cercano.</p><div class="battery-history-soc-curve-rows" data-battery-soc-curve-rows>'+points+'</div><button type="button" class="battery-history-soc-curve-add" data-soc-curve-add '+(socCurvePoints.length>=32?'disabled':'')+'>Agregar punto</button></div></details>'
+    return '<details class="battery-history-soc-curve" data-battery-soc-curve-details '+(socCurveEditorOpen?'open':'')+'><summary>Curva de correlación Voltaje estimado → SOC estimado</summary><div class="battery-history-soc-curve-content"><canvas data-battery-soc-curve-chart aria-label="Curva editable de Voltaje estimado y SOC estimado"></canvas><p>Arrastrá un punto para moverlo · Tocá un punto para eliminarlo · Tocá una línea para agregar un punto</p></div></details>'
   }
-
-  function drawSocCurve(root){
+  function socCurveDomain(){
+    const first=socCurvePoints[0]?.voltage??10,last=socCurvePoints[socCurvePoints.length-1]?.voltage??13.6,span=Math.max(.1,last-first),padding=Math.max(.2,span*.1);
+    return{min:first-padding,max:last+padding}
+  }
+  function socCurveMetrics(canvas,domain=socCurveDomain()){
+    const rect=canvas.getBoundingClientRect(),left=44,right=10,top=10,bottom=25,plotW=Math.max(10,rect.width-left-right),plotH=Math.max(10,rect.height-top-bottom),span=domain.max-domain.min||1;
+    return{rect,left,right,top,bottom,plotW,plotH,domain,xForVoltage:value=>left+(value-domain.min)/span*plotW,voltageForX:value=>domain.min+(value-left)/plotW*span,yForSoc:value=>top+(100-value)/100*plotH,socForY:value=>100-(value-top)/plotH*100}
+  }
+  function drawSocCurve(root,domainOverride=null,activeIndex=-1){
     const details=root?.querySelector('[data-battery-soc-curve-details]'),canvas=root?.querySelector('[data-battery-soc-curve-chart]');
     if(!details?.open||!canvas||socCurvePoints.length<2)return false;
-    const rect=canvas.getBoundingClientRect();if(rect.width<10||rect.height<30)return false;
+    const metrics=socCurveMetrics(canvas,domainOverride||socCurveDomain()),{rect,left,top,plotW,plotH,xForVoltage,yForSoc}=metrics;
+    if(rect.width<10||rect.height<30)return false;
     const dpr=devicePixelRatio||1,width=Math.round(rect.width*dpr),height=Math.round(rect.height*dpr);
     if(canvas.width!==width)canvas.width=width;if(canvas.height!==height)canvas.height=height;
     const context=canvas.getContext('2d');if(!context)return false;
     context.setTransform(dpr,0,0,dpr,0,0);context.clearRect(0,0,rect.width,rect.height);
-    const left=44,right=10,top=10,bottom=25,plotW=Math.max(10,rect.width-left-right),plotH=Math.max(10,rect.height-top-bottom),minV=socCurvePoints[0].voltage,maxV=socCurvePoints[socCurvePoints.length-1].voltage,span=maxV-minV||1,x=value=>left+(value-minV)/span*plotW,y=value=>top+(100-value)/100*plotH;
     context.font='10px system-ui,sans-serif';context.textAlign='right';context.textBaseline='middle';context.lineWidth=1;context.strokeStyle='#284b60';context.fillStyle='#a9bdc8';
-    for(let soc=0;soc<=100;soc+=25){const py=y(soc);context.beginPath();context.moveTo(left,py);context.lineTo(left+plotW,py);context.stroke();context.fillText(soc+'%',left-7,py)}
+    for(let soc=0;soc<=100;soc+=25){const py=yForSoc(soc);context.beginPath();context.moveTo(left,py);context.lineTo(left+plotW,py);context.stroke();context.fillText(soc+'%',left-7,py)}
     context.strokeStyle='#7895a5';context.beginPath();context.moveTo(left,top);context.lineTo(left,top+plotH);context.lineTo(left+plotW,top+plotH);context.stroke();
-    context.textAlign='left';context.textBaseline='top';context.fillStyle='#a9bdc8';context.fillText(minV.toFixed(2)+' V',left,top+plotH+5);context.textAlign='right';context.fillText(maxV.toFixed(2)+' V',left+plotW,top+plotH+5);
+    context.textAlign='left';context.textBaseline='top';context.fillStyle='#a9bdc8';context.fillText(metrics.domain.min.toFixed(2)+' V',left,top+plotH+5);context.textAlign='right';context.fillText(metrics.domain.max.toFixed(2)+' V',left+plotW,top+plotH+5);
     context.save();context.beginPath();context.rect(left,top,plotW,plotH);context.clip();context.beginPath();
-    socCurvePoints.forEach((point,index)=>{const px=x(point.voltage),py=y(point.soc);if(index===0)context.moveTo(px,py);else context.lineTo(px,py)});
-    context.strokeStyle='#6cc6d3';context.lineWidth=3;context.lineJoin='round';context.stroke();context.fillStyle='#6cc6d3';
-    for(const point of socCurvePoints){context.beginPath();context.arc(x(point.voltage),y(point.soc),4,0,Math.PI*2);context.fill()}
+    socCurvePoints.forEach((point,index)=>{const px=xForVoltage(point.voltage),py=yForSoc(point.soc);if(index===0)context.moveTo(px,py);else context.lineTo(px,py)});
+    context.strokeStyle='#6cc6d3';context.lineWidth=3;context.lineJoin='round';context.stroke();
+    for(let index=0;index<socCurvePoints.length;index++){const point=socCurvePoints[index];context.beginPath();context.arc(xForVoltage(point.voltage),yForSoc(point.soc),index===activeIndex?7:5,0,Math.PI*2);context.fillStyle=index===activeIndex?'#f2cf5b':'#6cc6d3';context.fill();context.strokeStyle='#071a27';context.lineWidth=2;context.stroke();if(index===activeIndex){context.beginPath();context.arc(xForVoltage(point.voltage),yForSoc(point.soc),9,0,Math.PI*2);context.strokeStyle='#f2cf5b';context.lineWidth=1.5;context.stroke()}}
     context.restore();return true
   }
+  function curveSegmentDistance(px,py,x1,y1,x2,y2){
+    const dx=x2-x1,dy=y2-y1,length=dx*dx+dy*dy,fraction=length?Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/length)):0;
+    return Math.hypot(px-(x1+fraction*dx),py-(y1+fraction*dy))
+  }
   function bindSocCurveEditor(root){
-    const details=root.querySelector('[data-battery-soc-curve-details]');if(!details||details.dataset.socCurveBound==='1')return;
+    const details=root.querySelector('[data-battery-soc-curve-details]'),canvas=root.querySelector('[data-battery-soc-curve-chart]');
+    if(!details||!canvas||details.dataset.socCurveBound==='1')return;
     details.dataset.socCurveBound='1';
     details.addEventListener('toggle',()=>{socCurveEditorOpen=details.open;if(details.open)drawSocCurve(root)});
-    const update=()=>{
-      const points=[...details.querySelectorAll('[data-soc-curve-row]')].map(row=>({voltage:num(row.querySelector('[data-soc-curve-voltage]')?.value),soc:num(row.querySelector('[data-soc-curve-soc]')?.value)}));
-      const normalized=normalizeSocCurve(points);if(normalized.length<2)return false;
-      socCurvePoints=normalized;write(SOC_CURVE_KEY,socCurvePoints);return true
+    const pointAt=(x,y,metrics)=>{let index=-1,distance=13;for(let i=0;i<socCurvePoints.length;i++){const point=socCurvePoints[i],d=Math.hypot(x-metrics.xForVoltage(point.voltage),y-metrics.yForSoc(point.soc));if(d<distance){distance=d;index=i}}return index};
+    const segmentAt=(x,y,metrics)=>{let index=-1,distance=12;for(let i=1;i<socCurvePoints.length;i++){const previous=socCurvePoints[i-1],next=socCurvePoints[i],d=curveSegmentDistance(x,y,metrics.xForVoltage(previous.voltage),metrics.yForSoc(previous.soc),metrics.xForVoltage(next.voltage),metrics.yForSoc(next.soc));if(d<distance){distance=d;index=i-1}}return index};
+    const canvasPoint=event=>{const rect=canvas.getBoundingClientRect();return{x:event.clientX-rect.left,y:event.clientY-rect.top}};
+    const onDown=event=>{
+      if(event.button!==undefined&&event.button!==0)return;
+      const domain=socCurveDomain(),metrics=socCurveMetrics(canvas,domain),point=canvasPoint(event),pointIndex=pointAt(point.x,point.y,metrics);
+      const type=pointIndex>=0?'point':'line',index=pointIndex>=0?pointIndex:segmentAt(point.x,point.y,metrics);if(index<0)return;
+      event.preventDefault();try{canvas.setPointerCapture(event.pointerId)}catch{}
+      socCurvePointer={pointerId:event.pointerId,type,index,domain,startX:point.x,startY:point.y,moved:false};canvas.classList.add('is-dragging')
     };
-    details.addEventListener('input',event=>{if(!event.target.matches('[data-soc-curve-voltage],[data-soc-curve-soc]'))return;if(update()){drawSocCurve(root);queueDraw(root)}});
-    details.addEventListener('change',event=>{if(!event.target.matches('[data-soc-curve-voltage],[data-soc-curve-soc]'))return;if(update()){renderSocCurveRows(root);drawSocCurve(root);queueDraw(root)}});
-    details.addEventListener('click',event=>{
-      const remove=event.target.closest('[data-soc-curve-delete]');
-      if(remove){event.preventDefault();event.stopPropagation();update();if(socCurvePoints.length<=2)return;const row=remove.closest('[data-soc-curve-row]'),voltage=num(row?.querySelector('[data-soc-curve-voltage]')?.value),soc=num(row?.querySelector('[data-soc-curve-soc]')?.value),index=socCurvePoints.findIndex(point=>point.voltage===voltage&&point.soc===soc);if(index>=0)socCurvePoints=socCurvePoints.filter((_,i)=>i!==index);renderSocCurveRows(root);write(SOC_CURVE_KEY,socCurvePoints);drawSocCurve(root);queueDraw(root);return}
-      const add=event.target.closest('[data-soc-curve-add]');
-      if(add){event.preventDefault();event.stopPropagation();update();if(socCurvePoints.length<2||socCurvePoints.length>=32)return;let gapIndex=0,gap=-Infinity;for(let i=1;i<socCurvePoints.length;i++){const width=socCurvePoints[i].voltage-socCurvePoints[i-1].voltage;if(width>gap){gap=width;gapIndex=i-1}}const left=socCurvePoints[gapIndex],right=socCurvePoints[gapIndex+1],voltage=(left.voltage+right.voltage)/2,soc=interpolateSoc(socCurvePoints,voltage);socCurvePoints=normalizeSocCurve([...socCurvePoints,{voltage,soc}]);renderSocCurveRows(root);write(SOC_CURVE_KEY,socCurvePoints);drawSocCurve(root);queueDraw(root)}
-    })
+    const onMove=event=>{
+      const gesture=socCurvePointer;if(!gesture||gesture.pointerId!==event.pointerId||gesture.type!=='point')return;
+      const point=canvasPoint(event);if(Math.hypot(point.x-gesture.startX,point.y-gesture.startY)>4)gesture.moved=true;if(!gesture.moved)return;
+      const metrics=socCurveMetrics(canvas,gesture.domain),previous=socCurvePoints[gesture.index-1],next=socCurvePoints[gesture.index+1],minGap=Math.max(.005,(gesture.domain.max-gesture.domain.min)*.001);
+      let voltage=Math.max(gesture.domain.min,Math.min(gesture.domain.max,metrics.voltageForX(point.x)));
+      if(previous)voltage=Math.max(voltage,previous.voltage+minGap);if(next)voltage=Math.min(voltage,next.voltage-minGap);
+      let soc=Math.max(0,Math.min(100,metrics.socForY(point.y)));
+      if(previous&&next&&previous.soc<=next.soc)soc=Math.max(previous.soc,Math.min(next.soc,soc));else if(previous&&!next)soc=Math.max(previous.soc,soc);else if(next&&!previous)soc=Math.min(next.soc,soc);
+      socCurvePoints=socCurvePoints.map((item,index)=>index===gesture.index?{voltage,soc}:item);
+      drawSocCurve(root,gesture.domain,gesture.index);queueDraw(root);event.preventDefault()
+    };
+    const finish=(event,cancelled=false)=>{
+      const gesture=socCurvePointer;if(!gesture||gesture.pointerId!==event.pointerId)return;socCurvePointer=null;canvas.classList.remove('is-dragging');
+      if(!cancelled){
+        if(gesture.type==='point'&&gesture.moved){write(SOC_CURVE_KEY,socCurvePoints)}
+        else if(gesture.type==='point'&&socCurvePoints.length>2){socCurvePoints=socCurvePoints.filter((_,index)=>index!==gesture.index);write(SOC_CURVE_KEY,socCurvePoints)}
+        else if(gesture.type==='line'&&!gesture.moved){
+          const metrics=socCurveMetrics(canvas,gesture.domain),point=canvasPoint(event),left=socCurvePoints[gesture.index],right=socCurvePoints[gesture.index+1],gap=Math.max(.005,(gesture.domain.max-gesture.domain.min)*.001);
+          let voltage=metrics.voltageForX(point.x);voltage=Math.max(left.voltage+gap,Math.min(right.voltage-gap,voltage));
+          if(right.voltage-left.voltage>gap*2){const soc=interpolateSoc(socCurvePoints,voltage);socCurvePoints=normalizeSocCurve([...socCurvePoints,{voltage,soc}]);write(SOC_CURVE_KEY,socCurvePoints)}
+        }
+      }else if(gesture.moved)write(SOC_CURVE_KEY,socCurvePoints);
+      try{if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId)}catch{}
+      drawSocCurve(root);queueDraw(root)
+    };
+    canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerup',event=>finish(event,false));canvas.addEventListener('pointercancel',event=>finish(event,true));canvas.addEventListener('lostpointercapture',event=>finish(event,true))
   }
   function chartData(){
     ensureHistoryAh();
