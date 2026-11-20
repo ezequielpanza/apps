@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chez-health-v14';
+const CACHE_NAME = 'chez-health-v15';
 const CORE_ASSETS = [
   './',
   './index.html',

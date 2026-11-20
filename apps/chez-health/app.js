@@ -324,7 +324,7 @@ function renderFoodList() {
         '<div class="category-choices" id="category-' + food.id + '"' + (open ? '' : ' hidden') + '>' + list +
         '<button type="button" class="add-food" data-add-food="' + food.id + '">＋ Agregar nuevo alimento</button></div></article>';
     }).join('');
-    return '<section class="food-section" aria-labelledby="section-' + section.id + '"><h3 id="section-' + section.id + '" class="food-section-title">' + section.title + '</h3><div class="food-list">' + rows + '</div></section>';
+    return rows;
   }).join('') + '<button type="button" class="add-category">＋ Agregar Categoría</button>';
   if (settingsCategory) {
     const food = FOOD_GROUPS.find(function (f) { return f.id === settingsCategory; });
