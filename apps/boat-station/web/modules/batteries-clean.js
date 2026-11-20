@@ -155,7 +155,12 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function bankEstimate(s){
     const current=num(s.current),charging=current!==null&&current>.05,discharging=current!==null&&current<-.05,label=charging?"Carga completa en":discharging?"Autonomía estimada":"En reposo",value=charging?chargeEtaLabel(s):discharging?autonomyLabel(s):current===null?"—":"Sin carga neta";
-    return `<div class="battery-bank-estimate"><span>${label}</span><strong>${esc(value)}</strong></div>`;
+    let finish='';
+    if(discharging&&s.connected>=s.total&&Number.isFinite(s.rem)&&s.rem>0){
+      const end=new Date(Date.now()+s.rem/Math.abs(current)*3600000);
+      if(Number.isFinite(end.getTime())){const now=new Date(),differentDay=end.toDateString()!==now.toDateString(),options=differentDay?{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}:{hour:'2-digit',minute:'2-digit'};finish='Finaliza: '+end.toLocaleString('es',options)}
+    }
+    return `<div class="battery-bank-estimate"><span>${label}</span><strong>${esc(value)}</strong>${finish?'<span>'+esc(finish)+'</span>':''}</div>`;
   }
   function overview(){
     const s=stats(),batteryCount=state.batteries.length,minis=batteryCount?state.batteries.map(mini).join(""):'<div class="battery-mini-empty">Sin baterías vinculadas</div>',single=batteryCount===1?" single":"",cardRows=Math.max(1,Math.ceil(batteryCount/2));
