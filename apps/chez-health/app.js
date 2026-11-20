@@ -49,7 +49,7 @@ const FOOD_GROUPS = [
     section: 'everyday',
     icon: '🌾',
     title: 'Cereales integrales',
-    examples: 'Avena, arroz integral, maíz, quinoa, pan integral',
+    examples: 'Avena, arroz integral, maíz, quinoa, cuscús integral, pan integral',
     target: 7,
     frequency: '1 ingesta por día'
   },
