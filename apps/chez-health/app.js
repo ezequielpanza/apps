@@ -206,6 +206,8 @@ const MAX_MARK = 35 * 10100;
 let customFoods = [];
 let hiddenFoods = [];
 let settingsCategory = null;
+let settingsFood = null;
+let foodNames = [];
 function escapeHtml(v) { return String(v).replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function hiddenSlot(id, slot) { return hiddenFoods.some(function (h) { return h.food === id && h.slot === slot; }); }
 async function changeCatalog(data) {
@@ -304,7 +306,8 @@ function renderFoodList() {
       const extra = customFoods.filter(function (item) { return item.food === food.id; }).map(function (item) { return {name:item.name, slot:item.slot}; });
       const choices = builtin.concat(extra).filter(function (item) { return !hiddenSlot(food.id, item.slot); });
       const list = choices.map(function (choice) {
-        const name = escapeHtml(choice.name);
+        const renamed = foodNames.find(function (n) { return n.food === food.id && n.slot === choice.slot; });
+        const name = escapeHtml(renamed ? renamed.name : choice.name);
         const base = choice.slot * 35;
         const slots = Array.from({length:food.target}, function (_, n) { return base + n; });
         const boxes = slots.map(function (mark) {
@@ -315,7 +318,7 @@ function renderFoodList() {
             ' aria-label="' + name + ', consumo ' + (mark - base + 1) + '">' +
             '<span aria-hidden="true">✓</span></label>';
         }).join('');
-        return '<div class="choice-row"><span class="choice-name">' + name + '</span><button type="button" class="remove-food" data-food="' + food.id + '" data-slot="' + choice.slot + '" aria-label="Eliminar ' + name + '">×</button><div class="food-checks">' + boxes + '</div></div>';
+        return '<div class="choice-row"><span class="choice-name">' + name + '</span><div class="food-checks">' + boxes + '</div><button type="button" class="properties-btn food-properties" data-food="' + food.id + '" data-slot="' + choice.slot + '" aria-label="Propiedades de ' + name + '">⚙</button></div>';
       }).join('');
       return '<article class="category-card' + (count ? ' has-checks' : '') + '">' +
         '<div class="category-head"><button type="button" class="category-toggle" data-category="' + food.id + '" aria-expanded="' + open + '" aria-controls="category-' + food.id + '">' +
@@ -330,6 +333,14 @@ function renderFoodList() {
     const food = FOOD_GROUPS.find(function (f) { return f.id === settingsCategory; });
     if (food) $('foodList').insertAdjacentHTML('beforeend', '<div class="modal-backdrop"><section class="properties-panel" role="dialog" aria-modal="true" aria-label="Propiedades de ' + escapeHtml(food.title) + '"><div class="properties-head"><h3>' + escapeHtml(food.title) + '</h3><button type="button" class="close-properties" aria-label="Cerrar">×</button></div><p>Consumos por semana</p><div class="properties-goal"><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir consumos semanales"' + (food.target <= checkedCount(food) ? ' disabled' : '') + '>−</button><strong>' + food.target + '</strong><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar consumos semanales"' + (food.target >= 35 ? ' disabled' : '') + '>+</button></div><div class="properties-actions"><button type="button" class="rename-category" data-food="' + food.id + '">Cambiar nombre</button><button type="button" class="delete-category" data-food="' + food.id + '">Eliminar categoría</button></div></section></div>');
   }
+  if (settingsFood) {
+    $('foodList').insertAdjacentHTML('beforeend', '<div class="modal-backdrop food-modal"><section class="properties-panel" role="dialog" aria-modal="true" aria-label="Propiedades de ' + escapeHtml(settingsFood.name) + '"><div class="properties-head"><h3>' + escapeHtml(settingsFood.name) + '</h3><button type="button" class="close-food-properties" aria-label="Cerrar">×</button></div><div class="properties-actions"><button type="button" class="rename-food">Cambiar nombre</button><button type="button" class="delete-food delete-category">Eliminar alimento</button></div></section></div>');
+  }
+  document.querySelectorAll('.food-properties').forEach(function (button) { button.addEventListener('click', function () { settingsFood = {food:button.dataset.food,slot:Number(button.dataset.slot),name:button.parentNode.querySelector('.choice-name').textContent}; render(); }); });
+  document.querySelectorAll('.close-food-properties').forEach(function (button) { button.addEventListener('click', function () { settingsFood = null; render(); }); });
+  document.querySelectorAll('.food-modal').forEach(function (backdrop) { backdrop.addEventListener('click', function (event) { if (event.target === backdrop) { settingsFood = null; render(); } }); });
+  document.querySelectorAll('.rename-food').forEach(function (button) { button.addEventListener('click', function () { const item = settingsFood; const name = prompt('Nuevo nombre del alimento:', item.name); if (name && name.trim() && name.trim() !== item.name) { settingsFood = null; changeCatalog({type:'rename-food',food:item.food,slot:item.slot,name:name.trim()}); } }); });
+  document.querySelectorAll('.delete-food').forEach(function (button) { button.addEventListener('click', function () { const item = settingsFood; if (confirm('Eliminar ' + item.name + ' de esta categoría? También se eliminarán sus marcas.')) { settingsFood = null; changeCatalog({type:'remove-food',food:item.food,slot:item.slot}); } }); });
   document.querySelectorAll('.rename-category').forEach(function (button) { button.addEventListener('click', function () {
     const food = FOOD_GROUPS.find(function (f) { return f.id === button.dataset.food; });
     if (!food) return;
@@ -346,7 +357,6 @@ function renderFoodList() {
   document.querySelectorAll('.close-properties').forEach(function (button) { button.addEventListener('click', function () { settingsCategory = null; render(); }); });
   document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) { backdrop.addEventListener('click', function (event) { if (event.target === backdrop) { settingsCategory = null; render(); } }); });
   document.querySelectorAll('.add-food').forEach(function (button) { button.addEventListener('click', function () { const name = prompt('Nombre del nuevo alimento:'); if (name && name.trim()) changeCatalog({type:'add-food', food:button.dataset.addFood, name:name.trim()}); }); });
-  document.querySelectorAll('.remove-food').forEach(function (button) { button.addEventListener('click', function () { const name = button.parentNode.querySelector('.choice-name').textContent; if (confirm('Eliminar ' + name + ' de esta categoría? También se eliminarán sus marcas.')) changeCatalog({type:'remove-food',food:button.dataset.food,slot:Number(button.dataset.slot)}); }); });
   document.querySelectorAll('.add-category').forEach(function (button) { button.addEventListener('click', function () { const title = prompt('Nombre de la nueva categoría:'); if (title && title.trim()) changeCatalog({type:'add-category',title:title.trim()}); }); });
   document.querySelectorAll('.category-toggle').forEach(function (button) {
     button.addEventListener('click', function () {
@@ -499,6 +509,7 @@ async function syncShared() {
       });
     }
     if (Array.isArray(result.customFoods)) customFoods = result.customFoods;
+    if (Array.isArray(result.foodNames)) foodNames = result.foodNames;
     if (Array.isArray(result.hiddenFoods)) hiddenFoods = result.hiddenFoods;
     if (result.targets && typeof result.targets === 'object') {
       FOOD_GROUPS.forEach(function (food) {

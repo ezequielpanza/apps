@@ -12,7 +12,8 @@ export async function onRequestGet(context) {
     const custom = await context.env.DB.prepare('SELECT id,food,name FROM custom_foods ORDER BY id').all();
     const hidden = await context.env.DB.prepare('SELECT food,slot FROM hidden_foods').all();
     const categorySettings = await context.env.DB.prepare('SELECT food,title,deleted FROM category_settings').all();
-    return new Response(JSON.stringify({marks:result.results.map(r=>({food:r.food,mark:r.mark,checked:!!r.checked})),targets:Object.fromEntries(settings.results.map(r=>[r.food,r.target])),categories:cats.results,customFoods:custom.results.map(r=>({food:r.food,name:r.name,slot:100+r.id})),hiddenFoods:hidden.results,categorySettings:categorySettings.results}),{headers});
+    const foodNames = await context.env.DB.prepare('SELECT food,slot,name FROM food_names').all();
+    return new Response(JSON.stringify({marks:result.results.map(r=>({food:r.food,mark:r.mark,checked:!!r.checked})),targets:Object.fromEntries(settings.results.map(r=>[r.food,r.target])),categories:cats.results,customFoods:custom.results.map(r=>({food:r.food,name:r.name,slot:100+r.id})),hiddenFoods:hidden.results,categorySettings:categorySettings.results,foodNames:foodNames.results}),{headers});
   } catch (_) { return new Response('Base no disponible',{status:503}); }
 }
 export async function onRequestPost(context) {
@@ -46,6 +47,12 @@ export async function onRequestPost(context) {
       const name = typeof data.name === 'string' ? data.name.trim() : '';
       if (!validFood || !name || name.length > 80) return new Response('Nombre inválido',{status:400});
       await context.env.DB.prepare('INSERT OR IGNORE INTO custom_foods (food,name) VALUES (?,?)').bind(data.food,name).run();
+      return new Response(JSON.stringify({ok:true}),{headers});
+    }
+    if (data.type === 'rename-food') {
+      const name = typeof data.name === 'string' ? data.name.trim() : '';
+      if (!validFood || !Number.isInteger(data.slot) || data.slot < 1 || data.slot >= 10100 || !name || name.length > 80) return new Response('Datos inválidos',{status:400});
+      await context.env.DB.prepare('INSERT INTO food_names (food,slot,name) VALUES (?,?,?) ON CONFLICT(food,slot) DO UPDATE SET name=excluded.name').bind(data.food,data.slot,name).run();
       return new Response(JSON.stringify({ok:true}),{headers});
     }
     if (data.type === 'remove-food') {

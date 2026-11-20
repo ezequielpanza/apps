@@ -39,5 +39,6 @@ jobs:
           npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS custom_foods (id INTEGER PRIMARY KEY AUTOINCREMENT, food TEXT NOT NULL, name TEXT NOT NULL, UNIQUE(food,name))"
           npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS hidden_foods (food TEXT NOT NULL, slot INTEGER NOT NULL, PRIMARY KEY(food,slot))"
           npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS category_settings (food TEXT PRIMARY KEY, title TEXT, deleted INTEGER NOT NULL DEFAULT 0)"
+          npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS food_names (food TEXT NOT NULL, slot INTEGER NOT NULL, name TEXT NOT NULL, PRIMARY KEY(food,slot))"
           npx --yes wrangler@latest pages project create chez-health --production-branch=main || true
           npx --yes wrangler@latest pages deploy . --project-name=chez-health --branch=main
