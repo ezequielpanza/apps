@@ -6,6 +6,7 @@
       appVersion:()=>NativeToolsBridge.appVersion?.()||'',
       exportGpx:gpx=>NativeToolsBridge.exportGpx(gpx),
       exportBatteryDiagnosticsCsv:filename=>NativeToolsBridge.exportBatteryDiagnosticsCsv?.(filename),
+      exportCsvText:(filename,csv)=>NativeToolsBridge.exportCsvText?.(filename,csv),
       importGpx:()=>NativeToolsBridge.importGpx()
     };
   }
