@@ -22,7 +22,16 @@ const FOOD_GROUPS = [
     section: 'produce',
     icon: '🥕',
     title: 'Vegetales de colores',
-    examples: 'Tomate, zanahoria, calabaza, pimiento, remolacha',
+    examples: 'Tomate, pimientos, berenjena, zanahoria, remolacha',
+    target: 7,
+    frequency: '1 ingesta por día'
+  },
+  {
+    id: 'vegetables-carb',
+    section: 'produce',
+    icon: '🍠',
+    title: 'Vegetales con carbohidratos',
+    examples: 'Papa, batata, zapallo, yuca',
     target: 7,
     frequency: '1 ingesta por día'
   },

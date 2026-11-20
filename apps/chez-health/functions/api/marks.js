@@ -1,5 +1,5 @@
 
-const TARGETS = {'vegetables':14,'vegetables-green':7,'vegetables-color':7,'fruits':7,'whole-grains':7,'legumes':3,'nuts-seeds':7,'calcium':7,'fish':2,'poultry':2,'beef':1,'pork':1,'eggs':3,'olive-oil':7,'turmeric':2,'ginger':2,'lemon':2,'cinnamon':2};
+const TARGETS = {'vegetables':14,'vegetables-green':7,'vegetables-color':7,'vegetables-carb':7,'fruits':7,'whole-grains':7,'legumes':3,'nuts-seeds':7,'calcium':7,'fish':2,'poultry':2,'beef':1,'pork':1,'eggs':3,'olive-oil':7,'turmeric':2,'ginger':2,'lemon':2,'cinnamon':2};
 const headers = {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'};
 function validWeek(w) { return typeof w === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w) && !Number.isNaN(Date.parse(w)); }
 export async function onRequestGet(context) {
