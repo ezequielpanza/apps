@@ -154,6 +154,9 @@ const FOOD_GROUPS = [
   }
 ];
 
+const TARGETS_KEY = 'chez-health-targets-v1';
+try { const targets = JSON.parse(localStorage.getItem(TARGETS_KEY) || '{}'); FOOD_GROUPS.forEach(function (food) { if (Number.isInteger(targets[food.id]) && targets[food.id] >= 0 && targets[food.id] <= 35) food.target = targets[food.id]; }); } catch (_) {}
+function saveTargets() { try { localStorage.setItem(TARGETS_KEY, JSON.stringify(Object.fromEntries(FOOD_GROUPS.map(f => [f.id, f.target])))); } catch (_) {} }
 const $ = function (id) { return document.getElementById(id); };
 let savedState = loadState();
 let deferredInstallPrompt = null;
@@ -182,7 +185,7 @@ function loadState() {
       FOOD_GROUPS.forEach(function (food) {
         const marks = Array.isArray(stored.checked[food.id]) ? stored.checked[food.id] : [];
         checked[food.id] = Array.from(new Set(marks.filter(function (mark) {
-          return Number.isInteger(mark) && mark >= 0 && mark < food.target;
+          return Number.isInteger(mark) && mark >= 0 && mark < 35;
         })));
       });
       return { week: week, checked: checked };
@@ -226,7 +229,7 @@ function weekLabel(week) {
 }
 
 function checkedCount(food) {
-  return (savedState.checked[food.id] || []).length;
+  return (savedState.checked[food.id] || []).filter(function (mark) { return mark < food.target; }).length;
 }
 
 function renderFoodList() {
@@ -234,8 +237,8 @@ function renderFoodList() {
     const rows = FOOD_GROUPS.filter(function (food) {
       return food.section === section.id;
     }).map(function (food) {
-      const marks = savedState.checked[food.id] || [];
-      const columns = Math.min(food.target, 7);
+      const marks = (savedState.checked[food.id] || []).filter(function (mark) { return mark < food.target; });
+      const columns = Math.max(1, Math.min(food.target, 7));
       const checkboxes = Array.from({ length: food.target }, function (_, index) {
         const checked = marks.includes(index);
         return '<label class="check-slot">' +
@@ -250,7 +253,11 @@ function renderFoodList() {
         '<div class="food-content">' +
           '<h3 class="food-title"><span aria-hidden="true">' + food.icon + '</span> ' + food.title + '</h3>' +
           '<p class="food-examples">' + food.examples + '</p>' +
-          '<p class="food-frequency">' + food.frequency + '</p>' +
+          '<div class="target-control" aria-label="Meta semanal de ' + food.title + '">' +
+            '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir ingestas semanales de ' + food.title + '"' + (food.target <= 0 ? ' disabled' : '') + '>−</button>' +
+            '<span class="food-frequency">' + food.target + (food.target === 1 ? ' ingesta por semana' : ' ingestas por semana') + '</span>' +
+            '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar ingestas semanales de ' + food.title + '"' + (food.target >= 35 ? ' disabled' : '') + '>+</button>' +
+          '</div>' +
         '</div>' +
         '<div class="food-tracker">' +
           '<span class="food-count">' + marks.length + '/' + food.target + '</span>' +
@@ -265,6 +272,19 @@ function renderFoodList() {
     '</section>';
   }).join('');
 
+  document.querySelectorAll('.target-btn').forEach(function (button) {
+    button.addEventListener('click', function () {
+      const food = FOOD_GROUPS.find(function (item) { return item.id === button.dataset.targetFood; });
+      const delta = Number(button.dataset.delta);
+      if (!food || food.target + delta < 0 || food.target + delta > 35) return;
+      food.target += delta;
+      saveTargets();
+      syncQueue.push({type:'target', food:food.id, delta:delta});
+      persistQueue();
+      render();
+      syncShared();
+    });
+  });
   document.querySelectorAll('.food-checkbox').forEach(function (checkbox) {
     checkbox.addEventListener('change', function () {
       const id = checkbox.dataset.foodId;
@@ -283,13 +303,13 @@ function renderFoodList() {
 function renderProgress() {
   const total = FOOD_GROUPS.reduce(function (sum, food) { return sum + food.target; }, 0);
   const count = FOOD_GROUPS.reduce(function (sum, food) { return sum + checkedCount(food); }, 0);
-  const percent = Math.round(count / total * 100);
+  const percent = total ? Math.round(count / total * 100) : 0;
   $('progressValue').textContent = count + ' de ' + total + ' ingestas';
   $('progressFill').style.width = percent + '%';
   $('progressTrack').setAttribute('aria-valuemax', String(total));
   $('progressTrack').setAttribute('aria-valuenow', String(count));
 
-  if (count === total) {
+  if (total > 0 && count === total) {
     $('progressMessage').textContent = 'Completaste todas las frecuencias de referencia de esta semana.';
   } else if (count === 0) {
     $('progressMessage').textContent = 'Marca una casilla cada vez que incluyas el alimento en una comida.';
@@ -381,10 +401,17 @@ async function syncShared() {
     if (!response.ok) throw new Error('No se pudo cargar');
     const result = await response.json();
     if (week !== currentWeekStart() || syncQueue.length) return;
+    if (result.targets && typeof result.targets === 'object') {
+      FOOD_GROUPS.forEach(function (food) {
+        const value = result.targets[food.id];
+        if (Number.isInteger(value) && value >= 0 && value <= 35) food.target = value;
+      });
+      saveTargets();
+    }
     const checked = {};
     (result.marks || []).forEach(function (item) {
       const food = FOOD_GROUPS.find(function (f) { return f.id === item.food; });
-      if (food && Number.isInteger(item.mark) && item.mark >= 0 && item.mark < food.target && item.checked) {
+      if (food && Number.isInteger(item.mark) && item.mark >= 0 && item.mark < 35 && item.checked) {
         (checked[item.food] ||= []).push(item.mark);
       }
     });

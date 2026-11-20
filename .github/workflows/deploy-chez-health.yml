@@ -31,5 +31,6 @@ jobs:
           test -n "$DB_ID"
           jq -n --arg id "$DB_ID" '{name:"chez-health",pages_build_output_dir:".",compatibility_date:"2025-04-01",d1_databases:[{binding:"DB",database_name:"chez-health",database_id:$id}]}' > wrangler.json
           npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS marks (week TEXT NOT NULL, food TEXT NOT NULL, mark INTEGER NOT NULL, checked INTEGER NOT NULL, PRIMARY KEY (week,food,mark))"
+          npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS food_targets (food TEXT PRIMARY KEY, target INTEGER NOT NULL)"
           npx --yes wrangler@latest pages project create chez-health --production-branch=main || true
           npx --yes wrangler@latest pages deploy . --project-name=chez-health --branch=main
