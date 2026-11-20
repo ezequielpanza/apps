@@ -237,3 +237,16 @@ h2 { margin-bottom: 0; color: var(--teal); font-size: clamp(22px, 4vw, 30px); le
 .check-slot input:disabled + span { border-color:#d5dcd7; background:#edf0ee; color:transparent; cursor:not-allowed; }
 .check-slot:has(input:disabled) { cursor:not-allowed; }
 @media(max-width:620px) { .category-name { font-size:12px; } .choice-name { font-size:12px; } }
+
+.properties-btn,.close-properties,.remove-food { border:0; background:transparent; color:#84938d; cursor:pointer; font-size:20px; padding:6px; }
+.remove-food { font-size:18px; padding:4px 8px; }
+.choice-row .food-checks { margin-left:auto; }
+.add-food,.add-category { display:block; width:100%; text-align:left; color:#7f8c86; background:#f1f3f2; border:1px dashed #c4cec8; border-radius:10px; padding:11px 12px; cursor:pointer; }
+.add-food { margin-top:7px; }
+.add-category { margin-top:18px; }
+.modal-backdrop { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:18px; background:rgba(8,35,35,.55); }
+.properties-panel { width:min(100%,380px); padding:20px; background:#fff; border-radius:18px; box-shadow:0 16px 40px #0003; }
+.properties-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.properties-head h3 { margin:0; color:var(--teal); }
+.properties-panel p { margin:18px 0 10px; color:var(--muted); }
+.properties-goal { display:flex; align-items:center; justify-content:center; gap:22px; }

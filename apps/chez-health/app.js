@@ -202,7 +202,19 @@ const FOOD_CHOICES = {
   'lemon':['Limón'],
   'cinnamon':['Canela']
 };
-const MAX_MARK = 35 * 8;
+const MAX_MARK = 35 * 10100;
+let customFoods = [];
+let hiddenFoods = [];
+let settingsCategory = null;
+function escapeHtml(v) { return String(v).replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function hiddenSlot(id, slot) { return hiddenFoods.some(function (h) { return h.food === id && h.slot === slot; }); }
+async function changeCatalog(data) {
+  try {
+    const response = await fetch('./api/marks', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data), cache:'no-store'});
+    if (!response.ok) { const message = await response.text(); throw new Error(message || 'No se pudo guardar'); }
+    await syncShared();
+  } catch (error) { alert('No se pudo guardar el cambio. Revisa la conexión e inténtalo de nuevo.'); }
+}
 const expanded = new Set();
 const TARGETS_KEY = 'chez-health-targets-v1';
 try { const targets = JSON.parse(localStorage.getItem(TARGETS_KEY) || '{}'); FOOD_GROUPS.forEach(function (food) { if (Number.isInteger(targets[food.id]) && targets[food.id] >= 0 && targets[food.id] <= 35) food.target = targets[food.id]; }); } catch (_) {}
@@ -288,9 +300,12 @@ function renderFoodList() {
       const marks = savedState.checked[food.id] || [];
       const count = marks.length;
       const open = expanded.has(food.id);
-      const choices = FOOD_CHOICES[food.id] || [food.title];
-      const list = choices.map(function (name, idx) {
-        const base = (idx + 1) * 35;
+      const builtin = (FOOD_CHOICES[food.id] || []).map(function (name, idx) { return {name:name, slot:idx + 1}; });
+      const extra = customFoods.filter(function (item) { return item.food === food.id; }).map(function (item) { return {name:item.name, slot:item.slot}; });
+      const choices = builtin.concat(extra).filter(function (item) { return !hiddenSlot(food.id, item.slot); });
+      const list = choices.map(function (choice) {
+        const name = escapeHtml(choice.name);
+        const base = choice.slot * 35;
         const slots = Array.from({length:food.target}, function (_, n) { return base + n; });
         const boxes = slots.map(function (mark) {
           const checked = marks.includes(mark);
@@ -300,18 +315,27 @@ function renderFoodList() {
             ' aria-label="' + name + ', consumo ' + (mark - base + 1) + '">' +
             '<span aria-hidden="true">✓</span></label>';
         }).join('');
-        return '<div class="choice-row"><span class="choice-name">' + name + '</span><div class="food-checks">' + boxes + '</div></div>';
+        return '<div class="choice-row"><span class="choice-name">' + name + '</span><button type="button" class="remove-food" data-food="' + food.id + '" data-slot="' + choice.slot + '" aria-label="Eliminar ' + name + '">×</button><div class="food-checks">' + boxes + '</div></div>';
       }).join('');
       return '<article class="category-card' + (count ? ' has-checks' : '') + '">' +
         '<div class="category-head"><button type="button" class="category-toggle" data-category="' + food.id + '" aria-expanded="' + open + '" aria-controls="category-' + food.id + '">' +
-        '<span class="category-name">' + food.icon + ' ' + food.title + '</span><span class="category-count">' + count + '/' + food.target + '</span><span aria-hidden="true">' + (open ? '▴' : '▾') + '</span></button>' +
-        '<div class="target-control" aria-label="Meta semanal de ' + food.title + '">' +
-        '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir consumos semanales de ' + food.title + '"' + (food.target <= count ? ' disabled' : '') + '>−</button>' +
-        '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar consumos semanales de ' + food.title + '"' + (food.target >= 35 ? ' disabled' : '') + '>+</button></div></div>' +
-        '<div class="category-choices" id="category-' + food.id + '"' + (open ? '' : ' hidden') + '>' + list + '</div></article>';
+        '<span class="category-name">' + food.icon + ' ' + escapeHtml(food.title) + '</span><span class="category-count">' + count + '/' + food.target + '</span></button>' +
+        '<button type="button" class="properties-btn" data-properties="' + food.id + '" aria-label="Propiedades de ' + escapeHtml(food.title) + '">⚙</button></div>' +
+        '<div class="category-choices" id="category-' + food.id + '"' + (open ? '' : ' hidden') + '>' + list +
+        '<button type="button" class="add-food" data-add-food="' + food.id + '">＋ Agregar nuevo alimento</button></div></article>';
     }).join('');
     return '<section class="food-section" aria-labelledby="section-' + section.id + '"><h3 id="section-' + section.id + '" class="food-section-title">' + section.title + '</h3><div class="food-list">' + rows + '</div></section>';
-  }).join('');
+  }).join('') + '<button type="button" class="add-category">＋ Agregar Categoría</button>';
+  if (settingsCategory) {
+    const food = FOOD_GROUPS.find(function (f) { return f.id === settingsCategory; });
+    if (food) $('foodList').insertAdjacentHTML('beforeend', '<div class="modal-backdrop"><section class="properties-panel" role="dialog" aria-modal="true" aria-label="Propiedades de ' + escapeHtml(food.title) + '"><div class="properties-head"><h3>' + escapeHtml(food.title) + '</h3><button type="button" class="close-properties" aria-label="Cerrar">×</button></div><p>Consumos por semana</p><div class="properties-goal"><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir consumos semanales"' + (food.target <= checkedCount(food) ? ' disabled' : '') + '>−</button><strong>' + food.target + '</strong><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar consumos semanales"' + (food.target >= 35 ? ' disabled' : '') + '>+</button></div></section></div>');
+  }
+  document.querySelectorAll('.properties-btn').forEach(function (button) { button.addEventListener('click', function () { settingsCategory = button.dataset.properties; render(); }); });
+  document.querySelectorAll('.close-properties').forEach(function (button) { button.addEventListener('click', function () { settingsCategory = null; render(); }); });
+  document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) { backdrop.addEventListener('click', function (event) { if (event.target === backdrop) { settingsCategory = null; render(); } }); });
+  document.querySelectorAll('.add-food').forEach(function (button) { button.addEventListener('click', function () { const name = prompt('Nombre del nuevo alimento:'); if (name && name.trim()) changeCatalog({type:'add-food', food:button.dataset.addFood, name:name.trim()}); }); });
+  document.querySelectorAll('.remove-food').forEach(function (button) { button.addEventListener('click', function () { const name = button.parentNode.querySelector('.choice-name').textContent; if (confirm('Eliminar ' + name + ' de esta categoría? También se eliminarán sus marcas.')) changeCatalog({type:'remove-food',food:button.dataset.food,slot:Number(button.dataset.slot)}); }); });
+  document.querySelectorAll('.add-category').forEach(function (button) { button.addEventListener('click', function () { const title = prompt('Nombre de la nueva categoría:'); if (title && title.trim()) changeCatalog({type:'add-category',title:title.trim()}); }); });
   document.querySelectorAll('.category-toggle').forEach(function (button) {
     button.addEventListener('click', function () {
       if (expanded.has(button.dataset.category)) expanded.delete(button.dataset.category); else expanded.add(button.dataset.category);
@@ -442,6 +466,17 @@ async function syncShared() {
     if (!response.ok) throw new Error('No se pudo cargar');
     const result = await response.json();
     if (week !== currentWeekStart() || syncQueue.length) return;
+    if (Array.isArray(result.categories)) {
+      if (!FOOD_SECTIONS.some(function (s) { return s.id === 'custom'; })) FOOD_SECTIONS.push({id:'custom', title:'Otras categorías'});
+      result.categories.forEach(function (category) {
+        if (!FOOD_GROUPS.some(function (food) { return food.id === category.id; })) {
+          FOOD_GROUPS.push({id:category.id, section:'custom', icon:'🍽️', title:category.title, target:7});
+          FOOD_CHOICES[category.id] = [];
+        }
+      });
+    }
+    if (Array.isArray(result.customFoods)) customFoods = result.customFoods;
+    if (Array.isArray(result.hiddenFoods)) hiddenFoods = result.hiddenFoods;
     if (result.targets && typeof result.targets === 'object') {
       FOOD_GROUPS.forEach(function (food) {
         const value = result.targets[food.id];
@@ -452,7 +487,7 @@ async function syncShared() {
     const checked = {};
     (result.marks || []).forEach(function (item) {
       const food = FOOD_GROUPS.find(function (f) { return f.id === item.food; });
-      if (food && Number.isInteger(item.mark) && item.mark >= 35 && item.mark < MAX_MARK && item.checked) {
+      if (food && Number.isInteger(item.mark) && item.mark >= 35 && item.mark < MAX_MARK && item.checked && !hiddenSlot(item.food, Math.floor(item.mark / 35))) {
         (checked[item.food] ||= []).push(item.mark);
       }
     });

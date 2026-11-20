@@ -35,5 +35,8 @@ jobs:
           npx --yes wrangler@latest d1 execute chez-health --remote --command "DELETE FROM marks WHERE mark < 35 OR food = 'vegetables'"
           npx --yes wrangler@latest d1 execute chez-health --remote --command "INSERT OR IGNORE INTO food_targets (food,target) SELECT 'vegetables-green', MIN(target,7) FROM food_targets WHERE food='vegetables'"
           npx --yes wrangler@latest d1 execute chez-health --remote --command "INSERT OR IGNORE INTO food_targets (food,target) SELECT 'vegetables-color', MAX(target-7,0) FROM food_targets WHERE food='vegetables'"
+          npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS custom_categories (id TEXT PRIMARY KEY, title TEXT NOT NULL UNIQUE)"
+          npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS custom_foods (id INTEGER PRIMARY KEY AUTOINCREMENT, food TEXT NOT NULL, name TEXT NOT NULL, UNIQUE(food,name))"
+          npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS hidden_foods (food TEXT NOT NULL, slot INTEGER NOT NULL, PRIMARY KEY(food,slot))"
           npx --yes wrangler@latest pages project create chez-health --production-branch=main || true
           npx --yes wrangler@latest pages deploy . --project-name=chez-health --branch=main
