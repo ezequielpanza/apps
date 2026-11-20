@@ -270,3 +270,11 @@ h2 { margin-bottom: 0; color: var(--teal); font-size: clamp(22px, 4vw, 30px); le
 
 .category-actions { display:flex; flex-wrap:wrap; gap:8px; margin:-10px 0 16px; }
 .category-actions button { padding:8px 12px; border:1px solid #b9dbc5; border-radius:9px; color:var(--teal); background:#eef8f1; font-size:12px; font-weight:750; cursor:pointer; }
+
+
+/* Agrupaciones de categorías */
+.health-group { margin: 1.2rem 0; }
+.group-head { display:flex; align-items:center; gap:.5rem; margin: 1.1rem .15rem .5rem; }
+.group-head h3 { flex:1; margin:0; font-size:1.05rem; }
+.group-add { border:0; background:transparent; color:#37866c; font:inherit; font-weight:700; white-space:nowrap; padding:.5rem; }
+.properties-panel select { width:100%; padding:.65rem; border:1px solid #b9c8bd; border-radius:.5rem; background:white; font:inherit; }

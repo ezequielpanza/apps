@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chez-health-v22';
+const CACHE_NAME = 'chez-health-v23';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -47,3 +47,4 @@ self.addEventListener('fetch', function (event) {
     });
   }));
 });
+

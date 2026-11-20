@@ -208,6 +208,30 @@ let hiddenFoods = [];
 let settingsCategory = null;
 let settingsFood = null;
 let foodNames = [];
+let groupRecords = [];
+let categoryGroups = [];
+let assignments = [];
+let orphanCategories = [];
+let settingsGroup = null;
+function activeCategories() { return FOOD_GROUPS.filter(f => !f.deleted); }
+function choicesFor(categoryId) {
+  const out = [];
+  FOOD_GROUPS.forEach(source => {
+    const options = (FOOD_CHOICES[source.id] || []).map((name,i) => ({name,slot:i+1})).concat(customFoods.filter(x => x.food === source.id).map(x => ({name:x.name,slot:x.slot})));
+    options.forEach(choice => {
+      if (hiddenSlot(source.id,choice.slot)) return;
+      const assignment = assignments.find(a => a.food === source.id && a.slot === choice.slot);
+      const dest = assignment ? assignment.category : (source.deleted ? (orphanCategories.includes(source.id) ? null : '__ignored') : source.id);
+      if ((dest || '__orphan') !== categoryId) return;
+      const renamed = foodNames.find(n => n.food === source.id && n.slot === choice.slot);
+      out.push({food:source.id,slot:choice.slot,name:renamed ? renamed.name : choice.name});
+    });
+  });
+  return out;
+}
+function categoryCount(id) {
+  return choicesFor(id).reduce((sum,c) => sum + (savedState.checked[c.food] || []).filter(m => Math.floor(m/35) === c.slot).length,0);
+}
 function escapeHtml(v) { return String(v).replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function hiddenSlot(id, slot) { return hiddenFoods.some(function (h) { return h.food === id && h.slot === slot; }); }
 async function changeCatalog(data) {
@@ -293,7 +317,7 @@ function weekLabel(week) {
 }
 
 function checkedCount(food) {
-  return (savedState.checked[food.id] || []).length;
+  return categoryCount(food.id);
 }
 
 let checkAudioContext = null;
@@ -320,105 +344,66 @@ function playCheckSound() {
 }
 
 function renderFoodList() {
-  $('foodList').innerHTML = FOOD_SECTIONS.map(function (section) {
-    const rows = FOOD_GROUPS.filter(function (food) { return food.section === section.id; }).map(function (food) {
-      const marks = savedState.checked[food.id] || [];
-      const count = marks.length;
-      const open = expanded.has(food.id);
-      const builtin = (FOOD_CHOICES[food.id] || []).map(function (name, idx) { return {name:name, slot:idx + 1}; });
-      const extra = customFoods.filter(function (item) { return item.food === food.id; }).map(function (item) { return {name:item.name, slot:item.slot}; });
-      const choices = builtin.concat(extra).filter(function (item) { return !hiddenSlot(food.id, item.slot); });
-      const list = choices.map(function (choice) {
-        const renamed = foodNames.find(function (n) { return n.food === food.id && n.slot === choice.slot; });
-        const name = escapeHtml(renamed ? renamed.name : choice.name);
-        const base = choice.slot * 35;
-        const selected = marks.filter(function (mark) { return mark >= base && mark < base + 35; }).sort(function (a, b) { return a - b; });
-        const remaining = Math.max(0, food.target - count);
-        const available = [];
-        for (let i = 0; i < 35 && available.length < remaining; i++) {
-          const mark = base + i;
-          if (!selected.includes(mark)) available.push(mark);
-        }
-        const slots = selected.concat(available);
-        const boxes = slots.map(function (mark) {
-          const checked = marks.includes(mark);
-          const disabled = !checked && count >= food.target;
-          return '<label class="check-slot"><input class="food-checkbox" type="checkbox" data-food-id="' + food.id + '" data-mark="' + mark + '"' +
-            (checked ? ' checked' : '') + (disabled ? ' disabled' : '') +
-            ' aria-label="' + name + ', consumo ' + (mark - base + 1) + '">' +
-            '<span aria-hidden="true">✓</span></label>';
-        }).join('');
-        return '<div class="choice-row"><span class="choice-name">' + name + '</span><div class="food-checks">' + boxes + '</div><button type="button" class="properties-btn food-properties" data-food="' + food.id + '" data-slot="' + choice.slot + '" aria-label="Propiedades de ' + name + '">⚙</button></div>';
-      }).join('');
-      return '<article class="category-card' + (count ? ' has-checks' : '') + '">' +
-        '<div class="category-head"><button type="button" class="category-toggle" data-category="' + food.id + '" aria-expanded="' + open + '" aria-controls="category-' + food.id + '">' +
-        '<span class="category-name">' + food.icon + ' ' + escapeHtml(food.title) + '</span></button>' +
-        '<button type="button" class="category-toggle category-count" data-category="' + food.id + '" aria-expanded="' + open + '" aria-controls="category-' + food.id + '" aria-label="Ver alimentos de ' + escapeHtml(food.title) + '">' + count + '/' + food.target + '</button>' +
-        '<button type="button" class="add-food category-add" data-add-food="' + food.id + '" aria-label="Agregar alimento a ' + escapeHtml(food.title) + '">＋ Agregar</button>' +
-        '<button type="button" class="properties-btn" data-properties="' + food.id + '" aria-label="Propiedades de ' + escapeHtml(food.title) + '">⚙</button></div>' +
-        '<div class="category-choices" id="category-' + food.id + '"' + (open ? '' : ' hidden') + '>' + list + '</div></article>';
+  const categories = activeCategories();
+  const orphanChoices = choicesFor('__orphan');
+  const ungrouped = categories.filter(f => !categoryGroups.find(m => m.food === f.id)?.group_id);
+  const sections = groupRecords.filter(g => !g.deleted).map(g => ({...g,foods:categories.filter(f => categoryGroups.find(m => m.food === f.id)?.group_id === g.id)}));
+  if (ungrouped.length || orphanChoices.length) sections.push({id:'__ungrouped',title:'Sin agrupar',foods:ungrouped});
+  function choiceRows(food, choices, count) {
+    return choices.map(choice => {
+      const marks = savedState.checked[choice.food] || [], base=choice.slot*35;
+      const selected=marks.filter(m => m>=base && m<base+35).sort((a,b)=>a-b);
+      const remaining=food.id === '__orphan' ? 0 : Math.max(0,food.target-count);
+      const available=[];
+      for (let i=0;i<35 && available.length<remaining;i++) if (!selected.includes(base+i)) available.push(base+i);
+      const name=escapeHtml(choice.name);
+      return '<div class="choice-row"><span class="choice-name">'+name+'</span><div class="food-checks">'+selected.concat(available).map(mark => '<label class="check-slot"><input class="food-checkbox" type="checkbox" data-food-id="'+escapeHtml(choice.food)+'" data-category-id="'+escapeHtml(food.id)+'" data-mark="'+mark+'"'+(marks.includes(mark)?' checked':'')+' aria-label="'+name+', consumo"><span aria-hidden="true">✓</span></label>').join('')+'</div><button type="button" class="properties-btn food-properties" data-food="'+escapeHtml(choice.food)+'" data-slot="'+choice.slot+'" aria-label="Propiedades de '+name+'">⚙</button></div>';
     }).join('');
-    return rows;
-  }).join('') + '<button type="button" class="add-category">＋ Agregar Categoría</button>';
+  }
+  function categoryRow(food) {
+    const count=categoryCount(food.id), open=expanded.has(food.id), choices=choicesFor(food.id);
+    return '<article class="category-card'+(count?' has-checks':'')+'"><div class="category-head"><button type="button" class="category-toggle" data-category="'+escapeHtml(food.id)+'" aria-expanded="'+open+'"><span class="category-name">'+food.icon+' '+escapeHtml(food.title)+'</span></button><button type="button" class="category-toggle category-count" data-category="'+escapeHtml(food.id)+'">'+count+'/'+food.target+'</button><button type="button" class="add-food category-add" data-add-food="'+escapeHtml(food.id)+'">＋ Agregar</button><button type="button" class="properties-btn category-properties" data-properties="'+escapeHtml(food.id)+'" aria-label="Propiedades">⚙</button></div><div class="category-choices"'+(open?'':' hidden')+'>'+choiceRows(food,choices,count)+'</div></article>';
+  }
+  $('foodList').innerHTML=sections.map(section => '<section class="health-group"><div class="group-head"><h3>'+escapeHtml(section.title)+'</h3>'+(section.id==='__ungrouped'?'':'<button type="button" class="group-add" data-group="'+escapeHtml(section.id)+'">＋ Agregar</button><button type="button" class="properties-btn group-properties" data-group="'+escapeHtml(section.id)+'" aria-label="Propiedades de '+escapeHtml(section.title)+'">⚙</button>')+'</div>'+section.foods.map(categoryRow).join('')+(section.id==='__ungrouped' && orphanChoices.length ? '<article class="category-card"><div class="category-head"><button type="button" class="category-toggle" data-category="__orphan"><span class="category-name">Sin categoría</span></button><span>'+categoryCount('__orphan')+'</span></div><div class="category-choices"'+(expanded.has('__orphan')?'':' hidden')+'>'+choiceRows({id:'__orphan'},orphanChoices,categoryCount('__orphan'))+'</div></article>':'')+'</section>').join('')+'<button type="button" class="add-category add-group">＋ Agregar agrupación</button>';
+  const groupOptions = '<option value="">Sin agrupar</option>'+groupRecords.filter(g=>!g.deleted).map(g=>'<option value="'+escapeHtml(g.id)+'">'+escapeHtml(g.title)+'</option>').join('');
+  if (settingsGroup) {
+    const group=groupRecords.find(g=>g.id===settingsGroup && !g.deleted);
+    if (group) $('foodList').insertAdjacentHTML('beforeend','<div class="modal-backdrop"><section class="properties-panel" role="dialog" aria-modal="true"><div class="properties-head"><h3>'+escapeHtml(group.title)+'</h3><button class="close-modal">×</button></div><div class="properties-actions"><button class="rename-group">Cambiar nombre</button><button class="delete-group delete-category">Eliminar agrupación</button></div></section></div>');
+  }
   if (settingsCategory) {
-    const food = FOOD_GROUPS.find(function (f) { return f.id === settingsCategory; });
-    if (food) $('foodList').insertAdjacentHTML('beforeend', '<div class="modal-backdrop"><section class="properties-panel" role="dialog" aria-modal="true" aria-label="Propiedades de ' + escapeHtml(food.title) + '"><div class="properties-head"><h3>' + escapeHtml(food.title) + '</h3><button type="button" class="close-properties" aria-label="Cerrar">×</button></div><p>Consumos por semana</p><div class="properties-goal"><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir consumos semanales"' + (food.target <= checkedCount(food) ? ' disabled' : '') + '>−</button><strong>' + food.target + '</strong><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar consumos semanales"' + (food.target >= 35 ? ' disabled' : '') + '>+</button></div><div class="properties-actions"><button type="button" class="rename-category" data-food="' + food.id + '">Cambiar nombre</button><button type="button" class="delete-category" data-food="' + food.id + '">Eliminar categoría</button></div></section></div>');
+    const food=categories.find(f=>f.id===settingsCategory);
+    if(food) $('foodList').insertAdjacentHTML('beforeend','<div class="modal-backdrop"><section class="properties-panel" role="dialog" aria-modal="true"><div class="properties-head"><h3>'+escapeHtml(food.title)+'</h3><button class="close-modal">×</button></div><p>Consumos por semana</p><div class="properties-goal"><button class="target-btn" data-delta="-1"'+(food.target<=checkedCount(food)?' disabled':'')+'>−</button><strong>'+food.target+'</strong><button class="target-btn" data-delta="1"'+(food.target>=35?' disabled':'')+'>+</button></div><p>Agrupación</p><select class="move-category">'+groupOptions+'</select><div class="properties-actions"><button class="rename-category">Cambiar nombre</button><button class="delete-category-action delete-category">Eliminar categoría</button></div></section></div>');
+    const select=document.querySelector('.move-category'); if(select) select.value=categoryGroups.find(m=>m.food===food.id)?.group_id || '';
   }
   if (settingsFood) {
-    $('foodList').insertAdjacentHTML('beforeend', '<div class="modal-backdrop food-modal"><section class="properties-panel" role="dialog" aria-modal="true" aria-label="Propiedades de ' + escapeHtml(settingsFood.name) + '"><div class="properties-head"><h3>' + escapeHtml(settingsFood.name) + '</h3><button type="button" class="close-food-properties" aria-label="Cerrar">×</button></div><div class="properties-actions"><button type="button" class="rename-food">Cambiar nombre</button><button type="button" class="delete-food delete-category">Eliminar alimento</button></div></section></div>');
+    const options=categories.map(f=>'<option value="'+escapeHtml(f.id)+'">'+escapeHtml(f.title)+'</option>').join('');
+    $('foodList').insertAdjacentHTML('beforeend','<div class="modal-backdrop"><section class="properties-panel" role="dialog" aria-modal="true"><div class="properties-head"><h3>'+escapeHtml(settingsFood.name)+'</h3><button class="close-modal">×</button></div><p>Mover a categoría</p><select class="move-food"><option value="">Elegir categoría</option>'+options+'</select><div class="properties-actions"><button class="rename-food">Cambiar nombre</button><button class="delete-food delete-category">Eliminar alimento</button></div></section></div>');
   }
-  document.querySelectorAll('.food-properties').forEach(function (button) { button.addEventListener('click', function () { settingsFood = {food:button.dataset.food,slot:Number(button.dataset.slot),name:button.parentNode.querySelector('.choice-name').textContent}; render(); }); });
-  document.querySelectorAll('.close-food-properties').forEach(function (button) { button.addEventListener('click', function () { settingsFood = null; render(); }); });
-  document.querySelectorAll('.food-modal').forEach(function (backdrop) { backdrop.addEventListener('click', function (event) { if (event.target === backdrop) { settingsFood = null; render(); } }); });
-  document.querySelectorAll('.rename-food').forEach(function (button) { button.addEventListener('click', function () { const item = settingsFood; const name = prompt('Nuevo nombre del alimento:', item.name); if (name && name.trim() && name.trim() !== item.name) { settingsFood = null; changeCatalog({type:'rename-food',food:item.food,slot:item.slot,name:name.trim()}); } }); });
-  document.querySelectorAll('.delete-food').forEach(function (button) { button.addEventListener('click', function () { const item = settingsFood; if (confirm('Eliminar ' + item.name + ' de esta categoría? También se eliminarán sus marcas.')) { settingsFood = null; changeCatalog({type:'remove-food',food:item.food,slot:item.slot}); } }); });
-  document.querySelectorAll('.rename-category').forEach(function (button) { button.addEventListener('click', function () {
-    const food = FOOD_GROUPS.find(function (f) { return f.id === button.dataset.food; });
-    if (!food) return;
-    const title = prompt('Nuevo nombre de la categoría:', food.title);
-    if (title && title.trim() && title.trim() !== food.title) changeCatalog({type:'rename-category',food:food.id,title:title.trim()});
-  }); });
-  document.querySelectorAll('.delete-category').forEach(function (button) { button.addEventListener('click', function () {
-    const food = FOOD_GROUPS.find(function (f) { return f.id === button.dataset.food; });
-    if (food && confirm('Eliminar la categoría ' + food.title + '? Se eliminarán también sus alimentos y sus marcas.')) {
-      settingsCategory = null; changeCatalog({type:'delete-category',food:food.id});
-    }
-  }); });
-  document.querySelectorAll('.properties-btn').forEach(function (button) { button.addEventListener('click', function () { settingsCategory = button.dataset.properties; render(); }); });
-  document.querySelectorAll('.close-properties').forEach(function (button) { button.addEventListener('click', function () { settingsCategory = null; render(); }); });
-  document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) { backdrop.addEventListener('click', function (event) { if (event.target === backdrop) { settingsCategory = null; render(); } }); });
-  document.querySelectorAll('.add-food').forEach(function (button) { button.addEventListener('click', function () { const name = prompt('Nombre del nuevo alimento:'); if (name && name.trim()) changeCatalog({type:'add-food', food:button.dataset.addFood, name:name.trim()}); }); });
-  document.querySelectorAll('.add-category').forEach(function (button) { button.addEventListener('click', function () { const title = prompt('Nombre de la nueva categoría:'); if (title && title.trim()) changeCatalog({type:'add-category',title:title.trim()}); }); });
-  document.querySelectorAll('.category-toggle').forEach(function (button) {
-    button.addEventListener('click', function () {
-      if (expanded.has(button.dataset.category)) expanded.delete(button.dataset.category); else expanded.add(button.dataset.category);
-      render();
-    });
-  });
-  document.querySelectorAll('.target-btn').forEach(function (button) {
-    button.addEventListener('click', function () {
-      const food = FOOD_GROUPS.find(function (item) { return item.id === button.dataset.targetFood; });
-      const delta = Number(button.dataset.delta);
-      if (!food || food.target + delta < checkedCount(food) || food.target + delta > 35) return;
-      food.target += delta; saveTargets(); syncQueue.push({type:'target', food:food.id, delta:delta}); persistQueue(); render(); syncShared();
-    });
-  });
-  document.querySelectorAll('.food-checkbox').forEach(function (checkbox) {
-    checkbox.addEventListener('change', function () {
-      const id = checkbox.dataset.foodId, mark = Number(checkbox.dataset.mark);
-      const food = FOOD_GROUPS.find(function (f) { return f.id === id; });
-      const marks = savedState.checked[id] || [];
-      if (checkbox.checked && marks.length >= food.target) { render(); return; }
-      if (checkbox.checked) playCheckSound();
-      savedState.checked[id] = checkbox.checked ? Array.from(new Set(marks.concat(mark))) : marks.filter(function (item) { return item !== mark; });
-      saveState(); queueMark(savedState.week, id, mark, checkbox.checked); render();
-    });
-  });
+  document.querySelectorAll('.category-toggle').forEach(b=>b.onclick=()=>{expanded.has(b.dataset.category)?expanded.delete(b.dataset.category):expanded.add(b.dataset.category);render()});
+  document.querySelectorAll('.category-properties').forEach(b=>b.onclick=()=>{settingsCategory=b.dataset.properties;render()});
+  document.querySelectorAll('.food-properties').forEach(b=>b.onclick=()=>{settingsFood={food:b.dataset.food,slot:Number(b.dataset.slot),name:b.parentNode.querySelector('.choice-name').textContent};render()});
+  document.querySelectorAll('.group-properties').forEach(b=>b.onclick=()=>{settingsGroup=b.dataset.group;render()});
+  document.querySelectorAll('.close-modal').forEach(b=>b.onclick=()=>{settingsCategory=null;settingsFood=null;settingsGroup=null;render()});
+  document.querySelectorAll('.modal-backdrop').forEach(b=>b.onclick=e=>{if(e.target===b){settingsCategory=null;settingsFood=null;settingsGroup=null;render()}});
+  document.querySelectorAll('.group-add').forEach(b=>b.onclick=()=>{const title=prompt('Nombre de la nueva categoría:');if(title?.trim())changeCatalog({type:'add-category',group:b.dataset.group,title:title.trim()})});
+  document.querySelectorAll('.add-group').forEach(b=>b.onclick=()=>{const title=prompt('Nombre de la nueva agrupación:');if(title?.trim())changeCatalog({type:'add-group',title:title.trim()})});
+  document.querySelectorAll('.add-food').forEach(b=>b.onclick=()=>{const name=prompt('Nombre del nuevo alimento:');if(name?.trim())changeCatalog({type:'add-food',food:b.dataset.addFood,name:name.trim()})});
+  const bind=(selector,fn)=>document.querySelectorAll(selector).forEach(b=>b.onclick=fn);
+  bind('.rename-group',()=>{const g=groupRecords.find(x=>x.id===settingsGroup),title=prompt('Nuevo nombre:',g.title);if(title?.trim()){settingsGroup=null;changeCatalog({type:'rename-group',group:g.id,title:title.trim()})}});
+  bind('.delete-group',()=>{const g=groupRecords.find(x=>x.id===settingsGroup);if(confirm('Eliminar '+g.title+'? Sus categorías pasarán a Sin agrupar.')){settingsGroup=null;changeCatalog({type:'delete-group',group:g.id})}});
+  bind('.rename-category',()=>{const f=categories.find(x=>x.id===settingsCategory),title=prompt('Nuevo nombre:',f.title);if(title?.trim())changeCatalog({type:'rename-category',food:f.id,title:title.trim()})});
+  bind('.delete-category-action',()=>{const f=categories.find(x=>x.id===settingsCategory);if(confirm('Eliminar '+f.title+'? Sus alimentos y marcas pasarán a Sin categoría.')){settingsCategory=null;changeCatalog({type:'delete-category',food:f.id})}});
+  bind('.rename-food',()=>{const item=settingsFood,name=prompt('Nuevo nombre:',item.name);if(name?.trim()){settingsFood=null;changeCatalog({type:'rename-food',food:item.food,slot:item.slot,name:name.trim()})}});
+  bind('.delete-food',()=>{const item=settingsFood;if(confirm('Eliminar '+item.name+'? También se eliminarán sus marcas.')){settingsFood=null;changeCatalog({type:'remove-food',food:item.food,slot:item.slot})}});
+  document.querySelectorAll('.move-category').forEach(b=>b.onchange=()=>changeCatalog({type:'move-category',food:settingsCategory,group:b.value||null}));
+  document.querySelectorAll('.move-food').forEach(b=>b.onchange=()=>{if(b.value){const item=settingsFood;settingsFood=null;changeCatalog({type:'move-food',food:item.food,slot:item.slot,category:b.value})}});
+  document.querySelectorAll('.target-btn').forEach(b=>b.onclick=()=>{const food=categories.find(f=>f.id===settingsCategory),delta=Number(b.dataset.delta);if(!food || (delta<0 && food.target+delta<checkedCount(food))||food.target+delta>35)return;food.target+=delta;saveTargets();syncQueue.push({type:'target',food:food.id,delta});persistQueue();render();syncShared()});
+  document.querySelectorAll('.food-checkbox').forEach(checkbox=>checkbox.onchange=()=>{const id=checkbox.dataset.foodId,mark=Number(checkbox.dataset.mark),category=categories.find(f=>f.id===checkbox.dataset.categoryId),marks=savedState.checked[id]||[];if(checkbox.checked && (!category || categoryCount(category.id)>=category.target)){render();return}if(checkbox.checked)playCheckSound();savedState.checked[id]=checkbox.checked?Array.from(new Set(marks.concat(mark))):marks.filter(x=>x!==mark);saveState();queueMark(savedState.week,id,mark,checkbox.checked);render()});
 }
 
 function renderProgress() {
-  const total = FOOD_GROUPS.reduce(function (sum, food) { return sum + food.target; }, 0);
-  const count = FOOD_GROUPS.reduce(function (sum, food) { return sum + checkedCount(food); }, 0);
+  const total = activeCategories().reduce(function (sum, food) { return sum + food.target; }, 0);
+  const count = activeCategories().reduce(function (sum, food) { return sum + checkedCount(food); }, 0);
   const percent = total ? Math.round(count / total * 100) : 0;
   $('progressValue').textContent = count + ' de ' + total + ' consumos';
   $('progressFill').style.width = percent + '%';
@@ -542,13 +527,18 @@ async function syncShared() {
         }
       });
     }
+    if (Array.isArray(result.groups)) groupRecords=result.groups;
+    if (Array.isArray(result.categoryGroups)) categoryGroups=result.categoryGroups;
+    if (Array.isArray(result.assignments)) assignments=result.assignments;
+    if (Array.isArray(result.orphans)) orphanCategories=result.orphans.map(x=>x.food);
+    FOOD_GROUPS.forEach(f=>f.deleted=false);
     if (Array.isArray(result.categorySettings)) {
       result.categorySettings.forEach(function (setting) {
         const index = FOOD_GROUPS.findIndex(function (food) { return food.id === setting.food; });
         if (index < 0) return;
         if (setting.deleted) {
-          FOOD_GROUPS.splice(index, 1);
-          expanded.delete(setting.food);
+          FOOD_GROUPS[index].deleted = true;
+          if (setting.title) FOOD_GROUPS[index].title = setting.title;
           if (settingsCategory === setting.food) settingsCategory = null;
         } else if (setting.title) FOOD_GROUPS[index].title = setting.title;
       });
@@ -581,3 +571,4 @@ async function syncShared() {
     if (syncQueue.length && navigator.onLine) setTimeout(syncShared, 15000);
   }
 }
+
