@@ -40,7 +40,7 @@ const FOOD_GROUPS = [
     section: 'produce',
     icon: '🍊',
     title: 'Frutas variadas',
-    examples: 'Cítricos, papaya, guayaba, frutos rojos',
+    examples: 'Cítricos, papaya, uva, frutos rojos',
     target: 7,
     frequency: '1 ingesta por día'
   },
@@ -66,8 +66,17 @@ const FOOD_GROUPS = [
     id: 'nuts-seeds',
     section: 'everyday',
     icon: '🥜',
-    title: 'Frutos secos y semillas',
-    examples: 'Nueces, almendras, chía, linaza',
+    title: 'Frutos secos',
+    examples: 'Nueces, almendras, castañas, avellanas',
+    target: 7,
+    frequency: '1 ingesta por día'
+  },
+  {
+    id: 'seeds',
+    section: 'everyday',
+    icon: '🌱',
+    title: 'Semillas',
+    examples: 'Chía, linaza, sésamo, semillas de calabaza',
     target: 7,
     frequency: '1 ingesta por día'
   },
