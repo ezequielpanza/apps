@@ -40,7 +40,7 @@ const FOOD_GROUPS = [
     section: 'produce',
     icon: '🍊',
     title: 'Frutas variadas',
-    examples: 'Cítricos, papaya, uva, frutos rojos',
+    examples: 'Cítricos, papaya, uva, frutos rojos, ananá, manzana',
     target: 7,
     frequency: '1 consumo por día'
   },
@@ -185,7 +185,7 @@ const FOOD_CHOICES = {
   'vegetables-green':['Apio','Espinaca','Brócoli','Kale','Lechuga','Rúcula'],
   'vegetables-color':['Tomate','Pimientos','Berenjena','Zanahoria','Remolacha','Palta'],
   'vegetables-carb':['Papa','Batata','Zapallo','Yuca'],
-  'fruits':['Cítricos','Papaya','Uva','Frutos rojos'],
+  'fruits':['Cítricos','Papaya','Uva','Frutos rojos','Ananá','Manzana'],
   'whole-grains':['Avena','Arroz integral','Maíz','Quinoa','Cuscús integral','Pan integral'],
   'legumes':['Porotos','Frijoles','Lentejas','Garbanzos','Arvejas'],
   'nuts-seeds':['Nueces','Almendras','Castañas','Avellanas'],
@@ -232,14 +232,10 @@ function loadState() {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (stored && stored.week === week && stored.checked && typeof stored.checked === 'object') {
       const checked = {};
-      if (Array.isArray(stored.checked.vegetables)) {
-        checked['vegetables-green'] = stored.checked.vegetables.filter(m => Number.isInteger(m) && m >= 0 && m < 7);
-        checked['vegetables-color'] = stored.checked.vegetables.filter(m => Number.isInteger(m) && m >= 7 && m < 35).map(m => m - 7);
-      }
       FOOD_GROUPS.forEach(function (food) {
         const marks = Array.isArray(stored.checked[food.id]) ? stored.checked[food.id] : (checked[food.id] || []);
         checked[food.id] = Array.from(new Set(marks.filter(function (mark) {
-          return Number.isInteger(mark) && mark >= 0 && mark < MAX_MARK;
+          return Number.isInteger(mark) && mark >= 35 && mark < MAX_MARK;
         })));
       });
       return { week: week, checked: checked };
@@ -293,12 +289,9 @@ function renderFoodList() {
       const count = marks.length;
       const open = expanded.has(food.id);
       const choices = FOOD_CHOICES[food.id] || [food.title];
-      const legacy = marks.some(function (m) { return m < 35; });
-      const names = legacy ? ['Registros anteriores'].concat(choices) : choices;
-      const list = names.map(function (name, idx) {
-        const item = legacy ? idx - 1 : idx;
-        const base = item < 0 ? 0 : (item + 1) * 35;
-        const slots = item < 0 ? marks.filter(function (m) { return m < 35; }) : Array.from({length:food.target}, function (_, n) { return base + n; });
+      const list = choices.map(function (name, idx) {
+        const base = (idx + 1) * 35;
+        const slots = Array.from({length:food.target}, function (_, n) { return base + n; });
         const boxes = slots.map(function (mark) {
           const checked = marks.includes(mark);
           const disabled = !checked && count >= food.target;
@@ -409,11 +402,8 @@ const QUEUE_KEY = 'chez-health-sync-queue-v1';
 const MIGRATION_KEY = 'chez-health-sync-migrated-v1';
 let syncQueue = [];
 try { syncQueue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); if (!Array.isArray(syncQueue)) syncQueue = []; } catch (_) { syncQueue = []; }
-syncQueue.forEach(function (item) {
-  if (item.food === 'vegetables' && item.type !== 'target' && Number.isInteger(item.mark)) {
-    item.food = item.mark < 7 ? 'vegetables-green' : 'vegetables-color';
-    if (item.mark >= 7) item.mark -= 7;
-  }
+syncQueue = syncQueue.filter(function (item) {
+  return item.type === 'target' || (item.food !== 'vegetables' && Number.isInteger(item.mark) && item.mark >= 35);
 });
 function persistQueue() { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(syncQueue)); } catch (_) {} }
 function queueMark(week, food, mark, checked) {
@@ -462,7 +452,7 @@ async function syncShared() {
     const checked = {};
     (result.marks || []).forEach(function (item) {
       const food = FOOD_GROUPS.find(function (f) { return f.id === item.food; });
-      if (food && Number.isInteger(item.mark) && item.mark >= 0 && item.mark < MAX_MARK && item.checked) {
+      if (food && Number.isInteger(item.mark) && item.mark >= 35 && item.mark < MAX_MARK && item.checked) {
         (checked[item.food] ||= []).push(item.mark);
       }
     });

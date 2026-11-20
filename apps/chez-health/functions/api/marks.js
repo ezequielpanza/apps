@@ -19,7 +19,7 @@ export async function onRequestPost(context) {
       await context.env.DB.prepare('INSERT INTO food_targets (food,target) VALUES (?, MAX(0, MIN(35, ? + ?))) ON CONFLICT(food) DO UPDATE SET target=MAX(0, MIN(35, food_targets.target + ?))').bind(data.food,TARGETS[data.food],data.delta,data.delta).run();
       return new Response(JSON.stringify({ok:true}),{headers});
     }
-    if (!validWeek(data.week) || !Object.hasOwn(TARGETS,data.food) || !Number.isInteger(data.mark) || data.mark<0 || data.mark>=280 || typeof data.checked!=='boolean') return new Response('Datos inválidos',{status:400});
+    if (!validWeek(data.week) || !Object.hasOwn(TARGETS,data.food) || !Number.isInteger(data.mark) || data.mark<35 || data.mark>=280 || typeof data.checked!=='boolean') return new Response('Datos inválidos',{status:400});
     const sql=data.migrate ? 'INSERT OR IGNORE INTO marks (week,food,mark,checked) VALUES (?,?,?,?)' : 'INSERT INTO marks (week,food,mark,checked) VALUES (?,?,?,?) ON CONFLICT(week,food,mark) DO UPDATE SET checked=excluded.checked';
     await context.env.DB.prepare(sql).bind(data.week,data.food,data.mark,data.checked?1:0).run();
     return new Response(JSON.stringify({ok:true}),{headers});
