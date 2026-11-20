@@ -328,8 +328,20 @@ function renderFoodList() {
   }).join('') + '<button type="button" class="add-category">＋ Agregar Categoría</button>';
   if (settingsCategory) {
     const food = FOOD_GROUPS.find(function (f) { return f.id === settingsCategory; });
-    if (food) $('foodList').insertAdjacentHTML('beforeend', '<div class="modal-backdrop"><section class="properties-panel" role="dialog" aria-modal="true" aria-label="Propiedades de ' + escapeHtml(food.title) + '"><div class="properties-head"><h3>' + escapeHtml(food.title) + '</h3><button type="button" class="close-properties" aria-label="Cerrar">×</button></div><p>Consumos por semana</p><div class="properties-goal"><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir consumos semanales"' + (food.target <= checkedCount(food) ? ' disabled' : '') + '>−</button><strong>' + food.target + '</strong><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar consumos semanales"' + (food.target >= 35 ? ' disabled' : '') + '>+</button></div></section></div>');
+    if (food) $('foodList').insertAdjacentHTML('beforeend', '<div class="modal-backdrop"><section class="properties-panel" role="dialog" aria-modal="true" aria-label="Propiedades de ' + escapeHtml(food.title) + '"><div class="properties-head"><h3>' + escapeHtml(food.title) + '</h3><button type="button" class="close-properties" aria-label="Cerrar">×</button></div><p>Consumos por semana</p><div class="properties-goal"><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir consumos semanales"' + (food.target <= checkedCount(food) ? ' disabled' : '') + '>−</button><strong>' + food.target + '</strong><button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar consumos semanales"' + (food.target >= 35 ? ' disabled' : '') + '>+</button></div><div class="properties-actions"><button type="button" class="rename-category" data-food="' + food.id + '">Cambiar nombre</button><button type="button" class="delete-category" data-food="' + food.id + '">Eliminar categoría</button></div></section></div>');
   }
+  document.querySelectorAll('.rename-category').forEach(function (button) { button.addEventListener('click', function () {
+    const food = FOOD_GROUPS.find(function (f) { return f.id === button.dataset.food; });
+    if (!food) return;
+    const title = prompt('Nuevo nombre de la categoría:', food.title);
+    if (title && title.trim() && title.trim() !== food.title) changeCatalog({type:'rename-category',food:food.id,title:title.trim()});
+  }); });
+  document.querySelectorAll('.delete-category').forEach(function (button) { button.addEventListener('click', function () {
+    const food = FOOD_GROUPS.find(function (f) { return f.id === button.dataset.food; });
+    if (food && confirm('Eliminar la categoría ' + food.title + '? Se eliminarán también sus alimentos y sus marcas.')) {
+      settingsCategory = null; changeCatalog({type:'delete-category',food:food.id});
+    }
+  }); });
   document.querySelectorAll('.properties-btn').forEach(function (button) { button.addEventListener('click', function () { settingsCategory = button.dataset.properties; render(); }); });
   document.querySelectorAll('.close-properties').forEach(function (button) { button.addEventListener('click', function () { settingsCategory = null; render(); }); });
   document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) { backdrop.addEventListener('click', function (event) { if (event.target === backdrop) { settingsCategory = null; render(); } }); });
@@ -473,6 +485,17 @@ async function syncShared() {
           FOOD_GROUPS.push({id:category.id, section:'custom', icon:'🍽️', title:category.title, target:7});
           FOOD_CHOICES[category.id] = [];
         }
+      });
+    }
+    if (Array.isArray(result.categorySettings)) {
+      result.categorySettings.forEach(function (setting) {
+        const index = FOOD_GROUPS.findIndex(function (food) { return food.id === setting.food; });
+        if (index < 0) return;
+        if (setting.deleted) {
+          FOOD_GROUPS.splice(index, 1);
+          expanded.delete(setting.food);
+          if (settingsCategory === setting.food) settingsCategory = null;
+        } else if (setting.title) FOOD_GROUPS[index].title = setting.title;
       });
     }
     if (Array.isArray(result.customFoods)) customFoods = result.customFoods;

@@ -11,7 +11,8 @@ export async function onRequestGet(context) {
     const cats = await context.env.DB.prepare('SELECT id,title FROM custom_categories ORDER BY rowid').all();
     const custom = await context.env.DB.prepare('SELECT id,food,name FROM custom_foods ORDER BY id').all();
     const hidden = await context.env.DB.prepare('SELECT food,slot FROM hidden_foods').all();
-    return new Response(JSON.stringify({marks:result.results.map(r=>({food:r.food,mark:r.mark,checked:!!r.checked})),targets:Object.fromEntries(settings.results.map(r=>[r.food,r.target])),categories:cats.results,customFoods:custom.results.map(r=>({food:r.food,name:r.name,slot:100+r.id})),hiddenFoods:hidden.results}),{headers});
+    const categorySettings = await context.env.DB.prepare('SELECT food,title,deleted FROM category_settings').all();
+    return new Response(JSON.stringify({marks:result.results.map(r=>({food:r.food,mark:r.mark,checked:!!r.checked})),targets:Object.fromEntries(settings.results.map(r=>[r.food,r.target])),categories:cats.results,customFoods:custom.results.map(r=>({food:r.food,name:r.name,slot:100+r.id})),hiddenFoods:hidden.results,categorySettings:categorySettings.results}),{headers});
   } catch (_) { return new Response('Base no disponible',{status:503}); }
 }
 export async function onRequestPost(context) {
@@ -25,6 +26,22 @@ export async function onRequestPost(context) {
     }
     const customCategory = typeof data.food === 'string' && data.food.startsWith('custom-') ? await context.env.DB.prepare('SELECT id FROM custom_categories WHERE id=?').bind(data.food).first() : null;
     const validFood = Object.hasOwn(TARGETS,data.food) || !!customCategory;
+    if (data.type === 'rename-category') {
+      const title = typeof data.title === 'string' ? data.title.trim() : '';
+      if (!validFood || !title || title.length > 80) return new Response('Nombre inválido',{status:400});
+      await context.env.DB.prepare('INSERT INTO category_settings (food,title,deleted) VALUES (?,?,0) ON CONFLICT(food) DO UPDATE SET title=excluded.title WHERE category_settings.deleted=0').bind(data.food,title).run();
+      return new Response(JSON.stringify({ok:true}),{headers});
+    }
+    if (data.type === 'delete-category') {
+      if (!validFood) return new Response('Categoría inválida',{status:400});
+      await context.env.DB.batch([
+        context.env.DB.prepare('INSERT INTO category_settings (food,deleted) VALUES (?,1) ON CONFLICT(food) DO UPDATE SET deleted=1').bind(data.food),
+        context.env.DB.prepare('DELETE FROM marks WHERE food=?').bind(data.food),
+        context.env.DB.prepare('DELETE FROM food_targets WHERE food=?').bind(data.food),
+        context.env.DB.prepare('DELETE FROM custom_foods WHERE food=?').bind(data.food)
+      ]);
+      return new Response(JSON.stringify({ok:true}),{headers});
+    }
     if (data.type === 'add-food') {
       const name = typeof data.name === 'string' ? data.name.trim() : '';
       if (!validFood || !name || name.length > 80) return new Response('Nombre inválido',{status:400});
