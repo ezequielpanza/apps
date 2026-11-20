@@ -146,3 +146,9 @@
 .battery-history-soc-curve-content select,.battery-history-soc-curve-content input[data-soc-cells]{min-height:32px;padding:4px 8px;border:1px solid #24516a;border-radius:7px;background:#10344a;color:#eaf6fb;font:600 12px system-ui,sans-serif}
 .battery-history-soc-curve-content input[data-soc-cells]{width:64px;text-align:center;font-variant-numeric:tabular-nums}
 .battery-history-soc-curve-content select:focus,.battery-history-soc-curve-content input[data-soc-cells]:focus{outline:2px solid #48d9ef;outline-offset:1px}
+
+/* Compact historical module: preserve controls while letting the plot shrink. */
+.battery-history-page{gap:5px}
+.battery-history-page>.battery-history-chart{min-height:56px}
+.battery-history-page>.battery-history-soc-curve{margin-top:0}
+.battery-history-page>.battery-history-legend{gap:4px 8px;margin:0}
