@@ -309,7 +309,14 @@ function renderFoodList() {
         const renamed = foodNames.find(function (n) { return n.food === food.id && n.slot === choice.slot; });
         const name = escapeHtml(renamed ? renamed.name : choice.name);
         const base = choice.slot * 35;
-        const slots = Array.from({length:food.target}, function (_, n) { return base + n; });
+        const selected = marks.filter(function (mark) { return mark >= base && mark < base + 35; }).sort(function (a, b) { return a - b; });
+        const remaining = Math.max(0, food.target - count);
+        const available = [];
+        for (let i = 0; i < 35 && available.length < remaining; i++) {
+          const mark = base + i;
+          if (!selected.includes(mark)) available.push(mark);
+        }
+        const slots = selected.concat(available);
         const boxes = slots.map(function (mark) {
           const checked = marks.includes(mark);
           const disabled = !checked && count >= food.target;
