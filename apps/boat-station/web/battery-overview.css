@@ -109,3 +109,8 @@
 .battery-history-average-stepper button:disabled{opacity:.4}
 .battery-history-average-stepper output{min-width:26px;text-align:center;color:#eaf6fb;font-weight:700;font-variant-numeric:tabular-nums}
 .battery-history-average-stepper span{color:#a9c2ce}
+
+/* Center the extrema heading, labels and readings within the four fields. */
+.battery-history-extremes h4{text-align:center}
+.battery-history-extreme-field{align-items:center;text-align:center}
+.battery-history-extreme-field>strong,.battery-history-extreme-field>b{align-self:center;text-align:center}
