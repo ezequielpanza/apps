@@ -419,6 +419,19 @@ function refreshWeekIfNeeded() {
 }
 
 window.addEventListener('DOMContentLoaded', function () {
+  $('openAll').addEventListener('click', function () {
+    FOOD_GROUPS.forEach(function (food) { expanded.add(food.id); });
+    render();
+  });
+  $('closeAll').addEventListener('click', function () {
+    expanded.clear();
+    render();
+  });
+  $('openPending').addEventListener('click', function () {
+    expanded.clear();
+    FOOD_GROUPS.forEach(function (food) { if (checkedCount(food) < food.target) expanded.add(food.id); });
+    render();
+  });
   render();
   startSync();
   window.setInterval(function () { refreshWeekIfNeeded(); syncShared(); }, 15000);
