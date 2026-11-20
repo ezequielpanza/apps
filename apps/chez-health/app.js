@@ -181,6 +181,29 @@ const FOOD_GROUPS = [
   }
 ];
 
+const FOOD_CHOICES = {
+  'vegetables-green':['Apio','Espinaca','Brócoli','Kale','Lechuga','Rúcula'],
+  'vegetables-color':['Tomate','Pimientos','Berenjena','Zanahoria','Remolacha','Palta'],
+  'vegetables-carb':['Papa','Batata','Zapallo','Yuca'],
+  'fruits':['Cítricos','Papaya','Uva','Frutos rojos'],
+  'whole-grains':['Avena','Arroz integral','Maíz','Quinoa','Cuscús integral','Pan integral'],
+  'legumes':['Porotos','Frijoles','Lentejas','Garbanzos','Arvejas'],
+  'nuts-seeds':['Nueces','Almendras','Castañas','Avellanas'],
+  'seeds':['Chía','Linaza','Sésamo','Semillas de calabaza'],
+  'calcium':['Yogur','Quesos','Leche de vaca','Bebida de almendra','Bebida de avena'],
+  'fish':['Sardina','Salmón','Trucha','Atún','Otros pescados'],
+  'poultry':['Pollo','Pavo'],
+  'beef':['Carne vacuna magra'],
+  'pork':['Cerdo magro'],
+  'eggs':['Huevos'],
+  'olive-oil':['Aceite de oliva'],
+  'turmeric':['Cúrcuma'],
+  'ginger':['Jengibre'],
+  'lemon':['Limón'],
+  'cinnamon':['Canela']
+};
+const MAX_MARK = 35 * 8;
+const expanded = new Set();
 const TARGETS_KEY = 'chez-health-targets-v1';
 try { const targets = JSON.parse(localStorage.getItem(TARGETS_KEY) || '{}'); FOOD_GROUPS.forEach(function (food) { if (Number.isInteger(targets[food.id]) && targets[food.id] >= 0 && targets[food.id] <= 35) food.target = targets[food.id]; }); } catch (_) {}
 function saveTargets() { try { localStorage.setItem(TARGETS_KEY, JSON.stringify(Object.fromEntries(FOOD_GROUPS.map(f => [f.id, f.target])))); } catch (_) {} }
@@ -216,7 +239,7 @@ function loadState() {
       FOOD_GROUPS.forEach(function (food) {
         const marks = Array.isArray(stored.checked[food.id]) ? stored.checked[food.id] : (checked[food.id] || []);
         checked[food.id] = Array.from(new Set(marks.filter(function (mark) {
-          return Number.isInteger(mark) && mark >= 0 && mark < 35;
+          return Number.isInteger(mark) && mark >= 0 && mark < MAX_MARK;
         })));
       });
       return { week: week, checked: checked };
@@ -260,73 +283,64 @@ function weekLabel(week) {
 }
 
 function checkedCount(food) {
-  return (savedState.checked[food.id] || []).filter(function (mark) { return mark < food.target; }).length;
+  return (savedState.checked[food.id] || []).length;
 }
 
 function renderFoodList() {
   $('foodList').innerHTML = FOOD_SECTIONS.map(function (section) {
-    const rows = FOOD_GROUPS.filter(function (food) {
-      return food.section === section.id;
-    }).map(function (food) {
-      const marks = (savedState.checked[food.id] || []).filter(function (mark) { return mark < food.target; });
-      const columns = Math.max(1, Math.min(food.target, 7));
-      const checkboxes = Array.from({ length: food.target }, function (_, index) {
-        const checked = marks.includes(index);
-        return '<label class="check-slot">' +
-          '<input class="food-checkbox" type="checkbox" data-food-id="' + food.id + '" data-mark="' + index + '"' +
-          (checked ? ' checked' : '') +
-          ' aria-label="' + food.title + ', consumo ' + (index + 1) + ' de ' + food.target + '">' +
-          '<span aria-hidden="true">✓</span>' +
-        '</label>';
+    const rows = FOOD_GROUPS.filter(function (food) { return food.section === section.id; }).map(function (food) {
+      const marks = savedState.checked[food.id] || [];
+      const count = marks.length;
+      const open = expanded.has(food.id);
+      const choices = FOOD_CHOICES[food.id] || [food.title];
+      const legacy = marks.some(function (m) { return m < 35; });
+      const names = legacy ? ['Registros anteriores'].concat(choices) : choices;
+      const list = names.map(function (name, idx) {
+        const item = legacy ? idx - 1 : idx;
+        const base = item < 0 ? 0 : (item + 1) * 35;
+        const slots = item < 0 ? marks.filter(function (m) { return m < 35; }) : Array.from({length:food.target}, function (_, n) { return base + n; });
+        const boxes = slots.map(function (mark) {
+          const checked = marks.includes(mark);
+          const disabled = !checked && count >= food.target;
+          return '<label class="check-slot"><input class="food-checkbox" type="checkbox" data-food-id="' + food.id + '" data-mark="' + mark + '"' +
+            (checked ? ' checked' : '') + (disabled ? ' disabled' : '') +
+            ' aria-label="' + name + ', consumo ' + (mark - base + 1) + '">' +
+            '<span aria-hidden="true">✓</span></label>';
+        }).join('');
+        return '<div class="choice-row"><span class="choice-name">' + name + '</span><div class="food-checks">' + boxes + '</div></div>';
       }).join('');
-
-      return '<article class="food-item' + (marks.length ? ' has-checks' : '') + '">' +
-        '<div class="food-content">' +
-          '<h3 class="food-title"><span aria-hidden="true">' + food.icon + '</span> ' + food.title + '</h3>' +
-          '<p class="food-examples">' + food.examples + '</p>' +
-          '<div class="target-control" aria-label="Meta semanal de ' + food.title + '">' +
-            '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir consumos semanales de ' + food.title + '"' + (food.target <= 0 ? ' disabled' : '') + '>−</button>' +
-            '<span class="food-frequency">' + food.target + (food.target === 1 ? ' consumo por semana' : ' consumos por semana') + '</span>' +
-            '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar consumos semanales de ' + food.title + '"' + (food.target >= 35 ? ' disabled' : '') + '>+</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="food-tracker">' +
-          '<span class="food-count">' + marks.length + '/' + food.target + '</span>' +
-          '<div class="food-checks" style="--columns:' + columns + '">' + checkboxes + '</div>' +
-        '</div>' +
-      '</article>';
+      return '<article class="category-card' + (count ? ' has-checks' : '') + '">' +
+        '<div class="category-head"><button type="button" class="category-toggle" data-category="' + food.id + '" aria-expanded="' + open + '" aria-controls="category-' + food.id + '">' +
+        '<span class="category-name">' + food.icon + ' ' + food.title + '</span><span class="category-count">' + count + '/' + food.target + '</span><span aria-hidden="true">' + (open ? '▴' : '▾') + '</span></button>' +
+        '<div class="target-control" aria-label="Meta semanal de ' + food.title + '">' +
+        '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir consumos semanales de ' + food.title + '"' + (food.target <= count ? ' disabled' : '') + '>−</button>' +
+        '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar consumos semanales de ' + food.title + '"' + (food.target >= 35 ? ' disabled' : '') + '>+</button></div></div>' +
+        '<div class="category-choices" id="category-' + food.id + '"' + (open ? '' : ' hidden') + '>' + list + '</div></article>';
     }).join('');
-
-    return '<section class="food-section" aria-labelledby="section-' + section.id + '">' +
-      '<h3 id="section-' + section.id + '" class="food-section-title">' + section.title + '</h3>' +
-      '<div class="food-list">' + rows + '</div>' +
-    '</section>';
+    return '<section class="food-section" aria-labelledby="section-' + section.id + '"><h3 id="section-' + section.id + '" class="food-section-title">' + section.title + '</h3><div class="food-list">' + rows + '</div></section>';
   }).join('');
-
+  document.querySelectorAll('.category-toggle').forEach(function (button) {
+    button.addEventListener('click', function () {
+      if (expanded.has(button.dataset.category)) expanded.delete(button.dataset.category); else expanded.add(button.dataset.category);
+      render();
+    });
+  });
   document.querySelectorAll('.target-btn').forEach(function (button) {
     button.addEventListener('click', function () {
       const food = FOOD_GROUPS.find(function (item) { return item.id === button.dataset.targetFood; });
       const delta = Number(button.dataset.delta);
-      if (!food || food.target + delta < 0 || food.target + delta > 35) return;
-      food.target += delta;
-      saveTargets();
-      syncQueue.push({type:'target', food:food.id, delta:delta});
-      persistQueue();
-      render();
-      syncShared();
+      if (!food || food.target + delta < checkedCount(food) || food.target + delta > 35) return;
+      food.target += delta; saveTargets(); syncQueue.push({type:'target', food:food.id, delta:delta}); persistQueue(); render(); syncShared();
     });
   });
   document.querySelectorAll('.food-checkbox').forEach(function (checkbox) {
     checkbox.addEventListener('change', function () {
-      const id = checkbox.dataset.foodId;
-      const mark = Number(checkbox.dataset.mark);
+      const id = checkbox.dataset.foodId, mark = Number(checkbox.dataset.mark);
+      const food = FOOD_GROUPS.find(function (f) { return f.id === id; });
       const marks = savedState.checked[id] || [];
-      savedState.checked[id] = checkbox.checked
-        ? Array.from(new Set(marks.concat(mark)))
-        : marks.filter(function (item) { return item !== mark; });
-      saveState();
-      queueMark(savedState.week, id, mark, checkbox.checked);
-      render();
+      if (checkbox.checked && marks.length >= food.target) { render(); return; }
+      savedState.checked[id] = checkbox.checked ? Array.from(new Set(marks.concat(mark))) : marks.filter(function (item) { return item !== mark; });
+      saveState(); queueMark(savedState.week, id, mark, checkbox.checked); render();
     });
   });
 }
@@ -345,7 +359,7 @@ function renderProgress() {
   } else if (count === 0) {
     $('progressMessage').textContent = 'Marca una casilla cada vez que incluyas el alimento en una comida.';
   } else {
-    $('progressMessage').textContent = 'Cada marca cuenta una consumo. Puedes completar las casillas en cualquier orden.';
+    $('progressMessage').textContent = 'Cada marca cuenta un consumo. Puedes completar las casillas en cualquier orden.';
   }
 }
 
@@ -448,7 +462,7 @@ async function syncShared() {
     const checked = {};
     (result.marks || []).forEach(function (item) {
       const food = FOOD_GROUPS.find(function (f) { return f.id === item.food; });
-      if (food && Number.isInteger(item.mark) && item.mark >= 0 && item.mark < 35 && item.checked) {
+      if (food && Number.isInteger(item.mark) && item.mark >= 0 && item.mark < MAX_MARK && item.checked) {
         (checked[item.food] ||= []).push(item.mark);
       }
     });

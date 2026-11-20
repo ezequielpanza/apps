@@ -220,3 +220,20 @@ h2 { margin-bottom: 0; color: var(--teal); font-size: clamp(22px, 4vw, 30px); le
   .food-content { gap: 8px; }
   .food-checks { gap: 4px; }
 }
+
+.category-card { border: 1px solid var(--line); border-radius: 15px; background: #fff; overflow: hidden; }
+.category-card.has-checks { border-color: #b9dbc5; }
+.category-head { display:flex; align-items:center; min-height:52px; gap:8px; padding: 6px 10px 6px 14px; }
+.category-toggle { display:flex; align-items:center; gap:10px; flex:1; min-width:0; border:0; background:none; color:var(--ink); cursor:pointer; padding:8px 0; text-align:left; }
+.category-name { flex:1; font-size:14px; font-weight:800; }
+.category-count { font-weight:800; color:#39815f; font-variant-numeric:tabular-nums; }
+.category-head .target-control { margin:0; gap:5px; }
+.category-choices { border-top:1px solid var(--line); padding:4px 12px 10px; }
+.category-choices[hidden] { display:none; }
+.choice-row { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; border-bottom:1px solid #eff4f0; }
+.choice-row:last-child { border-bottom:0; }
+.choice-name { flex:0 0 auto; font-size:13px; }
+.choice-row .food-checks { overflow-x:auto; justify-content:flex-start; padding:5px 1px; }
+.check-slot input:disabled + span { border-color:#d5dcd7; background:#edf0ee; color:transparent; cursor:not-allowed; }
+.check-slot:has(input:disabled) { cursor:not-allowed; }
+@media(max-width:620px) { .category-name { font-size:12px; } .choice-name { font-size:12px; } }
