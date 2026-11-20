@@ -58,7 +58,7 @@ const FOOD_GROUPS = [
     section: 'everyday',
     icon: '🫘',
     title: 'Legumbres',
-    examples: 'Habichuelas, frijoles, lentejas, garbanzos, arvejas',
+    examples: 'Porotos, frijoles, lentejas, garbanzos, arvejas',
     target: 3,
     frequency: '3 ingestas por semana'
   },
