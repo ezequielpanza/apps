@@ -156,8 +156,9 @@ export function createBatteriesModule(requestRender,openManager){
   function bankEstimate(s){
     const current=num(s.current),charging=current!==null&&current>.05,discharging=current!==null&&current<-.05,label=charging?"Carga completa en":discharging?"Autonomía estimada":"En reposo",value=charging?chargeEtaLabel(s):discharging?autonomyLabel(s):current===null?"—":"Sin carga neta";
     let finish='';
-    if(discharging&&s.connected>=s.total&&Number.isFinite(s.rem)&&s.rem>0){
-      const end=new Date(Date.now()+s.rem/Math.abs(current)*3600000);
+    const finishHours=discharging&&s.connected>=s.total&&Number.isFinite(s.rem)&&s.rem>0?s.rem/Math.abs(current):charging&&value!=='—'&&value!=='Completa'&&Number.isFinite(s.cap)&&Number.isFinite(s.rem)?Math.max(0,s.cap-s.rem)/current:null;
+    if(finishHours!==null&&Number.isFinite(finishHours)){
+      const end=new Date(Date.now()+finishHours*3600000);
       if(Number.isFinite(end.getTime())){const now=new Date(),differentDay=end.toDateString()!==now.toDateString(),options=differentDay?{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}:{hour:'2-digit',minute:'2-digit'};finish='Finaliza: '+end.toLocaleString('es',options)}
     }
     return `<div class="battery-bank-estimate"><span>${label}</span><strong>${esc(value)}</strong>${finish?'<span>'+esc(finish)+'</span>':''}</div>`;
