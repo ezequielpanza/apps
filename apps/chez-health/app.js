@@ -15,7 +15,7 @@ const FOOD_GROUPS = [
     title: 'Vegetales verdes',
     examples: 'Apio, espinaca, brócoli, kale, lechuga, rúcula',
     target: 7,
-    frequency: '1 ingesta por día'
+    frequency: '1 consumo por día'
   },
   {
     id: 'vegetables-color',
@@ -24,7 +24,7 @@ const FOOD_GROUPS = [
     title: 'Vegetales de colores',
     examples: 'Tomate, pimientos, berenjena, zanahoria, remolacha, palta',
     target: 7,
-    frequency: '1 ingesta por día'
+    frequency: '1 consumo por día'
   },
   {
     id: 'vegetables-carb',
@@ -33,7 +33,7 @@ const FOOD_GROUPS = [
     title: 'Vegetales con carbohidratos',
     examples: 'Papa, batata, zapallo, yuca',
     target: 7,
-    frequency: '1 ingesta por día'
+    frequency: '1 consumo por día'
   },
   {
     id: 'fruits',
@@ -42,7 +42,7 @@ const FOOD_GROUPS = [
     title: 'Frutas variadas',
     examples: 'Cítricos, papaya, uva, frutos rojos',
     target: 7,
-    frequency: '1 ingesta por día'
+    frequency: '1 consumo por día'
   },
   {
     id: 'whole-grains',
@@ -51,7 +51,7 @@ const FOOD_GROUPS = [
     title: 'Cereales integrales',
     examples: 'Avena, arroz integral, maíz, quinoa, cuscús integral, pan integral',
     target: 7,
-    frequency: '1 ingesta por día'
+    frequency: '1 consumo por día'
   },
   {
     id: 'legumes',
@@ -60,7 +60,7 @@ const FOOD_GROUPS = [
     title: 'Legumbres',
     examples: 'Porotos, frijoles, lentejas, garbanzos, arvejas',
     target: 3,
-    frequency: '3 ingestas por semana'
+    frequency: '3 consumos por semana'
   },
   {
     id: 'nuts-seeds',
@@ -69,7 +69,7 @@ const FOOD_GROUPS = [
     title: 'Frutos secos',
     examples: 'Nueces, almendras, castañas, avellanas',
     target: 7,
-    frequency: '1 ingesta por día'
+    frequency: '1 consumo por día'
   },
   {
     id: 'seeds',
@@ -78,7 +78,7 @@ const FOOD_GROUPS = [
     title: 'Semillas',
     examples: 'Chía, linaza, sésamo, semillas de calabaza',
     target: 7,
-    frequency: '1 ingesta por día'
+    frequency: '1 consumo por día'
   },
   {
     id: 'calcium',
@@ -87,7 +87,7 @@ const FOOD_GROUPS = [
     title: 'Lácteos',
     examples: 'Yogur, quesos, leche (vaca, almendra o avena)',
     target: 7,
-    frequency: '1 ingesta por día'
+    frequency: '1 consumo por día'
   },
   {
     id: 'fish',
@@ -96,7 +96,7 @@ const FOOD_GROUPS = [
     title: 'Pescado',
     examples: 'Sardina, salmón, trucha, atún u otros pescados',
     target: 2,
-    frequency: '2 ingestas por semana'
+    frequency: '2 consumos por semana'
   },
   {
     id: 'poultry',
@@ -105,7 +105,7 @@ const FOOD_GROUPS = [
     title: 'Pollo o pavo',
     examples: 'Preferiblemente sin piel y poco procesados',
     target: 2,
-    frequency: '2 ingestas por semana'
+    frequency: '2 consumos por semana'
   },
   {
     id: 'beef',
@@ -114,7 +114,7 @@ const FOOD_GROUPS = [
     title: 'Carne vacuna magra',
     examples: 'Cortes magros, en porciones moderadas',
     target: 1,
-    frequency: '1 ingesta por semana'
+    frequency: '1 consumo por semana'
   },
   {
     id: 'pork',
@@ -123,7 +123,7 @@ const FOOD_GROUPS = [
     title: 'Cerdo magro',
     examples: 'Lomo o cortes magros, poco procesados',
     target: 1,
-    frequency: '1 ingesta por semana'
+    frequency: '1 consumo por semana'
   },
   {
     id: 'eggs',
@@ -132,7 +132,7 @@ const FOOD_GROUPS = [
     title: 'Huevos',
     examples: 'Como opción de proteína junto con otros alimentos',
     target: 3,
-    frequency: '3 ingestas por semana'
+    frequency: '3 consumos por semana'
   },
   {
     id: 'olive-oil',
@@ -141,7 +141,7 @@ const FOOD_GROUPS = [
     title: 'Aceite de oliva',
     examples: 'Para cocinar o condimentar',
     target: 7,
-    frequency: '1 ingesta por día'
+    frequency: '1 consumo por día'
   },
   {
     id: 'turmeric',
@@ -150,7 +150,7 @@ const FOOD_GROUPS = [
     title: 'Cúrcuma',
     examples: 'Fresca o en polvo',
     target: 2,
-    frequency: '2 ingestas por semana'
+    frequency: '2 consumos por semana'
   },
   {
     id: 'ginger',
@@ -159,7 +159,7 @@ const FOOD_GROUPS = [
     title: 'Jengibre',
     examples: 'Fresco o en polvo',
     target: 2,
-    frequency: '2 ingestas por semana'
+    frequency: '2 consumos por semana'
   },
   {
     id: 'lemon',
@@ -168,7 +168,7 @@ const FOOD_GROUPS = [
     title: 'Limón',
     examples: 'En comidas o bebidas',
     target: 2,
-    frequency: '2 ingestas por semana'
+    frequency: '2 consumos por semana'
   },
   {
     id: 'cinnamon',
@@ -177,7 +177,7 @@ const FOOD_GROUPS = [
     title: 'Canela',
     examples: 'En preparaciones dulces o saladas',
     target: 2,
-    frequency: '2 ingestas por semana'
+    frequency: '2 consumos por semana'
   }
 ];
 
@@ -275,7 +275,7 @@ function renderFoodList() {
         return '<label class="check-slot">' +
           '<input class="food-checkbox" type="checkbox" data-food-id="' + food.id + '" data-mark="' + index + '"' +
           (checked ? ' checked' : '') +
-          ' aria-label="' + food.title + ', ingesta ' + (index + 1) + ' de ' + food.target + '">' +
+          ' aria-label="' + food.title + ', consumo ' + (index + 1) + ' de ' + food.target + '">' +
           '<span aria-hidden="true">✓</span>' +
         '</label>';
       }).join('');
@@ -285,9 +285,9 @@ function renderFoodList() {
           '<h3 class="food-title"><span aria-hidden="true">' + food.icon + '</span> ' + food.title + '</h3>' +
           '<p class="food-examples">' + food.examples + '</p>' +
           '<div class="target-control" aria-label="Meta semanal de ' + food.title + '">' +
-            '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir ingestas semanales de ' + food.title + '"' + (food.target <= 0 ? ' disabled' : '') + '>−</button>' +
-            '<span class="food-frequency">' + food.target + (food.target === 1 ? ' ingesta por semana' : ' ingestas por semana') + '</span>' +
-            '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar ingestas semanales de ' + food.title + '"' + (food.target >= 35 ? ' disabled' : '') + '>+</button>' +
+            '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="-1" aria-label="Reducir consumos semanales de ' + food.title + '"' + (food.target <= 0 ? ' disabled' : '') + '>−</button>' +
+            '<span class="food-frequency">' + food.target + (food.target === 1 ? ' consumo por semana' : ' consumos por semana') + '</span>' +
+            '<button type="button" class="target-btn" data-target-food="' + food.id + '" data-delta="1" aria-label="Aumentar consumos semanales de ' + food.title + '"' + (food.target >= 35 ? ' disabled' : '') + '>+</button>' +
           '</div>' +
         '</div>' +
         '<div class="food-tracker">' +
@@ -335,7 +335,7 @@ function renderProgress() {
   const total = FOOD_GROUPS.reduce(function (sum, food) { return sum + food.target; }, 0);
   const count = FOOD_GROUPS.reduce(function (sum, food) { return sum + checkedCount(food); }, 0);
   const percent = total ? Math.round(count / total * 100) : 0;
-  $('progressValue').textContent = count + ' de ' + total + ' ingestas';
+  $('progressValue').textContent = count + ' de ' + total + ' consumos';
   $('progressFill').style.width = percent + '%';
   $('progressTrack').setAttribute('aria-valuemax', String(total));
   $('progressTrack').setAttribute('aria-valuenow', String(count));
@@ -345,7 +345,7 @@ function renderProgress() {
   } else if (count === 0) {
     $('progressMessage').textContent = 'Marca una casilla cada vez que incluyas el alimento en una comida.';
   } else {
-    $('progressMessage').textContent = 'Cada marca cuenta una ingesta. Puedes completar las casillas en cualquier orden.';
+    $('progressMessage').textContent = 'Cada marca cuenta una consumo. Puedes completar las casillas en cualquier orden.';
   }
 }
 
