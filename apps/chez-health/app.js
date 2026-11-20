@@ -9,13 +9,22 @@ const FOOD_SECTIONS = [
 
 const FOOD_GROUPS = [
   {
-    id: 'vegetables',
+    id: 'vegetables-green',
     section: 'produce',
     icon: '🥦',
-    title: 'Vegetales variados',
-    examples: 'Hojas verdes, brócoli, tomate, zanahoria, calabaza',
-    target: 14,
-    frequency: '2 ingestas por día'
+    title: 'Vegetales verdes',
+    examples: 'Espinaca, brócoli, lechuga, acelga, kale',
+    target: 7,
+    frequency: '1 ingesta por día'
+  },
+  {
+    id: 'vegetables-color',
+    section: 'produce',
+    icon: '🥕',
+    title: 'Vegetales de colores',
+    examples: 'Tomate, zanahoria, calabaza, pimiento, remolacha',
+    target: 7,
+    frequency: '1 ingesta por día'
   },
   {
     id: 'fruits',
@@ -182,8 +191,12 @@ function loadState() {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (stored && stored.week === week && stored.checked && typeof stored.checked === 'object') {
       const checked = {};
+      if (Array.isArray(stored.checked.vegetables)) {
+        checked['vegetables-green'] = stored.checked.vegetables.filter(m => Number.isInteger(m) && m >= 0 && m < 7);
+        checked['vegetables-color'] = stored.checked.vegetables.filter(m => Number.isInteger(m) && m >= 7 && m < 35).map(m => m - 7);
+      }
       FOOD_GROUPS.forEach(function (food) {
-        const marks = Array.isArray(stored.checked[food.id]) ? stored.checked[food.id] : [];
+        const marks = Array.isArray(stored.checked[food.id]) ? stored.checked[food.id] : (checked[food.id] || []);
         checked[food.id] = Array.from(new Set(marks.filter(function (mark) {
           return Number.isInteger(mark) && mark >= 0 && mark < 35;
         })));
@@ -364,6 +377,12 @@ const QUEUE_KEY = 'chez-health-sync-queue-v1';
 const MIGRATION_KEY = 'chez-health-sync-migrated-v1';
 let syncQueue = [];
 try { syncQueue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); if (!Array.isArray(syncQueue)) syncQueue = []; } catch (_) { syncQueue = []; }
+syncQueue.forEach(function (item) {
+  if (item.food === 'vegetables' && item.type !== 'target' && Number.isInteger(item.mark)) {
+    item.food = item.mark < 7 ? 'vegetables-green' : 'vegetables-color';
+    if (item.mark >= 7) item.mark -= 7;
+  }
+});
 function persistQueue() { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(syncQueue)); } catch (_) {} }
 function queueMark(week, food, mark, checked) {
   syncQueue.push({week:week, food:food, mark:mark, checked:checked});
