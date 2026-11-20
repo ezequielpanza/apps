@@ -22,7 +22,7 @@ const FOOD_GROUPS = [
     section: 'produce',
     icon: '🥕',
     title: 'Vegetales de colores',
-    examples: 'Tomate, pimientos, berenjena, zanahoria, remolacha',
+    examples: 'Tomate, pimientos, berenjena, zanahoria, remolacha, palta',
     target: 7,
     frequency: '1 ingesta por día'
   },
