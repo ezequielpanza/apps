@@ -102,3 +102,10 @@
 .battery-history-average-control{flex-wrap:wrap;gap:4px 14px}
 .battery-history-average-control .battery-history-average-toggle{color:#d8e7ed;font-weight:600}
 .battery-history-average-toggle input{width:16px;height:16px;margin:0;accent-color:#48d9ef}
+
+/* Control de barras del promedio móvil sin menú desplegable. */
+.battery-history-average-stepper{display:flex;align-items:center;gap:6px;min-height:30px}
+.battery-history-average-stepper button{width:30px;height:30px;border:1px solid #24516a;border-radius:7px;background:#10344a;color:#eaf6fb;font-size:18px;font-weight:700;line-height:1;touch-action:manipulation}
+.battery-history-average-stepper button:disabled{opacity:.4}
+.battery-history-average-stepper output{min-width:26px;text-align:center;color:#eaf6fb;font-weight:700;font-variant-numeric:tabular-nums}
+.battery-history-average-stepper span{color:#a9c2ce}
