@@ -85,7 +85,7 @@ const FOOD_GROUPS = [
     section: 'everyday',
     icon: '🥛',
     title: 'Fuentes de calcio',
-    examples: 'Yogur, leche o bebida de soya fortificada',
+    examples: 'Yogur, leche (vaca, almendra o avena)',
     target: 7,
     frequency: '1 ingesta por día'
   },
