@@ -152,3 +152,5 @@
 .battery-history-page>.battery-history-chart{min-height:56px}
 .battery-history-page>.battery-history-soc-curve{margin-top:0}
 .battery-history-page>.battery-history-legend{gap:4px 8px;margin:0}
+
+.battery-history-page>.battery-history-soc-curve[open]{max-height:160px;overflow:auto}

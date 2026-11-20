@@ -579,7 +579,7 @@ export function createBatteriesModule(requestRender,openManager){
     if(canvas.width!==w)canvas.width=w;if(canvas.height!==h)canvas.height=h;
     const c=canvas.getContext('2d');if(!c)return false;
     const data=chartData(),bars=fillHistoryGaps(data.bars),directions=historyDirections(bars),extremes=historyExtremeData(data);
-    const slot=r.width/BARS,bw=Math.max(2,slot*.72),legend=new Map(),axisH=Math.min(68,Math.max(58,r.height<245?58:66)),plotH=Math.max(30,r.height-axisH);
+    const slot=r.width/BARS,bw=Math.max(2,slot*.72),legend=new Map(),axisH=Math.min(r.height*.35,Math.min(68,Math.max(24,r.height<245?58:66))),plotH=Math.max(1,r.height-axisH);
     const ahValues=bars.flatMap(b=>b.ah.filter(x=>!hiddenSeries['ah:'+x.id]).map(x=>x.value)),ahScale=niceAhScale(ahValues);
     const currentValues=bars.flatMap(b=>b.currents.filter(x=>!hiddenSeries['current:'+x.id]).map(x=>x.value)).concat(hiddenSeries['current:bank']&&!hiddenSeries['current:bank-average']?bars.map(bar=>bar.currents.find(item=>String(item.id)==='bank')?.value).filter(Number.isFinite):[]),currentScale=niceAhScale(currentValues),voltageValues=bars.flatMap(b=>b.voltages.filter(x=>x.id!=='bank-estimated'&&!hiddenSeries['voltage:'+x.id]).map(x=>x.value)),estimatedVoltageVisible=!hiddenSeries['voltage:bank-estimated']&&bars.some(b=>b.voltages.some(x=>x.id==='bank-estimated')),voltageScaleValues=bars.flatMap(b=>b.voltages.filter(x=>x.id!=='bank-estimated'&&(!hiddenSeries['voltage:'+x.id]||(estimatedVoltageVisible&&x.id==='bank'))).map(x=>x.value)),voltageScale=niceVoltageScale(voltageScaleValues);
     for(const axis of root.querySelectorAll('.battery-history-y')){axis.style.height=plotH+'px';axis.style.alignSelf='start'}
