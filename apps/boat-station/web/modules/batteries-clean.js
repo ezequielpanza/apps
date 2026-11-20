@@ -1,4 +1,4 @@
-import {estimatedSoc} from '../charge-calculation.mjs';
+import {estimatedSoc,profiles} from '../charge-calculation.mjs';
 const CURRENT_KEY='bs.batteries.current.v1',HISTORY_KEY='bs.batteries.history.v1',LEGACY_KEY='bs.batteries.state',ZOOM_KEY='bs.batteries.historyZoom.v3',OLD_ZOOM_KEY='bs.batteries.historyZoom.v2',VISIBILITY_KEY='bs.batteries.historyVisibility.v1',COLORS_KEY='bs.batteries.historyColors.v1',AVERAGE_BARS_KEY='bs.batteries.currentAverageBars.v1',SOC_CURVE_KEY='bs.batteries.historySocCurve.v1',VOLTAGE_ESTIMATE_FACTOR_KEY='bs.batteries.historyVoltageEstimateFactor.v1';
 const DEFAULT_SOC_CURVE=[{voltage:10,soc:0},{voltage:12,soc:5},{voltage:12.8,soc:10},{voltage:13,soc:20},{voltage:13.12,soc:40},{voltage:13.2,soc:60},{voltage:13.28,soc:80},{voltage:13.4,soc:90},{voltage:13.6,soc:100}];
 const SAMPLE_MS=30000,SAVE_MS=2000,MAX_AGE=840*86400000,BARS=30,MAX_AH_GAP_MS=120000,CHARGE_EFFICIENCY=.99;
@@ -338,7 +338,8 @@ export function createBatteriesModule(requestRender,openManager){
     historyDirty=true;saveHistory();
   }
 
-  let socCurveEditorOpen=false,socCurvePointer=null;
+  let socCurveEditorOpen=false,socCurvePointer=null,socCurvePreset=read('bs.batteries.historySocCurvePreset.v1','manual'),socCurveCells=Math.max(1,Math.min(48,Math.round(Number(read('bs.batteries.historySocCurveCells.v1',4))||4)));
+  if(!Object.prototype.hasOwnProperty.call(profiles,socCurvePreset))socCurvePreset='manual';
   if(socCurvePoints.length<2)socCurvePoints=DEFAULT_SOC_CURVE.map(point=>({...point}));
   write(SOC_CURVE_KEY,socCurvePoints);
   function normalizeSocCurve(points){
@@ -360,7 +361,7 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function estimateSocFromVoltage(voltage){return interpolateSoc(socCurvePoints,voltage)}
   function socCurveEditorMarkup(){
-    return '<details class="battery-history-soc-curve" data-battery-soc-curve-details '+(socCurveEditorOpen?'open':'')+'><summary>Curva de correlación Voltaje estimado → SOC estimado</summary><div class="battery-history-soc-curve-content"><canvas data-battery-soc-curve-chart aria-label="Curva editable de Voltaje estimado y SOC estimado"></canvas><p>Arrastrá un punto para moverlo · Tocá un punto para eliminarlo · Tocá una línea para agregar un punto</p></div></details>'
+    return '<details class="battery-history-soc-curve" data-battery-soc-curve-details '+(socCurveEditorOpen?'open':'')+'><summary>Curva de correlación Voltaje estimado → SOC estimado</summary><div class="battery-history-soc-curve-content"><label>Tipo <select data-soc-preset aria-label="Tipo de curva"><option value="manual" '+(socCurvePreset==='manual'?'selected':'')+'>Manual</option><option value="lifepo4" '+(socCurvePreset==='lifepo4'?'selected':'')+'>LiFePO₄</option><option value="agm" '+(socCurvePreset==='agm'?'selected':'')+'>AGM</option><option value="gel" '+(socCurvePreset==='gel'?'selected':'')+'>Gel</option><option value="flooded" '+(socCurvePreset==='flooded'?'selected':'')+'>Plomo ácido</option></select></label> <label>Celdas en serie <input type="number" min="1" max="48" step="1" value="'+socCurveCells+'" data-soc-cells aria-label="Cantidad de celdas en serie"></label><canvas data-battery-soc-curve-chart aria-label="Curva editable de Voltaje estimado y SOC estimado"></canvas><p>Arrastrá un punto para moverlo · Tocá un punto para eliminarlo · Tocá una línea para agregar un punto</p></div></details>'
   }
   function socCurveDomain(){
     const first=socCurvePoints[0]?.voltage??10,last=socCurvePoints[socCurvePoints.length-1]?.voltage??13.6,span=Math.max(.1,last-first),padding=Math.max(.2,span*.1);
@@ -397,6 +398,11 @@ export function createBatteriesModule(requestRender,openManager){
     const details=root.querySelector('[data-battery-soc-curve-details]'),canvas=root.querySelector('[data-battery-soc-curve-chart]');
     if(!details||!canvas||details.dataset.socCurveBound==='1')return;
     details.dataset.socCurveBound='1';
+    const preset=details.querySelector('[data-soc-preset]'),cells=details.querySelector('[data-soc-cells]');
+    const markManual=()=>{socCurvePreset='manual';write('bs.batteries.historySocCurvePreset.v1',socCurvePreset);if(preset)preset.value='manual'};
+    const applyPreset=()=>{if(!profiles[socCurvePreset])return;socCurvePoints=profiles[socCurvePreset].map(([voltage,soc])=>({voltage:voltage*socCurveCells,soc}));write(SOC_CURVE_KEY,socCurvePoints);write('bs.batteries.historySocCurvePreset.v1',socCurvePreset);write('bs.batteries.historySocCurveCells.v1',socCurveCells);drawSocCurve(root);queueDraw(root)};
+    preset?.addEventListener('change',()=>{socCurvePreset=preset.value;if(socCurvePreset==='manual'){markManual();return}socCurveCells=socCurvePreset==='lifepo4'?4:6;cells.value=String(socCurveCells);applyPreset()});
+    cells?.addEventListener('change',()=>{socCurveCells=Math.max(1,Math.min(48,Math.round(Number(cells.value)||1)));cells.value=String(socCurveCells);write('bs.batteries.historySocCurveCells.v1',socCurveCells);applyPreset()});
     details.addEventListener('toggle',()=>{socCurveEditorOpen=details.open;if(details.open)drawSocCurve(root)});
     const pointAt=(x,y,metrics)=>{let index=-1,distance=13;for(let i=0;i<socCurvePoints.length;i++){const point=socCurvePoints[i],d=Math.hypot(x-metrics.xForVoltage(point.voltage),y-metrics.yForSoc(point.soc));if(d<distance){distance=d;index=i}}return index};
     const segmentAt=(x,y,metrics)=>{let index=-1,distance=12;for(let i=1;i<socCurvePoints.length;i++){const previous=socCurvePoints[i-1],next=socCurvePoints[i],d=curveSegmentDistance(x,y,metrics.xForVoltage(previous.voltage),metrics.yForSoc(previous.soc),metrics.xForVoltage(next.voltage),metrics.yForSoc(next.soc));if(d<distance){distance=d;index=i-1}}return index};
@@ -430,6 +436,7 @@ export function createBatteriesModule(requestRender,openManager){
           if(right.voltage-left.voltage>gap*2){const soc=interpolateSoc(socCurvePoints,voltage);socCurvePoints=normalizeSocCurve([...socCurvePoints,{voltage,soc}]);write(SOC_CURVE_KEY,socCurvePoints)}
         }
       }else if(gesture.moved)write(SOC_CURVE_KEY,socCurvePoints);
+      if((gesture.type==='point'&&(gesture.moved||(!cancelled&&socCurvePoints.length>=2)))||(gesture.type==='line'&&!cancelled&&!gesture.moved))markManual();
       try{if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId)}catch{}
       drawSocCurve(root);queueDraw(root)
     };
