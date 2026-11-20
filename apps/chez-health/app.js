@@ -322,10 +322,11 @@ function renderFoodList() {
       }).join('');
       return '<article class="category-card' + (count ? ' has-checks' : '') + '">' +
         '<div class="category-head"><button type="button" class="category-toggle" data-category="' + food.id + '" aria-expanded="' + open + '" aria-controls="category-' + food.id + '">' +
-        '<span class="category-name">' + food.icon + ' ' + escapeHtml(food.title) + '</span><span class="category-count">' + count + '/' + food.target + '</span></button>' +
+        '<span class="category-name">' + food.icon + ' ' + escapeHtml(food.title) + '</span></button>' +
+        '<button type="button" class="add-food category-add" data-add-food="' + food.id + '" aria-label="Agregar alimento a ' + escapeHtml(food.title) + '">＋ Agregar</button>' +
+        '<button type="button" class="category-toggle category-count" data-category="' + food.id + '" aria-expanded="' + open + '" aria-controls="category-' + food.id + '" aria-label="Ver alimentos de ' + escapeHtml(food.title) + '">' + count + '/' + food.target + '</button>' +
         '<button type="button" class="properties-btn" data-properties="' + food.id + '" aria-label="Propiedades de ' + escapeHtml(food.title) + '">⚙</button></div>' +
-        '<div class="category-choices" id="category-' + food.id + '"' + (open ? '' : ' hidden') + '>' + list +
-        '<button type="button" class="add-food" data-add-food="' + food.id + '">＋ Agregar nuevo alimento</button></div></article>';
+        '<div class="category-choices" id="category-' + food.id + '"' + (open ? '' : ' hidden') + '>' + list + '</div></article>';
     }).join('');
     return rows;
   }).join('') + '<button type="button" class="add-category">＋ Agregar Categoría</button>';
