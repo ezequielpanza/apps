@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chez-health-v2';
+const CACHE_NAME = 'chez-health-v3';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -34,7 +34,7 @@ self.addEventListener('fetch', function (event) {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
   event.respondWith(fetch(request).then(function (response) {
     if (response.ok) {
       const copy = response.clone();

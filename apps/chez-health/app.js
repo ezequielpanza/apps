@@ -157,6 +157,7 @@ const FOOD_GROUPS = [
 const $ = function (id) { return document.getElementById(id); };
 let savedState = loadState();
 let deferredInstallPrompt = null;
+let syncBusy = false;
 
 function localDateString(date) {
   return date.getFullYear() + '-' +
@@ -195,7 +196,7 @@ function loadState() {
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedState));
-    $('storageNote').textContent = 'Tus marcas quedan guardadas en este dispositivo.';
+    if (!syncBusy) $('storageNote').textContent = 'Guardado en este dispositivo. Sincronizando…';
   } catch (error) {
     $('storageNote').textContent = 'El navegador no permitió guardar las marcas en este dispositivo.';
   }
@@ -273,6 +274,7 @@ function renderFoodList() {
         ? Array.from(new Set(marks.concat(mark)))
         : marks.filter(function (item) { return item !== mark; });
       saveState();
+      queueMark(savedState.week, id, mark, checkbox.checked);
       render();
     });
   });
@@ -313,7 +315,8 @@ function refreshWeekIfNeeded() {
 
 window.addEventListener('DOMContentLoaded', function () {
   render();
-  window.setInterval(refreshWeekIfNeeded, 30000);
+  startSync();
+  window.setInterval(function () { refreshWeekIfNeeded(); syncShared(); }, 15000);
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) refreshWeekIfNeeded();
   });
@@ -336,3 +339,63 @@ window.addEventListener('DOMContentLoaded', function () {
     deferredInstallPrompt = null;
   });
 });
+
+const QUEUE_KEY = 'chez-health-sync-queue-v1';
+const MIGRATION_KEY = 'chez-health-sync-migrated-v1';
+let syncQueue = [];
+try { syncQueue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); if (!Array.isArray(syncQueue)) syncQueue = []; } catch (_) { syncQueue = []; }
+function persistQueue() { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(syncQueue)); } catch (_) {} }
+function queueMark(week, food, mark, checked) {
+  syncQueue.push({week:week, food:food, mark:mark, checked:checked});
+  persistQueue();
+  syncShared();
+}
+function startSync() {
+  try {
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+      FOOD_GROUPS.forEach(function (food) {
+        (savedState.checked[food.id] || []).forEach(function (mark) {
+          syncQueue.push({week:savedState.week, food:food.id, mark:mark, checked:true, migrate:true});
+        });
+      });
+      persistQueue();
+      localStorage.setItem(MIGRATION_KEY, '1');
+    }
+  } catch (_) {}
+  syncShared();
+  window.addEventListener('online', syncShared);
+}
+async function syncShared() {
+  if (syncBusy) return;
+  syncBusy = true;
+  try {
+    $('storageNote').textContent = 'Sincronizando la lista compartida…';
+    while (syncQueue.length) {
+      const item = syncQueue[0];
+      const response = await fetch('./api/marks', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(item), cache:'no-store'});
+      if (!response.ok) throw new Error('No se pudo guardar');
+      syncQueue.shift(); persistQueue();
+    }
+    const week = currentWeekStart();
+    const response = await fetch('./api/marks?week=' + encodeURIComponent(week), {cache:'no-store'});
+    if (!response.ok) throw new Error('No se pudo cargar');
+    const result = await response.json();
+    if (week !== currentWeekStart() || syncQueue.length) return;
+    const checked = {};
+    (result.marks || []).forEach(function (item) {
+      const food = FOOD_GROUPS.find(function (f) { return f.id === item.food; });
+      if (food && Number.isInteger(item.mark) && item.mark >= 0 && item.mark < food.target && item.checked) {
+        (checked[item.food] ||= []).push(item.mark);
+      }
+    });
+    savedState = {week:week, checked:checked};
+    saveState();
+    render();
+    $('storageNote').textContent = 'Lista compartida sincronizada.';
+  } catch (_) {
+    $('storageNote').textContent = 'Sin conexión: los cambios se guardan en este dispositivo y se enviarán al reconectar.';
+  } finally {
+    syncBusy = false;
+    if (syncQueue.length && navigator.onLine) setTimeout(syncShared, 15000);
+  }
+}

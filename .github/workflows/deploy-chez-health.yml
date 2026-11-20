@@ -1,33 +1,35 @@
 name: Deploy Chez Health
-
 on:
   push:
     branches: [main]
     paths:
       - "apps/chez-health/**"
       - ".github/workflows/deploy-chez-health.yml"
-      - "APPS.md"
   workflow_dispatch:
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Ensure Cloudflare Pages project exists
+      - uses: actions/checkout@v4
+      - name: Create database and deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
         run: |
+          set -euo pipefail
+          cd apps/chez-health
+          BASE="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database"
+          RESPONSE="$(curl -fsS "$BASE" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")"
+          DB_ID="$(echo "$RESPONSE" | jq -r '.result[] | select(.name=="chez-health") | .uuid' | head -1)"
+          if [ -z "$DB_ID" ]; then
+            RESPONSE="$(curl -fsS -X POST "$BASE" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' --data '{"name":"chez-health"}')"
+            DB_ID="$(echo "$RESPONSE" | jq -r '.result.uuid // empty')"
+          fi
+          test -n "$DB_ID"
+          jq -n --arg id "$DB_ID" '{name:"chez-health",pages_build_output_dir:".",compatibility_date:"2025-04-01",d1_databases:[{binding:"DB",database_name:"chez-health",database_id:$id}]}' > wrangler.json
+          npx --yes wrangler@latest d1 execute chez-health --remote --command "CREATE TABLE IF NOT EXISTS marks (week TEXT NOT NULL, food TEXT NOT NULL, mark INTEGER NOT NULL, checked INTEGER NOT NULL, PRIMARY KEY (week,food,mark))"
           npx --yes wrangler@latest pages project create chez-health --production-branch=main || true
-
-      - name: Deploy to Cloudflare Pages
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          npx --yes wrangler@latest pages deploy apps/chez-health --project-name=chez-health --branch=main
+          npx --yes wrangler@latest pages deploy . --project-name=chez-health --branch=main
