@@ -198,3 +198,25 @@ h2 { margin-bottom: 0; color: var(--teal); font-size: clamp(22px, 4vw, 30px); le
 .target-btn:disabled { opacity: .4; cursor: default; }
 .target-control .food-frequency { white-space: nowrap; }
 @media (max-width: 360px) { .target-control { gap: 4px; } .target-btn { width: 26px; height: 26px; } }
+
+/* Cada alimento ocupa una única fila; se puede desplazar cuando no entra. */
+.food-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 9px 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.food-content { display: flex; flex: 1 0 auto; align-items: center; gap: 10px; min-width: max-content; }
+.food-title, .food-examples { flex: none; margin: 0; white-space: nowrap; }
+.target-control { flex: none; margin: 0; }
+.food-tracker { display: flex; flex: none; align-items: center; gap: 8px; margin-left: auto; }
+.food-checks { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 5px; }
+.check-slot { flex: none; }
+@media (max-width: 620px) {
+  .food-item { gap: 9px; padding: 8px 10px; min-height: 48px; }
+  .food-content { gap: 8px; }
+  .food-checks { gap: 4px; }
+}
