@@ -141,3 +141,8 @@
 .battery-history-soc-curve-content p{margin:8px 0 0;color:#9fb4c0;font-size:11px;line-height:1.45;text-align:center}
 .battery-history-legend i.line.soc-estimate{background:repeating-linear-gradient(to right,var(--series-color) 0 2px,transparent 2px 5px)}
 @media(max-width:430px){.battery-history-soc-curve>summary{font-size:12px}.battery-history-soc-curve-content{padding:8px}.battery-history-soc-curve-content canvas{height:170px}}
+
+.battery-history-soc-curve-content>label{display:inline-flex;align-items:center;gap:7px;margin:0 12px 10px 0;color:#d8e7ed;font-size:12px;font-weight:600}
+.battery-history-soc-curve-content select,.battery-history-soc-curve-content input[data-soc-cells]{min-height:32px;padding:4px 8px;border:1px solid #24516a;border-radius:7px;background:#10344a;color:#eaf6fb;font:600 12px system-ui,sans-serif}
+.battery-history-soc-curve-content input[data-soc-cells]{width:64px;text-align:center;font-variant-numeric:tabular-nums}
+.battery-history-soc-curve-content select:focus,.battery-history-soc-curve-content input[data-soc-cells]:focus{outline:2px solid #48d9ef;outline-offset:1px}
