@@ -159,9 +159,9 @@ export function createBatteriesModule(requestRender,openManager){
     const finishHours=discharging&&s.connected>=s.total&&Number.isFinite(s.rem)&&s.rem>0?s.rem/Math.abs(current):charging&&value!=='—'&&value!=='Completa'&&Number.isFinite(s.cap)&&Number.isFinite(s.rem)?Math.max(0,s.cap-s.rem)/current:null;
     if(finishHours!==null&&Number.isFinite(finishHours)){
       const end=new Date(Date.now()+finishHours*3600000);
-      if(Number.isFinite(end.getTime())){const now=new Date(),differentDay=end.toDateString()!==now.toDateString(),options=differentDay?{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}:{hour:'2-digit',minute:'2-digit'};finish='Finaliza: '+end.toLocaleString('es',options)}
+      if(Number.isFinite(end.getTime())){const now=new Date(),days=Math.round((Date.UTC(end.getFullYear(),end.getMonth(),end.getDate())-Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()))/86400000),time=end.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});finish=time+(days>0?' (+'+days+' '+(days===1?'día':'días')+')':'')}
     }
-    return `<div class="battery-bank-estimate"><span>${label}</span><strong>${esc(value)}</strong>${finish?'<span>'+esc(finish)+'</span>':''}</div>`;
+    return `<div class="battery-bank-estimate"><span>${label}</span><strong>${esc(value)}${finish?' · '+esc(finish):''}</strong></div>`;
   }
   function overview(){
     const s=stats(),batteryCount=state.batteries.length,minis=batteryCount?state.batteries.map(mini).join(""):'<div class="battery-mini-empty">Sin baterías vinculadas</div>',single=batteryCount===1?" single":"",cardRows=Math.max(1,Math.ceil(batteryCount/2));
