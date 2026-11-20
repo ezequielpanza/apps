@@ -84,8 +84,8 @@ const FOOD_GROUPS = [
     id: 'calcium',
     section: 'everyday',
     icon: '🥛',
-    title: 'Fuentes de calcio',
-    examples: 'Yogur, leche (vaca, almendra o avena)',
+    title: 'Lácteos',
+    examples: 'Yogur, quesos, leche (vaca, almendra o avena)',
     target: 7,
     frequency: '1 ingesta por día'
   },
