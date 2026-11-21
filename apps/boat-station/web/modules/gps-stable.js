@@ -5,6 +5,8 @@ export function createGpsModule(requestRender){
   const savedUnits=(()=>{try{return localStorage.getItem('bs.gps.units')||'nautical'}catch{return'nautical'}})();
   const savedCoordFormat=(()=>{try{return localStorage.getItem('bs.gps.coordFormat')||'dd'}catch{return'dd'}})();
   const readSetting=(key,fallback)=>{try{const value=localStorage.getItem(key);return value===null?fallback:value}catch{return fallback}};
+  const savedBowEnabled=readSetting('bs.gps.bowLineEnabled','true')==='true';
+  const savedBowDistance=Number(readSetting('bs.gps.bowLineNm','10'));
   const savedAlwaysRecord=readSetting('bs.gps.alwaysRecord','false')==='true';
   const retentionSetting=readSetting('bs.gps.retention',null);
   const legacyHistoryHours=[1,3,6,12,24].includes(Number(readSetting('bs.gps.historyHours','6')))?Number(readSetting('bs.gps.historyHours','6')):6;
@@ -17,12 +19,12 @@ export function createGpsModule(requestRender){
   const savedHistoryColor=/^#[0-9a-f]{6}$/i.test(readSetting('bs.gps.historyColor','#ff3b30'))?readSetting('bs.gps.historyColor','#ff3b30'):'#ff3b30';
   const savedBoatColor=/^#[0-9a-f]{6}$/i.test(readSetting('bs.gps.boatColor','#ff3b30'))?readSetting('bs.gps.boatColor','#ff3b30'):'#ff3b30';
   const GPS_MAX_ZOOM=22,MAX_ROUTE_POINTS=12000,REMOTE_ROUTE_POINTS=2000,REMOTE_HISTORY_POINTS=1000,REMOTE_HISTORY_SYNC_MS=30000;
-  const state={fix:null,recording:false,route:[],routeId:'',routeStartedAt:0,routeStoppedAt:0,importName:'',root:null,remoteAuthoritative:isRemoteClient,centerMode:savedCenterMode,units:['nautical','metric','imperial'].includes(savedUnits)?savedUnits:'nautical',coordFormat:['dd','dm','dms'].includes(savedCoordFormat)?savedCoordFormat:'dd',alwaysRecord:!isRemoteClient&&savedHistoryHours>0,historyHours:isRemoteClient?0:savedHistoryHours,frequencySeconds:isRemoteClient?60:savedFrequency,historyRoute:[],remoteRoutePointCount:null,remoteHistoryPointCount:null,historyColor:isRemoteClient?'#ff3b30':savedHistoryColor,boatColor:isRemoteClient?'#ff3b30':savedBoatColor,anchor:isRemoteClient?normalizeAnchorSettings({}):savedAnchor,anchorSelection:false,anchorTripped:false,anchorAlarmReady:true,anchorCommandResult:null,anchorControlPending:false,anchorControlMessage:'',vessel:isRemoteClient?normalizeVesselConfig():savedVessel,mapType:savedMapType};
+  const state={fix:null,recording:false,route:[],routeId:'',routeStartedAt:0,routeStoppedAt:0,importName:'',root:null,remoteAuthoritative:isRemoteClient,centerMode:savedCenterMode,units:['nautical','metric','imperial'].includes(savedUnits)?savedUnits:'nautical',coordFormat:['dd','dm','dms'].includes(savedCoordFormat)?savedCoordFormat:'dd',alwaysRecord:!isRemoteClient&&savedHistoryHours>0,historyHours:isRemoteClient?0:savedHistoryHours,frequencySeconds:isRemoteClient?60:savedFrequency,historyRoute:[],remoteRoutePointCount:null,remoteHistoryPointCount:null,historyColor:isRemoteClient?'#ff3b30':savedHistoryColor,boatColor:isRemoteClient?'#ff3b30':savedBoatColor,anchor:isRemoteClient?normalizeAnchorSettings({}):savedAnchor,anchorSelection:false,anchorTripped:false,anchorAlarmReady:true,anchorCommandResult:null,anchorControlPending:false,anchorControlMessage:'',vessel:isRemoteClient?normalizeVesselConfig():savedVessel,mapType:savedMapType,bowLineEnabled:savedBowEnabled,bowLineNm:Number.isFinite(savedBowDistance)&&savedBowDistance>0&&savedBowDistance<=1000?savedBowDistance:10};
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const frequencyDefs=[[30,'30 segundos'],[60,'1 minuto'],[150,'2 minutos 30 segundos'],[300,'5 minutos'],[600,'10 minutos']];
   const unitDefs={nautical:{label:'Náuticas',speed:'kn',accuracy:'m'},metric:{label:'Métricas',speed:'km/h',accuracy:'m'},imperial:{label:'Imperiales',speed:'mph',accuracy:'ft'}};
   const coordDefs={dd:{label:'Grados decimales'},dm:{label:'Grados y minutos'},dms:{label:'Grados, minutos y segundos'}};
-  let lastRemoteHistoryExportAt=0,gpsMap=null,gpsMapElement=null,gpsRouteLayer=null,gpsHistoryLayer=null,gpsPositionLayer=null,gpsBoatLayers=[],gpsAnchorCircle=null,gpsAnchorMarker=null,gpsAnchorLine=null,gpsAnchorLabel=null,gpsAnchorRadiusMarker=null,gpsAnchorRadiusLabel=null,gpsAnchorDragging=false,gpsAnchorRadiusDragging=false,gpsOsmLayer=null,gpsSatelliteLayer=null,gpsSeamarkLayer=null,gpsMapResizeObserver=null,gpsMapZoom=(()=>{try{const value=Number(localStorage.getItem('bs.gps.mapZoom'));return Number.isFinite(value)&&value>=1&&value<=GPS_MAX_ZOOM?value:null}catch{return null}})();
+  let lastRemoteHistoryExportAt=0,gpsMap=null,gpsMapElement=null,gpsRouteLayer=null,gpsHistoryLayer=null,gpsPositionLayer=null,gpsBowLine=null,gpsBoatLayers=[],gpsAnchorCircle=null,gpsAnchorMarker=null,gpsAnchorLine=null,gpsAnchorLabel=null,gpsAnchorRadiusMarker=null,gpsAnchorRadiusLabel=null,gpsAnchorDragging=false,gpsAnchorRadiusDragging=false,gpsOsmLayer=null,gpsSatelliteLayer=null,gpsSeamarkLayer=null,gpsMapResizeObserver=null,gpsMapZoom=(()=>{try{const value=Number(localStorage.getItem('bs.gps.mapZoom'));return Number.isFinite(value)&&value>=1&&value<=GPS_MAX_ZOOM?value:null}catch{return null}})();
   function unitDef(){return unitDefs[state.units]||unitDefs.nautical}
   function anchorRadiusBounds(){return state.anchor.radiusUnit==='ft'?{min:17,max:16404,step:1}:{min:5,max:5000,step:5}}
   function adjustAnchorRadius(direction){const bounds=anchorRadiusBounds(),current=anchorRadiusValue(state.anchor.radius,state.anchor.radiusUnit);if(!Number.isFinite(current))return false;const next=Math.max(bounds.min,Math.min(bounds.max,current+direction*bounds.step));if(next===current)return true;const ready=setAnchorRadius(next);if(!ready&&!state.anchorControlMessage){state.anchorControlMessage='No se pudo actualizar el radio del ancla.';requestRender('gps')}return ready}
@@ -43,6 +45,8 @@ export function createGpsModule(requestRender){
   function setCoordFormat(format){if(!coordDefs[format])return;state.coordFormat=format;try{localStorage.setItem('bs.gps.coordFormat',format)}catch{}requestRender('gps')}
   function getCoordFormat(){return state.coordFormat}function getCoordFormatOptions(){return Object.entries(coordDefs).map(([id,v])=>({id,label:v.label}))}
   function persist(key,value){try{localStorage.setItem(key,String(value))}catch{}}
+  function setBowLineEnabled(enabled){state.bowLineEnabled=!!enabled;persist('bs.gps.bowLineEnabled',state.bowLineEnabled);if(state.root)draw(state.root)}
+  function setBowLineNm(value){const n=Number(value);if(!Number.isFinite(n)||n<0.1||n>1000)return false;state.bowLineNm=n;persist('bs.gps.bowLineNm',n);if(state.root)draw(state.root);return true}
   function getHistorySettings(){return{enabled:state.alwaysRecord,retentionHours:state.historyHours,frequencySeconds:state.frequencySeconds,historyColor:state.historyColor,boatColor:state.boatColor}}
   function configureNativeHistory(){if(!window.NativeBridge?.setGpsHistorySettings)return true;try{return window.NativeBridge.setGpsHistorySettings(state.alwaysRecord,state.historyHours,state.frequencySeconds)!==false}catch{return false}}
   function persistAnchor(){try{localStorage.setItem('bs.gps.anchor',JSON.stringify(state.anchor))}catch{}}
@@ -201,7 +205,7 @@ export function createGpsModule(requestRender){
   function ensureMap(root){
     const element=root?.querySelector('[data-gps-map]');if(!element||!element.isConnected)return null;
     if(gpsMap&&gpsMapElement===element)return gpsMap;
-    if(gpsMapResizeObserver){try{gpsMapResizeObserver.disconnect()}catch{}gpsMapResizeObserver=null}if(gpsMap){try{gpsMap.remove()}catch{}gpsMap=null;gpsMapElement=null;gpsRouteLayer=null;gpsHistoryLayer=null;gpsPositionLayer=null;gpsBoatLayers=[];gpsAnchorCircle=null;gpsAnchorMarker=null;gpsAnchorLine=null;gpsAnchorLabel=null;gpsAnchorRadiusMarker=null;gpsAnchorRadiusLabel=null;gpsAnchorDragging=false;gpsAnchorRadiusDragging=false;gpsOsmLayer=null;gpsSatelliteLayer=null;gpsSeamarkLayer=null}
+    if(gpsMapResizeObserver){try{gpsMapResizeObserver.disconnect()}catch{}gpsMapResizeObserver=null}if(gpsMap){try{gpsMap.remove()}catch{}gpsMap=null;gpsMapElement=null;gpsRouteLayer=null;gpsHistoryLayer=null;gpsPositionLayer=null;gpsBowLine=null;gpsBoatLayers=[];gpsAnchorCircle=null;gpsAnchorMarker=null;gpsAnchorLine=null;gpsAnchorLabel=null;gpsAnchorRadiusMarker=null;gpsAnchorRadiusLabel=null;gpsAnchorDragging=false;gpsAnchorRadiusDragging=false;gpsOsmLayer=null;gpsSatelliteLayer=null;gpsSeamarkLayer=null}
     const L=window.L;
     if(!L){element.textContent='No se pudo cargar el mapa';return null}
     const center=centerTarget()||currentMapPosition()||state.route[state.route.length-1]||state.historyRoute[state.historyRoute.length-1]||{lat:20,lon:-69};
@@ -284,7 +288,9 @@ export function createGpsModule(requestRender){
     if(position&&gpsPositionLayer)gpsPositionLayer.setLatLng([position.lat,position.lon]);
     const target=centerTarget(position);if(target)map.panTo([target.lat,target.lon??target.lng],{animate:false});
     for(const layer of gpsBoatLayers)map.removeLayer(layer);gpsBoatLayers=[];
-    if(position&&state.fix){const magnetic=Number(window.BoatStation?.getBoatHeading?.()),vessel=vesselPosition(state.fix,Number.isFinite(magnetic)?magnetic:null,state.vessel);for(const hull of boatFootprint(position,vessel?.heading,state.vessel)){const shape=window.L.polygon(hull,{color:state.boatColor,weight:1.5,opacity:.95,fillColor:state.boatColor,fillOpacity:.3,lineJoin:'round'}).addTo(map);gpsBoatLayers.push(shape)}}
+    const rawHeading=window.BoatStation?.getBoatHeading?.(),magnetic=rawHeading===null||rawHeading===undefined?null:Number(rawHeading),vessel=state.fix?vesselPosition(state.fix,Number.isFinite(magnetic)?magnetic:null,state.vessel):null;
+    if(state.bowLineEnabled&&position&&vessel?.heading!==null&&vessel?.heading!==undefined&&Number.isFinite(Number(vessel.heading))){const end=destinationPoint(position,Number(vessel.heading),state.bowLineNm*1852),points=[[position.lat,position.lon],[end.lat,end.lon]];if(!gpsBowLine)gpsBowLine=window.L.polyline(points,{color:'#4ee3f2',weight:2.5,opacity:.9,interactive:false}).addTo(map);else gpsBowLine.setLatLngs(points)}else if(gpsBowLine){map.removeLayer(gpsBowLine);gpsBowLine=null}
+    if(position&&state.fix){for(const hull of boatFootprint(position,vessel?.heading,state.vessel)){const shape=window.L.polygon(hull,{color:state.boatColor,weight:1.5,opacity:.95,fillColor:state.boatColor,fillOpacity:.3,lineJoin:'round'}).addTo(map);gpsBoatLayers.push(shape)}}
     if(state.anchor.hasPoint){
       if(!gpsAnchorCircle)gpsAnchorCircle=window.L.circle([state.anchor.lat,state.anchor.lon],{radius:state.anchor.radius,color:state.anchor.enabled?'#ffb15c':'#8298a8',weight:2,fillColor:'#ffb15c',fillOpacity:.08,dashArray:state.anchor.enabled?'':'5 6'}).addTo(map);
       const anchorPoint=gpsAnchorDragging&&gpsAnchorMarker?gpsAnchorMarker.getLatLng():{lat:state.anchor.lat,lng:state.anchor.lon};
@@ -329,7 +335,7 @@ export function createGpsModule(requestRender){
     if(ready){state.anchorControlMessage='';refreshLive()}
   });
   initializeHistory();
-  return{id:'gps',name:'Ubicación',pages:1,summary,page,afterRender,update,state,setUnits,getUnits,getUnitOptions,setCoordFormat,getCoordFormat,getCoordFormatOptions,getFrequencyOptions,getHistorySettings,setAlwaysRecord,setHistoryHours,setFrequencySeconds,setHistoryColor,setBoatColor,getAnchorSettings,setAnchorEnabled,setAnchorRadius,setAnchorRadiusUnit,setAnchorPoint,beginAnchorSelection,getVesselSettings,setVesselSettings,mapTypeLabel,setMapType};
+  return{id:'gps',name:'Ubicación',pages:1,summary,page,afterRender,update,state,setUnits,getUnits,getUnitOptions,setCoordFormat,getCoordFormat,getCoordFormatOptions,getFrequencyOptions,getHistorySettings,setAlwaysRecord,setHistoryHours,setFrequencySeconds,setHistoryColor,setBoatColor,getAnchorSettings,setAnchorEnabled,setAnchorRadius,setAnchorRadiusUnit,setAnchorPoint,beginAnchorSelection,getVesselSettings,setVesselSettings,mapTypeLabel,setMapType,setBowLineEnabled,setBowLineNm};
 }
 
 
