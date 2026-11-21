@@ -281,6 +281,7 @@ window.BoatStation={
   getBoatStatusState:()=>modules.seastate.exportRemoteState(),
   getBoatHeading:()=>{const heading=modules.seastate.boatHeading();return Number.isFinite(Number(heading))?Number(heading):null},
   applyBoatStatusState:value=>modules.seastate.applyRemoteState(value),
+  executeBoatStatusCommand:(command,payload)=>modules.seastate.executeRemoteCommand(command,payload),
   updateBattery:data=>modules.batteries.updateBattery(data),
   bluetoothDevices:list=>{scanDevices=Array.isArray(list)?list:[];if(bluetoothScanner.classList.contains('open'))renderBluetoothScanner(scanDevices.length?`${scanDevices.length} dispositivo${scanDevices.length===1?'':'s'} encontrado${scanDevices.length===1?'':'s'}`:'Escaneando dispositivos Bluetooth…')}
 };
