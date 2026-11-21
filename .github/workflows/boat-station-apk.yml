@@ -46,6 +46,14 @@ jobs:
         id: version
         run: echo "version=$(tr -d '\r\n ' < apps/boat-station/core/VERSION)" >> "$GITHUB_OUTPUT"
 
+      - name: Check version consistency
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(sed -n "s/^[[:space:]]*versionName '\([^']*\)'.*/\1/p" apps/boat-station/core/app/build.gradle)
+          test -n "$actual"
+          test "$actual" = "${{ steps.version.outputs.version }}" || { echo "VERSION and Android versionName do not match"; exit 1; }
+
       - name: Restore permanent signing key
         shell: bash
         env:
