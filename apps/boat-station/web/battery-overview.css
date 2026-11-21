@@ -154,3 +154,8 @@
 .battery-history-page>.battery-history-legend{gap:4px 8px;margin:0}
 
 .battery-history-page>.battery-history-soc-curve[open]{max-height:160px;overflow:auto}
+
+/* Permit chart grid tracks and axes to shrink while dragging the module handle. */
+.battery-history-page>.battery-history-chart{grid-template-rows:minmax(0,1fr);overflow:hidden}
+.battery-history-chart>.battery-history-y{min-height:0;height:100%;box-sizing:border-box;align-self:stretch;overflow:hidden}
+.battery-history-chart>canvas{min-height:0;height:100%;max-height:100%}
