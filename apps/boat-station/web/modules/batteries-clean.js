@@ -619,6 +619,20 @@ export function createBatteriesModule(requestRender,openManager){
       start,ms,openIndex
     };
   }
+  function accumulatedBankAh(data){
+    const bank=stats(),values=Array(BARS).fill(null);if(!Number.isFinite(bank.rem)||!Number.isFinite(bank.cap)||bank.cap<=0||!state.history.length)return{values,capacity:bank.cap};
+    const now=Date.now(),currentStart=Math.floor(now/data.ms)*data.ms,visibleStart=data.start,byInterval=new Map();
+    for(const sample of state.history){const time=Number(sample.time);if(!Number.isFinite(time)||time>now||time<visibleStart||time>=currentStart)continue;const index=Math.floor(time/data.ms),parts=(sample.batteries||[]).map(part=>num(part.storedAh)).filter(value=>value!==null),amount=parts.length?parts.reduce((sum,value)=>sum+value,0):num(sample.storedAh);if(amount!==null)byInterval.set(index,(byInterval.get(index)||0)+amount)}
+    const savedOffset=historyOffset;let currentData=data;if(savedOffset!==0){historyOffset=0;try{currentData=chartData()}finally{historyOffset=savedOffset}}
+    let amount=currentData.bars[currentData.openIndex]?.ah.find(item=>item.id==='bank')?.value,remaining=bank.rem;
+    const startIndex=Math.floor(visibleStart/data.ms),currentIndex=Math.floor(currentStart/data.ms);
+    for(let index=currentIndex;index>=startIndex;index--){
+      const position=index-startIndex;if(position>=0&&position<BARS)values[position]=remaining;
+      if(index===startIndex)break;
+      const change=index===currentIndex?amount:byInterval.get(index);if(!Number.isFinite(change))break;remaining-=change
+    }
+    return{values,capacity:bank.cap}
+  }
   function getCurrentHistoryColor(id,lineIds=null){if(String(id)==='bank')return validColor(state.bankHistoryColor,'#20d7e5');const battery=state.batteries.find(item=>String(item.id)===String(id)),configured=validColor(battery?.historyCurrentColor,'');if(configured)return configured;const ids=lineIds||[...new Set(chartData().bars.flatMap(bar=>bar.ah.map(x=>x.id)))].sort();if(!ids.includes(String(id)))ids.push(String(id)),ids.sort();return CURRENT_LINE_COLORS[Math.max(0,ids.indexOf(String(id)))%CURRENT_LINE_COLORS.length]}
   function fillHistoryGaps(bars){const previous=Array(bars.length).fill(-1),next=Array(bars.length).fill(-1);let last=-1;for(let i=0;i<bars.length;i++){previous[i]=last;if(bars[i].parts.length)last=i}last=-1;for(let i=bars.length-1;i>=0;i--){next[i]=last;if(bars[i].parts.length)last=i}for(let i=0;i<bars.length;i++){if(bars[i].parts.length||previous[i]<0||next[i]<0)continue;const leftIndex=previous[i],rightIndex=next[i],left=bars[leftIndex],right=bars[rightIndex],fraction=(i-leftIndex)/(rightIndex-leftIndex),leftParts=new Map(left.parts.map(p=>[p.id,p])),rightParts=new Map(right.parts.map(p=>[p.id,p])),ids=new Set([...leftParts.keys(),...rightParts.keys()]);bars[i].parts=[...ids].map(id=>{const a=leftParts.get(id),b=rightParts.get(id),start=a?.value||0,end=b?.value||0;return{id,name:a?.name||b?.name||'Batería',value:start+(end-start)*fraction}}).filter(p=>p.value>0);const a=num(left.soc),b=num(right.soc);if(bars[i].soc===null&&a!==null&&b!==null)bars[i].soc=a+(b-a)*fraction}return bars}
   function historyDirections(bars){let last=null;const dirs=bars.map((b,i)=>{let dir=null;if(b.current!==null&&b.current!==0)dir=b.current>0?1:-1;else if(i>0&&b.soc!==null&&bars[i-1].soc!==null){const delta=b.soc-bars[i-1].soc;if(delta>0)dir=1;else if(delta<0)dir=-1}if(dir!==null)last=dir;return dir??last});let next=null;for(let i=dirs.length-1;i>=0;i--){if(dirs[i]!==null)next=dirs[i];else if(next!==null)dirs[i]=next}return dirs}
@@ -728,6 +742,15 @@ export function createBatteriesModule(requestRender,openManager){
         c.stroke();c.restore()
       }
     }
+    const accumulatedKey='ah:bank-remaining',accumulated=accumulatedBankAh(data),accumulatedColor=getHistorySeriesColor(accumulatedKey,paletteIds);
+    if(accumulated.values.some(Number.isFinite)){
+      legend.set(accumulatedKey,{name:'Ah del banco estimados · escala 0–'+Math.round(accumulated.capacity)+' Ah',color:accumulatedColor,kind:'line'});
+      if(!hiddenSeries[accumulatedKey]){
+        c.save();c.beginPath();c.rect(0,0,r.width,plotH);c.clip();c.strokeStyle=accumulatedColor;c.lineWidth=2.5;c.lineJoin='round';c.beginPath();let open=false;
+        accumulated.values.forEach((value,index)=>{if(!Number.isFinite(value)){open=false;return}const x=(index+.5)*slot,y=plotH-value/accumulated.capacity*plotH;if(!open){c.moveTo(x,y);open=true}else c.lineTo(x,y)});c.stroke();
+        accumulated.values.forEach((value,index)=>{if(!Number.isFinite(value))return;const x=(index+.5)*slot,y=plotH-value/accumulated.capacity*plotH;c.beginPath();c.arc(x,y,2,0,2*Math.PI);c.fillStyle=accumulatedColor;c.fill()});c.restore()
+      }
+    }
     const estimatedSocKey='soc:bank-estimated',estimatedSocColor=getHistorySeriesColor(estimatedSocKey,paletteIds),estimatedSocValues=bars.map(bar=>bar.estimatedSoc);
     if(estimatedSocValues.some(Number.isFinite)){
       legend.set(estimatedSocKey,{name:'SOC estimado (Ve)',color:estimatedSocColor,kind:'line soc-estimate'});
@@ -770,7 +793,7 @@ export function createBatteriesModule(requestRender,openManager){
   function queueDraw(root=state.historyRoot||state.root,retries=0){if(drawPending||!root)return;drawPending=true;requestAnimationFrame(()=>{drawPending=false;if(!draw(root)&&root.querySelector?.('[data-battery-history-chart]')&&retries<6)setTimeout(()=>queueDraw(root,retries+1),80)})}
   window.addEventListener('boatstation-page-change',event=>{if(event.detail?.id==='batteryHistory')queueDraw()});
   function historyBatteries(){const items=new Map();for(const b of state.batteries){const id=String(b.id||b.address||'');if(id)items.set(id,{id,name:String(b.name||b.deviceName||'Batería')})}for(const point of state.history)for(const part of point.batteries||[]){const id=String(part.id||part.name||'');if(id&&!items.has(id))items.set(id,{id,name:String(part.name||'Batería')})}return [...items.values()]}
-  function getHistorySeriesColor(key,knownIds=null){key=String(key);const configured=validColor(historyColors[key],'');if(configured)return configured;const split=key.indexOf(':'),kind=key.slice(0,split),id=key.slice(split+1),ids=knownIds||historyBatteries().map(b=>b.id).sort();if(kind==='soc-charge'||kind==='soc-discharge'){const palette=kind==='soc-charge'?['#3fae54','#69c95b','#91db70','#b7ea8b']:['#b94149','#d65b5d','#e57a70','#f09c8b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='voltage'&&id==='bank-estimated')return '#ff9d54';if(kind==='soc'&&id==='bank-estimated')return '#c5a1ff';if(kind==='voltage'){const palette=['#f1c75b','#53c8ef','#ad8cff','#ff9878','#74d69b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='ah'||kind==='current'){const lineIds=[...new Set([...ids,'bank'])].sort();return getCurrentHistoryColor(id,lineIds)}return '#20d7e5'}
+  function getHistorySeriesColor(key,knownIds=null){key=String(key);const configured=validColor(historyColors[key],'');if(configured)return configured;const split=key.indexOf(':'),kind=key.slice(0,split),id=key.slice(split+1),ids=knownIds||historyBatteries().map(b=>b.id).sort();if(kind==='soc-charge'||kind==='soc-discharge'){const palette=kind==='soc-charge'?['#3fae54','#69c95b','#91db70','#b7ea8b']:['#b94149','#d65b5d','#e57a70','#f09c8b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='ah'&&id==='bank-remaining')return '#fff0a0';if(kind==='voltage'&&id==='bank-estimated')return '#ff9d54';if(kind==='soc'&&id==='bank-estimated')return '#c5a1ff';if(kind==='voltage'){const palette=['#f1c75b','#53c8ef','#ad8cff','#ff9878','#74d69b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='ah'||kind==='current'){const lineIds=[...new Set([...ids,'bank'])].sort();return getCurrentHistoryColor(id,lineIds)}return '#20d7e5'}
   function setHistorySeriesColor(key,value){key=String(key);const color=validColor(value,'');if(!color||!/^(soc-charge|soc-discharge|ah|current|voltage):.+/.test(key))return false;historyColors[key]=color;write(COLORS_KEY,historyColors);queueDraw();return true}
   function isHistorySeriesVisible(key){return !hiddenSeries[String(key)]}
   function setHistorySeriesVisible(key,visible){key=String(key);if(!/^(soc|ah|current|voltage):.+/.test(key))return;hiddenSeries[key]=!visible;write(VISIBILITY_KEY,hiddenSeries);queueDraw()}
