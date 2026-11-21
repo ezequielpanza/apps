@@ -346,7 +346,7 @@ export function createBatteriesModule(requestRender,openManager){
   }
 
   let socViewport=null,factorViewport=null;
-  let bankAhAdjustment=0,trialSocEnd=null;const trialVisible={'voltage:bank-estimated':true,'soc:bank-estimated':true,'ah:bank-remaining':true};
+  let bankAhAdjustment=0,trialSocEnd=null;const trialVisible={'voltage:bank-estimated':!hiddenSeries['voltage:bank-estimated'],'soc:bank-estimated':!hiddenSeries['soc:bank-estimated'],'ah:bank-remaining':!hiddenSeries['ah:bank-remaining']};
   let factorCurveOpen=false,factorCurveExpansion=0,factorPointer=null,factorCurve=read(FACTOR_CURVE_KEY,null);if(!Array.isArray(factorCurve)||factorCurve.length<2)factorCurve=[{voltage:10,factor:voltageEstimateFactor},{voltage:15,factor:voltageEstimateFactor}];
   let socCurveEditorOpen=false,socCurveExpansion=0,socCurvePointer=null,socCurvePreset=read('bs.batteries.historySocCurvePreset.v1','manual'),socCurveCells=Math.max(1,Math.min(48,Math.round(Number(read('bs.batteries.historySocCurveCells.v1',4))||4)));
   if(!Object.prototype.hasOwnProperty.call(profiles,socCurvePreset))socCurvePreset='manual';
@@ -777,7 +777,7 @@ export function createBatteriesModule(requestRender,openManager){
   function getHistorySeriesColor(key,knownIds=null){key=String(key);const configured=validColor(historyColors[key],'');if(configured)return configured;const split=key.indexOf(':'),kind=key.slice(0,split),id=key.slice(split+1),ids=knownIds||historyBatteries().map(b=>b.id).sort();if(kind==='soc-charge'||kind==='soc-discharge'){const palette=kind==='soc-charge'?['#3fae54','#69c95b','#91db70','#b7ea8b']:['#b94149','#d65b5d','#e57a70','#f09c8b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='ah'&&id==='bank-remaining')return '#fff0a0';if(kind==='voltage'&&id==='bank-estimated')return '#ff9d54';if(kind==='soc'&&id==='bank-estimated')return '#c5a1ff';if(kind==='voltage'){const palette=['#f1c75b','#53c8ef','#ad8cff','#ff9878','#74d69b'];return palette[Math.max(0,ids.indexOf(id))%palette.length]}if(kind==='ah'||kind==='current'){const lineIds=[...new Set([...ids,'bank'])].sort();return getCurrentHistoryColor(id,lineIds)}return '#20d7e5'}
   function setHistorySeriesColor(key,value){key=String(key);const color=validColor(value,'');if(!color||!/^(soc-charge|soc-discharge|ah|current|voltage):.+/.test(key))return false;historyColors[key]=color;write(COLORS_KEY,historyColors);queueDraw();return true}
   function isHistorySeriesVisible(key){return !hiddenSeries[String(key)]}
-  function setHistorySeriesVisible(key,visible){key=String(key);if(!/^(soc|ah|current|voltage):.+/.test(key))return;hiddenSeries[key]=!visible;write(VISIBILITY_KEY,hiddenSeries);queueDraw()}
+  function setHistorySeriesVisible(key,visible){key=String(key);if(!/^(soc|ah|current|voltage):.+/.test(key))return;hiddenSeries[key]=!visible;if(Object.prototype.hasOwnProperty.call(trialVisible,key))trialVisible[key]=!!visible;write(VISIBILITY_KEY,hiddenSeries);queueDraw()}
 
   function afterRender(root){
     state.root=root;const canvas=root.querySelector('[data-battery-history-chart]'),chart=root.querySelector('.battery-history-chart');
@@ -792,7 +792,7 @@ export function createBatteriesModule(requestRender,openManager){
     }
     root.querySelectorAll('[data-battery-manage]').forEach(button=>button.addEventListener('click',event=>{event.stopPropagation();openManager?.()}));
     root.querySelector('[data-battery-history-export]')?.addEventListener('click',downloadHistoryCsv);
-    root.querySelectorAll('[data-trial-visible]').forEach(input=>input.addEventListener('change',()=>{trialVisible[input.dataset.trialVisible]=input.checked;queueDraw(root)}));
+    root.querySelectorAll('[data-trial-visible]').forEach(input=>input.addEventListener('change',()=>{const key=input.dataset.trialVisible;if(!Object.prototype.hasOwnProperty.call(trialVisible,key))return;trialVisible[key]=input.checked;hiddenSeries[key]=!input.checked;write(VISIBILITY_KEY,hiddenSeries);queueDraw(root)}));
     root.querySelector('[data-copy-factor]')?.addEventListener('click',()=>copyTrialSettings('factor',root));
     root.querySelector('[data-copy-curve]')?.addEventListener('click',()=>copyTrialSettings('curve',root));
     const factorInput=root.querySelector('[data-factor-value]');
