@@ -34,7 +34,7 @@ export class StationState {
       if (request.method === 'POST') {
         const body = await request.json();
         const command = String(body?.command || '');
-        const allowed = ['system.refresh', 'gps.new', 'gps.resume', 'gps.stop', 'gps.clear', 'gps.import', 'gps.anchor.command', 'gps.anchor.settings', 'battery.scan', 'battery.add', 'battery.remove', 'battery.renameBank', 'battery.edit', 'battery.diagnostics.exportCsv'];
+        const allowed = ['system.refresh', 'gps.new', 'gps.resume', 'gps.stop', 'gps.clear', 'gps.import', 'gps.anchor.command', 'gps.anchor.settings', 'battery.scan', 'battery.add', 'battery.remove', 'battery.renameBank', 'battery.edit', 'battery.diagnostics.exportCsv', 'battery.chargeCalculation', 'battery.currentHistoryColor', 'battery.bankHistoryColor', 'gps.history.settings', 'gps.vessel.settings', 'boatStatus.adjustHeading', 'boatStatus.action'];
         if (!allowed.includes(command)) return json({error: 'invalid command'}, 400);
         const commands = (await this.state.storage.get('commands')) || [];
         commands.push({id: crypto.randomUUID(), command, payload: body?.payload ?? null, createdAt: Date.now()});
