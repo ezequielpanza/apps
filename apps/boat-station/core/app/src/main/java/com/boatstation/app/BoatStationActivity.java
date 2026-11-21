@@ -84,8 +84,12 @@ public class BoatStationActivity extends MainActivityCore {
                 startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+getPackageName())));
                 return;
             }
-            long size=c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
-            beginPackageInstallerSession(uri,id,size);
+            // Hand the downloaded APK to Android's normal package installer, as a file manager does.
+            Intent install=new Intent(Intent.ACTION_VIEW);
+            install.setDataAndType(uri,"application/vnd.android.package-archive");
+            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            prefs.edit().remove(UPDATE_ID).apply();
+            startActivity(install);
         }catch(Exception e){Toast.makeText(this,"No se pudo iniciar la instalación. La APK sigue en Descargas.",Toast.LENGTH_LONG).show();}
     }
 
