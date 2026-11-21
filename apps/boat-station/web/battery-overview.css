@@ -201,3 +201,17 @@
 .battery-soc-estimated-row .battery-soc-copy{margin-left:0}
 .battery-soc-estimated-row [data-copy-curve]{margin-left:auto}
 @media(max-width:500px){.battery-history-soc-curve-content .battery-soc-estimated-row{gap:3px}.battery-history-soc-curve-content .battery-soc-estimated-row .battery-soc-control-label{flex-basis:45px}.battery-soc-estimated-row .battery-soc-smoothing{gap:2px;font-size:9px}.battery-soc-estimated-row .battery-soc-smoothing button{width:21px;min-width:21px}.battery-soc-estimated-row .battery-soc-smoothing input{width:25px}.battery-soc-estimated-row .battery-soc-copy{padding:5px;font-size:9px}}
+
+/* SOCr and its retrospective factor share one row. */
+.battery-soc-retrospective .battery-soc-fr-label{color:#d8e7ed;font-size:11px;font-weight:600;white-space:nowrap}
+.battery-soc-retrospective [data-load-current-soc]{margin-left:auto}
+@media(max-width:500px){
+  .battery-history-soc-curve-content .battery-soc-retrospective{gap:3px}
+  .battery-history-soc-curve-content .battery-soc-retrospective .battery-soc-control-label{flex-basis:43px}
+  .battery-soc-retrospective .battery-history-voltage-estimate-stepper{gap:2px}
+  .battery-soc-retrospective .battery-history-voltage-estimate-stepper button{width:22px;min-width:22px;flex-basis:22px}
+  .battery-soc-retrospective .battery-history-voltage-estimate-stepper input{width:38px}
+  .battery-soc-retrospective .battery-soc-copy{padding:5px;font-size:9px}
+  .battery-soc-retrospective input[type=number]{appearance:textfield;-moz-appearance:textfield}
+  .battery-soc-retrospective input[type=number]::-webkit-inner-spin-button,.battery-soc-retrospective input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+}
