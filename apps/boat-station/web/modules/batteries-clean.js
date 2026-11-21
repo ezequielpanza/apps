@@ -344,6 +344,7 @@ export function createBatteriesModule(requestRender,openManager){
     historyDirty=true;saveHistory();
   }
 
+  let socViewport=null,factorViewport=null;
   let factorCurveOpen=false,factorCurveExpansion=0,factorPointer=null,factorCurve=read(FACTOR_CURVE_KEY,null);if(!Array.isArray(factorCurve)||factorCurve.length<2)factorCurve=[{voltage:10,factor:voltageEstimateFactor},{voltage:15,factor:voltageEstimateFactor}];
   let socCurveEditorOpen=false,socCurveExpansion=0,socCurvePointer=null,socCurvePreset=read('bs.batteries.historySocCurvePreset.v1','manual'),socCurveCells=Math.max(1,Math.min(48,Math.round(Number(read('bs.batteries.historySocCurveCells.v1',4))||4)));
   if(!Object.prototype.hasOwnProperty.call(profiles,socCurvePreset))socCurvePreset='manual';
@@ -372,11 +373,11 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function socCurveDomain(){
     const first=socCurvePoints[0]?.voltage??10,last=socCurvePoints[socCurvePoints.length-1]?.voltage??13.6,span=Math.max(.1,last-first),padding=Math.max(.2,span*.1);
-    return{min:first-padding,max:last+padding}
+    return socViewport||{min:first-padding,max:last+padding,minY:0,maxY:100}
   }
   function socCurveMetrics(canvas,domain=socCurveDomain()){
     const rect=canvas.getBoundingClientRect(),left=44,right=10,top=10,bottom=25,plotW=Math.max(10,rect.width-left-right),plotH=Math.max(10,rect.height-top-bottom),span=domain.max-domain.min||1;
-    return{rect,left,right,top,bottom,plotW,plotH,domain,xForVoltage:value=>left+(value-domain.min)/span*plotW,voltageForX:value=>domain.min+(value-left)/plotW*span,yForSoc:value=>top+(100-value)/100*plotH,socForY:value=>100-(value-top)/plotH*100}
+    return{rect,left,right,top,bottom,plotW,plotH,domain,xForVoltage:value=>left+(value-domain.min)/span*plotW,voltageForX:value=>domain.min+(value-left)/plotW*span,yForSoc:value=>top+(domain.maxY-value)/(domain.maxY-domain.minY)*plotH,socForY:value=>domain.maxY-(value-top)/plotH*(domain.maxY-domain.minY)}
   }
   function drawSocCurve(root,domainOverride=null,activeIndex=-1){
     const details=root?.querySelector('[data-battery-soc-curve-details]'),canvas=root?.querySelector('[data-battery-soc-curve-chart]');
@@ -388,14 +389,14 @@ export function createBatteriesModule(requestRender,openManager){
     const context=canvas.getContext('2d');if(!context)return false;
     context.setTransform(dpr,0,0,dpr,0,0);context.clearRect(0,0,rect.width,rect.height);
     context.font='10px system-ui,sans-serif';context.textAlign='right';context.textBaseline='middle';context.lineWidth=1;context.strokeStyle='#284b60';context.fillStyle='#a9bdc8';
-    for(let soc=0;soc<=100;soc+=25){const py=yForSoc(soc);context.beginPath();context.moveTo(left,py);context.lineTo(left+plotW,py);context.stroke();context.fillText(soc+'%',left-7,py)}
+    for(let i=0;i<=4;i++){const soc=metrics.domain.maxY-(metrics.domain.maxY-metrics.domain.minY)*i/4,py=yForSoc(soc);context.beginPath();context.moveTo(left,py);context.lineTo(left+plotW,py);context.stroke();context.fillText(Math.round(soc)+'%',left-7,py)}
     context.strokeStyle='#7895a5';context.beginPath();context.moveTo(left,top);context.lineTo(left,top+plotH);context.lineTo(left+plotW,top+plotH);context.stroke();
     context.textAlign='left';context.textBaseline='top';context.fillStyle='#a9bdc8';context.fillText(metrics.domain.min.toFixed(2)+' V',left,top+plotH+5);context.textAlign='right';context.fillText(metrics.domain.max.toFixed(2)+' V',left+plotW,top+plotH+5);
     context.save();context.beginPath();context.rect(left,top,plotW,plotH);context.clip();context.beginPath();
     socCurvePoints.forEach((point,index)=>{const px=xForVoltage(point.voltage),py=yForSoc(point.soc);if(index===0)context.moveTo(px,py);else context.lineTo(px,py)});
     context.strokeStyle='#6cc6d3';context.lineWidth=3;context.lineJoin='round';context.stroke();
     for(let index=0;index<socCurvePoints.length;index++){const point=socCurvePoints[index];context.beginPath();context.arc(xForVoltage(point.voltage),yForSoc(point.soc),index===activeIndex?7:5,0,Math.PI*2);context.fillStyle=index===activeIndex?'#f2cf5b':'#6cc6d3';context.fill();context.strokeStyle='#071a27';context.lineWidth=2;context.stroke();if(index===activeIndex){context.beginPath();context.arc(xForVoltage(point.voltage),yForSoc(point.soc),9,0,Math.PI*2);context.strokeStyle='#f2cf5b';context.lineWidth=1.5;context.stroke()}}
-    context.restore();drawCurvePointLabels(context,socCurvePoints.map(point=>({x:xForVoltage(point.voltage),y:yForSoc(point.soc),label:point.voltage.toFixed(2)+' V · '+point.soc.toFixed(1)+'%'})),rect.width,rect.height,activeIndex);return true
+    context.restore();drawCurvePointLabels(context,socCurvePoints.map(point=>({x:xForVoltage(point.voltage),y:yForSoc(point.soc),label:point.voltage.toFixed(2)+' V · '+point.soc.toFixed(1)+'%'})).filter(point=>point.x>=left&&point.x<=left+plotW&&point.y>=top&&point.y<=top+plotH),rect.width,rect.height);return true
   }
   function drawCurvePointLabels(context,points,width,height,active=-1){
     context.save();context.font='bold 9px system-ui,sans-serif';context.textBaseline='middle';context.textAlign='left';
@@ -466,9 +467,25 @@ export function createBatteriesModule(requestRender,openManager){
       try{if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId)}catch{}
       drawSocCurve(root);queueDraw(root)
     };
-    canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerup',event=>finish(event,false));canvas.addEventListener('pointercancel',event=>finish(event,true));canvas.addEventListener('lostpointercapture',event=>finish(event,true))
+    bindCurveViewport(canvas,root,'soc');canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerup',event=>finish(event,false));canvas.addEventListener('pointercancel',event=>finish(event,true));canvas.addEventListener('lostpointercapture',event=>finish(event,true))
   }
 
+  function bindCurveViewport(canvas,root,kind){
+    if(canvas.dataset.viewportBound)return;canvas.dataset.viewportBound='1';let pan=null;
+    const current=()=>kind==='soc'?socCurveDomain():factorMetrics(canvas).domain;
+    const set=d=>{if(kind==='soc')socViewport=d;else factorViewport=d};
+    const redraw=()=>kind==='soc'?drawSocCurve(root):drawFactorCurve(root);
+    const position=e=>{const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
+    const geometry=d=>{if(kind==='soc'){const m=socCurveMetrics(canvas,d);return{left:m.left,top:m.top,w:m.plotW,h:m.plotH,x:p=>m.xForVoltage(p.voltage),y:p=>m.yForSoc(p.soc)}}const m=factorMetrics(canvas,d);return{left:m.left,top:m.top,w:m.w,h:m.h,x:p=>m.x(p.voltage),y:p=>m.y(p.factor)}};
+    const hit=(p,d)=>{const m=geometry(d),points=kind==='soc'?socCurvePoints:factorCurve;for(const point of points)if(Math.hypot(p.x-m.x(point),p.y-m.y(point))<14)return true;for(let i=1;i<points.length;i++)if(curveSegmentDistance(p.x,p.y,m.x(points[i-1]),m.y(points[i-1]),m.x(points[i]),m.y(points[i]))<12)return true;return false};
+    canvas.addEventListener('wheel',e=>{e.preventDefault();e.stopPropagation();const d={...current()},m=geometry(d),p=position(e),scale=Math.exp(Math.max(-2,Math.min(2,e.deltaY*.0015))),tx=Math.max(0,Math.min(1,(p.x-m.left)/m.w)),ty=Math.max(0,Math.min(1,(p.y-m.top)/m.h));
+      const x0=kind==='soc'?'min':'minV',x1=kind==='soc'?'max':'maxV',y0=kind==='soc'?'minY':'minF',y1=kind==='soc'?'maxY':'maxF',x=d[x0]+(d[x1]-d[x0])*tx,y=d[y1]-(d[y1]-d[y0])*ty;
+      const sx=Math.max(.02,Math.min(100,(d[x1]-d[x0])*scale)),sy=Math.max(kind==='soc'?.5:.0001,Math.min(kind==='soc'?500:10,(d[y1]-d[y0])*scale));d[x0]=x-tx*sx;d[x1]=d[x0]+sx;d[y1]=y+ty*sy;d[y0]=d[y1]-sy;set(d);redraw()
+    },{passive:false});
+    canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;const d={...current()},p=position(e);if(hit(p,d))return;e.preventDefault();e.stopImmediatePropagation();pan={id:e.pointerId,start:p,domain:d};canvas.classList.add('is-dragging');try{canvas.setPointerCapture(e.pointerId)}catch{}},{capture:true});
+    canvas.addEventListener('pointermove',e=>{const p=position(e);if(!pan){canvas.style.cursor=hit(p,current())?'crosshair':'grab';return}if(pan.id!==e.pointerId)return;e.preventDefault();e.stopImmediatePropagation();const d={...pan.domain},m=geometry(d),x0=kind==='soc'?'min':'minV',x1=kind==='soc'?'max':'maxV',y0=kind==='soc'?'minY':'minF',y1=kind==='soc'?'maxY':'maxF',dx=-(p.x-pan.start.x)/m.w*(d[x1]-d[x0]),dy=(p.y-pan.start.y)/m.h*(d[y1]-d[y0]);d[x0]+=dx;d[x1]+=dx;d[y0]+=dy;d[y1]+=dy;set(d);redraw()},{capture:true});
+    const finish=e=>{if(!pan||pan.id!==e.pointerId)return;pan=null;canvas.classList.remove('is-dragging');e.stopImmediatePropagation()};canvas.addEventListener('pointerup',finish,{capture:true});canvas.addEventListener('pointercancel',finish,{capture:true});canvas.addEventListener('lostpointercapture',finish,{capture:true})
+  }
   function factorAtVoltage(voltage){
     const pts=factorCurve.filter(p=>Number.isFinite(p.voltage)&&Number.isFinite(p.factor)).slice().sort((a,b)=>a.voltage-b.voltage);if(!pts.length)return voltageEstimateFactor;
     if(voltage<=pts[0].voltage)return pts[0].factor;if(voltage>=pts[pts.length-1].voltage)return pts[pts.length-1].factor;
@@ -477,7 +494,7 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function factorCurveMarkup(){return '<details class="battery-history-soc-curve battery-history-factor-curve" data-factor-details '+(factorCurveOpen?'open':'')+'><summary>Curva de correlación Voltaje observado → Factor</summary><div class="battery-history-soc-curve-content"><canvas data-factor-chart aria-label="Curva editable del factor por voltaje observado"></canvas><p>Arrastrá un punto para moverlo · Tocá un punto para eliminarlo · Tocá una línea para agregar un punto</p></div></details>'}
   function factorMetrics(canvas,domain){
-    const rect=canvas.getBoundingClientRect(),left=48,top=12,w=Math.max(1,rect.width-60),h=Math.max(1,rect.height-42),xs=domain||{minV:Math.min(10,...factorCurve.map(p=>p.voltage))-.2,maxV:Math.max(15,...factorCurve.map(p=>p.voltage))+.2,minF:Math.min(-.01,...factorCurve.map(p=>p.factor))-.005,maxF:Math.max(.03,...factorCurve.map(p=>p.factor))+.005};
+    const rect=canvas.getBoundingClientRect(),left=48,top=12,w=Math.max(1,rect.width-60),h=Math.max(1,rect.height-42),xs=domain||factorViewport||{minV:Math.min(10,...factorCurve.map(p=>p.voltage))-.2,maxV:Math.max(15,...factorCurve.map(p=>p.voltage))+.2,minF:Math.min(-.01,...factorCurve.map(p=>p.factor))-.005,maxF:Math.max(.03,...factorCurve.map(p=>p.factor))+.005};
     return{rect,left,top,w,h,domain:xs,x:v=>left+(v-xs.minV)/(xs.maxV-xs.minV)*w,y:v=>top+(xs.maxF-v)/(xs.maxF-xs.minF)*h,v:x=>xs.minV+(x-left)/w*(xs.maxV-xs.minV),f:y=>xs.maxF-(y-top)/h*(xs.maxF-xs.minF)}
   }
   function drawFactorCurve(root,domain=null,active=-1){
@@ -486,13 +503,13 @@ export function createBatteriesModule(requestRender,openManager){
     const c=canvas.getContext('2d');if(!c)return;c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,r.width,r.height);c.font='10px system-ui';c.fillStyle='#a9bdc8';c.strokeStyle='#284b60';c.textAlign='right';c.textBaseline='middle';
     for(let i=0;i<=4;i++){const y=m.top+i*m.h/4,value=m.domain.maxF-(m.domain.maxF-m.domain.minF)*i/4;c.beginPath();c.moveTo(m.left,y);c.lineTo(m.left+m.w,y);c.stroke();c.fillText(value.toFixed(3),m.left-5,y)}
     c.textBaseline='top';c.textAlign='left';c.fillText(m.domain.minV.toFixed(1)+' V',m.left,m.top+m.h+6);c.textAlign='right';c.fillText(m.domain.maxV.toFixed(1)+' V',m.left+m.w,m.top+m.h+6);
-    c.beginPath();factorCurve.forEach((p,i)=>{if(i)c.lineTo(m.x(p.voltage),m.y(p.factor));else c.moveTo(m.x(p.voltage),m.y(p.factor))});c.strokeStyle='#6cc6d3';c.lineWidth=3;c.stroke();factorCurve.forEach((p,i)=>{c.beginPath();c.arc(m.x(p.voltage),m.y(p.factor),i===active?7:5,0,2*Math.PI);c.fillStyle=i===active?'#f2cf5b':'#6cc6d3';c.fill()});drawCurvePointLabels(c,factorCurve.map(point=>({x:m.x(point.voltage),y:m.y(point.factor),label:point.voltage.toFixed(2)+' V · '+point.factor.toFixed(3)+' Ω'})),r.width,r.height,active)
+    c.save();c.beginPath();c.rect(m.left,m.top,m.w,m.h);c.clip();c.beginPath();factorCurve.forEach((p,i)=>{if(i)c.lineTo(m.x(p.voltage),m.y(p.factor));else c.moveTo(m.x(p.voltage),m.y(p.factor))});c.strokeStyle='#6cc6d3';c.lineWidth=3;c.stroke();factorCurve.forEach((p,i)=>{c.beginPath();c.arc(m.x(p.voltage),m.y(p.factor),i===active?7:5,0,2*Math.PI);c.fillStyle=i===active?'#f2cf5b':'#6cc6d3';c.fill()});c.restore();drawCurvePointLabels(c,factorCurve.map(point=>({x:m.x(point.voltage),y:m.y(point.factor),label:point.voltage.toFixed(2)+' V · '+point.factor.toFixed(3)+' Ω'})).filter(point=>point.x>=m.left&&point.x<=m.left+m.w&&point.y>=m.top&&point.y<=m.top+m.h),r.width,r.height)
   }
   function bindFactorCurve(root){
     const details=root.querySelector('[data-factor-details]'),canvas=details?.querySelector('[data-factor-chart]');if(!details||!canvas||details.dataset.bound)return;details.dataset.bound='1';
     details.addEventListener('toggle',()=>{if(details.open===factorCurveOpen){if(details.open)drawFactorCurve(root);return}factorCurveOpen=details.open;const card=details.closest('.card');if(details.open){factorCurveExpansion=Math.ceil(details.querySelector('.battery-history-soc-curve-content')?.scrollHeight||0);if(card&&factorCurveExpansion)window.BoatStationPageLayout?.adjustPageHeight?.(card,factorCurveExpansion);drawFactorCurve(root)}else if(card&&factorCurveExpansion){window.BoatStationPageLayout?.adjustPageHeight?.(card,-factorCurveExpansion);factorCurveExpansion=0}});
     const pos=e=>{const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
-    canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;const m=factorMetrics(canvas),p=pos(e);let index=-1,dist=14;factorCurve.forEach((v,i)=>{const d=Math.hypot(p.x-m.x(v.voltage),p.y-m.y(v.factor));if(d<dist){dist=d;index=i}});let segment=-1;if(index<0){let best=12;for(let i=1;i<factorCurve.length;i++){const a=factorCurve[i-1],b=factorCurve[i],d=curveSegmentDistance(p.x,p.y,m.x(a.voltage),m.y(a.factor),m.x(b.voltage),m.y(b.factor));if(d<best){best=d;segment=i-1}}}if(index<0&&segment<0)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);factorPointer={id:e.pointerId,index,segment,domain:m.domain,start:p,moved:false}});
+    bindCurveViewport(canvas,root,'factor');canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;const m=factorMetrics(canvas),p=pos(e);let index=-1,dist=14;factorCurve.forEach((v,i)=>{const d=Math.hypot(p.x-m.x(v.voltage),p.y-m.y(v.factor));if(d<dist){dist=d;index=i}});let segment=-1;if(index<0){let best=12;for(let i=1;i<factorCurve.length;i++){const a=factorCurve[i-1],b=factorCurve[i],d=curveSegmentDistance(p.x,p.y,m.x(a.voltage),m.y(a.factor),m.x(b.voltage),m.y(b.factor));if(d<best){best=d;segment=i-1}}}if(index<0&&segment<0)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);factorPointer={id:e.pointerId,index,segment,domain:m.domain,start:p,moved:false}});
     canvas.addEventListener('pointermove',e=>{const g=factorPointer;if(!g||g.id!==e.pointerId)return;const p=pos(e);if(Math.hypot(p.x-g.start.x,p.y-g.start.y)>4)g.moved=true;if(g.index<0||!g.moved)return;e.preventDefault();const m=factorMetrics(canvas,g.domain),prev=factorCurve[g.index-1],next=factorCurve[g.index+1];let v=Math.max(m.domain.minV,Math.min(m.domain.maxV,m.v(p.x)));if(prev)v=Math.max(v,prev.voltage+.001);if(next)v=Math.min(v,next.voltage-.001);factorCurve[g.index]={voltage:v,factor:Math.max(m.domain.minF,Math.min(m.domain.maxF,m.f(p.y)))};drawFactorCurve(root,g.domain,g.index);queueDraw(root)});
     const finish=(e,cancel=false)=>{const g=factorPointer;if(!g||g.id!==e.pointerId)return;factorPointer=null;const p=pos(e),m=factorMetrics(canvas,g.domain);if(!cancel&&!g.moved&&g.index>=0&&factorCurve.length>2)factorCurve.splice(g.index,1);else if(!cancel&&!g.moved&&g.segment>=0){const a=factorCurve[g.segment],b=factorCurve[g.segment+1],v=Math.max(a.voltage+.001,Math.min(b.voltage-.001,m.v(p.x)));if(v>a.voltage&&v<b.voltage)factorCurve.splice(g.segment+1,0,{voltage:v,factor:factorAtVoltage(v)})}write(FACTOR_CURVE_KEY,factorCurve);drawFactorCurve(root);queueDraw(root)};
     canvas.addEventListener('pointerup',e=>finish(e));canvas.addEventListener('pointercancel',e=>finish(e,true));canvas.addEventListener('lostpointercapture',e=>finish(e,true));drawFactorCurve(root)

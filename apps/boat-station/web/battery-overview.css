@@ -166,3 +166,6 @@
 
 /* Opening the correlation editor adds its natural height to the module. */
 .battery-history-page>.battery-history-soc-curve[open]{max-height:none;flex:0 0 auto;overflow:visible}
+
+.battery-history-soc-curve-content canvas{cursor:grab}
+.battery-history-soc-curve-content canvas.is-dragging{cursor:grabbing!important}
