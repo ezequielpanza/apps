@@ -30,8 +30,13 @@ export function createBatteriesModule(requestRender,openManager){
   function loadHistoryVisibility(){try{const raw=window.StorageBridge?.getHistoryVisibility?.();if(raw){const value=JSON.parse(raw);if(value&&typeof value==='object'&&!Array.isArray(value))return value}}catch(error){console.warn('Boat Station: no se pudieron leer las preferencias nativas',error)}const value=read(VISIBILITY_KEY,{});return value&&typeof value==='object'&&!Array.isArray(value)?value:{}}
   let hiddenSeries=loadHistoryVisibility(),visibilityStorageWarning=false;
   function saveHistoryVisibility(){const data=JSON.stringify(hiddenSeries);let saved=false;try{if(typeof window.StorageBridge?.setHistoryVisibility==='function')saved=window.StorageBridge.setHistoryVisibility(data)===true}catch(error){console.warn('Boat Station: no se pudieron guardar las preferencias nativas',error)}try{localStorage.setItem(VISIBILITY_KEY,data);saved=true}catch(error){console.warn('Boat Station: no se pudieron guardar las preferencias web',error)}if(!saved&&!visibilityStorageWarning){visibilityStorageWarning=true;window.alert('No se pudieron guardar los indicadores del histórico en este dispositivo.')}return saved}
+  const SOC_TRIAL_KEY='bs.batteries.historySocTrialCurve.v1';
+  function validSocTrial(value){return value&&value.version===1&&Array.isArray(value.points)&&normalizeSocCurve(value.points).length>=2}
+  function loadSocTrial(){let native=null;try{const raw=window.StorageBridge?.getSocTrialCurve?.();if(raw){const value=JSON.parse(raw);if(validSocTrial(value))native=value}}catch(error){console.warn('Boat Station: no se pudo leer la curva SOC nativa',error)}const web=read(SOC_TRIAL_KEY,null),local=validSocTrial(web)?web:null;return native&&(!local||(Number(native.revision)||0)>=(Number(local.revision)||0))?native:local}
+  const savedSocTrial=loadSocTrial();let socTrialWarning=false,socTrialRevision=Number(savedSocTrial?.revision)||0;
+  function saveSocTrial(){socTrialRevision=Math.max(Date.now(),socTrialRevision+1);const data=JSON.stringify({version:1,revision:socTrialRevision,points:socCurvePoints,preset:socCurvePreset,cells:socCurveCells});let saved=false;try{if(typeof window.StorageBridge?.setSocTrialCurve==='function')saved=window.StorageBridge.setSocTrialCurve(data)===true}catch(error){console.warn('Boat Station: no se pudo guardar la curva SOC nativa',error)}try{localStorage.setItem(SOC_TRIAL_KEY,data);saved=true}catch(error){console.warn('Boat Station: no se pudo guardar la curva SOC web',error)}if(!saved&&!socTrialWarning){socTrialWarning=true;window.alert('No se pudo guardar la curva de cálculo de SOC en este dispositivo.')}return saved}
   const oldZoomIndices=[1,3,5,6,7,8,9,10,11],oldZoom=Math.max(0,Math.min(oldZoomIndices.length-1,Number(read(OLD_ZOOM_KEY,0))||0)),storedZoom=read(ZOOM_KEY,null);
-  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedChart=null,historyOffset=0,historyActivePointers=new Set(),historyControlPointers=new Set(),historyControlProtectionBound=false,historyCurrentAverageBars=Math.max(1,Math.min(BARS,Math.round(Number(read(AVERAGE_BARS_KEY,3))||3))),voltageEstimateFactor=Math.round((num(read('bs.batteries.historyConstantFactor.v1',0.0006))??0.0006)*100000)/100000,socCurvePoints=normalizeSocCurve(read(SOC_CURVE_KEY,DEFAULT_SOC_CURVE));
+  let saveTimer=0,historyDirty=false,zoom=storedZoom===null?oldZoomIndices[oldZoom]:Math.max(0,Math.min(ZOOMS.length-1,Number(storedZoom)||0)),drawPending=false,historyResizeObserver=null,historyObservedChart=null,historyOffset=0,historyActivePointers=new Set(),historyControlPointers=new Set(),historyControlProtectionBound=false,historyCurrentAverageBars=Math.max(1,Math.min(BARS,Math.round(Number(read(AVERAGE_BARS_KEY,3))||3))),voltageEstimateFactor=Math.round((num(read('bs.batteries.historyConstantFactor.v1',0.0006))??0.0006)*100000)/100000,socCurvePoints=normalizeSocCurve(savedSocTrial?.points??read(SOC_CURVE_KEY,DEFAULT_SOC_CURVE));
   const batteryTransientFields=new Set(['connected','voltage','current','power','soc','soh','remainingAh','totalAh','cycles','temperature','temperatures','cellVoltages','cellVoltage','cellVoltageMin','cellVoltageMax','lastSeen','lastSeenAt','rssi','alarms','flags','time','lastDataTime','historyCurrent','historyCurrentAt','historyAh','lastKnownCharge']);
   function batteryConfigSnapshot(){return{bankName:state.bankName,bankHistoryColor:state.bankHistoryColor,batteries:state.batteries.map(b=>{const config={};for(const [key,value] of Object.entries(b)){if(batteryTransientFields.has(key))continue;if(key==='currentCorrection'&&value&&typeof value==='object'){const copy={...value};delete copy.lastSample;config[key]=copy}else config[key]=value}return config})}}
   let configRevision=Number(saved._configRevision)||0,lastConfigSignature=JSON.stringify(batteryConfigSnapshot()),nativeConfigSignature=nativeSaved?JSON.stringify({bankName:nativeSaved.bankName,bankHistoryColor:nativeSaved.bankHistoryColor,batteries:nativeSaved.batteries}):null,batterySaveWarning=false;
@@ -361,7 +366,7 @@ export function createBatteriesModule(requestRender,openManager){
   let socViewport=null,factorViewport=null;
   let bankAhAdjustment=0,trialSocEnd=null,retrospectiveFactor=1,socSmoothingPoints=1,hasCalculatedSocCurve=false;const trialVisible={'voltage:bank-estimated':!hiddenSeries['voltage:bank-estimated'],'soc:bank-estimated':!hiddenSeries['soc:bank-estimated'],'ah:bank-remaining':!hiddenSeries['ah:bank-remaining']};
   let factorCurveOpen=false,factorCurveExpansion=0,factorPointer=null,factorCurve=read(FACTOR_CURVE_KEY,null);if(!Array.isArray(factorCurve)||factorCurve.length<2)factorCurve=[{voltage:10,factor:voltageEstimateFactor},{voltage:15,factor:voltageEstimateFactor}];
-  let socCurveEditorOpen=false,socCurveExpansion=0,socCurvePointer=null,socCurvePreset=read('bs.batteries.historySocCurvePreset.v1','manual'),socCurveCells=Math.max(1,Math.min(48,Math.round(Number(read('bs.batteries.historySocCurveCells.v1',4))||4)));
+  let socCurveEditorOpen=false,socCurveExpansion=0,socCurvePointer=null,socCurvePreset=savedSocTrial?.preset??read('bs.batteries.historySocCurvePreset.v1','manual'),socCurveCells=Math.max(1,Math.min(48,Math.round(Number(savedSocTrial?.cells??read('bs.batteries.historySocCurveCells.v1',4))||4)));
   if(!Object.prototype.hasOwnProperty.call(profiles,socCurvePreset))socCurvePreset='manual';
   if(socCurvePoints.length<2)socCurvePoints=DEFAULT_SOC_CURVE.map(point=>({...point}));
   function normalizeSocCurve(points){
@@ -436,8 +441,8 @@ export function createBatteriesModule(requestRender,openManager){
     const preset=details.querySelector('[data-soc-preset]'),cells=details.querySelector('[data-soc-cells]');
     const markManual=()=>{socCurvePreset='manual';if(preset)preset.value='manual'};
     const applyPreset=()=>{if(!profiles[socCurvePreset])return;socCurvePoints=profiles[socCurvePreset].map(([voltage,soc])=>({voltage:voltage*socCurveCells,soc}));drawSocCurve(root);queueDraw(root)};
-    preset?.addEventListener('change',()=>{socCurvePreset=preset.value;if(socCurvePreset==='manual'){markManual();return}socCurveCells=socCurvePreset==='lifepo4'?4:6;cells.value=String(socCurveCells);applyPreset()});
-    cells?.addEventListener('change',()=>{socCurveCells=Math.max(1,Math.min(48,Math.round(Number(cells.value)||1)));cells.value=String(socCurveCells);applyPreset()});
+    preset?.addEventListener('change',()=>{socCurvePreset=preset.value;if(socCurvePreset==='manual'){markManual();saveSocTrial();return}socCurveCells=socCurvePreset==='lifepo4'?4:6;cells.value=String(socCurveCells);applyPreset();saveSocTrial()});
+    cells?.addEventListener('change',()=>{socCurveCells=Math.max(1,Math.min(48,Math.round(Number(cells.value)||1)));cells.value=String(socCurveCells);applyPreset();saveSocTrial()});
     details.addEventListener('toggle',()=>{
       const opened=details.open;if(opened===socCurveEditorOpen){if(opened)drawSocCurve(root);return}
       socCurveEditorOpen=opened;const card=details.closest('.card'),layout=window.BoatStationPageLayout;
@@ -477,7 +482,7 @@ export function createBatteriesModule(requestRender,openManager){
           if(right.voltage-left.voltage>gap*2){const soc=interpolateSoc(socCurvePoints,voltage);socCurvePoints=normalizeSocCurve([...socCurvePoints,{voltage,soc}]);}
         }
       }
-      if((gesture.type==='point'&&(gesture.moved||(!cancelled&&socCurvePoints.length>=2)))||(gesture.type==='line'&&!cancelled&&!gesture.moved))markManual();
+      if((gesture.type==='point'&&(gesture.moved||(!cancelled&&socCurvePoints.length>=2)))||(gesture.type==='line'&&!cancelled&&!gesture.moved)){markManual();saveSocTrial()}
       try{if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId)}catch{}
       drawSocCurve(root);queueDraw(root)
     };
@@ -669,7 +674,7 @@ export function createBatteriesModule(requestRender,openManager){
     const left=[],right=[];let lastSoc=-Infinity;
     for(const point of outside.filter(p=>p.voltage<low.voltage)){if(point.soc>=lastSoc&&point.soc<=low.soc){left.push({...point});lastSoc=point.soc}}
     lastSoc=high.soc;for(const point of outside.filter(p=>p.voltage>high.voltage)){if(point.soc>=lastSoc){right.push({...point});lastSoc=point.soc}}
-    socCurvePoints=[...left,...fitted,...right];hasCalculatedSocCurve=true;socCurvePreset='manual';socViewport=null;const preset=root.querySelector('[data-soc-preset]');if(preset)preset.value='manual';
+    socCurvePoints=[...left,...fitted,...right];hasCalculatedSocCurve=true;socCurvePreset='manual';socViewport=null;saveSocTrial();const preset=root.querySelector('[data-soc-preset]');if(preset)preset.value='manual';
     drawSocCurve(root);queueDraw(root);const omitted=outside.length-left.length-right.length;
     show('Curva calculada con '+pairs.length+' intervalos visibles; se ajustó para que sea creciente y se suavizó con '+socSmoothingPoints+(socSmoothingPoints===1?' punto.':' puntos.')+(omitted?' Se omitieron '+omitted+' puntos anteriores incompatibles.':' Los puntos compatibles fuera del tramo se conservaron.'));
     return true
