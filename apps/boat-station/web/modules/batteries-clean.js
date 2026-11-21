@@ -544,9 +544,9 @@ export function createBatteriesModule(requestRender,openManager){
         if(time>=bankVoltage.lastTime){bankVoltage.last=sampleBankVoltage;bankVoltage.lastTime=time}
         b.voltages.set('bank',bankVoltage);
         for(const part of p.batteries||[]){
-          const id=String(part.id||part.name||'battery'),name=String(part.name||'Batería'),battery=state.batteries.find(x=>String(x.id)===id),capacity=num(battery?.capacityAh),bankCapacity=state.batteries.reduce((total,x)=>total+(num(x.capacityAh)||0),0),sampleVe=batteryVe({...battery,connected:true,voltage:part.voltage,current:part.current}),sampleSoc=battery&&battery.chargeCalculation?.mode!=='bms'?estimatedSoc({...battery,voltage:sampleVe}):null,contribution=sampleSoc!==null&&capacity!==null&&bankCapacity>0?sampleSoc*capacity/bankCapacity:null;
+          const id=String(part.id||part.name||'battery'),name=String(part.name||'Batería'),battery=state.batteries.find(x=>String(x.id)===id),capacity=num(battery?.capacityAh),bankCapacity=state.batteries.reduce((total,x)=>total+(num(x.capacityAh)||0),0),sampleVe=batteryVe({...battery,connected:true,voltage:part.voltage,current:part.current}),sampleSoc=battery&&battery.chargeCalculation?.mode!=='bms'?estimatedSoc({...battery,voltage:sampleVe}):null,contribution=sampleSoc!==null&&capacity!==null&&bankCapacity>0?sampleSoc*capacity/bankCapacity:num(part.contribution),usedRecorded=sampleSoc===null||capacity===null||bankCapacity<=0;
           const item=b.parts.get(id)||{id,name,sum:0,n:0,last:null,lastTime:-Infinity};
-          if(contribution!==null){item.sum+=contribution;item.n++}
+          if(contribution!==null){item.sum+=contribution;item.n++;item.usedRecorded=!!item.usedRecorded||usedRecorded}
           if(time>=item.lastTime){item.last=contribution;item.lastTime=time}
           item.name=name;b.parts.set(id,item);
           const currentLine=b.currents.get(id)||{id,name,sum:0,n:0,last:null,lastTime:-Infinity},batteryCurrent=num(part.current);
@@ -570,10 +570,10 @@ export function createBatteriesModule(requestRender,openManager){
       const time=Number(latestBeforeOpen.time);
       if(open.socLastTime===-Infinity)open.socLast=num(latestBeforeOpen.soc);
       for(const part of latestBeforeOpen.batteries||[]){
-        const id=String(part.id||part.name||'battery'),name=String(part.name||'Batería'),battery=state.batteries.find(x=>String(x.id)===id),capacity=num(battery?.capacityAh),bankCapacity=state.batteries.reduce((total,x)=>total+(num(x.capacityAh)||0),0),sampleVe=batteryVe({...battery,connected:true,voltage:part.voltage,current:part.current}),sampleSoc=battery&&battery.chargeCalculation?.mode!=='bms'?estimatedSoc({...battery,voltage:sampleVe}):null,contribution=sampleSoc!==null&&capacity!==null&&bankCapacity>0?sampleSoc*capacity/bankCapacity:null;
+        const id=String(part.id||part.name||'battery'),name=String(part.name||'Batería'),battery=state.batteries.find(x=>String(x.id)===id),capacity=num(battery?.capacityAh),bankCapacity=state.batteries.reduce((total,x)=>total+(num(x.capacityAh)||0),0),sampleVe=batteryVe({...battery,connected:true,voltage:part.voltage,current:part.current}),sampleSoc=battery&&battery.chargeCalculation?.mode!=='bms'?estimatedSoc({...battery,voltage:sampleVe}):null,contribution=sampleSoc!==null&&capacity!==null&&bankCapacity>0?sampleSoc*capacity/bankCapacity:num(part.contribution),usedRecorded=sampleSoc===null||capacity===null||bankCapacity<=0;
         if(contribution!==null){
           const item=open.parts.get(id)||{id,name,sum:0,n:0,last:null,lastTime:-Infinity};
-          if(item.lastTime===-Infinity){item.sum=contribution;item.n=1;item.last=contribution;item.lastTime=time}
+          if(item.lastTime===-Infinity){item.sum=contribution;item.n=1;item.last=contribution;item.lastTime=time;item.usedRecorded=usedRecorded}
           item.name=name;open.parts.set(id,item);
         }
         const currentLine=open.currents.get(id)||{id,name,sum:0,n:0,last:null,lastTime:-Infinity},current=num(part.currentLast??part.current);
@@ -615,7 +615,7 @@ export function createBatteriesModule(requestRender,openManager){
         const estimatedVoltage=Number.isFinite(bankVoltageValue)&&Number.isFinite(bankCurrentValue)?bankVoltageValue-bankCurrentValue*voltageEstimateFactor:null;
         if(Number.isFinite(estimatedVoltage))voltages.push({id:'bank-estimated',name:'Voltaje estimado (Ve)',value:estimatedVoltage});
         return{
-          parts:[...b.parts.values()].filter(item=>item.n&&(!isOpen||item.last!==null)).map(item=>({id:item.id,name:item.name,value:isOpen?item.last:item.sum/item.n})),
+          parts:[...b.parts.values()].filter(item=>item.n&&(!isOpen||item.last!==null)).map(item=>({id:item.id,name:item.name,value:isOpen?item.last:item.sum/item.n,usedRecorded:!!item.usedRecorded})),
           current:isOpen?b.currentLast:(b.currentN?b.current/b.currentN:null),
           soc:b.socLast,estimatedSoc:estimateSocFromVoltage(estimatedVoltage),
           ah:[...ah.values()],currents,voltages,isOpen
@@ -767,6 +767,7 @@ export function createBatteriesModule(requestRender,openManager){
     c.restore();
     const host=root.querySelector('[data-battery-history-legend]');
     if(host)host.innerHTML=[...legend.entries()].filter(([key])=>Object.prototype.hasOwnProperty.call(trialVisible,key)?trialVisible[key]:!hiddenSeries[key]).map(([,item])=>'<span><i class="'+item.kind+'" style="--series-color:'+item.color+'"></i>'+esc(item.name)+'</span>').join('')||(legend.size?'':'<span class="muted">Se necesitan muestras históricas para mostrar aportes.</span>');
+    if(host&&bars.some(bar=>bar.parts.some(part=>part.usedRecorded)))host.insertAdjacentHTML('beforeend','<span class="muted">Algunos valores muestran el SOC registrado.</span>');
     return true
   }
   function formatAhTick(value){const n=Number(value),a=Math.abs(n);return a>=10?String(Math.round(n)):a>=1?n.toFixed(1):a>=.1?n.toFixed(2):n.toFixed(3)}
