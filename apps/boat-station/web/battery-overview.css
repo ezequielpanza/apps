@@ -159,3 +159,7 @@
 .battery-history-page>.battery-history-chart{grid-template-rows:minmax(0,1fr);overflow:hidden}
 .battery-history-chart>.battery-history-y{min-height:0;height:100%;box-sizing:border-box;align-self:stretch;overflow:hidden}
 .battery-history-chart>canvas{min-height:0;height:100%;max-height:100%}
+
+/* A closed correlation editor must contribute only its summary to layout. */
+.battery-history-soc-curve:not([open])>.battery-history-soc-curve-content{display:none}
+.battery-history-page>.battery-history-soc-curve[open]{min-height:0;flex:0 1 160px;overflow:auto}
