@@ -190,5 +190,5 @@
   window.addEventListener('boatstation-core-ready',()=>{try{if(window.CoreBridge&&typeof CoreBridge.getApkVersion==='function')installed=String(CoreBridge.getApkVersion()||'').trim()}catch(_){}check(true);syncNativeDownloadState()});
   window.addEventListener('boatstation-apk-install-error',()=>setDownloadState('ready'));
   setTimeout(()=>{check(true);syncNativeDownloadState()},1000);
-  window.BoatStationApkUpdate={check:()=>check(true),getInstalled:()=>installed,getLatest:()=>latest,getLatestApkUrl:()=>APK_URL,downloadLatest};
+  window.BoatStationApkUpdate={check:()=>check(true),getInstalled:()=>installed,getLatest:()=>latest,getLatestApkUrl:()=>APK_URL,downloadLatest:(ask=false)=>download(latest,ask)};
 })();
