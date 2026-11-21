@@ -163,3 +163,6 @@
 /* A closed correlation editor must contribute only its summary to layout. */
 .battery-history-soc-curve:not([open])>.battery-history-soc-curve-content{display:none}
 .battery-history-page>.battery-history-soc-curve[open]{min-height:0;flex:0 1 160px;overflow:auto}
+
+/* Opening the correlation editor adds its natural height to the module. */
+.battery-history-page>.battery-history-soc-curve[open]{max-height:none;flex:0 0 auto;overflow:visible}

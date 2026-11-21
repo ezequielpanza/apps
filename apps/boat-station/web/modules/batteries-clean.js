@@ -344,7 +344,7 @@ export function createBatteriesModule(requestRender,openManager){
     historyDirty=true;saveHistory();
   }
 
-  let socCurveEditorOpen=false,socCurvePointer=null,socCurvePreset=read('bs.batteries.historySocCurvePreset.v1','manual'),socCurveCells=Math.max(1,Math.min(48,Math.round(Number(read('bs.batteries.historySocCurveCells.v1',4))||4)));
+  let socCurveEditorOpen=false,socCurveExpansion=0,socCurvePointer=null,socCurvePreset=read('bs.batteries.historySocCurvePreset.v1','manual'),socCurveCells=Math.max(1,Math.min(48,Math.round(Number(read('bs.batteries.historySocCurveCells.v1',4))||4)));
   if(!Object.prototype.hasOwnProperty.call(profiles,socCurvePreset))socCurvePreset='manual';
   if(socCurvePoints.length<2)socCurvePoints=DEFAULT_SOC_CURVE.map(point=>({...point}));
   write(SOC_CURVE_KEY,socCurvePoints);
@@ -409,7 +409,13 @@ export function createBatteriesModule(requestRender,openManager){
     const applyPreset=()=>{if(!profiles[socCurvePreset])return;socCurvePoints=profiles[socCurvePreset].map(([voltage,soc])=>({voltage:voltage*socCurveCells,soc}));write(SOC_CURVE_KEY,socCurvePoints);write('bs.batteries.historySocCurvePreset.v1',socCurvePreset);write('bs.batteries.historySocCurveCells.v1',socCurveCells);drawSocCurve(root);queueDraw(root)};
     preset?.addEventListener('change',()=>{socCurvePreset=preset.value;if(socCurvePreset==='manual'){markManual();return}socCurveCells=socCurvePreset==='lifepo4'?4:6;cells.value=String(socCurveCells);applyPreset()});
     cells?.addEventListener('change',()=>{socCurveCells=Math.max(1,Math.min(48,Math.round(Number(cells.value)||1)));cells.value=String(socCurveCells);write('bs.batteries.historySocCurveCells.v1',socCurveCells);applyPreset()});
-    details.addEventListener('toggle',()=>{socCurveEditorOpen=details.open;if(details.open)drawSocCurve(root)});
+    details.addEventListener('toggle',()=>{
+      const opened=details.open;if(opened===socCurveEditorOpen){if(opened)drawSocCurve(root);return}
+      socCurveEditorOpen=opened;const card=details.closest('.card'),layout=window.BoatStationPageLayout;
+      if(opened){const body=details.querySelector('.battery-history-soc-curve-content');socCurveExpansion=Math.ceil(body?.scrollHeight||0);if(card&&socCurveExpansion)layout?.adjustPageHeight?.(card,socCurveExpansion);drawSocCurve(root)}
+      else if(card&&socCurveExpansion){layout?.adjustPageHeight?.(card,-socCurveExpansion);socCurveExpansion=0}
+      queueDraw(root)
+    });
     const pointAt=(x,y,metrics)=>{let index=-1,distance=13;for(let i=0;i<socCurvePoints.length;i++){const point=socCurvePoints[i],d=Math.hypot(x-metrics.xForVoltage(point.voltage),y-metrics.yForSoc(point.soc));if(d<distance){distance=d;index=i}}return index};
     const segmentAt=(x,y,metrics)=>{let index=-1,distance=12;for(let i=1;i<socCurvePoints.length;i++){const previous=socCurvePoints[i-1],next=socCurvePoints[i],d=curveSegmentDistance(x,y,metrics.xForVoltage(previous.voltage),metrics.yForSoc(previous.soc),metrics.xForVoltage(next.voltage),metrics.yForSoc(next.soc));if(d<distance){distance=d;index=i-1}}return index};
     const canvasPoint=event=>{const rect=canvas.getBoundingClientRect();return{x:event.clientX-rect.left,y:event.clientY-rect.top}};
