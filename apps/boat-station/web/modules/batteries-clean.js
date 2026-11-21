@@ -399,6 +399,7 @@ export function createBatteriesModule(requestRender,openManager){
     return{rect,left,right,top,bottom,plotW,plotH,domain,xForVoltage:value=>left+(value-domain.min)/span*plotW,voltageForX:value=>domain.min+(value-left)/plotW*span,yForSoc:value=>top+(domain.maxY-value)/(domain.maxY-domain.minY)*plotH,socForY:value=>domain.maxY-(value-top)/plotH*(domain.maxY-domain.minY)}
   }
   function drawSocCurve(root,domainOverride=null,activeIndex=-1){
+    if(activeIndex<0&&socCurvePointer?.type==='point'&&socCurvePointer.moved)activeIndex=socCurvePointer.index;
     const details=root?.querySelector('[data-battery-soc-curve-details]'),canvas=root?.querySelector('[data-battery-soc-curve-chart]');
     if(!details?.open||!canvas||socCurvePoints.length<2)return false;
     const metrics=socCurveMetrics(canvas,domainOverride||socCurveDomain()),{rect,left,top,plotW,plotH,xForVoltage,yForSoc}=metrics;
@@ -415,7 +416,7 @@ export function createBatteriesModule(requestRender,openManager){
     socCurvePoints.forEach((point,index)=>{const px=xForVoltage(point.voltage),py=yForSoc(point.soc);if(index===0)context.moveTo(px,py);else context.lineTo(px,py)});
     context.strokeStyle='#6cc6d3';context.lineWidth=3;context.lineJoin='round';context.stroke();
     for(let index=0;index<socCurvePoints.length;index++){const point=socCurvePoints[index];context.beginPath();context.arc(xForVoltage(point.voltage),yForSoc(point.soc),index===activeIndex?7:5,0,Math.PI*2);context.fillStyle=index===activeIndex?'#f2cf5b':'#6cc6d3';context.fill();context.strokeStyle='#071a27';context.lineWidth=2;context.stroke();if(index===activeIndex){context.beginPath();context.arc(xForVoltage(point.voltage),yForSoc(point.soc),9,0,Math.PI*2);context.strokeStyle='#f2cf5b';context.lineWidth=1.5;context.stroke()}}
-    context.restore();drawCurvePointLabels(context,socCurvePoints.map(point=>({x:xForVoltage(point.voltage),y:yForSoc(point.soc),label:point.voltage.toFixed(2)+' V · '+point.soc.toFixed(1)+'%'})).filter(point=>point.x>=left&&point.x<=left+plotW&&point.y>=top&&point.y<=top+plotH),rect.width,rect.height);return true
+    context.restore();if(activeIndex>=0&&socCurvePoints[activeIndex]){const point=socCurvePoints[activeIndex],x=xForVoltage(point.voltage),y=yForSoc(point.soc);if(x>=left&&x<=left+plotW&&y>=top&&y<=top+plotH)drawCurvePointLabels(context,[{x,y,label:point.voltage.toFixed(2)+' V · '+point.soc.toFixed(1)+'%'}],rect.width,rect.height,0)}return true
   }
   function drawCurvePointLabels(context,points,width,height,active=-1){
     context.save();context.font='bold 9px system-ui,sans-serif';context.textBaseline='middle';context.textAlign='left';
