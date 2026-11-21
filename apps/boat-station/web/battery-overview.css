@@ -215,3 +215,7 @@
   .battery-soc-retrospective input[type=number]{appearance:textfield;-moz-appearance:textfield}
   .battery-soc-retrospective input[type=number]::-webkit-inner-spin-button,.battery-soc-retrospective input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 }
+
+/* Separación de las herramientas de cálculo de SOC. */
+.battery-history-soc-curve-content .battery-soc-retrospective,
+.battery-history-soc-curve-content .battery-soc-estimated-row{border-top:1px solid #29475a;padding-top:10px;margin-top:10px}
