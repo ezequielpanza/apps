@@ -13,10 +13,18 @@
   function moduleId(card){return card?.dataset?.id||''}
 
   function holdModule(id){id=String(id||'');if(!id)return;activeModules.add(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-start',{detail:{id}}))}
-  function releaseModule(id){id=String(id||'');if(!id)return;activeModules.delete(id);const pending=pendingRenders.get(id);pendingRenders.delete(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-end',{detail:{id}}));if(pending)requestAnimationFrame(()=>{try{pending()}catch(error){console.warn('Boat Station deferred render',error)}})}
+  function releaseModule(id){id=String(id||'');if(!id)return;activeModules.delete(id);const pending=pendingRenders.get(id);pendingRenders.delete(id);window.dispatchEvent(new CustomEvent('boatstation-page-interaction-end',{detail:{id}}));if(pending)requestAnimationFrame(()=>{try{requestModuleRender(id,pending)}catch(error){console.warn('Boat Station deferred render',error)}})}
   function beginModuleInteraction(card){holdModule(moduleId(card))}
   function endModuleInteraction(card){releaseModule(moduleId(card))}
-  function requestModuleRender(id,render){id=String(id||'');if(!id||typeof render!=='function')return false;if(activeModules.has(id)){pendingRenders.set(id,render);return true}render();return true}
+  const controlPointers=new Map();
+  function focusedEditor(id){const active=document.activeElement;if(!active||!active.matches?.('input:not([type=button]):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]),textarea,select,[contenteditable="true"]'))return false;return moduleId(active.closest('.card'))===id}
+  function controlsActive(id){return focusedEditor(id)||[...controlPointers.values()].includes(id)}
+  function flushDeferred(id){const pending=pendingRenders.get(id);if(!pending||activeModules.has(id)||controlsActive(id))return;pendingRenders.delete(id);requestAnimationFrame(()=>requestModuleRender(id,pending))}
+  function requestModuleRender(id,render){id=String(id||'');if(!id||typeof render!=='function')return false;if(activeModules.has(id)||controlsActive(id)){pendingRenders.set(id,render);return true}pendingRenders.delete(id);render();return true}
+  cards.addEventListener('pointerdown',event=>{const control=event.target.closest?.('button,input,textarea,select,[contenteditable="true"]');const id=moduleId(control?.closest('.card'));if(id)controlPointers.set(event.pointerId,id)},true);
+  const releaseControl=event=>{const id=controlPointers.get(event.pointerId);if(!id)return;controlPointers.delete(event.pointerId);setTimeout(()=>flushDeferred(id),0)};
+  document.addEventListener('pointerup',releaseControl,true);document.addEventListener('pointercancel',releaseControl,true);document.addEventListener('lostpointercapture',releaseControl,true);
+  cards.addEventListener('focusout',event=>{const id=moduleId(event.target.closest?.('.card'));if(id)setTimeout(()=>flushDeferred(id),0)},true);
 
   cards.addEventListener('pointerdown',event=>{
     if(!primary(event)||document.body.classList.contains('menu-open')||blocked(event.target)||layout()?.isResizing?.())return;
