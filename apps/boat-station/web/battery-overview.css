@@ -169,3 +169,6 @@
 
 .battery-history-soc-curve-content canvas{cursor:grab}
 .battery-history-soc-curve-content canvas.is-dragging{cursor:grabbing!important}
+
+.battery-history-page>.battery-history-ah-adjust{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;min-height:30px;padding:0 2px;color:#d8e7ed;font-size:11px}
+.battery-history-ah-adjust .battery-history-voltage-estimate-stepper span{font-size:11px;color:#a8bfcd}
