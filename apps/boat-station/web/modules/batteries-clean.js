@@ -547,7 +547,7 @@ export function createBatteriesModule(requestRender,openManager){
           if(bank?.n)ah.set('bank',{id:'bank',name:'Banco',value:bank.value});
         }
         const bankVoltageValue=voltages.find(item=>item.id==='bank')?.value,bankCurrentValue=currents.find(item=>item.id==='bank')?.value;
-        const estimatedVoltage=Number.isFinite(bankVoltageValue)&&Number.isFinite(bankCurrentValue)?bankVoltageValue+bankCurrentValue*voltageEstimateFactor:null;
+        const estimatedVoltage=Number.isFinite(bankVoltageValue)&&Number.isFinite(bankCurrentValue)?bankVoltageValue-bankCurrentValue*voltageEstimateFactor:null;
         if(Number.isFinite(estimatedVoltage))voltages.push({id:'bank-estimated',name:'Voltaje estimado (Ve)',value:estimatedVoltage});
         return{
           parts:[...b.parts.values()].filter(item=>item.n&&(!isOpen||item.last!==null)).map(item=>({id:item.id,name:item.name,value:isOpen?item.last:item.sum/item.n})),
