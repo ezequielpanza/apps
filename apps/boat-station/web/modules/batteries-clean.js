@@ -298,9 +298,9 @@ export function createBatteriesModule(requestRender,openManager){
     return groups;
   }
   function historyPage(){
-    const [label,ms]=ZOOMS[zoom],total=ms*BARS,span=total>=86400000?Math.round(total/86400000)+' días':total<3600000?Math.round(total/60000)+' min':Number((total/3600000).toFixed(1)).toLocaleString('es')+' h',exportLabel='Descargar histórico de carga (CSV)',averageVisible=!hiddenSeries['current:bank-average'];
+    const [label,ms]=ZOOMS[zoom],total=ms*BARS,span=total>=86400000?Math.round(total/86400000)+' días':total<3600000?Math.round(total/60000)+' min':Number((total/3600000).toFixed(1)).toLocaleString('es')+' h',exportLabel='Descargar histórico de carga (CSV)';
     const maxOffset=historyOffsetRange(ms);historyOffset=Math.max(0,Math.min(maxOffset,historyOffset));
-    return'<div class="battery-history-page"><div class="battery-history-head"><div><strong>Histórico de carga</strong><small>30 intervalos · '+label+' por intervalo · '+span+'</small></div><div class="battery-history-zoom"><button type="button" data-battery-history-zoom="out" '+(zoom===ZOOMS.length-1?'disabled':'')+'>−</button><b>'+label+'</b><button type="button" data-battery-history-zoom="in" '+(zoom===0?'disabled':'')+'>+</button></div><button type="button" class="battery-history-export" data-battery-history-export aria-label="'+exportLabel+'" title="'+exportLabel+'" '+(!state.history.length?'disabled':'')+'>CSV ↓</button></div><div class="battery-history-average-control"><label class="battery-history-average-toggle"><input type="checkbox" data-battery-current-average-visible aria-label="Mostrar promedio móvil de Corriente" '+(averageVisible?'checked':'')+'> Mostrar promedio móvil</label><div class="battery-history-average-stepper" role="group" aria-label="Cantidad de barras para el promedio móvil"><button type="button" data-battery-current-average-step="-1" aria-label="Reducir barras del promedio" '+(historyCurrentAverageBars<=1?'disabled':'')+'>−</button><output data-battery-current-average-value aria-live="polite">'+historyCurrentAverageBars+'</output><button type="button" data-battery-current-average-step="1" aria-label="Aumentar barras del promedio" '+(historyCurrentAverageBars>=BARS?'disabled':'')+'>+</button><span>barras</span></div></div>'+
+    return'<div class="battery-history-page"><div class="battery-history-head"><div><strong>Histórico de carga</strong><small>30 intervalos · '+label+' por intervalo · '+span+'</small></div><div class="battery-history-zoom"><button type="button" data-battery-history-zoom="out" '+(zoom===ZOOMS.length-1?'disabled':'')+'>−</button><b>'+label+'</b><button type="button" data-battery-history-zoom="in" '+(zoom===0?'disabled':'')+'>+</button></div><button type="button" class="battery-history-export" data-battery-history-export aria-label="'+exportLabel+'" title="'+exportLabel+'" '+(!state.history.length?'disabled':'')+'>CSV ↓</button></div>'+
       '<div class="battery-history-ah-adjust"><label for="battery-history-ah-end">Ah finales para la línea</label><div class="battery-history-voltage-estimate-stepper"><button type="button" data-ah-end-step="-1" aria-label="Reducir Ah finales">−</button><input id="battery-history-ah-end" type="number" step="1" inputmode="decimal" data-ah-end value="'+(Number.isFinite(stats().rem)?(stats().rem+bankAhAdjustment).toFixed(1):'')+'" aria-label="Ah finales para la línea"><button type="button" data-ah-end-step="1" aria-label="Aumentar Ah finales">+</button><span>Ah</span></div></div>'+
       '<div class="battery-history-chart"><div class="battery-history-y"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><canvas data-battery-history-chart aria-label="Histórico de carga, desliza para recorrer y pellizca para cambiar el intervalo"></canvas><div class="battery-history-y battery-history-y-ah"><span data-ah-label="top">+— Ah</span><span data-ah-label="upper">+— Ah</span><span data-ah-label="zero">0 Ah</span><span data-ah-label="lower">−— Ah</span><span data-ah-label="bottom">−— Ah</span></div><div class="battery-history-y battery-history-y-current"><span data-current-label="top">+— A</span><span data-current-label="upper">+— A</span><span data-current-label="zero">0 A</span><span data-current-label="lower">−— A</span><span data-current-label="bottom">−— A</span></div><div class="battery-history-y battery-history-y-voltage"><span data-voltage-label="top">— V</span><span data-voltage-label="upper">— V</span><span data-voltage-label="zero">— V</span><span data-voltage-label="lower">— V</span><span data-voltage-label="bottom">— V</span></div></div>'+
 
@@ -657,7 +657,7 @@ export function createBatteriesModule(requestRender,openManager){
     const data=chartData(),bars=fillHistoryGaps(data.bars),directions=historyDirections(bars),extremes=historyExtremeData(data);
     const slot=r.width/BARS,bw=Math.max(2,slot*.72),legend=new Map(),axisH=Math.min(r.height*.35,Math.min(68,Math.max(24,r.height<245?58:66))),plotH=Math.max(1,r.height-axisH);
     const ahValues=bars.flatMap(b=>b.ah.filter(x=>!hiddenSeries['ah:'+x.id]).map(x=>x.value)),ahScale=niceAhScale(ahValues);
-    const currentValues=bars.flatMap(b=>b.currents.filter(x=>!hiddenSeries['current:'+x.id]).map(x=>x.value)).concat(hiddenSeries['current:bank']&&!hiddenSeries['current:bank-average']?bars.map(bar=>bar.currents.find(item=>String(item.id)==='bank')?.value).filter(Number.isFinite):[]),currentScale=niceAhScale(currentValues),voltageValues=bars.flatMap(b=>b.voltages.filter(x=>x.id!=='bank-estimated'&&!hiddenSeries['voltage:'+x.id]).map(x=>x.value)),estimatedVoltageVisible=!hiddenSeries['voltage:bank-estimated']&&bars.some(b=>b.voltages.some(x=>x.id==='bank-estimated')),voltageScaleValues=bars.flatMap(b=>b.voltages.filter(x=>x.id!=='bank-estimated'&&(!hiddenSeries['voltage:'+x.id]||(estimatedVoltageVisible&&x.id==='bank'))).map(x=>x.value)),voltageScale=niceVoltageScale(voltageScaleValues);
+    const currentValues=bars.flatMap(b=>b.currents.filter(x=>!hiddenSeries['current:'+x.id]).map(x=>x.value)),currentScale=niceAhScale(currentValues),voltageValues=bars.flatMap(b=>b.voltages.filter(x=>x.id!=='bank-estimated'&&!hiddenSeries['voltage:'+x.id]).map(x=>x.value)),estimatedVoltageVisible=!hiddenSeries['voltage:bank-estimated']&&bars.some(b=>b.voltages.some(x=>x.id==='bank-estimated')),voltageScaleValues=bars.flatMap(b=>b.voltages.filter(x=>x.id!=='bank-estimated'&&(!hiddenSeries['voltage:'+x.id]||(estimatedVoltageVisible&&x.id==='bank'))).map(x=>x.value)),voltageScale=niceVoltageScale(voltageScaleValues);
     for(const axis of root.querySelectorAll('.battery-history-y')){axis.style.removeProperty('height');axis.style.paddingBottom=axisH+'px'}
     const ahLabels={top:'+'+formatAhTick(ahScale)+' Ah',upper:'+'+formatAhTick(ahScale/2)+' Ah',zero:'0 Ah',lower:'−'+formatAhTick(ahScale/2)+' Ah',bottom:'−'+formatAhTick(ahScale)+' Ah'};
     for(const [position,label] of Object.entries(ahLabels)){const node=root.querySelector('[data-ah-label="'+position+'"]');if(node)node.textContent=label}
@@ -717,25 +717,6 @@ export function createBatteriesModule(requestRender,openManager){
           if(index===data.openIndex){c.globalAlpha=1;c.strokeStyle=color;c.lineWidth=1;c.beginPath();c.arc(x,y,radius+1,0,Math.PI*2);c.stroke()}
         });
         c.restore()
-      }
-    }
-    if(!hiddenSeries['current:bank-average']){
-      const bankCurrentValues=bars.map(bar=>bar.currents.find(item=>String(item.id)==='bank')?.value);
-      const averaged=bankCurrentValues.map((_,index)=>{
-        const start=Math.max(0,index-historyCurrentAverageBars+1),windowValues=bankCurrentValues.slice(start,index+1).filter(Number.isFinite);
-        return windowValues.length?windowValues.reduce((sum,value)=>sum+value,0)/windowValues.length:null
-      });
-      if(averaged.some(Number.isFinite)){
-        const color='#48d9ef',label='Promedio móvil · '+historyCurrentAverageBars+' '+(historyCurrentAverageBars===1?'barra':'barras');
-        legend.set('current:bank-average',{name:label,color,kind:'line'});
-        c.save();c.strokeStyle=color;c.lineWidth=2.5;c.lineJoin='round';c.beginPath();
-        let open=false;
-        averaged.forEach((value,index)=>{
-          if(!Number.isFinite(value)){open=false;return}
-          const x=(index+.5)*slot,y=Math.max(2,Math.min(plotH-2,zeroY-(value/currentScale)*zeroY));
-          if(!open){c.moveTo(x,y);open=true}else c.lineTo(x,y)
-        });
-        c.stroke();c.restore()
       }
     }
     const accumulatedKey='ah:bank-remaining',accumulated=accumulatedBankAh(data),accumulatedColor=getHistorySeriesColor(accumulatedKey,paletteIds);
@@ -807,13 +788,11 @@ export function createBatteriesModule(requestRender,openManager){
     }
     root.querySelectorAll('[data-battery-manage]').forEach(button=>button.addEventListener('click',event=>{event.stopPropagation();openManager?.()}));
     root.querySelector('[data-battery-history-export]')?.addEventListener('click',downloadHistoryCsv);
-    root.querySelectorAll('[data-battery-current-average-step]').forEach(button=>button.addEventListener('click',()=>{const delta=Number(button.dataset.batteryCurrentAverageStep)||0;historyCurrentAverageBars=Math.max(1,Math.min(BARS,historyCurrentAverageBars+delta));write(AVERAGE_BARS_KEY,historyCurrentAverageBars);const output=root.querySelector('[data-battery-current-average-value]');if(output)output.textContent=String(historyCurrentAverageBars);for(const control of root.querySelectorAll('[data-battery-current-average-step]'))control.disabled=Number(control.dataset.batteryCurrentAverageStep)<0?historyCurrentAverageBars<=1:historyCurrentAverageBars>=BARS;queueDraw(root)}));
     const ahEndInput=root.querySelector('[data-ah-end]');
     const setAhEnd=(value,updateField=true)=>{const amount=num(value),actual=stats().rem;if(amount===null||!Number.isFinite(actual))return false;bankAhAdjustment=Math.round((amount-actual)*1000)/1000;write(BANK_AH_ADJUST_KEY,bankAhAdjustment);if(updateField&&ahEndInput)ahEndInput.value=(actual+bankAhAdjustment).toFixed(1);queueDraw(root);return true};
     root.querySelectorAll('[data-ah-end-step]').forEach(button=>button.addEventListener('click',()=>{const actual=stats().rem;if(!Number.isFinite(actual))return;const current=num(ahEndInput?.value)??(actual+bankAhAdjustment);setAhEnd(current+Number(button.dataset.ahEndStep))}));
     ahEndInput?.addEventListener('blur',()=>notifyHistoryInteractionEnd());
     ahEndInput?.addEventListener('input',()=>{if(num(ahEndInput.value)!==null)setAhEnd(ahEndInput.value,false)});ahEndInput?.addEventListener('change',()=>{if(!setAhEnd(ahEndInput.value)&&Number.isFinite(stats().rem))ahEndInput.value=(stats().rem+bankAhAdjustment).toFixed(1)});
-    root.querySelector('[data-battery-current-average-visible]')?.addEventListener('change',event=>{hiddenSeries['current:bank-average']=!event.currentTarget.checked;write(VISIBILITY_KEY,hiddenSeries);queueDraw(root)});
     root.querySelectorAll('[data-battery-history-zoom]').forEach(button=>button.addEventListener('click',()=>{
       const delta=button.dataset.batteryHistoryZoom==='in'?-1:1;changeHistoryZoom(zoom+delta)
     }))
