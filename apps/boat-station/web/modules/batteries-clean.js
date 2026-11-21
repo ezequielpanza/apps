@@ -395,7 +395,20 @@ export function createBatteriesModule(requestRender,openManager){
     socCurvePoints.forEach((point,index)=>{const px=xForVoltage(point.voltage),py=yForSoc(point.soc);if(index===0)context.moveTo(px,py);else context.lineTo(px,py)});
     context.strokeStyle='#6cc6d3';context.lineWidth=3;context.lineJoin='round';context.stroke();
     for(let index=0;index<socCurvePoints.length;index++){const point=socCurvePoints[index];context.beginPath();context.arc(xForVoltage(point.voltage),yForSoc(point.soc),index===activeIndex?7:5,0,Math.PI*2);context.fillStyle=index===activeIndex?'#f2cf5b':'#6cc6d3';context.fill();context.strokeStyle='#071a27';context.lineWidth=2;context.stroke();if(index===activeIndex){context.beginPath();context.arc(xForVoltage(point.voltage),yForSoc(point.soc),9,0,Math.PI*2);context.strokeStyle='#f2cf5b';context.lineWidth=1.5;context.stroke()}}
-    context.restore();return true
+    context.restore();drawCurvePointLabels(context,socCurvePoints.map(point=>({x:xForVoltage(point.voltage),y:yForSoc(point.soc),label:point.voltage.toFixed(2)+' V · '+point.soc.toFixed(1)+'%'})),rect.width,rect.height,activeIndex);return true
+  }
+  function drawCurvePointLabels(context,points,width,height,active=-1){
+    context.save();context.font='bold 9px system-ui,sans-serif';context.textBaseline='middle';context.textAlign='left';
+    const placed=[];const ordered=points.map((point,index)=>({...point,index})).sort((a,b)=>(a.index===active?-1:0)-(b.index===active?-1:0));
+    for(const point of ordered){
+      const text=point.label,boxWidth=Math.ceil(context.measureText(text).width)+8,boxHeight=15;
+      const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
+      const candidates=[[point.x+7,point.y-20],[point.x+7,point.y+7],[point.x-boxWidth-7,point.y-20],[point.x-boxWidth-7,point.y+7]];
+      let best=null,bestScore=Infinity;
+      for(const [cx,cy] of candidates){const x=clamp(cx,1,Math.max(1,width-boxWidth-1)),y=clamp(cy,1,Math.max(1,height-boxHeight-1));let score=0;for(const b of placed){const overlapX=Math.max(0,Math.min(x+boxWidth,b.x+b.w)-Math.max(x,b.x)),overlapY=Math.max(0,Math.min(y+boxHeight,b.y+b.h)-Math.max(y,b.y));score+=overlapX*overlapY}if(score<bestScore){bestScore=score;best={x,y,w:boxWidth,h:boxHeight}}}
+      placed.push(best);context.fillStyle='rgba(5,22,34,.90)';context.fillRect(best.x,best.y,best.w,best.h);context.fillStyle=point.index===active?'#ffe17a':'#e5f4f8';context.fillText(text,best.x+4,best.y+boxHeight/2)
+    }
+    context.restore()
   }
   function curveSegmentDistance(px,py,x1,y1,x2,y2){
     const dx=x2-x1,dy=y2-y1,length=dx*dx+dy*dy,fraction=length?Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/length)):0;
@@ -473,7 +486,7 @@ export function createBatteriesModule(requestRender,openManager){
     const c=canvas.getContext('2d');if(!c)return;c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,r.width,r.height);c.font='10px system-ui';c.fillStyle='#a9bdc8';c.strokeStyle='#284b60';c.textAlign='right';c.textBaseline='middle';
     for(let i=0;i<=4;i++){const y=m.top+i*m.h/4,value=m.domain.maxF-(m.domain.maxF-m.domain.minF)*i/4;c.beginPath();c.moveTo(m.left,y);c.lineTo(m.left+m.w,y);c.stroke();c.fillText(value.toFixed(3),m.left-5,y)}
     c.textBaseline='top';c.textAlign='left';c.fillText(m.domain.minV.toFixed(1)+' V',m.left,m.top+m.h+6);c.textAlign='right';c.fillText(m.domain.maxV.toFixed(1)+' V',m.left+m.w,m.top+m.h+6);
-    c.beginPath();factorCurve.forEach((p,i)=>{if(i)c.lineTo(m.x(p.voltage),m.y(p.factor));else c.moveTo(m.x(p.voltage),m.y(p.factor))});c.strokeStyle='#6cc6d3';c.lineWidth=3;c.stroke();factorCurve.forEach((p,i)=>{c.beginPath();c.arc(m.x(p.voltage),m.y(p.factor),i===active?7:5,0,2*Math.PI);c.fillStyle=i===active?'#f2cf5b':'#6cc6d3';c.fill()})
+    c.beginPath();factorCurve.forEach((p,i)=>{if(i)c.lineTo(m.x(p.voltage),m.y(p.factor));else c.moveTo(m.x(p.voltage),m.y(p.factor))});c.strokeStyle='#6cc6d3';c.lineWidth=3;c.stroke();factorCurve.forEach((p,i)=>{c.beginPath();c.arc(m.x(p.voltage),m.y(p.factor),i===active?7:5,0,2*Math.PI);c.fillStyle=i===active?'#f2cf5b':'#6cc6d3';c.fill()});drawCurvePointLabels(c,factorCurve.map(point=>({x:m.x(point.voltage),y:m.y(point.factor),label:point.voltage.toFixed(2)+' V · '+point.factor.toFixed(3)+' Ω'})),r.width,r.height,active)
   }
   function bindFactorCurve(root){
     const details=root.querySelector('[data-factor-details]'),canvas=details?.querySelector('[data-factor-chart]');if(!details||!canvas||details.dataset.bound)return;details.dataset.bound='1';
