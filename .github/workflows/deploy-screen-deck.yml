@@ -1,0 +1,28 @@
+name: Deploy Screen Deck
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/screen-deck/**'
+      - '.github/workflows/deploy-screen-deck.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/screen-deck
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Create Pages project if needed
+        run: npx --yes wrangler@4 pages project list | grep -q 'screen-deck' || npx --yes wrangler@4 pages project create screen-deck --production-branch main
+      - name: Deploy Screen Deck
+        run: npx --yes wrangler@4 pages deploy public --project-name screen-deck --branch main
