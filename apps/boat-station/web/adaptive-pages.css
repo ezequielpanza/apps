@@ -334,3 +334,7 @@
   .sea-wave-data strong{font-size:13px}
   .sea-wave-data span{font-size:7px}
 }
+
+/* Estimated times on the bank's outer SOC ring. */
+.battery-milestone-duration,.battery-milestone-clock{font-family:system-ui,sans-serif;font-size:9px;font-weight:700;paint-order:stroke;stroke:#071b29;stroke-width:2px;stroke-linejoin:round}
+.battery-milestone-duration{fill:#f4f8fb}.battery-milestone-clock{fill:#63dce7;font-size:8px;font-weight:600}

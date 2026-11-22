@@ -163,6 +163,31 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function batteryDialPoint(radius,degrees){const angle=degrees*Math.PI/180;return[100+radius*Math.sin(angle),100-radius*Math.cos(angle)]}
   function batteryDialArc(radius,startDegrees,endDegrees){const start=batteryDialPoint(radius,startDegrees),end=batteryDialPoint(radius,endDegrees),large=endDegrees-startDegrees>180?1:0;return"M "+start[0].toFixed(2)+" "+start[1].toFixed(2)+" A "+radius+" "+radius+" 0 "+large+" 1 "+end[0].toFixed(2)+" "+end[1].toFixed(2)}
+  function batteryMilestones(s,now=Date.now()){
+    const current=num(s.current),cap=num(s.cap),remaining=num(s.rem);
+    const ready=state.batteries.length>0&&state.batteries.every(b=>b.connected!==false&&num(b.current)!==null&&num(b.capacityAh)>0&&charge(b).rem!==null)&&current!==null&&Math.abs(current)>.05&&cap!==null&&cap>0&&remaining!==null;
+    if(!ready)return [];
+    const soc=Math.max(0,Math.min(100,remaining/cap*100)),charging=current>0,items=[];
+    for(let i=0;i<8;i++){
+      const target=i===0?(charging?100:0):i*12.5,delta=target-soc;
+      if((charging&&delta<=0)||(!charging&&delta>=0))continue;
+      const minutes=Math.round(Math.abs(delta)*cap/100/Math.abs(current)*60);
+      if(!Number.isFinite(minutes)||minutes<0)continue;
+      const end=new Date(now+minutes*60000),today=new Date(now);
+      if(!Number.isFinite(end.getTime()))continue;
+      const days=Math.round((Date.UTC(end.getFullYear(),end.getMonth(),end.getDate())-Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()))/86400000);
+      const duration=minutes<60?minutes+' min':Math.floor(minutes/60)+' h'+(minutes%60?' '+minutes%60+' min':'');
+      const clock=String(end.getHours()).padStart(2,'0')+':'+String(end.getMinutes()).padStart(2,'0')+(days>0?' (+'+days+'d)':'');
+      items.push({angle:i*45,target,duration,clock});
+    }
+    return items
+  }
+  function batteryMilestonesMarkup(s){
+    return batteryMilestones(s).map(item=>{
+      const point=batteryDialPoint(118,item.angle),rotation=item.angle>90&&item.angle<270?item.angle+180:item.angle;
+      return `<g class="battery-milestone" transform="translate(${point[0].toFixed(2)} ${point[1].toFixed(2)}) rotate(${rotation})"><title>${item.target}%: faltan ${esc(item.duration)}, hora estimada ${esc(item.clock)}</title><text class="battery-milestone-duration" text-anchor="middle" y="-2">${esc(item.duration)}</text><text class="battery-milestone-clock" text-anchor="middle" y="9">${esc(item.clock)}</text></g>`
+    }).join('')
+  }
   function batteryDial(s){
     const soc=num(s.soc),current=num(s.current),roundedCurrent=current===null?null:Math.round(current),voltageText=s.voltage===null?"—":Number(s.voltage).toFixed(2)+" V",currentText=roundedCurrent===null?"— A":roundedCurrent===0?"0 A":(roundedCurrent>0?"+":"−")+Math.abs(roundedCurrent)+" A",powerText=s.power===null?"—":Math.round(s.power)+" W",segments=[];
     for(let i=0;i<20;i++){const start=i*18+1.5,span=15,portion=soc===null?0:Math.max(0,Math.min(1,(soc-i*5)/5));segments.push(`<path class="battery-dial-soc-track" d="${batteryDialArc(93,start,start+span)}"/>`);if(portion>0)segments.push(`<path class="battery-dial-soc-fill" d="${batteryDialArc(93,start,start+span*portion)}"/>`)}
@@ -170,7 +195,7 @@ export function createBatteriesModule(requestRender,openManager){
     for(let amps=-40;amps<=40;amps+=5){const angle=amps/40*145,inner=batteryDialPoint(65,angle),outer=batteryDialPoint(71,angle),labelPoint=batteryDialPoint(54,angle),label=amps>0?"+"+amps:amps<0?"−"+Math.abs(amps):"0";ticks.push(`<line class="battery-dial-tick" x1="${inner[0].toFixed(2)}" y1="${inner[1].toFixed(2)}" x2="${outer[0].toFixed(2)}" y2="${outer[1].toFixed(2)}"/><text class="battery-dial-scale" x="${labelPoint[0].toFixed(2)}" y="${labelPoint[1].toFixed(2)}" text-anchor="middle" dominant-baseline="central">${label}</text>`)}
     let marker="";if(current!==null){const point=batteryDialPoint(69,Math.max(-40,Math.min(40,current))/40*145);marker=`<circle class="battery-dial-current-marker" cx="${point[0].toFixed(2)}" cy="${point[1].toFixed(2)}" r="5"/>`}
     const ariaLabel=`Carga ${soc===null?"sin datos":Math.round(soc)+" por ciento"}, voltaje ${voltageText}, corriente ${currentText}, potencia ${powerText}`;
-    return `<svg class="battery-combined-dial" viewBox="0 0 200 200" role="img" aria-label="${esc(ariaLabel)}"><title>Estado instantáneo del banco de baterías</title><g aria-hidden="true">${segments.join("")}<path class="battery-dial-current-discharge" d="${batteryDialArc(69,-145,0)}"/><path class="battery-dial-current-charge" d="${batteryDialArc(69,0,145)}"/>${ticks.join("")}${marker}<text class="battery-dial-soc-value" x="100" y="88" text-anchor="middle">${soc===null?"—":Math.round(soc)+"%"}</text><text class="battery-dial-voltage" x="100" y="109" text-anchor="middle">${voltageText}</text><text class="battery-dial-current-value" x="100" y="133" text-anchor="middle">${currentText}</text><text class="battery-dial-power" x="100" y="151" text-anchor="middle">${powerText}</text></g></svg>`;
+    return `<svg class="battery-combined-dial" viewBox="-38 -38 276 276" role="img" aria-label="${esc(ariaLabel)}"><title>Estado instantáneo del banco de baterías</title><g aria-hidden="true">${segments.join("")}<path class="battery-dial-current-discharge" d="${batteryDialArc(69,-145,0)}"/><path class="battery-dial-current-charge" d="${batteryDialArc(69,0,145)}"/>${ticks.join("")}${marker}<text class="battery-dial-soc-value" x="100" y="88" text-anchor="middle">${soc===null?"—":Math.round(soc)+"%"}</text><text class="battery-dial-voltage" x="100" y="109" text-anchor="middle">${voltageText}</text><text class="battery-dial-current-value" x="100" y="133" text-anchor="middle">${currentText}</text><text class="battery-dial-power" x="100" y="151" text-anchor="middle">${powerText}</text></g>${batteryMilestonesMarkup(s)}</svg>`;
   }
   function bankEstimate(s){
     const current=num(s.current),charging=current!==null&&current>.05,discharging=current!==null&&current<-.05,label=charging?"Carga completa en":discharging?"Autonomía estimada":"En reposo",value=charging?chargeEtaLabel(s):discharging?autonomyLabel(s):current===null?"—":"Sin carga neta";
