@@ -17,7 +17,7 @@ function filterAddSheet(){
 
 const freshness=document.createElement('div');
 freshness.id='remoteFreshness';freshness.className='remote-freshness waiting';
-freshness.innerHTML='<span class="remote-connection-dot" aria-hidden="true"></span><span class="remote-connection-text">Sin conexión</span><span class="remote-connection-detail">· esperando al Core</span>';
+freshness.innerHTML='<span class="remote-connection-dot" aria-hidden="true"></span><span class="remote-connection-text">Sin conexión</span><span class="remote-connection-detail">· esperando al Core</span><span class="remote-received-data" title="Datos recibidos de la estación durante esta sesión; no incluye mapas ni encabezados de red">↓ 0 B</span>';
 if(cards?.parentNode)cards.parentNode.insertBefore(freshness,cards);
 let lastSnapshotAt=0,interactionDepth=0,pendingData=null,pendingApply=null,interactionReleaseTimer=0,lastConnectivity=null,lastConnectivityName='';
 const CONNECTED_MAX_AGE_MS=30000;
@@ -25,7 +25,9 @@ function elapsedLabel(ms){const seconds=Math.max(0,Math.floor(ms/1000));if(secon
 function markUpdated(time){const remoteTime=Number(time);lastSnapshotAt=Number.isFinite(remoteTime)&&remoteTime>0?Math.min(Date.now(),remoteTime):Date.now();renderFreshness()}
 function publishConnectivity(connected){const stationName=activeStationName();if(lastConnectivity===connected&&lastConnectivityName===stationName)return;if(lastConnectivity===null&&!connected)return;lastConnectivity=connected;lastConnectivityName=stationName;window.dispatchEvent(new CustomEvent('boatstation-remote-connection',{detail:{connected,stationName}}))}
 function renderFreshness(){const text=freshness.querySelector('.remote-connection-text'),detail=freshness.querySelector('.remote-connection-detail');if(!lastSnapshotAt){freshness.classList.remove('connected','disconnected');freshness.classList.add('waiting');if(text)text.textContent='Sin conexión';if(detail)detail.textContent='· esperando al Core';return}const age=Math.max(0,Date.now()-lastSnapshotAt),connected=age<=CONNECTED_MAX_AGE_MS;freshness.classList.toggle('connected',connected);freshness.classList.toggle('disconnected',!connected);freshness.classList.remove('waiting');if(text)text.textContent=connected?`Conectado a ${activeStationName()}`:'Sin conexión';if(detail)detail.textContent=connected?'':`· última conexión ${elapsedLabel(age)}`;publishConnectivity(connected)}
-setInterval(renderFreshness,1000);
+function formatReceivedBytes(bytes){const value=Math.max(0,Number(bytes)||0);if(value<1000)return Math.floor(value)+' B';if(value<1000000)return (value/1000).toFixed(1).replace('.',',')+' KB';return (value/1000000).toFixed(value<100000000?1:0).replace('.',',')+' MB'}
+function renderReceivedBytes(){const label=freshness.querySelector('.remote-received-data');if(label)label.textContent='↓ '+formatReceivedBytes(window.BoatStationReceivedBytes?.get?.()||0)}
+setInterval(()=>{renderFreshness();renderReceivedBytes()},1000);
 
 function beginInteraction(){clearTimeout(interactionReleaseTimer);interactionReleaseTimer=0;interactionDepth++}
 function flushPending(){if(interactionDepth||!pendingApply)return;const apply=pendingApply,data=pendingData;pendingApply=null;pendingData=null;apply(data)}
@@ -58,4 +60,4 @@ document.addEventListener('click',async event=>{
 const addObserver=new MutationObserver(()=>requestAnimationFrame(filterAddSheet));if(addSheet)addObserver.observe(addSheet,{childList:true,subtree:true});
 window.addEventListener('boatstation-module-catalog-updated',filterAddSheet);
 window.BoatStationRemoteUI={isBusy,scheduleData,markUpdated,filterAddSheet};
-filterAddSheet();renderFreshness();
+filterAddSheet();renderFreshness();renderReceivedBytes();

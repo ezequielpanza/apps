@@ -42,6 +42,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class BoatStationCoreService extends Service implements LocationListener {
     public static final String ACTION_START = "com.boatstation.app.action.START_CORE";
@@ -132,6 +133,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private ConnectivityManager.NetworkCallback networkCallback;
     private volatile String latestStationSnapshot = "";
     private volatile String latestRemoteState = "";
+    private final AtomicLong remoteReceivedBytes = new AtomicLong();
     private boolean syncInFlight;
     private boolean syncPending;
     private boolean hasCompletedClientPoll;
@@ -474,6 +476,11 @@ public class BoatStationCoreService extends Service implements LocationListener 
         return service == null ? "" : service.latestRemoteState;
     }
 
+    public static long getRemoteReceivedBytes() {
+        BoatStationCoreService service = activeService;
+        return service == null ? 0L : service.remoteReceivedBytes.get();
+    }
+
     public static boolean announceAlarmFromApp(String text) {
         BoatStationCoreService service = activeService;
         if (service == null || service.syncHandler == null || text == null || text.trim().isEmpty()) return false;
@@ -802,6 +809,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
                 + "/state?clientId=" + Uri.encode(clientId)
                 + "&clientName=" + Uri.encode(clientName);
         String response = request(url, "GET", token, null);
+        remoteReceivedBytes.addAndGet(response.getBytes(StandardCharsets.UTF_8).length);
         JSONObject parsed = new JSONObject(response);
         JSONObject snapshot = parsed.optJSONObject("snapshot");
         JSONObject telemetry = snapshot == null ? null : snapshot.optJSONObject("telemetry");
