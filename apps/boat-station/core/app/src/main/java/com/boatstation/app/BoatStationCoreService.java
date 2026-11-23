@@ -101,6 +101,7 @@ public class BoatStationCoreService extends Service implements LocationListener 
     private static final String PREF_GPS_ANCHOR_RADIUS_UNIT = "gpsAnchorRadiusUnit";
     private static final String PREF_GPS_ANCHOR_TRIPPED = "gpsAnchorTripped";
     private static final long SYNC_INTERVAL_MS = 5000L;
+    private static final String PREF_SYNC_INTERVAL_SECONDS = "syncIntervalSeconds";
     private static final long MAX_BACKOFF_MS = 60000L;
     private static final int HTTP_TIMEOUT_MS = 7000;
     private static final String TAG = "BoatStationCore";
@@ -616,17 +617,19 @@ public class BoatStationCoreService extends Service implements LocationListener 
 
     private boolean hasFreshRemoteSnapshot(String raw, long now, SharedPreferences prefs) {
         long time = 0L;
+        long serverInterval = 5000L;
         try {
             JSONObject root = new JSONObject(raw == null ? "{}" : raw);
             JSONObject snapshot = root.optJSONObject("snapshot");
             JSONObject telemetry = snapshot == null ? null : snapshot.optJSONObject("telemetry");
-            if (telemetry != null) time = telemetry.optLong("time", 0L);
+            if (telemetry != null) { time = telemetry.optLong("time", 0L); serverInterval=1000L*Math.max(5,Math.min(60,telemetry.optInt("syncIntervalSeconds",5))); }
         } catch (Exception ignored) {
         }
         if (time <= 0L) time = prefs.getLong(PREF_LAST_REMOTE_TELEMETRY_TIME, 0L);
         if (time <= 0L) return false;
         long effectiveTime = Math.min(now, time);
-        return now - effectiveTime <= 30000L;
+        long localInterval=1000L*Math.max(5,Math.min(60,prefs.getInt(PREF_SYNC_INTERVAL_SECONDS,5)));
+        return now-effectiveTime <= Math.max(30000L,2L*(serverInterval+localInterval)+5000L);
     }
 
     private String remoteStationName(String raw, SharedPreferences prefs) {
@@ -730,13 +733,23 @@ public class BoatStationCoreService extends Service implements LocationListener 
         }
     }
 
+    public void setSyncIntervalSeconds(int seconds) {
+        int safe=Math.max(5,Math.min(60,seconds));
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt(PREF_SYNC_INTERVAL_SECONDS,safe).apply();
+        Handler handler=syncHandler;if(handler!=null)handler.post(()->scheduleSync(0L));
+    }
+
+    public static boolean updateSyncIntervalSeconds(int seconds) {
+        BoatStationCoreService service=activeService;if(service==null)return false;service.setSyncIntervalSeconds(seconds);return true;
+    }
+
     private long nextSyncDelay() {
         if (!networkAvailable()) return 10000L;
         if (consecutiveSyncFailures > 0) {
             int exponent = Math.min(consecutiveSyncFailures - 1, 5);
             return Math.min(MAX_BACKOFF_MS, 2000L * (1L << exponent));
         }
-        return SYNC_INTERVAL_MS;
+        return Math.max(SYNC_INTERVAL_MS,Math.min(60000L,1000L*getSharedPreferences(PREFS, MODE_PRIVATE).getInt(PREF_SYNC_INTERVAL_SECONDS,5)));
     }
 
     private boolean networkAvailable() {
