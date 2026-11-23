@@ -58,14 +58,10 @@ export function createPageLayoutEngine(cards){
     if(!Number.isFinite(target)){
       const saved=savedContentHeight(id,page);
       if(id==='batteries'&&page===0){
-        const compactKey=`${storageBase()}.batteryOverviewLayout.v1`;
-        let migrated=false;
-        try{migrated=localStorage.getItem(compactKey)==='1'}catch{}
-        if(!migrated){
-          const compactHeight=defaultContentHeight(content,true);
-          target=Number.isFinite(saved)?Math.min(saved,compactHeight):compactHeight;
-          try{localStorage.setItem(compactKey,'1')}catch{}
-        }else target=saved;
+        const centeredKey=`${storageBase()}.batteryOverviewCentered.v1`;
+        let centered=false;try{centered=localStorage.getItem(centeredKey)==='1'}catch{}
+        if(!centered){target=Math.max(Number(saved)||0,430);try{localStorage.setItem(centeredKey,'1')}catch{}}
+        else target=saved;
       }else if(id==='batteryHistory'){
         const compactKey=`${storageBase()}.batteryHistoryCompact.v1`;let migrated=false;
         try{migrated=localStorage.getItem(compactKey)==='1'}catch{}
