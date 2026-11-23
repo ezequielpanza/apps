@@ -198,7 +198,7 @@ export function createBatteriesModule(requestRender,openManager){
   function batteryMilestonesMarkup(s){
     return batteryMilestones(s).map(item=>{
       const point=batteryDialPoint(118,item.angle),rotation=item.angle>90&&item.angle<270?item.angle+180:item.angle;
-      return `<g class="battery-milestone" transform="translate(${point[0].toFixed(2)} ${point[1].toFixed(2)}) rotate(${rotation})"><title>${item.target}%: faltan ${esc(item.duration)}, hora estimada ${esc(item.clock)}</title><text class="battery-milestone-duration" text-anchor="middle" y="-2">${esc(item.duration)}</text><text class="battery-milestone-clock" text-anchor="middle" y="9">${esc(item.clock)}</text></g>`
+      return `<g class="battery-milestone" transform="translate(${point[0].toFixed(2)} ${point[1].toFixed(2)}) rotate(${rotation})"><title>${item.target}%: faltan ${esc(item.duration)}, hora estimada ${esc(item.clock)}</title><text class="battery-milestone-duration" text-anchor="middle" y="-3">${esc(item.duration)}</text><text class="battery-milestone-clock" text-anchor="middle" y="10">${esc(item.clock)}</text></g>`
     }).join('')
   }
   function batteryDial(s){
