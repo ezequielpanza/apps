@@ -1,4 +1,5 @@
 import {validateCurve,profiles} from './charge-calculation.mjs';
+import {createSolarModule} from './modules/solar.js';
 import {createGpsModule} from './modules/gps.js';
 import {createBatteriesModule} from './modules/batteries-clean.js';
 import {createPhoneModule} from './modules/phone.js';
@@ -9,11 +10,12 @@ import {createNotificationsMenu} from './notifications.js';
 const cards=document.getElementById('cards');
 const menu=document.getElementById('menuSheet');
 const add=document.getElementById('addSheet');
-const ALL_MODULE_IDS=['gps','batteries','batteryHistory','batteryStats','phone','seastate','seastateHistory'];
+const ALL_MODULE_IDS=['gps','batteries','solar','batteryHistory','batteryStats','phone','seastate','seastateHistory'];
 const readJson=(key,fallback)=>{try{const value=JSON.parse(localStorage.getItem(key)||'null');return value??fallback}catch{return fallback}};
 const savedOrder=readJson('bs.ui.order',readJson('bs.clean.order',null));
 function migratedOrder(value){if(!Array.isArray(value))return[...ALL_MODULE_IDS];const order=value.filter(id=>ALL_MODULE_IDS.includes(id)),migrationKey='bs.ui.independentModules.v1';if(localStorage.getItem(migrationKey)==='1')return order;const insertAfter=(after,ids)=>{let at=order.indexOf(after);if(at<0)return;for(const id of ids)if(!order.includes(id))order.splice(++at,0,id)};insertAfter('batteries',['batteryHistory','batteryStats']);insertAfter('seastate',['seastateHistory']);localStorage.setItem(migrationKey,'1');localStorage.setItem('bs.ui.order',JSON.stringify(order));return order}
 const ui={order:migratedOrder(savedOrder),collapsed:{}};
+if(!localStorage.getItem('bs.ui.solar.v1')){if(!ui.order.includes('solar'))ui.order.splice(Math.max(0,ui.order.indexOf('batteries')+1),0,'solar');localStorage.setItem('bs.ui.order',JSON.stringify(ui.order));localStorage.setItem('bs.ui.solar.v1','1')}
 const modules={};
 let lockedScrollY=0,sheetDrag=null,moduleMenuId=null,reorder=null,tapCandidate=null,refreshGesture=null;
 let scanDevices=[];
@@ -39,6 +41,7 @@ function requestRender(id){if(!modules[id])return;pendingRenders.add(id);schedul
 function requestModuleGroup(id){if(id==='batteries'){for(const moduleId of ['batteries','batteryHistory','batteryStats'])requestRender(moduleId);return}if(id==='seastate'){for(const moduleId of ['seastate','seastateHistory'])requestRender(moduleId);return}requestRender(id)}
 function openBatteryManager(){renderBatteryManager();openSheet(batteryManager)}
 modules.gps=createGpsModule(requestRender);
+modules.solar=createSolarModule(requestRender);
 const batteriesCore=createBatteriesModule(requestModuleGroup,openBatteryManager);
 modules.batteries={...batteriesCore,pages:1,page:()=>batteriesCore.page(0)};
 modules.batteryHistory={id:'batteryHistory',name:'Histórico de carga',pages:1,summary:()=>batteriesCore.summary(),page:()=>batteriesCore.page(1),afterRender:root=>batteriesCore.afterRender(root),state:batteriesCore.state};

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+let role='server',renders=0,starts=0;
+globalThis.window={BoatStationRuntime:{isServer:()=>role==='server'},SolarBridge:{configured:()=>true,start:()=>starts++}};
+globalThis.document={querySelector:()=>null};
+const oldTimeout=globalThis.setTimeout,oldInterval=globalThis.setInterval;
+globalThis.setTimeout=f=>f();globalThis.setInterval=()=>0;
+const {createSolarModule}=await import('../modules/solar.js');
+const solar=createSolarModule(()=>renders++);
+window.BoatStationSolar.receive({time:Date.now(),status:'Conectado',power:140,current:10.4,voltage:13.22,yieldWh:1230,chargeState:3});
+assert.equal(solar.summary(),'140 W');assert.match(solar.page(),/10\.4 A/);assert.match(solar.page(),/1\.23 kWh/);assert.match(solar.page(),/Carga inicial/);assert.equal(starts,1);
+assert.equal('key' in window.BoatStationSolar.exportRemoteState(),false);
+role='client';window.BoatStationSolar.applyRemoteState({time:Date.now(),power:80});assert.equal(solar.summary(),'80 W');assert.match(solar.page(),/teléfono servidor/);
+assert.ok(renders>0);globalThis.setTimeout=oldTimeout;globalThis.setInterval=oldInterval;
+console.log('Solar display, role, sync, and key exclusion verified');
