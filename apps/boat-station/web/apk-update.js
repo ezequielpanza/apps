@@ -125,9 +125,8 @@
     if(staticButton){staticButton.textContent=buttonLabel('Descargar Última Versión');staticButton.disabled=blocked}
     if(!installed||!latest){if(staticRow)staticRow.hidden=false;return}
     const updateAvailable=newer(latest,installed);
-    const installedIsNewer=newer(installed,latest);
-    if(staticRow)staticRow.hidden=updateAvailable||installedIsNewer;
-    if(installedIsNewer||!updateAvailable)return;
+    if(staticRow)staticRow.hidden=updateAvailable;
+    if(!updateAvailable){if(status)status.textContent='Ya tenés la última versión';if(staticButton){staticButton.textContent='Última versión instalada';staticButton.disabled=true}return;}
     const inner=menuInner();if(!inner)return;
     const row=document.createElement('div');
     row.className='option remote-apk-row';
