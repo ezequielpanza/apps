@@ -110,39 +110,36 @@
       if(typeof window.CoreBridge?.startApkDownload==='function'){
         const started=window.CoreBridge.startApkDownload(APK_URL,targetVersion);
         if(started!==false){setDownloadState('downloading');syncNativeDownloadState();return true}
-        setDownloadState('error');return false;
+        return launchLegacyDownload(APK_URL,false);
       }
-    }catch(_){setDownloadState('error');return false}
+    }catch(_){return launchLegacyDownload(APK_URL,false)}
     return launchLegacyDownload(APK_URL,false);
   }
   function render(){
-    removeRow();
     const staticRow=document.querySelector('[data-server-apk-download]');
     const status=staticRow?.querySelector('small');
     const staticButton=staticRow?.querySelector('[data-server-apk-button]');
     const blocked=downloadState==='starting'||downloadState==='downloading'||downloadState==='legacy-downloading'||downloadState==='installing'||downloadState==='legacy-opening';
-    if(status)status.textContent=stateDetail();
+    if(status)status.textContent='Instalada: '+(installed||'desconocida')+' · Disponible: '+(latest||'consultando…')+(downloadState?' · '+stateDetail():'');
     if(staticButton){staticButton.textContent=buttonLabel('Descargar Última Versión');staticButton.disabled=blocked}
-    if(!installed||!latest){if(staticRow)staticRow.hidden=false;return}
+    if(!installed||!latest){removeRow();if(staticRow)staticRow.hidden=false;return}
     const updateAvailable=newer(latest,installed);
     if(staticRow)staticRow.hidden=updateAvailable;
-    if(!updateAvailable){if(status)status.textContent='Ya tenés la última versión';if(staticButton){staticButton.textContent='Última versión instalada';staticButton.disabled=true}return;}
+    if(!updateAvailable){removeRow();if(status)status.textContent='Instalada: '+installed+' · Disponible: '+latest+' · Ya tenés la última versión';if(staticButton){staticButton.textContent='Última versión instalada';staticButton.disabled=true}return;}
     const inner=menuInner();if(!inner)return;
-    const row=document.createElement('div');
-    row.className='option remote-apk-row';
-    row.dataset.coreApkUpdate='1';
-    row.style.display='flex';
-    row.style.alignItems='center';
-    row.style.justifyContent='space-between';
-    row.style.gap='12px';
-    let sub=updateAvailable?'APK instalada: '+installed:'Versión instalada: '+installed;
-    if(downloadState)sub=stateDetail();
-    const heading=updateAvailable?'Nueva versión '+latest:'Última versión disponible';
-    const label=buttonLabel(updateAvailable?'Actualizar':'Descargar Última Versión');
-    row.innerHTML='<span style="min-width:0;flex:1">'+escapeHtml(heading)+'<br><small class="sub">'+escapeHtml(sub)+'</small></span><button type="button" class="btn" data-core-apk-download '+(blocked?'disabled':'')+'>'+escapeHtml(label)+'</button>';
-    row.querySelector('[data-core-apk-download]')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();download(latest,false)});
-    const title=inner.querySelector('h3');
-    if(title&&title.nextSibling)inner.insertBefore(row,title.nextSibling);else inner.appendChild(row);
+    let row=inner.querySelector('[data-core-apk-update]');
+    if(!row){
+      row=document.createElement('div');row.className='option remote-apk-row';row.dataset.coreApkUpdate='1';
+      row.style.display='flex';row.style.alignItems='center';row.style.justifyContent='space-between';row.style.gap='12px';
+      row.innerHTML='<span style="min-width:0;flex:1"><span data-apk-heading></span><br><small class="sub" data-apk-detail></small></span><button type="button" class="btn" data-core-apk-download></button>';
+      row.querySelector('[data-core-apk-download]')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();download(latest,false)});
+      const title=inner.querySelector('h3');if(title&&title.nextSibling)inner.insertBefore(row,title.nextSibling);else inner.appendChild(row);
+    }
+    const heading=row.querySelector('[data-apk-heading]'),detail=row.querySelector('[data-apk-detail]'),button=row.querySelector('[data-core-apk-download]');
+    if(heading)heading.textContent='Nueva versión '+latest;
+    if(detail)detail.textContent='Instalada: '+installed+' · Disponible: '+latest+(downloadState?' · '+stateDetail():'');
+    if(button){button.textContent=buttonLabel('Descargar');button.disabled=blocked}
+
   }
   async function check(force){
     force=!!force;
@@ -164,6 +161,7 @@
   function capture(value){
     const version=String(value?.version||value?.apkVersion||'').trim();
     if(!version)return;
+    if(version===installed)return;
     installed=version;render();check(true);
   }
   function wrapPhone(){
