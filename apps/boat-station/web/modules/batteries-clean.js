@@ -899,7 +899,7 @@ export function createBatteriesModule(requestRender,openManager){
     root.querySelector('[data-copy-curve]')?.addEventListener('click',()=>copyTrialSettings('curve',root));
     const factorInput=root.querySelector('[data-factor-value]');
     const setFactor=(value,updateField=true)=>{const n=num(value);if(n===null||n<0)return false;voltageEstimateFactor=Math.round(n*100000)/100000;if(updateField&&factorInput)factorInput.value=voltageEstimateFactor.toFixed(5);queueDraw(root);return true};
-    root.querySelectorAll('[data-factor-step]').forEach(button=>button.addEventListener('click',()=>{const current=num(factorInput?.value)??voltageEstimateFactor;setFactor(Math.max(0,current+Number(button.dataset.factorStep)*0.00001))}));
+    root.querySelectorAll('[data-factor-step]').forEach(button=>button.addEventListener('click',()=>{const current=num(factorInput?.value)??voltageEstimateFactor;setFactor(Math.max(0,current+Number(button.dataset.factorStep)*0.0001))}));
     factorInput?.addEventListener('input',()=>setFactor(factorInput.value,false));factorInput?.addEventListener('change',()=>{if(!setFactor(factorInput.value))factorInput.value=voltageEstimateFactor.toFixed(5)});factorInput?.addEventListener('blur',()=>{factorInput.value=voltageEstimateFactor.toFixed(5);notifyHistoryInteractionEnd()});
     const frInput=root.querySelector('[data-fr-value]');
     const setFr=(value,updateField=true)=>{const n=num(value);if(n===null||n<0)return false;retrospectiveFactor=Math.round(n*100)/100;if(updateField&&frInput)frInput.value=retrospectiveFactor.toFixed(2);queueDraw(root);return true};
