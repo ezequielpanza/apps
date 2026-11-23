@@ -12,3 +12,8 @@
 
 /BoatStation.apk
   Cache-Control: no-store, no-cache, must-revalidate
+
+/apk-release.json
+  Cache-Control: no-store, max-age=0
+/BoatStation-LastVersion.apk
+  Cache-Control: no-store, max-age=0

@@ -5,10 +5,11 @@
   if(!isCore)return;
 
   const RELEASE_BASE='https://boat-station.pages.dev';
-  const VERSION_URL='https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web/APK_VERSION';
+  const VERSION_URL=RELEASE_BASE+'/apk-release.json';
   const APK_URL=new URL('/BoatStation-LastVersion.apk',RELEASE_BASE).href;
   let installed='';
   let latest='';
+  let available=false;
   let checking=false;
   let checkPromise=null;
   let lastCheck=0;
@@ -90,6 +91,7 @@
   function download(version,ask){
     ask=!!ask;
     if(ask&&!window.confirm(version?'Descargar Boat Station '+version+'?':'Descargar la última versión de Boat Station?'))return false;
+    if(!available){setDownloadState('error');return false}
     const targetVersion=String(version||latest||'').trim();
     if(downloadState==='ready'||downloadState==='legacy-ready'){
       const downloaded=nativeDownloadedVersion();
@@ -119,9 +121,10 @@
     const staticRow=document.querySelector('[data-server-apk-download]');
     const status=staticRow?.querySelector('small');
     const staticButton=staticRow?.querySelector('[data-server-apk-button]');
-    const blocked=downloadState==='starting'||downloadState==='downloading'||downloadState==='legacy-downloading'||downloadState==='installing'||downloadState==='legacy-opening';
+    const blocked=!available||downloadState==='starting'||downloadState==='downloading'||downloadState==='legacy-downloading'||downloadState==='installing'||downloadState==='legacy-opening';
     if(status)status.textContent='Instalada: '+(installed||'desconocida')+' · Disponible: '+(latest||'consultando…')+(downloadState?' · '+stateDetail():'');
     if(staticButton){staticButton.textContent=buttonLabel('Descargar Última Versión');staticButton.disabled=blocked}
+    if(!available){removeRow();if(staticRow)staticRow.hidden=false;if(status)status.textContent='Descarga no disponible · verificá la conexión e intentá de nuevo';if(staticButton)staticButton.disabled=true;return}
     if(!installed||!latest){removeRow();if(staticRow)staticRow.hidden=false;return}
     const updateAvailable=newer(latest,installed);
     if(staticRow)staticRow.hidden=updateAvailable;
@@ -150,8 +153,11 @@
     const request=(async()=>{
       try{
         const response=await fetch(VERSION_URL+'?v='+now,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
-        if(response.ok){latest=(await response.text()).trim();render();syncNativeDownloadState()}
-      }catch(_){}
+        if(!response.ok)throw new Error('release unavailable');
+        const info=await response.json();
+        if(!info||info.available!==true||!/^\d+\.\d+\.\d+$/.test(info.version||''))throw new Error('release not ready');
+        latest=info.version;available=true;render();syncNativeDownloadState()
+      }catch(_){available=false;render()}
       return latest;
     })();
     checkPromise=request;
@@ -159,6 +165,9 @@
     finally{checking=false;if(checkPromise===request)checkPromise=null}
   }
   function capture(value){
+    // A client's phone telemetry comes from the server, not the installed client APK.
+    // The native bridge is authoritative whenever it is available.
+    if(window.BoatStationRuntime?.isClient?.()||typeof window.CoreBridge?.getApkVersion==='function')return;
     const version=String(value?.version||value?.apkVersion||'').trim();
     if(!version)return;
     if(version===installed)return;
