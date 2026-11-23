@@ -104,8 +104,10 @@ jobs:
           cp "/tmp/$APK" "apps/boat-station/web/$LATEST"
           cp "/tmp/$APK" "apps/boat-station/web/BoatStation.apk"
           printf '%s\n' "${{ steps.version.outputs.version }}" > apps/boat-station/web/APK_VERSION
-          printf '%s\n' "/$APK https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web/$APK 302" "/BoatStation.apk /$LATEST 302" "/BoatStation-LastVersion.apk https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web/$APK 302" > apps/boat-station/web/_redirects
-          git add "apps/boat-station/core/releases/$APK" "apps/boat-station/web/$APK" "apps/boat-station/web/$LATEST" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION apps/boat-station/web/_redirects
+          printf '%s\n' "/$APK /$LATEST 302" "/BoatStation.apk /$LATEST 302" > apps/boat-station/web/_redirects
+          APK_SHA=$(sha256sum "/tmp/$APK" | cut -d' ' -f1)
+          printf '{"version":"%s","available":true,"sha256":"%s"}\n' "${{ steps.version.outputs.version }}" "$APK_SHA" > apps/boat-station/web/apk-release.json
+          git add "apps/boat-station/core/releases/$APK" "apps/boat-station/web/$APK" "apps/boat-station/web/$LATEST" apps/boat-station/web/BoatStation.apk apps/boat-station/web/APK_VERSION apps/boat-station/web/_redirects apps/boat-station/web/apk-release.json
           if ! git diff --cached --quiet; then
             git commit -m "Build Boat Station ${{ steps.version.outputs.version }} APK"
             git push origin HEAD:main
@@ -113,8 +115,20 @@ jobs:
             echo "APK already published"
           fi
 
-      - name: Remove APK binaries from Cloudflare payload
-        run: find apps/boat-station/web -maxdepth 1 -type f -name '*.apk' -delete
+      - name: Verify APK and release metadata before deployment
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib, json
+          from pathlib import Path
+          root=Path('apps/boat-station/web')
+          info=json.loads((root/'apk-release.json').read_text())
+          apk=root/'BoatStation-LastVersion.apk'
+          assert info['available'] is True and apk.is_file()
+          assert hashlib.sha256(apk.read_bytes()).hexdigest()==info['sha256']
+          PYCODE
+          find apps/boat-station/web -maxdepth 1 -type f -name '*.apk' ! -name 'BoatStation-LastVersion.apk' -delete
 
       - name: Deploy updated Boat Station web to Cloudflare Pages
         if: github.event_name == 'push'

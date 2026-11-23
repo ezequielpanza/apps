@@ -1,13 +1,6 @@
 name: Deploy Boat Station
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/boat-station/web/**"
-      - "apps/boat-station/core/VERSION"
-      - "apps/boat-station/core/releases/BoatStation-*.apk"
-      - ".github/workflows/deploy-boat-station-remote.yml"
   workflow_dispatch:
 
 jobs:
@@ -19,17 +12,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Stage latest APK in PWA
+      - name: Verify release metadata and APK
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(tr -d '\r\n ' < apps/boat-station/core/VERSION)"
-          APK="apps/boat-station/core/releases/BoatStation-${VERSION}.apk"
-          if [ -f "$APK" ]; then
-            echo "$VERSION" > apps/boat-station/web/APK_VERSION
-            printf '%s\n' "/BoatStation-${VERSION}.apk https://raw.githubusercontent.com/ezequielpanza/apps/main/apps/boat-station/web/BoatStation-${VERSION}.apk 302" "/BoatStation.apk /BoatStation-${VERSION}.apk 302" > apps/boat-station/web/_redirects
-          fi
-          find apps/boat-station/web -maxdepth 1 -type f -name '*.apk' -delete
+          python3 - <<'PYCODE'
+          import hashlib, json
+          from pathlib import Path
+          root=Path('apps/boat-station/web')
+          info=json.loads((root/'apk-release.json').read_text())
+          apk=root/'BoatStation-LastVersion.apk'
+          assert info['available'] is True and apk.is_file()
+          assert hashlib.sha256(apk.read_bytes()).hexdigest()==info['sha256']
+          PYCODE
+          find apps/boat-station/web -maxdepth 1 -type f -name '*.apk' ! -name 'BoatStation-LastVersion.apk' -delete
 
       - name: Validate canonical Boat Station web
         shell: bash

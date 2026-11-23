@@ -1,1 +1,12 @@
-const vm=require('vm'),fs=require('fs'),assert=require('assert');let native=[];const row={hidden:false,querySelector:()=>null};const win={BoatStationRuntime:{isNative:()=>true},CoreRuntimeBridge:{downloadApk:(url,ver)=>{native.push([url,ver]);return true}},confirm:()=>true,addEventListener(){},BoatStation:{updatePhone(){}},CoreBridge:{getApkVersion:()=> '1.2.52'}};const context={window:win,CoreBridge:win.CoreBridge,CoreRuntimeBridge:win.CoreRuntimeBridge,document:{addEventListener(){},querySelector:()=>row,querySelectorAll:()=>[],getElementById:()=>({addEventListener(){}})},URL,URLSearchParams,location:{search:'?mode=station',href:''},fetch:async()=>({ok:true,text:async()=>'1.2.53'}),setTimeout:()=>{},setInterval:()=>{},clearInterval:()=>{},Date,console};vm.createContext(context);vm.runInContext(fs.readFileSync('apps/boat-station/web/apk-update.js','utf8'),context);win.BoatStationApkUpdate.downloadLatest();assert.equal(native.length,1);assert.equal(native[0][0],'https://boat-station.pages.dev/BoatStation-LastVersion.apk');assert.equal(native[0][1],'');console.log('Native download fallback without version: passed');
+const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
+(async()=>{
+ let starts=0,available=false;
+ const win={BoatStationRuntime:{isNative:()=>true},CoreRuntimeBridge:{downloadApk(){starts++;return true}},addEventListener(){},BoatStation:{updatePhone(){}},CoreBridge:{getApkVersion:()=> '1.2.52'}};
+ const doc={addEventListener(){},querySelector(){return null},querySelectorAll(){return []},getElementById(){return null}};
+ const ctx={window:win,CoreBridge:win.CoreBridge,document:doc,URL,URLSearchParams,location:{search:'?mode=station'},fetch:async()=>({ok:true,json:async()=>({version:'1.2.53',available})}),setTimeout(){},setInterval(){},clearInterval(){},Date,console};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync('apps/boat-station/web/apk-update.js','utf8'),ctx);
+ assert.equal(win.BoatStationApkUpdate.downloadLatest(),false);assert.equal(starts,0);
+ await win.BoatStationApkUpdate.check();assert.equal(win.BoatStationApkUpdate.downloadLatest(),false);assert.equal(starts,0);
+ available=true;await win.BoatStationApkUpdate.check();assert.equal(win.BoatStationApkUpdate.downloadLatest(),true);assert.equal(starts,1);
+ console.log('Download requires available verified release metadata');
+})().catch(e=>{console.error(e);process.exitCode=1});
