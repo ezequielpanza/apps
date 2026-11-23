@@ -159,6 +159,9 @@
     finally{checking=false;if(checkPromise===request)checkPromise=null}
   }
   function capture(value){
+    // A client's phone telemetry comes from the server, not the installed client APK.
+    // The native bridge is authoritative whenever it is available.
+    if(window.BoatStationRuntime?.isClient?.()||typeof window.CoreBridge?.getApkVersion==='function')return;
     const version=String(value?.version||value?.apkVersion||'').trim();
     if(!version)return;
     if(version===installed)return;
