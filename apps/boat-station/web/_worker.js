@@ -10,7 +10,7 @@ const corsHeaders = {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === "/APK_VERSION") {
+    if (url.pathname === "/APK_VERSION" || url.pathname === "/apk-release.json") {
       if (request.method === "OPTIONS") {
         return new Response(null, { status: 204, headers: corsHeaders });
       }
