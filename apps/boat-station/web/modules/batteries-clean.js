@@ -160,15 +160,31 @@ export function createBatteriesModule(requestRender,openManager){
   function rememberCharge(b,now){const value=charge(b);if(value.soc!==null||value.rem!==null)b.lastKnownCharge={...value,time:now}}
   function stats(){let cap=0,rem=0,currentSum=0,currentN=0,vs=0,vn=0,connected=0,missing=false;for(const b of state.batteries){const c=num(b.capacityAh)||0,s=charge(b).soc,r=charge(b).rem,online=b.connected!==false,a=online?num(b.current):null,v=online?num(b.voltage):null;cap+=c;if(c>0&&r===null&&s===null)missing=true;rem+=r!==null?r:(s!==null?s*c/100:0);if(a!==null){currentSum+=a;currentN++}if(v!==null){vs+=v;vn++}if(online)connected++}const voltage=vn?vs/vn:null,current=currentN?currentSum:null,soc=cap&&!missing?Math.max(0,Math.min(100,rem/cap*100)):null;return{cap,rem:missing?null:rem,current,voltage,soc,power:voltage===null||current===null?null:voltage*current,connected,total:state.batteries.length}}
   const SOC_SOURCE_KEY='bs.batteries.indicatorSocSource.v1';
-  let indicatorSocSource=read(SOC_SOURCE_KEY,'soce');if(!['soce','socc','socb'].includes(indicatorSocSource))indicatorSocSource='soce';
+  let indicatorSocSource=read(SOC_SOURCE_KEY,'soce');if(!['soce','socc','socb','socc_adjusted'].includes(indicatorSocSource))indicatorSocSource='soce';
   function getIndicatorSocSource(){return indicatorSocSource}
-  function setIndicatorSocSource(value){if(!['soce','socc','socb'].includes(value))return false;indicatorSocSource=value;write(SOC_SOURCE_KEY,value);requestRender('batteries');return true}
+  function setIndicatorSocSource(value){if(!['soce','socc','socb','socc_adjusted'].includes(value))return false;indicatorSocSource=value;write(SOC_SOURCE_KEY,value);requestRender('batteries');return true}
+  const SOCC_ADJUST_KEY='bs.batteries.soccAdjustment.v1';
+  const savedSoccAdjustment=read(SOCC_ADJUST_KEY,{});
+  let soccChargeEfficiency=Math.max(0,Math.min(100,num(savedSoccAdjustment?.chargeEfficiency)??100));
+  let soccSelfDischarge=Math.max(0,Math.min(100,num(savedSoccAdjustment?.selfDischargePerDay)??0));
+  function adjustedSoccPoints(history,capacity){
+    const anchor=1795342459141,points=[];let ah=0,previous=anchor;
+    if(!(capacity>0))return points;
+    for(const p of history.slice().sort((a,b)=>Number(a.time)-Number(b.time))){
+      const time=Number(p.time),charge=num(p.chargeAh),discharge=num(p.dischargeAh);
+      if(!(time>anchor)||charge===null||discharge===null)continue;
+      const elapsed=Math.max(0,time-previous)/86400000;
+      ah-=Math.max(0,ah)*(1-Math.pow(1-soccSelfDischarge/100,elapsed));
+      ah+=charge*soccChargeEfficiency/100-discharge;previous=time;
+      points.push({time,soc:100*ah/capacity,ah});
+    }return points
+  }
   function indicatorStats(){
     const base=stats();if(indicatorSocSource==='soce')return base;
     if(indicatorSocSource==='socb'){let ah=0;for(const b of state.batteries){const cap=num(b.capacityAh),soc=num(b.soc);if(b.connected===false||cap===null||cap<=0||soc===null||soc<0||soc>100)return {...base,soc:null,rem:null};ah+=cap*soc/100}if(!state.batteries.length||base.cap<=0)return {...base,soc:null,rem:null};return {...base,soc:100*ah/base.cap,rem:ah}}
     const anchor=1795342459141,ordered=state.history.filter(p=>Number.isFinite(Number(p.time))).slice().sort((a,b)=>Number(a.time)-Number(b.time));
     if(!isChezReference()||base.cap<=0||!ordered.length||Number(ordered[0].time)>anchor)return {...base,soc:null,rem:null};
-    let ah=0,count=0;for(const p of ordered){if(Number(p.time)<=anchor)continue;const charge=num(p.chargeAh),discharge=num(p.dischargeAh);if(charge===null||discharge===null)continue;ah+=charge-discharge;count++}
+    let ah=0,count=0;if(indicatorSocSource==='socc_adjusted'){const points=adjustedSoccPoints(ordered,base.cap);count=points.length;if(count)ah=points[count-1].ah}else for(const p of ordered){if(Number(p.time)<=anchor)continue;const charge=num(p.chargeAh),discharge=num(p.dischargeAh);if(charge===null||discharge===null)continue;ah+=charge-discharge;count++}
     if(!count)return {...base,soc:null,rem:null};
     return {...base,soc:Math.max(0,Math.min(100,100*ah/base.cap)),rem:Math.max(0,Math.min(base.cap,ah))};
   }
@@ -418,7 +434,7 @@ export function createBatteriesModule(requestRender,openManager){
   }
 
   let socViewport=null,factorViewport=null;
-  let bankAhAdjustment=0,trialSocEnd=null,retrospectiveFactor=1,socSmoothingPoints=1,hasCalculatedSocCurve=false;const trialVisible={'voltage:bank-estimated':!hiddenSeries['voltage:bank-estimated'],'soc:bank-estimated':!hiddenSeries['soc:bank-estimated'],'ah:bank-remaining':!hiddenSeries['ah:bank-remaining'],'soc:bank-coulomb':!hiddenSeries['soc:bank-coulomb']};
+  let bankAhAdjustment=0,trialSocEnd=null,retrospectiveFactor=1,socSmoothingPoints=1,hasCalculatedSocCurve=false;const trialVisible={'voltage:bank-estimated':!hiddenSeries['voltage:bank-estimated'],'soc:bank-estimated':!hiddenSeries['soc:bank-estimated'],'ah:bank-remaining':!hiddenSeries['ah:bank-remaining'],'soc:bank-coulomb':!hiddenSeries['soc:bank-coulomb'],'soc:bank-coulomb-adjusted':!hiddenSeries['soc:bank-coulomb-adjusted']};
   let factorCurveOpen=false,factorCurveExpansion=0,factorPointer=null,factorCurve=read(FACTOR_CURVE_KEY,null);if(!Array.isArray(factorCurve)||factorCurve.length<2)factorCurve=[{voltage:10,factor:voltageEstimateFactor},{voltage:15,factor:voltageEstimateFactor}];
   let socCurveEditorOpen=false,socCurveExpansion=0,socCurvePointer=null,socCurvePreset=savedSocTrial?.preset??read('bs.batteries.historySocCurvePreset.v1','manual'),socCurveCells=Math.max(1,Math.min(48,Math.round(Number(savedSocTrial?.cells??read('bs.batteries.historySocCurveCells.v1',4))||4)));
   if(!Object.prototype.hasOwnProperty.call(profiles,socCurvePreset))socCurvePreset='manual';
@@ -834,6 +850,10 @@ export function createBatteriesModule(requestRender,openManager){
       if(capacity>0)for(const p of state.history.slice().sort((a,b)=>Number(a.time)-Number(b.time))){const t=Number(p.time),charge=num(p.chargeAh),discharge=num(p.dischargeAh);if(!(t>anchor)||charge===null||discharge===null)continue;ah+=charge-discharge;points.push({time:t,soc:100*ah/capacity})}
       if(points.length){legend.set(key,{name:'SOCc por Ah · aproximado',color,kind:'line'});if(trialVisible[key]){c.save();c.beginPath();c.rect(0,0,r.width,plotH);c.clip();c.strokeStyle=color;c.lineWidth=2.5;c.beginPath();let open=false;for(const p of points){const x=(p.time-data.start)/data.ms*slot;if(x<0||x>r.width)continue;const y=plotH-p.soc/100*plotH;if(!open){c.moveTo(x,y);open=true}else c.lineTo(x,y)}c.stroke();c.restore()}}
     }
+    if(isChezReference()){
+      const key='soc:bank-coulomb-adjusted',color='#a88afa',points=adjustedSoccPoints(state.history,stats().cap);
+      if(points.length){legend.set(key,{name:'SOCc ajustado · aproximado',color,kind:'line'});if(trialVisible[key]){c.save();c.beginPath();c.rect(0,0,r.width,plotH);c.clip();c.strokeStyle=color;c.lineWidth=2.5;c.setLineDash([6,4]);c.beginPath();let open=false;for(const p of points){const x=(p.time-data.start)/data.ms*slot;if(x<0||x>r.width)continue;const y=plotH-p.soc/100*plotH;if(!open){c.moveTo(x,y);open=true}else c.lineTo(x,y)}c.stroke();c.restore()}}
+    }
     const estimatedSocKey='soc:bank-estimated',estimatedSocColor=getHistorySeriesColor(estimatedSocKey,paletteIds),estimatedSocValues=bars.map(bar=>bar.estimatedSoc);
     if(estimatedSocValues.some(Number.isFinite)){
       legend.set(estimatedSocKey,{name:'SOC estimado (Ve)',color:estimatedSocColor,kind:'line soc-estimate'});
@@ -901,6 +921,12 @@ export function createBatteriesModule(requestRender,openManager){
       const label=document.createElement('label');label.dataset.soccControl='1';label.className='battery-soc-control-row';
       label.innerHTML='<input type="checkbox" data-socc-toggle> SOCc <small>0 % el 22/11 a las 6:14 · aproximado</small>';
       const toggle=label.querySelector('[data-socc-toggle]');toggle.checked=trialVisible['soc:bank-coulomb'];toggle.addEventListener('change',()=>{trialVisible['soc:bank-coulomb']=toggle.checked;hiddenSeries['soc:bank-coulomb']=!toggle.checked;saveHistoryVisibility();queueDraw(root)});socControls.prepend(label);
+      const adjusted=document.createElement('div');adjusted.className='battery-soc-control-row';adjusted.innerHTML='<label><input type="checkbox" data-socc-adjusted-toggle> SOCc ajustado</label> <label>Eficiencia de carga (%) <input type="number" min="0" max="100" step="0.1" inputmode="decimal" data-socc-efficiency></label> <label>Autodescarga (% por día) <input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-socc-self-discharge></label>';
+      const adjustedToggle=adjusted.querySelector('[data-socc-adjusted-toggle]'),efficiency=adjusted.querySelector('[data-socc-efficiency]'),selfDischarge=adjusted.querySelector('[data-socc-self-discharge]');
+      adjustedToggle.checked=trialVisible['soc:bank-coulomb-adjusted'];efficiency.value=String(soccChargeEfficiency);selfDischarge.value=String(soccSelfDischarge);
+      adjustedToggle.addEventListener('change',()=>{trialVisible['soc:bank-coulomb-adjusted']=adjustedToggle.checked;hiddenSeries['soc:bank-coulomb-adjusted']=!adjustedToggle.checked;saveHistoryVisibility();queueDraw(root)});
+      const updateAdjustment=()=>{const e=num(efficiency.value),d=num(selfDischarge.value);if(e===null||d===null||e<0||e>100||d<0||d>100){efficiency.value=String(soccChargeEfficiency);selfDischarge.value=String(soccSelfDischarge);return}soccChargeEfficiency=e;soccSelfDischarge=d;write(SOCC_ADJUST_KEY,{chargeEfficiency:e,selfDischargePerDay:d});queueDraw(root);requestRender('batteries')};
+      efficiency.addEventListener('change',updateAdjustment);selfDischarge.addEventListener('change',updateAdjustment);label.after(adjusted);
     }
     root.querySelectorAll('[data-trial-visible]').forEach(input=>input.addEventListener('change',()=>{const key=input.dataset.trialVisible;if(!Object.prototype.hasOwnProperty.call(trialVisible,key))return;trialVisible[key]=input.checked;hiddenSeries[key]=!input.checked;saveHistoryVisibility();queueDraw(root)}));
     const smoothingInput=root.querySelector('[data-soc-smooth]');
