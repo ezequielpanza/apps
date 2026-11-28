@@ -160,11 +160,12 @@ export function createBatteriesModule(requestRender,openManager){
   function rememberCharge(b,now){const value=charge(b);if(value.soc!==null||value.rem!==null)b.lastKnownCharge={...value,time:now}}
   function stats(){let cap=0,rem=0,currentSum=0,currentN=0,vs=0,vn=0,connected=0,missing=false;for(const b of state.batteries){const c=num(b.capacityAh)||0,s=charge(b).soc,r=charge(b).rem,online=b.connected!==false,a=online?num(b.current):null,v=online?num(b.voltage):null;cap+=c;if(c>0&&r===null&&s===null)missing=true;rem+=r!==null?r:(s!==null?s*c/100:0);if(a!==null){currentSum+=a;currentN++}if(v!==null){vs+=v;vn++}if(online)connected++}const voltage=vn?vs/vn:null,current=currentN?currentSum:null,soc=cap&&!missing?Math.max(0,Math.min(100,rem/cap*100)):null;return{cap,rem:missing?null:rem,current,voltage,soc,power:voltage===null||current===null?null:voltage*current,connected,total:state.batteries.length}}
   const SOC_SOURCE_KEY='bs.batteries.indicatorSocSource.v1';
-  let indicatorSocSource=read(SOC_SOURCE_KEY,'soce')==='socc'?'socc':'soce';
+  let indicatorSocSource=read(SOC_SOURCE_KEY,'soce');if(!['soce','socc','socb'].includes(indicatorSocSource))indicatorSocSource='soce';
   function getIndicatorSocSource(){return indicatorSocSource}
-  function setIndicatorSocSource(value){if(value!=='soce'&&value!=='socc')return false;indicatorSocSource=value;write(SOC_SOURCE_KEY,value);requestRender('batteries');return true}
+  function setIndicatorSocSource(value){if(!['soce','socc','socb'].includes(value))return false;indicatorSocSource=value;write(SOC_SOURCE_KEY,value);requestRender('batteries');return true}
   function indicatorStats(){
-    const base=stats();if(indicatorSocSource!=='socc')return base;
+    const base=stats();if(indicatorSocSource==='soce')return base;
+    if(indicatorSocSource==='socb'){let ah=0;for(const b of state.batteries){const cap=num(b.capacityAh),soc=num(b.soc);if(b.connected===false||cap===null||cap<=0||soc===null||soc<0||soc>100)return {...base,soc:null,rem:null};ah+=cap*soc/100}if(!state.batteries.length||base.cap<=0)return {...base,soc:null,rem:null};return {...base,soc:100*ah/base.cap,rem:ah}}
     const anchor=1795342459141,ordered=state.history.filter(p=>Number.isFinite(Number(p.time))).slice().sort((a,b)=>Number(a.time)-Number(b.time));
     if(!isChezReference()||base.cap<=0||!ordered.length||Number(ordered[0].time)>anchor)return {...base,soc:null,rem:null};
     let ah=0,count=0;for(const p of ordered){if(Number(p.time)<=anchor)continue;const charge=num(p.chargeAh),discharge=num(p.dischargeAh);if(charge===null||discharge===null)continue;ah+=charge-discharge;count++}
@@ -235,7 +236,7 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function overview(){
     const s=indicatorStats(),batteryCount=state.batteries.length,minis=batteryCount?state.batteries.map(mini).join(""):'<div class="battery-mini-empty">Sin baterías vinculadas</div>',single=batteryCount===1?" single":"",cardRows=Math.max(1,Math.ceil(batteryCount/2));
-    return '<div class="battery-overview" data-layout="dial-cards"><div class="battery-indicators-panel">'+batteryDial(s)+(s.rem===null&&indicatorSocSource==='socc'?'<div class="battery-bank-estimate"><span>SOCc sin datos suficientes</span></div>':bankEstimate(s))+'</div><div class="battery-bank-panel"><div class="battery-bank-heading"><div class="battery-bank-name">'+esc(state.bankName)+solarIndicatorMarkup()+'</div><div class="battery-ah">'+(s.rem===null?"—":Math.round(s.rem))+' / '+Math.round(s.cap)+' Ah</div></div><div class="battery-mini-column'+single+'" style="--battery-card-rows:'+cardRows+'">'+minis+'</div></div></div>';
+    return '<div class="battery-overview" data-layout="dial-cards"><div class="battery-indicators-panel">'+batteryDial(s)+(s.rem===null&&indicatorSocSource!=='soce'?'<div class="battery-bank-estimate"><span>'+indicatorSocSource.toUpperCase()+' sin datos suficientes</span></div>':bankEstimate(s))+'</div><div class="battery-bank-panel"><div class="battery-bank-heading"><div class="battery-bank-name">'+esc(state.bankName)+solarIndicatorMarkup()+'</div><div class="battery-ah">'+(s.rem===null?"—":Math.round(s.rem))+' / '+Math.round(s.cap)+' Ah</div></div><div class="battery-mini-column'+single+'" style="--battery-card-rows:'+cardRows+'">'+minis+'</div></div></div>';
   }
 
 
