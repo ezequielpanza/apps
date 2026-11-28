@@ -235,7 +235,7 @@ export function createBatteriesModule(requestRender,openManager){
   }
   function overview(){
     const s=indicatorStats(),batteryCount=state.batteries.length,minis=batteryCount?state.batteries.map(mini).join(""):'<div class="battery-mini-empty">Sin baterías vinculadas</div>',single=batteryCount===1?" single":"",cardRows=Math.max(1,Math.ceil(batteryCount/2));
-    return '<div class="battery-overview" data-layout="dial-cards"><div class="battery-indicators-panel">'+batteryDial(s)+(s.rem===null?'<div class="battery-bank-estimate"><span>SOCc sin datos suficientes</span></div>':bankEstimate(s))+'</div><div class="battery-bank-panel"><div class="battery-bank-heading"><div class="battery-bank-name">'+esc(state.bankName)+solarIndicatorMarkup()+'</div><div class="battery-ah">'+(s.rem===null?"—":Math.round(s.rem))+' / '+Math.round(s.cap)+' Ah</div></div><div class="battery-mini-column'+single+'" style="--battery-card-rows:'+cardRows+'">'+minis+'</div></div></div>';
+    return '<div class="battery-overview" data-layout="dial-cards"><div class="battery-indicators-panel">'+batteryDial(s)+(s.rem===null&&indicatorSocSource==='socc'?'<div class="battery-bank-estimate"><span>SOCc sin datos suficientes</span></div>':bankEstimate(s))+'</div><div class="battery-bank-panel"><div class="battery-bank-heading"><div class="battery-bank-name">'+esc(state.bankName)+solarIndicatorMarkup()+'</div><div class="battery-ah">'+(s.rem===null?"—":Math.round(s.rem))+' / '+Math.round(s.cap)+' Ah</div></div><div class="battery-mini-column'+single+'" style="--battery-card-rows:'+cardRows+'">'+minis+'</div></div></div>';
   }
 
 
