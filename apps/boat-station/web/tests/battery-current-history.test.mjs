@@ -9,7 +9,7 @@ function setup(now,history=[],batteries=[]){
     ['bs.batteries.historyZoom.v2','0']
   ]);
   globalThis.localStorage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)};
-  globalThis.window={addEventListener(){},BoatStationPageLayout:{currentPage:()=>1}};
+  globalThis.window={addEventListener(){},dispatchEvent(){},BoatStationPageLayout:{currentPage:()=>1}};
   globalThis.requestAnimationFrame=callback=>callback();
   globalThis.devicePixelRatio=1;
   Date.now=()=>now();
@@ -51,7 +51,7 @@ try{
   const calibrated=setup(()=>clock);
   const updateVoltage=(current,voltage)=>calibrated.updateBattery({id:'battery-b',name:'Batería B',capacityAh:100,soc:50,remainingAh:50,voltage,current,connected:true});
   updateVoltage(0,12.00);
-  calibrated.setChargeCalculation('battery-b',{mode:'agm',cells:6});
+  calibrated.setChargeCalculation('battery-b',{mode:'agm',cells:6,veFactor:.002});
   for(let step=1;step<=3;step++){clock+=6000;updateVoltage(step*10,12+step*.02)}
   const correction=calibrated.state.batteries[0].currentCorrection;
   assert.equal(correction.samples,3,'learns after three useful current steps');
@@ -64,11 +64,11 @@ try{
     {time:now-300_000,soc:50,current:-5,storedAh:-.05,batteries:[{id:'battery-a',name:'Batería A',contribution:50,current:-5,storedAh:-.05}]}
   ],[{id:'battery-a',name:'Batería A',capacityAh:100}]);
   const lineCalls=[];
-  const context={setTransform(){},clearRect(){},beginPath(){},moveTo(x,y){lineCalls.push(['move',x,y])},lineTo(x,y){lineCalls.push(['line',x,y])},stroke(){},fillRect(){},save(){},restore(){},translate(){},rotate(){},fillText(){},arc(){},fill(){}};
+  const context={rect(){},clip(){},setLineDash(){},closePath(){},setTransform(){},clearRect(){},beginPath(){},moveTo(x,y){lineCalls.push(['move',x,y])},lineTo(x,y){lineCalls.push(['line',x,y])},stroke(){},fillRect(){},save(){},restore(){},translate(){},rotate(){},fillText(){},arc(){},fill(){}};
   const canvas={width:0,height:0,getBoundingClientRect:()=>({width:300,height:230}),getContext:()=>context};
   const labels=new Map(['top','upper','zero','lower','bottom'].map(pos=>[pos,{textContent:''}]));
-  const legend={innerHTML:''},leftAxis={style:{}},rightAxis={style:{}};
-  const root={querySelector(selector){if(selector.startsWith('.page[data-page='))return canvas;if(selector==='.battery-history-y:not(.battery-history-y-ah)')return leftAxis;if(selector==='.battery-history-y-ah')return rightAxis;const match=selector.match(/data-ah-label="([^"]+)"/);if(match)return labels.get(match[1]);if(selector==='[data-battery-history-legend]')return legend;return null},querySelectorAll(){return[]}};
+  const legend={innerHTML:'',insertAdjacentHTML(_where,html){this.innerHTML+=html}},leftAxis={style:{}},rightAxis={style:{}};
+  const root={querySelector(selector){if(selector==='[data-battery-history-chart]')return canvas;if(selector==='.battery-history-y:not(.battery-history-y-ah)')return leftAxis;if(selector==='.battery-history-y-ah')return rightAxis;const match=selector.match(/data-ah-label="([^"]+)"/);if(match)return labels.get(match[1]);if(selector==='[data-battery-history-legend]')return legend;return null},querySelectorAll(){return[]}};
   graph.afterRender(root);
   assert.equal(labels.get('zero').textContent,'0 Ah');
   assert.equal(leftAxis.style.height,rightAxis.style.height,'both axes align to the plotted region');
@@ -90,7 +90,7 @@ try{
 
   const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
   const addStart=app.indexOf("bluetoothScanner.addEventListener('click',async");
-  const addEnd=app.indexOf('});\n[menu,add,moduleMenu]',addStart);
+  const addEnd=app.indexOf(');\n[menu,add,moduleMenu',addStart);
   assert.ok(addEnd>addStart,'scanner listener ends before the remaining menu listeners are bound');
   const addFlow=app.slice(addStart,addEnd);
   const addCompletion=addFlow.slice(addFlow.indexOf('const added=selected.filter'));
