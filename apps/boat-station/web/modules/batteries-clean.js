@@ -159,9 +159,21 @@ export function createBatteriesModule(requestRender,openManager){
   function charge(b){if(b.connected===false&&b.lastKnownCharge){return {soc:num(b.lastKnownCharge.soc),rem:num(b.lastKnownCharge.rem)}}if(!b.chargeCalculation||b.chargeCalculation.mode==='bms')return {soc:num(b.soc),rem:num(b.remainingAh)};const soc=estimatedSoc({...b,voltage:batteryVe(b)}),cap=num(b.capacityAh);return {soc,rem:soc!==null&&cap!==null?soc*cap/100:null}}
   function rememberCharge(b,now){const value=charge(b);if(value.soc!==null||value.rem!==null)b.lastKnownCharge={...value,time:now}}
   function stats(){let cap=0,rem=0,currentSum=0,currentN=0,vs=0,vn=0,connected=0,missing=false;for(const b of state.batteries){const c=num(b.capacityAh)||0,s=charge(b).soc,r=charge(b).rem,online=b.connected!==false,a=online?num(b.current):null,v=online?num(b.voltage):null;cap+=c;if(c>0&&r===null&&s===null)missing=true;rem+=r!==null?r:(s!==null?s*c/100:0);if(a!==null){currentSum+=a;currentN++}if(v!==null){vs+=v;vn++}if(online)connected++}const voltage=vn?vs/vn:null,current=currentN?currentSum:null,soc=cap&&!missing?Math.max(0,Math.min(100,rem/cap*100)):null;return{cap,rem:missing?null:rem,current,voltage,soc,power:voltage===null||current===null?null:voltage*current,connected,total:state.batteries.length}}
+  const SOC_SOURCE_KEY='bs.batteries.indicatorSocSource.v1';
+  let indicatorSocSource=read(SOC_SOURCE_KEY,'soce')==='socc'?'socc':'soce';
+  function getIndicatorSocSource(){return indicatorSocSource}
+  function setIndicatorSocSource(value){if(value!=='soce'&&value!=='socc')return false;indicatorSocSource=value;write(SOC_SOURCE_KEY,value);requestRender('batteries');return true}
+  function indicatorStats(){
+    const base=stats();if(indicatorSocSource!=='socc')return base;
+    const anchor=1795342459141,ordered=state.history.filter(p=>Number.isFinite(Number(p.time))).slice().sort((a,b)=>Number(a.time)-Number(b.time));
+    if(!isChezReference()||base.cap<=0||!ordered.length||Number(ordered[0].time)>anchor)return {...base,soc:null,rem:null};
+    let ah=0,count=0;for(const p of ordered){if(Number(p.time)<=anchor)continue;const charge=num(p.chargeAh),discharge=num(p.dischargeAh);if(charge===null||discharge===null)continue;ah+=charge-discharge;count++}
+    if(!count)return {...base,soc:null,rem:null};
+    return {...base,soc:Math.max(0,Math.min(100,100*ah/base.cap)),rem:Math.max(0,Math.min(base.cap,ah))};
+  }
   function autonomyLabel(s){if(s.connected<s.total)return '—';const drain=Number(s.current);if(!Number.isFinite(drain)||drain>=-0.05||!Number.isFinite(s.rem)||s.rem<=0)return '—';const hours=s.rem/Math.abs(drain);if(hours>=48)return `${(hours/24).toFixed(hours>=240?0:1)} días`;return `${Math.max(1,Math.round(hours))} h`}
   function chargeEtaLabel(s){const ready=state.batteries.length>0&&state.batteries.every(b=>{const cap=num(b.capacityAh),hasCharge=charge(b).rem!==null||(charge(b).soc!==null&&cap!==null&&cap>0);return b.connected!==false&&cap!==null&&cap>0&&hasCharge&&num(b.current)!==null});if(!ready||!Number.isFinite(s.current)||s.current<=0.15)return '—';const remaining=Math.max(0,s.cap-s.rem);if(remaining<=0.01)return 'Completa';const hours=remaining/s.current;if(hours<1)return `${Math.max(1,Math.round(hours*60))} min`;if(hours>=48)return `${(hours/24).toFixed(hours>=240?0:1)} días`;const h=Math.floor(hours),m=Math.round((hours-h)*60);return m?`${h} h ${m} min`:`${h} h`}
-  const summary=()=>{const s=stats();return s.soc===null?(s.cap?`${Math.round(s.cap)} Ah`:'Sin datos'):`${Math.round(s.soc)}% · ${Math.round(s.rem)}/${Math.round(s.cap)} Ah`};
+  const summary=()=>{const s=indicatorStats();return s.soc===null?(s.cap?`${Math.round(s.cap)} Ah`:'Sin datos'):`${Math.round(s.soc)}% · ${Math.round(s.rem)}/${Math.round(s.cap)} Ah`};
   const metric=(v,l)=>`<div class="metric"><div class="value">${v}</div><div class="label">${l}</div></div>`;
   function solarIndicatorMarkup(){
     const labels={unknown:'Sin carga solar detectada',charging:'Paneles solares cargando',cloudy:'Paneles solares sin carga durante el día',daylight:'De día, sin detección de carga solar',night:'Es de noche, paneles solares sin carga'},label=labels[solarState]||labels.unknown;
@@ -222,8 +234,8 @@ export function createBatteriesModule(requestRender,openManager){
     return `<div class="battery-bank-estimate"><span>${label}</span><strong>${esc(value)}${finish?' · '+esc(finish):''}</strong></div>`;
   }
   function overview(){
-    const s=stats(),batteryCount=state.batteries.length,minis=batteryCount?state.batteries.map(mini).join(""):'<div class="battery-mini-empty">Sin baterías vinculadas</div>',single=batteryCount===1?" single":"",cardRows=Math.max(1,Math.ceil(batteryCount/2));
-    return '<div class="battery-overview" data-layout="dial-cards"><div class="battery-indicators-panel">'+batteryDial(s)+bankEstimate(s)+'</div><div class="battery-bank-panel"><div class="battery-bank-heading"><div class="battery-bank-name">'+esc(state.bankName)+solarIndicatorMarkup()+'</div><div class="battery-ah">'+(s.rem===null?"—":Math.round(s.rem))+' / '+Math.round(s.cap)+' Ah</div></div><div class="battery-mini-column'+single+'" style="--battery-card-rows:'+cardRows+'">'+minis+'</div></div></div>';
+    const s=indicatorStats(),batteryCount=state.batteries.length,minis=batteryCount?state.batteries.map(mini).join(""):'<div class="battery-mini-empty">Sin baterías vinculadas</div>',single=batteryCount===1?" single":"",cardRows=Math.max(1,Math.ceil(batteryCount/2));
+    return '<div class="battery-overview" data-layout="dial-cards"><div class="battery-indicators-panel">'+batteryDial(s)+(s.rem===null?'<div class="battery-bank-estimate"><span>SOCc sin datos suficientes</span></div>':bankEstimate(s))+'</div><div class="battery-bank-panel"><div class="battery-bank-heading"><div class="battery-bank-name">'+esc(state.bankName)+solarIndicatorMarkup()+'</div><div class="battery-ah">'+(s.rem===null?"—":Math.round(s.rem))+' / '+Math.round(s.cap)+' Ah</div></div><div class="battery-mini-column'+single+'" style="--battery-card-rows:'+cardRows+'">'+minis+'</div></div></div>';
   }
 
 
@@ -944,7 +956,7 @@ export function createBatteriesModule(requestRender,openManager){
   function executeRemoteCommand(command,payload){if(command==='battery.history.insertEstimated')return insertEstimatedHistory(payload);if(command==='battery.edit'&&payload?.voltageAutoAction&&typeof payload.voltageAutoAction.active==='boolean')setVoltageAutoCalibration(payload?.id,payload.voltageAutoAction.active,payload.voltageAutoAction.actionId);else if(command==='battery.edit'&&Array.isArray(payload?.voltageCalibrationPoints))setVoltageCalibrationPoints(payload?.id,payload.voltageCalibrationPoints);else if(command==='battery.chargeCalculation')setChargeCalculation(payload?.id,payload?.config);else if(command==='battery.currentHistoryColor')setCurrentHistoryColor(payload?.id,payload?.color);else if(command==='battery.bankHistoryColor')setBankHistoryColor(payload?.color);else if(command==='battery.add')addBattery(payload?.device||payload);else if(command==='battery.remove')removeBattery(payload?.id);else if(command==='battery.renameBank')renameBank(payload?.name);else if(command==='battery.scan')try{window.BoatStationCore?.openBluetoothScanner?.()||window.NativeBridge?.startBatteryScan?.()}catch{}}
   window.addEventListener('resize',()=>queueDraw());
   window.BoatStationBatteryState={exportRemoteState,applyRemoteState,executeRemoteCommand,setScanDevices,isRemote:()=>state.remoteAuthoritative};
-  return{id:'batteries',name:'Baterías',pages:4,summary,page,afterRender,state,isHistoryInteracting,updateBattery,addBattery,removeBattery,renameBank,setChargeCalculation,setVoltageCalibrationPoints,setVoltageAutoCalibration,estimatedVoltage,setBankHistoryColor,setCurrentHistoryColor,getCurrentHistoryColor,historyBatteries,getHistorySeriesColor,setHistorySeriesColor,isHistorySeriesVisible,setHistorySeriesVisible,stats,exportHistoryCsv:downloadHistoryCsv,exportRemoteState,applyRemoteState};
+  return{id:'batteries',name:'Baterías',pages:4,summary,page,afterRender,state,getIndicatorSocSource,setIndicatorSocSource,isHistoryInteracting,updateBattery,addBattery,removeBattery,renameBank,setChargeCalculation,setVoltageCalibrationPoints,setVoltageAutoCalibration,estimatedVoltage,setBankHistoryColor,setCurrentHistoryColor,getCurrentHistoryColor,historyBatteries,getHistorySeriesColor,setHistorySeriesColor,isHistorySeriesVisible,setHistorySeriesVisible,stats,exportHistoryCsv:downloadHistoryCsv,exportRemoteState,applyRemoteState};
 }
 
 
